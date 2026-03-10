@@ -1924,10 +1924,11 @@ void jPlacedResourcePool::Free(const ComPtr<ID3D12Resource>& InData, jPendingDea
         auto it_find = UsingPlacedResources.find(InData.Get());
         if (UsingPlacedResources.end() != it_find)
         {
-            auto& PendingList = GetPendingPlacedResources(it_find->second.IsUploadResource, it_find->second.Size);
+            std::vector<jPlacedResource>* PendingList = GetPendingPlacedResources(it_find->second.IsUploadResource, it_find->second.Size);
+            check(PendingList);
             it_find->second.LastLayout = InInfo.Layout;  // Save layout before adding to pending list
             it_find->second.ResourceName = InInfo.ResourceName;
-            PendingList.push_back(it_find->second);
+            PendingList->push_back(it_find->second);
             UsingPlacedResources.erase(it_find);
             return;
         }

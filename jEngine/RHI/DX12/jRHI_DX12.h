@@ -118,13 +118,15 @@ struct jPlacedResourcePool
     {
         jScopedLock s(&Lock);
 
-		auto& PendingList = GetPendingPlacedResources(InIsUploadResource, InRequestedSize);
-        for (int32 i = 0; i < (int32)PendingList.size(); ++i)
+        std::vector<jPlacedResource>* PendingList = GetPendingPlacedResources(InIsUploadResource, InRequestedSize);
+        if (!PendingList)
+            return jPlacedResource();
+        for (int32 i = 0; i < (int32)PendingList->size(); ++i)
         {
-            if (PendingList[i].Size >= InRequestedSize)
+            if ((*PendingList)[i].Size >= InRequestedSize)
             {
-                jPlacedResource resource = PendingList[i];
-				PendingList.erase(PendingList.begin() + i);
+                jPlacedResource resource = (*PendingList)[i];
+				PendingList->erase(PendingList->begin() + i);
 				UsingPlacedResources.insert(std::make_pair(resource.PlacedSubResource.Get(), resource));
                 return resource;
             }
@@ -150,11 +152,12 @@ struct jPlacedResourcePool
         Free(InData.Resource, InData.Info);
     }
 
-	std::vector<jPlacedResource>& GetPendingPlacedResources(bool InIsUploadPlacedResource, size_t InSize)
+	std::vector<jPlacedResource>* GetPendingPlacedResources(bool InIsUploadPlacedResource, size_t InSize)
 	{
 		const int32 Index = (int32)GetPoolSizeType(InSize);
-		check(Index != (int32)EPoolSizeType::MAX);
-		return InIsUploadPlacedResource ? PendingUploadPlacedResources[Index] : PendingPlacedResources[Index];
+        if (Index == (int32)EPoolSizeType::MAX)
+            return nullptr;
+		return InIsUploadPlacedResource ? &PendingUploadPlacedResources[Index] : &PendingPlacedResources[Index];
 	}
 
     // ������ PoolSize ���� �Լ�
@@ -162,7 +165,7 @@ struct jPlacedResourcePool
     {
         for (int32 i = 0; i < (int32)EPoolSizeType::MAX; ++i)
         {
-            if (MemorySize[i] > InSize)
+            if (MemorySize[i] >= InSize)
             {
                 return (EPoolSizeType)i;
             }
