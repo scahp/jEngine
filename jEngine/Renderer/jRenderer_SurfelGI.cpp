@@ -991,15 +991,6 @@ void jRenderer::SurfelGIPass()
         || !GSurfelGIStatsBuffer || !GSurfelIrradianceBuffer || !GSurfelGuidingBuffer
         || !GSurfelGIActiveIndexBuffer || !GSurfelGIActiveCounterBuffer || !GSurfelGIInlineRayDispatchArgsBuffer)
         return;
-    struct alignas(16) jFloat4
-    {
-        float x;
-        float y;
-        float z;
-        float w;
-    };
-    static_assert(sizeof(jFloat4) == 16, "jFloat4 must be 16 bytes");
-
     struct alignas(16) jSurfelGIUniformBuffer
     {
         Matrix InvP;
@@ -1020,28 +1011,28 @@ void jRenderer::SurfelGIPass()
         int32 SpawnBudget;
         int32 TTLInFrames;
         float GridCellSize;
-        jFloat4 CascadeCellScaleFromPrevPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        jFloat4 CascadeStartDistancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        jFloat4 CascadeRadiusScalePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+        Vector4 CascadeCellScaleFromPrevPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+        Vector4 CascadeStartDistancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+        Vector4 CascadeRadiusScalePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
         int32 OutOfViewKeepFrames;
         float RadiusScale;
         float FaceMarginRadiusScale;
-        jFloat4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        jFloat4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        jFloat4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        jFloat4 SurfelsPerCellPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        jFloat4 CascadeOriginCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        jFloat4 CascadeOriginCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        jFloat4 CascadeOriginCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        jFloat4 CascadeRingOffsetXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        jFloat4 CascadeRingOffsetYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        jFloat4 CascadeRingOffsetZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        jFloat4 CascadeCellBasePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        jFloat4 CascadeCellCountPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        jFloat4 CascadeDeltaCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        jFloat4 CascadeDeltaCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        jFloat4 CascadeDeltaCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        jFloat4 CascadeClearAllPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+        Vector4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+        Vector4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+        Vector4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+        Vector4 SurfelsPerCellPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+        Vector4 CascadeOriginCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+        Vector4 CascadeOriginCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+        Vector4 CascadeOriginCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+        Vector4 CascadeRingOffsetXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+        Vector4 CascadeRingOffsetYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+        Vector4 CascadeRingOffsetZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+        Vector4 CascadeCellBasePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+        Vector4 CascadeCellCountPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+        Vector4 CascadeDeltaCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+        Vector4 CascadeDeltaCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+        Vector4 CascadeDeltaCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+        Vector4 CascadeClearAllPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     };
     static_assert((sizeof(jSurfelGIUniformBuffer) % 16) == 0, "jSurfelGIUniformBuffer size must be 16-byte aligned");
 
@@ -1105,7 +1096,7 @@ void jRenderer::SurfelGIPass()
         UniformData.CascadeClearAllPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
     }
     UniformData.FaceMarginRadiusScale = Clamp(gOptions.SurfelGIFaceMarginRadiusScale, 0.0f, 2.0f);
-    auto SetPackedCascadeValue = [](jFloat4* packedArray, int32 cascade, float value)
+    auto SetPackedCascadeValue = [](Vector4* packedArray, int32 cascade, float value)
     {
         const int32 packIndex = cascade / 4;
         const int32 lane = cascade % 4;
@@ -1919,18 +1910,18 @@ void jRenderer::SurfelGIPass()
                 Matrix InvV;
                 Vector2 ScreenSize;
                 float GridCellSize;
-                jFloat4 CascadeCellScaleFromPrevPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-                jFloat4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-                jFloat4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-                jFloat4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-                jFloat4 SurfelsPerCellPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-                jFloat4 CascadeOriginCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-                jFloat4 CascadeOriginCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-                jFloat4 CascadeOriginCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-                jFloat4 CascadeRingOffsetXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-                jFloat4 CascadeRingOffsetYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-                jFloat4 CascadeRingOffsetZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-                jFloat4 CascadeCellBasePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+                Vector4 CascadeCellScaleFromPrevPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+                Vector4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+                Vector4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+                Vector4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+                Vector4 SurfelsPerCellPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+                Vector4 CascadeOriginCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+                Vector4 CascadeOriginCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+                Vector4 CascadeOriginCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+                Vector4 CascadeRingOffsetXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+                Vector4 CascadeRingOffsetYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+                Vector4 CascadeRingOffsetZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+                Vector4 CascadeCellBasePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
                 int32 MaxSurfels = 0;
                 int32 SurfelPageSize = 0;
                 int32 SurfelPageTableCapacity = 0;
@@ -1947,7 +1938,7 @@ void jRenderer::SurfelGIPass()
             HoverSelectUniformData.InvV = MainCamera->View.GetInverse();
             HoverSelectUniformData.ScreenSize = Vector2((float)SCR_WIDTH, (float)SCR_HEIGHT);
             HoverSelectUniformData.GridCellSize = Max(0.1f, gOptions.SurfelGIWorldGridCellSize);
-            auto SetPackedHoverSelectValue = [](jFloat4* packedArray, int32 cascade, float value)
+            auto SetPackedHoverSelectValue = [](Vector4* packedArray, int32 cascade, float value)
             {
                 const int32 packIndex = cascade / 4;
                 const int32 lane = cascade % 4;
@@ -2072,18 +2063,18 @@ void jRenderer::SurfelGIPass()
             uint32 SurfelPageSize = 0;
             float GridCellSize = 0.0f;
             float Padding0 = 0.0f;
-            jFloat4 CascadeCellScaleFromPrevPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-            jFloat4 CascadeStartDistancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-            jFloat4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-            jFloat4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-            jFloat4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-            jFloat4 CascadeOriginCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-            jFloat4 CascadeOriginCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-            jFloat4 CascadeOriginCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-            jFloat4 CascadeRingOffsetXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-            jFloat4 CascadeRingOffsetYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-            jFloat4 CascadeRingOffsetZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-            jFloat4 CascadeCellBasePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            Vector4 CascadeCellScaleFromPrevPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            Vector4 CascadeStartDistancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            Vector4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            Vector4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            Vector4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            Vector4 CascadeOriginCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            Vector4 CascadeOriginCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            Vector4 CascadeOriginCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            Vector4 CascadeRingOffsetXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            Vector4 CascadeRingOffsetYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            Vector4 CascadeRingOffsetZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            Vector4 CascadeCellBasePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
         };
         static_assert((sizeof(jSurfelGIInlineRayGatherUniformBuffer) % 16) == 0, "jSurfelGIInlineRayGatherUniformBuffer size must be 16-byte aligned");
 
@@ -2166,26 +2157,26 @@ void jRenderer::SurfelGIPass()
             Vector2 ScreenSize;
             float BlendAlpha;
             float GridCellSize;
-            jFloat4 CascadeCellScaleFromPrevPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-            jFloat4 CascadeStartDistancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-            jFloat4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-            jFloat4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-            jFloat4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            Vector4 CascadeCellScaleFromPrevPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            Vector4 CascadeStartDistancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            Vector4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            Vector4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            Vector4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
             int32 MaxSurfels;
             int32 SurfelPageSize;
             int32 SurfelPageTableCapacity;
             int32 NeighborCellRadius;
             int32 BlendWithScene;
             int32 ShowStateDebug;
-            jFloat4 SurfelsPerCellPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-            jFloat4 CascadeOriginCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-            jFloat4 CascadeOriginCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-            jFloat4 CascadeOriginCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-            jFloat4 CascadeRingOffsetXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-            jFloat4 CascadeRingOffsetYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-            jFloat4 CascadeRingOffsetZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-            jFloat4 CascadeCellBasePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-            jFloat4 CascadeCellCountPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            Vector4 SurfelsPerCellPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            Vector4 CascadeOriginCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            Vector4 CascadeOriginCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            Vector4 CascadeOriginCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            Vector4 CascadeRingOffsetXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            Vector4 CascadeRingOffsetYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            Vector4 CascadeRingOffsetZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            Vector4 CascadeCellBasePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+            Vector4 CascadeCellCountPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
             int32 ShowCellDebug;
             int32 ShowUnderfilledCellDebug;
             int32 ShowCellGrid;
@@ -2223,7 +2214,7 @@ void jRenderer::SurfelGIPass()
             VisualizeUniformData.CascadeCellBasePacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
             VisualizeUniformData.CascadeCellCountPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
         }
-        auto SetPackedVisualizeValue = [](jFloat4* packedArray, int32 cascade, float value)
+        auto SetPackedVisualizeValue = [](Vector4* packedArray, int32 cascade, float value)
         {
             const int32 packIndex = cascade / 4;
             const int32 lane = cascade % 4;
