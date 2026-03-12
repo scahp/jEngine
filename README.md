@@ -38,6 +38,9 @@ Simple toy engine for implementing graphics feature with multiple api
 8. SSGI : https://github.com/scahp/jEngine/tree/SSGI \
 <img src="https://github.com/user-attachments/assets/2d338852-4f73-4d53-a524-a81860a562bd" width="90%"></img>
 
+9. SurfelGI : https://github.com/scahp/jEngine/tree/Surfel-GI 
+<img src="https://github.com/user-attachments/assets/d8f4a0ca-7bf8-4e32-b679-88ac64e07059" width="90%"/>
+<img src="https://github.com/user-attachments/assets/b09eb9d6-a610-44e0-b0c5-c4a276a4802a" width="45%" />
 
 <br/><br/>
 
