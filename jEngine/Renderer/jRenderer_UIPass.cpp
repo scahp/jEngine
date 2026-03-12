@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jRenderer.h"
 #include "ImGui/jImGui.h"
 #include "Profiler/jPerformanceProfile.h"
@@ -606,56 +606,117 @@ void IRenderer::UIPass()
                     ImGui::PopID();
                 };
 
+                auto DrawSliderInt60_40_ReadOnly = [&](const char* label, int32 value, int32 minValue, int32 maxValue)
+                {
+                    int32 displayValue = value;
+                    ImGui::BeginDisabled(true);
+                    DrawSliderInt60_40(label, &displayValue, minValue, maxValue);
+                    ImGui::EndDisabled();
+                };
+
+                auto DrawSliderFloat60_40_ReadOnly = [&](const char* label, float value, float minValue, float maxValue)
+                {
+                    float displayValue = value;
+                    ImGui::BeginDisabled(true);
+                    DrawSliderFloat60_40(label, &displayValue, minValue, maxValue);
+                    ImGui::EndDisabled();
+                };
+
+                auto FormatCompactFloat = [](float value, int precision) -> std::string
+                {
+                    char buffer[32];
+                    sprintf_s(buffer, "%.*f", precision, value);
+
+                    std::string result(buffer);
+                    while (!result.empty() && result.back() == '0')
+                        result.pop_back();
+                    if (!result.empty() && result.back() == '.')
+                        result.pop_back();
+                    if (result.empty())
+                        result = "0";
+                    return result;
+                };
+
                 ImGui::Checkbox("Enable SurfelGI", &gOptions.UseSurfelGI);
                 if (gOptions.UseSurfelGI)
                 {
                     ImGui::Indent();
+                    ImGui::TextColored(ImVec4(1, 1, 0, 1), "Pool / Lifetime");
                     DrawSliderInt60_40("Surfel Max Pool", &gOptions.SurfelGIMaxSurfels, 4096, 2097152);
                     DrawSliderInt60_40("Spawn Budget / Frame", &gOptions.SurfelGISpawnBudgetPerFrame, 64, 16384);
+                    DrawSliderInt60_40("TTL Frames", &gOptions.SurfelGITTLInFrames, 1, 600);
+                    DrawSliderInt60_40("Out-Of-View Keep Frames", &gOptions.SurfelGIOutOfViewKeepFrames, 1, 120);
+
                     ImGui::Checkbox("Use Tile Based Sampling", &gOptions.UseSurfelGITileBasedSampling);
                     DrawSliderInt60_40("Tile Size", &gOptions.SurfelGITileSize, 4, 32);
-                    DrawSliderFloat60_40("Merge Distance", &gOptions.SurfelGIMergeDistanceScale, 0.5f, 4.0f);
+
+                    ImGui::Separator();
+                    ImGui::TextColored(ImVec4(1, 1, 0, 1), "Clipmap");
+                    ImGui::SetWindowFontScale(0.92f);
+                    for (int32 cascade = 0; cascade < SURFEL_GI_CASCADE_COUNT; ++cascade)
+                    {
+                        float cascadeCellScale = 1.0f;
+                        for (int32 i = 1; i <= cascade && i < SURFEL_GI_CASCADE_COUNT; ++i)
+                            cascadeCellScale *= Max(1.0f, gOptions.SurfelGICascadeCellScaleFromPrev[i]);
+
+                        const float clipmapGridSize = gOptions.SurfelGIWorldGridCellSize * cascadeCellScale;
+                        const float startDistance = (cascade == 0) ? 0.0f : gOptions.SurfelGICascadeStartDistance[cascade];
+                        const float radiusScale = (cascade == 0) ? 1.0f : gOptions.SurfelGICascadeRadiusScale[cascade];
+                        const std::string clipmapGridSizeText = FormatCompactFloat(clipmapGridSize, 1);
+                        const std::string cascadeCellScaleText = FormatCompactFloat(cascadeCellScale, 2);
+                        const std::string startDistanceText = FormatCompactFloat(startDistance, 1);
+                        const std::string radiusScaleText = FormatCompactFloat(radiusScale, 2);
+
+                        char header[256];
+                        sprintf_s(header, "Cascade%d - Grid %s, Cell %s, Start %s, Radius %s, Dim %dx%dx%d, Surfels %d###SurfelGICascade%d",
+                            cascade,
+                            clipmapGridSizeText.c_str(),
+                            cascadeCellScaleText.c_str(),
+                            startDistanceText.c_str(),
+                            radiusScaleText.c_str(),
+                            gOptions.SurfelGIClipmapGridDimX[cascade],
+                            gOptions.SurfelGIClipmapGridDimY[cascade],
+                            gOptions.SurfelGIClipmapGridDimZ[cascade],
+                            gOptions.SurfelGISurfelsPerCell[cascade],
+                            cascade);
+
+                        const ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_Framed
+                            | ImGuiTreeNodeFlags_SpanAvailWidth;
+                        if (ImGui::TreeNodeEx(header, flags))
+                        {
+                            ImGui::Indent();
+                            if (cascade == 0)
+                            {
+                                DrawSliderFloat60_40("Clipmap Grid Size", &gOptions.SurfelGIWorldGridCellSize, 10.0f, 1000.0f);
+                                DrawSliderFloat60_40_ReadOnly("Cell Scale", 1.0f, 1.0f, 6.0f);
+                                DrawSliderFloat60_40_ReadOnly("Start Distance", 0.0f, 0.0f, 4000.0f);
+                                DrawSliderFloat60_40_ReadOnly("Radius Scale", 1.0f, 0.25f, 4.0f);
+                            }
+                            else
+                            {
+                                DrawSliderFloat60_40_ReadOnly("Clipmap Grid Size", clipmapGridSize, 10.0f, 1000.0f * 6.0f * 6.0f);
+                                DrawSliderFloat60_40("Cell Scale", &gOptions.SurfelGICascadeCellScaleFromPrev[cascade], 1.0f, 6.0f);
+                                DrawSliderFloat60_40("Start Distance", &gOptions.SurfelGICascadeStartDistance[cascade], 0.0f, 4000.0f);
+                                DrawSliderFloat60_40("Radius Scale", &gOptions.SurfelGICascadeRadiusScale[cascade], 0.25f, 4.0f);
+                            }
+
+                            DrawSliderInt60_40("Clipmap Dim X", &gOptions.SurfelGIClipmapGridDimX[cascade], 8, 256);
+                            DrawSliderInt60_40("Clipmap Dim Y", &gOptions.SurfelGIClipmapGridDimY[cascade], 8, 256);
+                            DrawSliderInt60_40("Clipmap Dim Z", &gOptions.SurfelGIClipmapGridDimZ[cascade], 4, 128);
+                            DrawSliderInt60_40("Surfels / Cell", &gOptions.SurfelGISurfelsPerCell[cascade], 1, 5);
+
+                            ImGui::Unindent();
+                            ImGui::TreePop();
+                        }
+                    }
+                    ImGui::SetWindowFontScale(1.0f);
+
+                    ImGui::Separator();
+                    ImGui::TextColored(ImVec4(1, 1, 0, 1), "Surfel Placement");
                     DrawSliderFloat60_40("Surfel Radius Scale", &gOptions.SurfelGIRadiusScale, 0.25f, 2.5f);
                     DrawSliderFloat60_40("Face Margin Radius Scale", &gOptions.SurfelGIFaceMarginRadiusScale, 0.0f, 1.0f);
                     DrawSliderFloat60_40("Normal Threshold", &gOptions.SurfelGINormalThreshold, 0.0f, 1.0f);
-                    DrawSliderInt60_40("TTL Frames", &gOptions.SurfelGITTLInFrames, 1, 600);
-                    DrawSliderInt60_40("Spawn Hysteresis N", &gOptions.SurfelGISpawnHysteresisFrames, 1, 8);
-                    DrawSliderInt60_40("Delete Hysteresis K", &gOptions.SurfelGIDeleteHysteresisFrames, 1, 120);
-                    DrawSliderFloat60_40("Cascade0 Grid Size", &gOptions.SurfelGIWorldGridCellSize, 10.0f, 1000.0f);
-                    for (int32 cascade = 1; cascade < SURFEL_GI_CASCADE_COUNT; ++cascade)
-                    {
-                        char label[64];
-                        sprintf_s(label, "Cascade%d Cell Scale", cascade);
-                        DrawSliderFloat60_40(label, &gOptions.SurfelGICascadeCellScaleFromPrev[cascade], 1.0f, 6.0f);
-                        sprintf_s(label, "Cascade%d Start Distance", cascade);
-                        DrawSliderFloat60_40(label, &gOptions.SurfelGICascadeStartDistance[cascade], 0.0f, 4000.0f);
-                        sprintf_s(label, "Cascade%d Radius Scale", cascade);
-                        DrawSliderFloat60_40(label, &gOptions.SurfelGICascadeRadiusScale[cascade], 0.25f, 4.0f);
-                    }
-                    for (int32 cascade = 0; cascade < SURFEL_GI_CASCADE_COUNT; ++cascade)
-                    {
-                        char label[64];
-                        sprintf_s(label, "Cascade%d Clipmap Dim X", cascade);
-                        DrawSliderInt60_40(label, &gOptions.SurfelGIClipmapGridDimX[cascade], 8, 256);
-                        sprintf_s(label, "Cascade%d Clipmap Dim Y", cascade);
-                        DrawSliderInt60_40(label, &gOptions.SurfelGIClipmapGridDimY[cascade], 8, 256);
-                        sprintf_s(label, "Cascade%d Clipmap Dim Z", cascade);
-                        DrawSliderInt60_40(label, &gOptions.SurfelGIClipmapGridDimZ[cascade], 4, 128);
-                    }
-                    for (int32 cascade = 0; cascade < SURFEL_GI_CASCADE_COUNT; ++cascade)
-                    {
-                        char label[64];
-                        sprintf_s(label, "Cascade%d Surfels / Cell", cascade);
-                        DrawSliderInt60_40(label, &gOptions.SurfelGISurfelsPerCell[cascade], 1, 5);
-                    }
-                    ImGui::Checkbox("Use Center Spawn Bias", &gOptions.UseSurfelGICenterSpawnBias);
-                    DrawSliderFloat60_40("Near Keep Radius", &gOptions.SurfelGINearKeepRadius, 0.0f, 300.0f);
-                    DrawSliderFloat60_40("Near Spawn Bias", &gOptions.SurfelGINearSpawnBias, 0.0f, 1.0f);
-                    DrawSliderFloat60_40("Frustum Interior Scale", &gOptions.SurfelGIFrustumInteriorScale, 1.0f, 40.0f);
-                    DrawSliderFloat60_40("Far NearFactor Threshold", &gOptions.SurfelGIFarNearFactorThreshold, 0.0f, 1.0f);
-                    DrawSliderFloat60_40("Far Distance Multiplier", &gOptions.SurfelGIFarMaxDistanceMultiplier, 1.0f, 3.0f);
-                    DrawSliderFloat60_40("Replace Near Delta", &gOptions.SurfelGIReplaceNearDelta, 0.0f, 1.0f);
-                    DrawSliderFloat60_40("Stale Age Divisor", &gOptions.SurfelGIStaleAgeDivisor, 1.0f, 24.0f);
+                    ImGui::Checkbox("Prefer Cell Center For First Placement", &gOptions.UseSurfelGIPreferCellCenterForFirstPlacement);
 
                     ImGui::Separator();
                     ImGui::TextColored(ImVec4(1, 1, 0, 1), "Inline Ray Gather (HWRT DI)");
@@ -663,30 +724,87 @@ void IRenderer::UIPass()
                     if (gOptions.SurfelGIInlineRayEnable)
                     {
                         ImGui::Checkbox("Enable Guiding", &gOptions.SurfelGIInlineRayGuideEnable);
-                        if (gOptions.SurfelGIInlineRayGuideEnable)
-                            ImGui::Checkbox("Use Average Guide Scalar", &gOptions.SurfelGIUseAverageGuideScalar);
                         DrawSliderInt60_40("Inline Ray Count", &gOptions.SurfelGIInlineRayCount, 1, 16);
                         DrawSliderInt60_40("New Surfel Bootstrap Rays", &gOptions.SurfelGINewSurfelBootstrapRayCount, 1, 32);
-                        DrawSliderFloat60_40("Radiance Scale", &gOptions.SurfelGIRadianceScale, 0.0f, 8.0f);
                         DrawSliderFloat60_40("Inline Ray Max Distance", &gOptions.SurfelGIInlineRayMaxDistance, 10.0f, 5000.0f);
                         DrawSliderFloat60_40("Inline Ray Normal Bias", &gOptions.SurfelGIInlineRayNormalBias, 0.001f, 10.0f);
                         DrawSliderFloat60_40("MSME History Blend", &gOptions.SurfelGIInlineRayHistoryBlend, 0.0f, 0.99f);
                     }
-                    DrawSliderFloat60_40("Surfel GI Intensity", &gOptions.SurfelGIIntensity, 0.0f, 8.0f);
+                    DrawSliderFloat60_40("Radiance Scale", &gOptions.SurfelGIRadianceScale, 0.0f, 8.0f);
+                    DrawSliderFloat60_40("SurfelGI Intensity", &gOptions.SurfelGIIntensity, 0.0f, 8.0f);
+
+                    ImGui::Separator();
+                    ImGui::TextColored(ImVec4(1, 1, 0, 1), "Resolve");
+                    DrawSliderInt60_40("Neighbor Cell Radius", &gOptions.SurfelGIVisualizeNeighborCellRadius, 0, 3);
+                    DrawSliderFloat60_40("Resolve Softness", &gOptions.SurfelGIResolveSoftness, 0.5f, 4.0f);
+                    DrawSliderFloat60_40("Resolve Irradiance Warmup Updates", &gOptions.SurfelGIResolveIrradianceWarmupUpdates, 0.0f, 16.0f);
 
                     ImGui::Separator();
                     ImGui::TextColored(ImVec4(1, 1, 0, 1), "Visualization");
-                    ImGui::Checkbox("Show Candidate Debug", &gOptions.ShowSurfelGIDebug);
+                    auto DrawVisualizationGroupTitle = [](const char* title)
+                    {
+                        ImGui::Spacing();
+                        ImGui::TextDisabled("%s", title);
+                    };
+
+                    DrawVisualizationGroupTitle("Output");
+                    ImGui::Indent();
+                    ImGui::Checkbox("Show Candidate Debug RT", &gOptions.ShowSurfelGIDebug);
+                    ImGui::Checkbox("Blend With Scene", &gOptions.SurfelGIVisualizeBlendWithScene);
+                    if (gOptions.SurfelGIVisualizeBlendWithScene)
+                    {
+                        DrawSliderFloat60_40("Blend Alpha (1=Overwrite Surfel)", &gOptions.SurfelGIVisualizeBlendAlpha, 0.0f, 1.0f);
+                    }
+                    ImGui::Unindent();
+
+                    DrawVisualizationGroupTitle("Surfel Overlay");
+                    ImGui::Indent();
                     ImGui::Checkbox("Show Placed Surfels", &gOptions.ShowSurfelGIPlacedSurfels);
-                    ImGui::Checkbox("Show Surfel State Debug", &gOptions.ShowSurfelGIStateDebug);
-                    ImGui::Checkbox("Show Surfel Cell Debug", &gOptions.ShowSurfelGICellDebug);
-                    ImGui::Checkbox("Show Underfilled Cell Debug", &gOptions.ShowSurfelGIUnderfilledCellDebug);
-                    ImGui::Checkbox("Show Surfel Cell Grid", &gOptions.ShowSurfelGICellGrid);
-                    ImGui::Checkbox("Show Spawn Attempt Points", &gOptions.ShowSurfelGISpawnAttemptDebug);
+                    if (!gOptions.ShowSurfelGIPlacedSurfels)
+                    {
+                        ImGui::TextDisabled("Surfel Color Mode / Underfilled / Cell Grid need Show Placed Surfels");
+                    }
+                    else if (gOptions.ShowSurfelGIIrradianceDebug)
+                    {
+                        ImGui::TextDisabled("Irradiance debug overrides Surfel Color Mode / Underfilled / Cell Grid");
+                    }
+
+                    const bool canEditSurfelOverlay = gOptions.ShowSurfelGIPlacedSurfels && !gOptions.ShowSurfelGIIrradianceDebug;
+                    ImGui::BeginDisabled(!canEditSurfelOverlay);
+                    {
+                        static const char* GSurfelOverlayColorModes[] =
+                        {
+                            "Radius",
+                            "State",
+                            "Cell"
+                        };
+                        const int32 SurfelOverlayColorModeCount = (int32)(sizeof(GSurfelOverlayColorModes) / sizeof(GSurfelOverlayColorModes[0]));
+                        int32 surfelOverlayColorMode = gOptions.ShowSurfelGICellDebug ? 2 : (gOptions.ShowSurfelGIStateDebug ? 1 : 0);
+                        surfelOverlayColorMode = Clamp(surfelOverlayColorMode, 0, SurfelOverlayColorModeCount - 1);
+                        if (ImGui::BeginCombo("Surfel Color Mode", GSurfelOverlayColorModes[surfelOverlayColorMode], ImGuiComboFlags_None))
+                        {
+                            for (int32 mode = 0; mode < SurfelOverlayColorModeCount; ++mode)
+                            {
+                                const bool isSelected = (surfelOverlayColorMode == mode);
+                                if (ImGui::Selectable(GSurfelOverlayColorModes[mode], isSelected))
+                                    surfelOverlayColorMode = mode;
+                                if (isSelected)
+                                    ImGui::SetItemDefaultFocus();
+                            }
+                            ImGui::EndCombo();
+                        }
+                        gOptions.ShowSurfelGIStateDebug = (surfelOverlayColorMode == 1);
+                        gOptions.ShowSurfelGICellDebug = (surfelOverlayColorMode == 2);
+
+                        ImGui::Checkbox("Show Underfilled Cell Debug", &gOptions.ShowSurfelGIUnderfilledCellDebug);
+                        ImGui::Checkbox("Show Surfel Cell Grid", &gOptions.ShowSurfelGICellGrid);
+                    }
+                    ImGui::EndDisabled();
+                    ImGui::Unindent();
+
+                    DrawVisualizationGroupTitle("Irradiance");
+                    ImGui::Indent();
                     ImGui::Checkbox("Show Surfel Irradiance", &gOptions.ShowSurfelGIIrradianceDebug);
-                    ImGui::Checkbox("Show Hover Ray Debug", &gOptions.ShowSurfelGIHoverRayDebug);
-                    if (gOptions.ShowSurfelGIHoverRayDebug)
-                        ImGui::Checkbox("Use Hit Radiance Color", &gOptions.ShowSurfelGIHoverRayHitRadianceColor);
                     if (gOptions.ShowSurfelGIIrradianceDebug)
                     {
                         static const char* GIrradianceDebugModes[] =
@@ -712,14 +830,15 @@ void IRenderer::UIPass()
                             ImGui::EndCombo();
                         }
                     }
-                    DrawSliderInt60_40("Neighbor Cell Radius", &gOptions.SurfelGIVisualizeNeighborCellRadius, 0, 3);
-                    DrawSliderFloat60_40("Resolve Softness", &gOptions.SurfelGIResolveSoftness, 0.5f, 4.0f);
-                    DrawSliderFloat60_40("Resolve Warmup Samples", &gOptions.SurfelGIResolveWarmupSamples, 0.0f, 16.0f);
-                    ImGui::Checkbox("Blend With Scene", &gOptions.SurfelGIVisualizeBlendWithScene);
-                    if (gOptions.SurfelGIVisualizeBlendWithScene)
-                    {
-                        DrawSliderFloat60_40("Blend Alpha (1=Overwrite Surfel)", &gOptions.SurfelGIVisualizeBlendAlpha, 0.0f, 1.0f);
-                    }
+                    ImGui::Unindent();
+
+                    DrawVisualizationGroupTitle("Extra Overlays");
+                    ImGui::Indent();
+                    ImGui::Checkbox("Show Spawn Attempt Points", &gOptions.ShowSurfelGISpawnAttemptDebug);
+                    ImGui::Checkbox("Show Hover Ray Debug", &gOptions.ShowSurfelGIHoverRayDebug);
+                    if (gOptions.ShowSurfelGIHoverRayDebug)
+                        ImGui::Checkbox("Use Hit Radiance Color", &gOptions.ShowSurfelGIHoverRayHitRadianceColor);
+                    ImGui::Unindent();
                     ImGui::Unindent();
                 }
 

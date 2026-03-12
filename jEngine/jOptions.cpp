@@ -89,7 +89,6 @@ jOptions::jOptions()
     SurfelGISpawnBudgetPerFrame = 2048;
     UseSurfelGITileBasedSampling = true;
     SurfelGITileSize = 8;
-    SurfelGIMergeDistanceScale = 1.5f;
     SurfelGIRadiusScale = 0.5f;
     SurfelGIFaceMarginRadiusScale = 0.5f;
     SurfelGINormalThreshold = 0.8f;
@@ -99,26 +98,16 @@ jOptions::jOptions()
     SurfelGIReservoirPerCellLimit = ReservoirPerCellDefault;
     for (int32 i = 0; i < SURFEL_GI_CASCADE_COUNT; ++i)
     {
-        SurfelGICascadeCellScaleFromPrev[i] = (i == 0) ? 1.0f : 2.0f;
+        SurfelGICascadeCellScaleFromPrev[i] = (float)(i + 1);
         SurfelGICascadeStartDistance[i] = (i == 0) ? 0.0f : (float)(i * 600.0f);
-        SurfelGICascadeRadiusScale[i] = (i == 2) ? 4.0f : ((i == 0) ? 1.0f : 2.0f);
+        SurfelGICascadeRadiusScale[i] = i + 1;
         SurfelGIClipmapGridDimX[i] = (i == 0) ? 64 : 48;
         SurfelGIClipmapGridDimY[i] = (i == 0) ? 64 : 48;
         SurfelGIClipmapGridDimZ[i] = (i == 0) ? 32 : 24;
         SurfelGISurfelsPerCell[i] = ReservoirPerCellDefault;
     }
-    UseSurfelGICenterSpawnBias = true;
-    SurfelGINearKeepRadius = 60.0f;
-    SurfelGINearSpawnBias = 0.40f;
-    SurfelGIFrustumInteriorScale = 20.0f;
-    SurfelGIFarNearFactorThreshold = 0.15f;
-    SurfelGIFarMaxDistanceMultiplier = 1.25f;
-    SurfelGIReplaceNearDelta = 0.2f;
-    SurfelGIStaleAgeDivisor = 6.0f;
-    SurfelGIReservoirEnable = true;
-    SurfelGIReservoirTableCapacityScale = 1.0f;
-    SurfelGISpawnHysteresisFrames = 8;
-    SurfelGIDeleteHysteresisFrames = 120;
+    UseSurfelGIPreferCellCenterForFirstPlacement = true;
+    SurfelGIOutOfViewKeepFrames = 120;
     ShowSurfelGIDebug = false;
     ShowSurfelGIPlacedSurfels = false;
     ShowSurfelGIStateDebug = false;
@@ -131,18 +120,17 @@ jOptions::jOptions()
     ShowSurfelGIHoverRayHitRadianceColor = false;
     SurfelGIInlineRayEnable = true;
     SurfelGIInlineRayGuideEnable = true;
-    SurfelGIUseAverageGuideScalar = false;
     SurfelGIInlineRayCount = 16;
     SurfelGINewSurfelBootstrapRayCount = 32;
     SurfelGIRadianceScale = 1.0f;
     SurfelGIInlineRayMaxDistance = 5000.0f;
     SurfelGIInlineRayNormalBias = 1.0f;
-    SurfelGIInlineRayHistoryBlend = 0.85f;
+    SurfelGIInlineRayHistoryBlend = 0.9f;
     SurfelGIIntensity = 1.0f;
     SurfelGIIrradianceDebugMode = 0;
     SurfelGIVisualizeNeighborCellRadius = 1;
     SurfelGIResolveSoftness = 2.957f;
-    SurfelGIResolveWarmupSamples = 16.0f;
+    SurfelGIResolveIrradianceWarmupUpdates = 16.0f;
     SurfelGIVisualizeBlendWithScene = true;
     SurfelGIVisualizeBlendAlpha = 1.0f;
 

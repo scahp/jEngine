@@ -19,18 +19,10 @@ struct CommonComputeUniformBuffer
     float4x4 V;
     float4x4 InvV;
     float2 ScreenSize;
-    float MergeDistanceScale;
     float NormalThreshold;
     float DepthEdgeScale;
     float NormalEdgeScale;
-    int UseCenterSpawnBias;
-    float NearKeepRadius;
-    float NearSpawnBias;
-    float FrustumInteriorScale;
-    float FarNearFactorThreshold;
-    float FarMaxDistanceMultiplier;
-    float ReplaceNearDelta;
-    float StaleAgeDivisor;
+    int PreferCellCenterForFirstPlacement;
     float MinRadius;
     float MaxDistance;
     int FrameNumber;
@@ -44,8 +36,7 @@ struct CommonComputeUniformBuffer
     float4 CascadeCellScaleFromPrevPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     float4 CascadeStartDistancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     float4 CascadeRadiusScalePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    int SpawnHysteresisFrames;
-    int DeleteHysteresisFrames;
+    int OutOfViewKeepFrames;
     float RadiusScale;
     float FaceMarginRadiusScale;
     float4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
@@ -352,11 +343,11 @@ float ComputeNonOverlapScoreNeighbor27(uint activeNeighborCount, float minSepara
     return (activeNeighborCount == 0u) ? 1.0 : saturate(minSeparationNorm * 0.5);
 }
 
-float ComputeCenterProximityScore(float3 worldPos, int3 cellCoord, float cellSize, int useCenterSpawnBias)
+float ComputeCenterProximityScore(float3 worldPos, int3 cellCoord, float cellSize, int preferCellCenterForFirstPlacement)
 {
     const float3 cellCenter = (float3(cellCoord) + 0.5) * cellSize;
     const float centerDistance = distance(worldPos, cellCenter) / max(cellSize * 0.8660254, 0.001);
-    return (useCenterSpawnBias != 0) ? (1.0 - saturate(centerDistance)) : 1.0;
+    return (preferCellCenterForFirstPlacement != 0) ? (1.0 - saturate(centerDistance)) : 1.0;
 }
 
 float ComposeReservoirPriority(float nonOverlapNeighborScore, float overlapFaceScore)
@@ -515,7 +506,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         }
     }
 
-    const float centerPriority = ComputeCenterProximityScore(worldPos, cellCoord, cellSize, ComputeCommon.UseCenterSpawnBias);
+    const float centerPriority = ComputeCenterProximityScore(worldPos, cellCoord, cellSize, ComputeCommon.PreferCellCenterForFirstPlacement);
     const float3 cellLocal = frac(worldPos / max(cellSize, 0.001));
     // Margin is a radius-relative band: radius * FaceMarginRadiusScale.
     const float faceMargin = radius * max(ComputeCommon.FaceMarginRadiusScale, 0.0);

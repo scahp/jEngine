@@ -1006,18 +1006,10 @@ void jRenderer::SurfelGIPass()
         Matrix V;
         Matrix InvV;
         Vector2 ScreenSize;
-        float MergeDistanceScale;
         float NormalThreshold;
         float DepthEdgeScale;
         float NormalEdgeScale;
-        int32 UseCenterSpawnBias;
-        float NearKeepRadius;
-        float NearSpawnBias;
-        float FrustumInteriorScale;
-        float FarNearFactorThreshold;
-        float FarMaxDistanceMultiplier;
-        float ReplaceNearDelta;
-        float StaleAgeDivisor;
+        int32 PreferCellCenterForFirstPlacement;
         float MinRadius;
         float MaxDistance;
         int32 FrameNumber;
@@ -1031,8 +1023,7 @@ void jRenderer::SurfelGIPass()
         jFloat4 CascadeCellScaleFromPrevPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
         jFloat4 CascadeStartDistancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
         jFloat4 CascadeRadiusScalePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        int32 SpawnHysteresisFrames;
-        int32 DeleteHysteresisFrames;
+        int32 OutOfViewKeepFrames;
         float RadiusScale;
         float FaceMarginRadiusScale;
         jFloat4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
@@ -1077,18 +1068,10 @@ void jRenderer::SurfelGIPass()
     UniformData.V = MainCamera->View;
     UniformData.InvV = MainCamera->View.GetInverse();
     UniformData.ScreenSize = Vector2((float)SCR_WIDTH, (float)SCR_HEIGHT);
-    UniformData.MergeDistanceScale = gOptions.SurfelGIMergeDistanceScale;
     UniformData.NormalThreshold = gOptions.SurfelGINormalThreshold;
     UniformData.DepthEdgeScale = 0.75f;
     UniformData.NormalEdgeScale = 1.25f;
-    UniformData.UseCenterSpawnBias = gOptions.UseSurfelGICenterSpawnBias ? 1 : 0;
-    UniformData.NearKeepRadius = Max(0.0f, gOptions.SurfelGINearKeepRadius);
-    UniformData.NearSpawnBias = Clamp(gOptions.SurfelGINearSpawnBias, 0.0f, 1.0f);
-    UniformData.FrustumInteriorScale = Max(1.0f, gOptions.SurfelGIFrustumInteriorScale);
-    UniformData.FarNearFactorThreshold = Clamp(gOptions.SurfelGIFarNearFactorThreshold, 0.0f, 1.0f);
-    UniformData.FarMaxDistanceMultiplier = Max(1.0f, gOptions.SurfelGIFarMaxDistanceMultiplier);
-    UniformData.ReplaceNearDelta = Clamp(gOptions.SurfelGIReplaceNearDelta, 0.0f, 1.0f);
-    UniformData.StaleAgeDivisor = Max(1.0f, gOptions.SurfelGIStaleAgeDivisor);
+    UniformData.PreferCellCenterForFirstPlacement = gOptions.UseSurfelGIPreferCellCenterForFirstPlacement ? 1 : 0;
     UniformData.MinRadius = 15.0f;
     UniformData.MaxDistance = gOptions.SSGIMaxDistance;
     UniformData.FrameNumber = (int32)g_rhi->GetCurrentFrameNumber();
@@ -1146,8 +1129,7 @@ void jRenderer::SurfelGIPass()
         SetPackedCascadeValue(UniformData.CascadeStartDistancePacked, cascade, CascadeStartDistanceSanitized[cascade]);
         SetPackedCascadeValue(UniformData.CascadeRadiusScalePacked, cascade, (cascade == 0) ? 1.0f : Max(0.05f, gOptions.SurfelGICascadeRadiusScale[cascade]));
     }
-    UniformData.SpawnHysteresisFrames = Max(1, gOptions.SurfelGISpawnHysteresisFrames);
-    UniformData.DeleteHysteresisFrames = Max(1, gOptions.SurfelGIDeleteHysteresisFrames);
+    UniformData.OutOfViewKeepFrames = Max(1, gOptions.SurfelGIOutOfViewKeepFrames);
     UniformData.RadiusScale = Max(0.05f, gOptions.SurfelGIRadiusScale);
     const bool ForceClearAllThisFrame = GSurfelClipmapForceClearAll;
     bool NeedClipmapCellClear = ForceClearAllThisFrame;
@@ -2081,7 +2063,6 @@ void jRenderer::SurfelGIPass()
             uint32 MaxSurfels = 0;
             uint32 RayCount = 0;
             uint32 BootstrapRayCount = 0;
-            uint32 UseAverageGuideScalar = 0;
             float MaxRayDistance = 0.0f;
             float RadianceScale = 1.0f;
             float NormalBias = 0.0f;
@@ -2096,7 +2077,6 @@ void jRenderer::SurfelGIPass()
         GatherUniformData.MaxSurfels = (uint32)Max(1, GSurfelPoolMaxCount);
         GatherUniformData.RayCount = (uint32)Clamp(gOptions.SurfelGIInlineRayCount, 1, 16);
         GatherUniformData.BootstrapRayCount = (uint32)Clamp(gOptions.SurfelGINewSurfelBootstrapRayCount, 1, 32);
-        GatherUniformData.UseAverageGuideScalar = gOptions.SurfelGIUseAverageGuideScalar ? 1u : 0u;
         GatherUniformData.MaxRayDistance = Max(10.0f, gOptions.SurfelGIInlineRayMaxDistance);
         GatherUniformData.RadianceScale = Max(0.0f, gOptions.SurfelGIRadianceScale);
         GatherUniformData.NormalBias = Max(0.001f, gOptions.SurfelGIInlineRayNormalBias);
@@ -2437,7 +2417,7 @@ void jRenderer::SurfelGIResolvePass()
         int32 SurfelPageTableCapacity;
         int32 NeighborCellRadius;
         float ResolveSoftness;
-        float ResolveWarmupSamples;
+        float ResolveIrradianceWarmupUpdates;
         float Padding1;
         float Padding2;
     };
@@ -2492,7 +2472,7 @@ void jRenderer::SurfelGIResolvePass()
     ResolveUniformData.SurfelPageTableCapacity = Max(1, GSurfelCellPageTableCapacity);
     ResolveUniformData.NeighborCellRadius = Clamp(gOptions.SurfelGIVisualizeNeighborCellRadius, 0, 3);
     ResolveUniformData.ResolveSoftness = Max(0.1f, gOptions.SurfelGIResolveSoftness);
-    ResolveUniformData.ResolveWarmupSamples = Max(0.0f, gOptions.SurfelGIResolveWarmupSamples);
+    ResolveUniformData.ResolveIrradianceWarmupUpdates = Max(0.0f, gOptions.SurfelGIResolveIrradianceWarmupUpdates);
 
     auto ResolveUniformBuffer = g_rhi->CreateUniformBufferBlock(jNameStatic("SurfelGIResolveUniformBuffer"), jLifeTimeType::OneFrame, sizeof(ResolveUniformData));
     ResolveUniformBuffer->UpdateBufferData(&ResolveUniformData, sizeof(ResolveUniformData));

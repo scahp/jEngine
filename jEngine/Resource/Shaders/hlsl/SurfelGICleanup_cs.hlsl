@@ -21,18 +21,10 @@ struct CommonComputeUniformBuffer
     float4x4 V;
     float4x4 InvV;
     float2 ScreenSize;
-    float MergeDistanceScale;
     float NormalThreshold;
     float DepthEdgeScale;
     float NormalEdgeScale;
-    int UseCenterSpawnBias;
-    float NearKeepRadius;
-    float NearSpawnBias;
-    float FrustumInteriorScale;
-    float FarNearFactorThreshold;
-    float FarMaxDistanceMultiplier;
-    float ReplaceNearDelta;
-    float StaleAgeDivisor;
+    int PreferCellCenterForFirstPlacement;
     float MinRadius;
     float MaxDistance;
     int FrameNumber;
@@ -46,8 +38,7 @@ struct CommonComputeUniformBuffer
     float4 CascadeCellScaleFromPrevPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     float4 CascadeStartDistancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
     float4 CascadeRadiusScalePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    int SpawnHysteresisFrames;
-    int DeleteHysteresisFrames;
+    int OutOfViewKeepFrames;
     float RadiusScale;
     float FaceMarginRadiusScale;
     float4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
@@ -204,7 +195,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
     SurfelData s = SurfelPool[surfelIndex];
     const uint ttl = max((uint)ComputeCommon.TTLInFrames, 1u);
-    const uint deleteHysteresis = max((uint)ComputeCommon.DeleteHysteresisFrames, 1u);
+    const uint outOfViewKeepFrames = max((uint)ComputeCommon.OutOfViewKeepFrames, 1u);
     const float cascade0CellSize = max(ComputeCommon.GridCellSize, 0.1);
     const float cascadeBoundaryBand = max(cascade0CellSize * SURFEL_GI_BOUNDARY_CLEANUP_BAND_SCALE, 1.0);
 
@@ -220,7 +211,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
         // Purge very old inactive/dormant slots to keep allocation state clean.
         const uint inactiveAgeFrames = GetConsumedAge(s.NormalSeenFrame.w);
-        const uint inactivePurgeFrames = max(ttl * 4u, deleteHysteresis * 2u);
+        const uint inactivePurgeFrames = max(ttl * 4u, outOfViewKeepFrames * 2u);
         if (inactiveAgeFrames > inactivePurgeFrames)
         {
             ResetSurfelHard(s);
@@ -246,10 +237,9 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     if (surfelCascade != expectedCascade)
         ageFrames *= 2u;
 
-    const bool isNearKeepSurfel = surfelCameraDistance <= max(ComputeCommon.NearKeepRadius, 0.0);
     const float nearFactor = saturate(1.0 - abs(surfelViewPos.z) / max(ComputeCommon.MaxDistance, 0.001));
-    const uint effectiveTTLBase = isNearKeepSurfel ? ttl : max(1u, (uint)round((float)ttl * lerp(0.25, 1.0, nearFactor)));
-    const uint effectiveTTL = max(effectiveTTLBase, deleteHysteresis);
+    const uint effectiveTTLBase = max(1u, (uint)round((float)ttl * lerp(0.25, 1.0, nearFactor)));
+    const uint effectiveTTL = max(effectiveTTLBase, outOfViewKeepFrames);
 
     if (ageFrames > effectiveTTL && !IsBoundarySurfel(surfelPos, cascadeBoundaryBand))
     {

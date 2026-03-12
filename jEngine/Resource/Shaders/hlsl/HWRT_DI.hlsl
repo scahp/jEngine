@@ -781,7 +781,6 @@ struct SurfelGIGatherUniformBuffer
     uint MaxSurfels;
     uint RayCount;
     uint BootstrapRayCount;
-    uint UseAverageGuideScalar;
     float MaxRayDistance;
     float RadianceScale;
     float NormalBias;
@@ -1176,9 +1175,11 @@ void SurfelGIGatherIrradianceHWRT_CS(uint3 DispatchThreadID : SV_DispatchThreadI
         }
 
         AccumulatedIrradiance += SampleLi * (CosTerm / MixPdf);
-        const float SampleLuminance = ((g_surfelGatherCB.UseAverageGuideScalar != 0u)
-            ? ((SampleLi.x + SampleLi.y + SampleLi.z) / 3.0)
-            : dot(SampleLi, float3(0.2126, 0.7152, 0.0722))) * CosTerm;
+        // Guiding stores a scalar importance per sampled direction.
+        // We currently use Rec.709 luminance as the fixed guide scalar.
+        // Alternative reference for future experimentation:
+        // const float SampleGuideScalarAverage = ((SampleLi.x + SampleLi.y + SampleLi.z) / 3.0) * CosTerm;
+        const float SampleLuminance = dot(SampleLi, float3(0.2126, 0.7152, 0.0722)) * CosTerm;
         GuidingMass = max(GuidingMass + UpdateSurfelGIGuidingFromSample(SurfelIndex, GuideUV, SampleLuminance), 0.0);
     }
 

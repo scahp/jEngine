@@ -83,7 +83,6 @@ struct jOptions
     int32 SurfelGISpawnBudgetPerFrame;
     bool UseSurfelGITileBasedSampling;
     int32 SurfelGITileSize;
-    float SurfelGIMergeDistanceScale;
     float SurfelGIRadiusScale;
     // Candidate face margin = candidate radius * SurfelGIFaceMarginRadiusScale.
     // Used to reject candidates too close to multiple cell faces (edge/corner crowding).
@@ -98,19 +97,9 @@ struct jOptions
     int32 SurfelGIClipmapGridDimY[SURFEL_GI_CASCADE_COUNT];
     int32 SurfelGIClipmapGridDimZ[SURFEL_GI_CASCADE_COUNT];
     int32 SurfelGISurfelsPerCell[SURFEL_GI_CASCADE_COUNT];
-    bool UseSurfelGICenterSpawnBias;
-    float SurfelGINearKeepRadius;
-    float SurfelGINearSpawnBias;
-    float SurfelGIFrustumInteriorScale;
-    float SurfelGIFarNearFactorThreshold;
-    float SurfelGIFarMaxDistanceMultiplier;
-    float SurfelGIReplaceNearDelta;
-    float SurfelGIStaleAgeDivisor;
-    bool SurfelGIReservoirEnable;
+    bool UseSurfelGIPreferCellCenterForFirstPlacement;
     int32 SurfelGIReservoirPerCellLimit;
-    float SurfelGIReservoirTableCapacityScale;
-    int32 SurfelGISpawnHysteresisFrames;
-    int32 SurfelGIDeleteHysteresisFrames;
+    int32 SurfelGIOutOfViewKeepFrames;
     bool ShowSurfelGIDebug;
     bool ShowSurfelGIPlacedSurfels;
     bool ShowSurfelGIStateDebug;
@@ -123,7 +112,6 @@ struct jOptions
     bool ShowSurfelGIHoverRayHitRadianceColor;
     bool SurfelGIInlineRayEnable;
     bool SurfelGIInlineRayGuideEnable;
-    bool SurfelGIUseAverageGuideScalar;
     int32 SurfelGIInlineRayCount;
     int32 SurfelGINewSurfelBootstrapRayCount;
     float SurfelGIRadianceScale;
@@ -134,7 +122,7 @@ struct jOptions
     int32 SurfelGIIrradianceDebugMode;
     int32 SurfelGIVisualizeNeighborCellRadius;
     float SurfelGIResolveSoftness;
-    float SurfelGIResolveWarmupSamples;
+    float SurfelGIResolveIrradianceWarmupUpdates;
     bool SurfelGIVisualizeBlendWithScene;
     float SurfelGIVisualizeBlendAlpha;
 

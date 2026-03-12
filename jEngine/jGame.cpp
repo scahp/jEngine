@@ -95,9 +95,7 @@ void jGame::Setup()
         static jConsoleVariableBool* cvar_UseHWRTDirectLighting = new jConsoleVariableBool("r.hwrt.direct_lighting.enable", &gOptions.UseHWRTDirectLighting, "Enable HWRT direct lighting path");
         static jConsoleVariableInt* cvar_HWRTDirectLightingMode = new jConsoleVariableInt("r.hwrt.direct_lighting.mode", &gOptions.HWRTDirectLightingMode, "HWRT direct lighting mode (0=DispatchRays, 1=InlineRayQuery)");
         static jConsoleVariableBool* cvar_UseSurfelGI = new jConsoleVariableBool("r.surfelgi.enable", &gOptions.UseSurfelGI, "Enable SurfelGI prototype pool update");
-        static jConsoleVariableBool* cvar_SurfelGIReservoirEnable = new jConsoleVariableBool("r.surfelgi.reservoir.enable", &gOptions.SurfelGIReservoirEnable, "Enable SurfelGI reservoir gather/place pipeline");
         static jConsoleVariableInt* cvar_SurfelGIReservoirPerCellLimit = new jConsoleVariableInt("r.surfelgi.reservoir.per_cell_limit", &gOptions.SurfelGIReservoirPerCellLimit, "SurfelGI reservoir per-cell page size limit");
-        static jConsoleVariableFloat* cvar_SurfelGIReservoirTableCapacityScale = new jConsoleVariableFloat("r.surfelgi.reservoir.table_capacity_scale", &gOptions.SurfelGIReservoirTableCapacityScale, "SurfelGI reservoir page table capacity scale");
         static jConsoleVariableFloat* cvar_SurfelGIFaceMarginRadiusScale = new jConsoleVariableFloat("r.surfelgi.face_margin_radius_scale", &gOptions.SurfelGIFaceMarginRadiusScale, "SurfelGI reservoir candidate face margin radius scale");
 static jConsoleVariableBool* cvar_SurfelGIInlineRayEnable = new jConsoleVariableBool("r.surfelgi.inline_ray.enable", &gOptions.SurfelGIInlineRayEnable, "Enable SurfelGI inline ray irradiance gather pass");
 static jConsoleVariableBool* cvar_SurfelGIInlineRayGuideEnable = new jConsoleVariableBool("r.surfelgi.inline_ray.guide_enable", &gOptions.SurfelGIInlineRayGuideEnable, "Enable SurfelGI inline ray directional guiding");

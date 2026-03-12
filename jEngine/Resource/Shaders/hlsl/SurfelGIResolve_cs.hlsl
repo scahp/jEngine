@@ -31,7 +31,7 @@ struct ResolveUniformBuffer
     int SurfelPageTableCapacity;
     int NeighborCellRadius;
     float ResolveSoftness;
-    float ResolveWarmupSamples;
+    float ResolveIrradianceWarmupUpdates;
     float2 Padding0;
 };
 
@@ -296,8 +296,8 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                         const SurfelIrradianceData irradiance = SurfelIrradianceBuffer[surfelIndex];
                         // IrradianceAndCount.xyz stores the MSME long-term mean. That is the stable
                         // lighting value meant for downstream shading.
-                        const float warmupSamples = max(ResolveCommon.ResolveWarmupSamples, 0.0);
-                        const float maturity = (warmupSamples > 0.0) ? saturate(irradiance.IrradianceAndCount.w / warmupSamples) : 1.0;
+                        const float irradianceWarmupUpdates = max(ResolveCommon.ResolveIrradianceWarmupUpdates, 0.0);
+                        const float maturity = (irradianceWarmupUpdates > 0.0) ? saturate(irradiance.IrradianceAndCount.w / irradianceWarmupUpdates) : 1.0;
                         const float3 surfelIrradiance = max(irradiance.IrradianceAndCount.xyz, 0.0) * maturity;
                         const float weight = ComputeSurfelWeight(worldPos, worldNormal, surfel, irradiance);
                         if (weight <= 1e-5)
