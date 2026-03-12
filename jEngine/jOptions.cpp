@@ -122,7 +122,7 @@ jOptions::jOptions()
     SurfelGIInlineRayGuideEnable = true;
     SurfelGIInlineRayCount = 16;
     SurfelGINewSurfelBootstrapRayCount = 32;
-    SurfelGIRadianceScale = 1.0f;
+    SurfelGIRadianceScale = 1.5f;
     SurfelGIInlineRayMaxDistance = 5000.0f;
     SurfelGIInlineRayNormalBias = 1.0f;
     SurfelGIInlineRayHistoryBlend = 0.9f;

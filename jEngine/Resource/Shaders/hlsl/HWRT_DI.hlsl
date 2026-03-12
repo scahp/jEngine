@@ -1,6 +1,7 @@
 #include "common.hlsl"
 #include "PBR.hlsl"
 #include "lightutil.hlsl"
+#include "SurfelGIClipmapLookup.hlsl"
 
 struct SceneConstantBuffer
 {
@@ -787,7 +788,21 @@ struct SurfelGIGatherUniformBuffer
     float HistoryBlend;
     uint UseGuiding;
     int FrameNumber;
-    uint Padding0;
+    uint SurfelPageSize;
+    float GridCellSize;
+    float Padding0;
+    float4 CascadeCellScaleFromPrevPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeStartDistancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeOriginCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeOriginCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeOriginCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeRingOffsetXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeRingOffsetYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeRingOffsetZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+    float4 CascadeCellBasePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
 };
 
 struct SurfelGIHoverSelection
@@ -833,6 +848,101 @@ uint InitSurfelGatherSeed(uint SurfelIndex, uint FrameNumber)
 float3 EvaluateSurfelGatherMissRadiance(in float3 WorldDir)
 {
     return 0.0;
+}
+
+float ComputeHitSurfelWeight(float3 SurfaceWorldPos, float3 SurfaceWorldNormal, SurfelGIData Surfel, SurfelGIIrradianceData Irradiance)
+{
+    const float3 SurfelNormal = normalize(Surfel.NormalSeenFrame.xyz);
+    const float SurfelRadius = max(Surfel.PositionRadius.w, 0.001);
+    const float3 Delta = SurfaceWorldPos - Surfel.PositionRadius.xyz;
+    const float PlaneDistance = abs(dot(Delta, SurfelNormal));
+    const float3 TangentOffset = Delta - SurfelNormal * dot(Delta, SurfelNormal);
+    const float RadialDistance = length(TangentOffset);
+    const float PlaneWeight = saturate(1.0 - PlaneDistance / max(SurfelRadius * 1.25, 0.001));
+    const float RadialWeight = saturate(1.0 - RadialDistance / max(SurfelRadius * 2.0, 0.001));
+    const float NormalAlignment = saturate(dot(SurfaceWorldNormal, SurfelNormal));
+    const float ConfidenceWeight = saturate(Irradiance.IrradianceAndCount.w / 16.0);
+    return PlaneWeight * RadialWeight * NormalAlignment * ConfidenceWeight;
+}
+
+bool TrySampleSurfelIrradianceAtCascade(float3 SurfaceWorldPos, float3 SurfaceWorldNormal, uint CascadeIndex, out float3 OutIrradiance)
+{
+    const float CellSize = max(g_surfelGatherCB.GridCellSize, 0.1) * SurfelGIGetCascadeScale(g_surfelGatherCB.CascadeCellScaleFromPrevPacked, CascadeIndex);
+    const int3 CellCoord = int3(floor(SurfaceWorldPos / CellSize));
+    uint BaseIndex = 0u;
+    if (!SurfelGITryGetCellBaseIndex(
+        CellCoord,
+        max(g_surfelGatherCB.MaxSurfels, 1u),
+        max(g_surfelGatherCB.SurfelPageSize, 1u),
+        0xffffffffu,
+        CascadeIndex,
+        g_surfelGatherCB.CascadeClipmapGridDimXPacked,
+        g_surfelGatherCB.CascadeClipmapGridDimYPacked,
+        g_surfelGatherCB.CascadeClipmapGridDimZPacked,
+        g_surfelGatherCB.CascadeOriginCellXPacked,
+        g_surfelGatherCB.CascadeOriginCellYPacked,
+        g_surfelGatherCB.CascadeOriginCellZPacked,
+        g_surfelGatherCB.CascadeRingOffsetXPacked,
+        g_surfelGatherCB.CascadeRingOffsetYPacked,
+        g_surfelGatherCB.CascadeRingOffsetZPacked,
+        g_surfelGatherCB.CascadeCellBasePacked,
+        BaseIndex))
+    {
+        OutIrradiance = 0.0;
+        return false;
+    }
+
+    const uint SlotsPerCell = min(max(g_surfelGatherCB.SurfelPageSize, 1u), 5u);
+    float BestWeight = 0.0;
+    float3 BestIrradiance = 0.0;
+    [loop] for (uint Slot = 0u; Slot < SlotsPerCell; ++Slot)
+    {
+        const uint CandidateSurfelIndex = BaseIndex + Slot;
+        if (CandidateSurfelIndex >= max(g_surfelGatherCB.MaxSurfels, 1u))
+            break;
+
+        const SurfelGIData CandidateSurfel = SurfelGIPool[CandidateSurfelIndex];
+        if (CandidateSurfel.Extra.y < 0.5)
+            continue;
+        if ((uint)round(CandidateSurfel.Extra.w) != CascadeIndex)
+            continue;
+
+        const int3 CandidateCellCoord = int3(floor(CandidateSurfel.PositionRadius.xyz / CellSize));
+        if (any(CandidateCellCoord != CellCoord))
+            continue;
+
+        const SurfelGIIrradianceData CandidateIrradiance = SurfelGIIrradianceBuffer[CandidateSurfelIndex];
+        if (CandidateIrradiance.IrradianceAndCount.w <= 0.01)
+            continue;
+
+        const float Weight = ComputeHitSurfelWeight(SurfaceWorldPos, SurfaceWorldNormal, CandidateSurfel, CandidateIrradiance);
+        if (Weight <= BestWeight)
+            continue;
+
+        BestWeight = Weight;
+        BestIrradiance = max(CandidateIrradiance.IrradianceAndCount.xyz, 0.0) * saturate(CandidateIrradiance.IrradianceAndCount.w / 16.0);
+    }
+
+    if (BestWeight <= 1e-5)
+    {
+        OutIrradiance = 0.0;
+        return false;
+    }
+
+    OutIrradiance = BestIrradiance;
+    return true;
+}
+
+float3 EvaluateHitSurfelIndirectRadiance(in SurfaceData Surface)
+{
+    const float CameraDistance = length(Surface.WorldPos - g_sceneCB.cameraPosition);
+    const uint ExpectedCascade = SurfelGIGetCascadeIndexByDistance(g_surfelGatherCB.CascadeStartDistancePacked, CameraDistance);
+
+    float3 SampledIrradiance = 0.0;
+    if (!TrySampleSurfelIrradianceAtCascade(Surface.WorldPos, Surface.WorldNormal, ExpectedCascade, SampledIrradiance))
+        return 0.0;
+
+    return max(SampledIrradiance, 0.0) * (Surface.Albedo / PI);
 }
 
 // MSME = multi-state moment estimation.
@@ -1157,6 +1267,7 @@ void SurfelGIGatherIrradianceHWRT_CS(uint3 DispatchThreadID : SV_DispatchThreadI
             const MyAttributes Attr = MakeAttributesFromBarycentrics(Barycentrics);
             const SurfaceData Surface = GetSurfaceDataInternal(InstanceIdx, PrimitiveIdx, Attr, HitWorldPos);
             SampleLi = EvaluateSurfaceRadianceFromViewPosition(Surface, Attr, ReceiverWorldPos);
+            SampleLi += EvaluateHitSurfelIndirectRadiance(Surface);
         }
         else
         {

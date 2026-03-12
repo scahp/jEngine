@@ -1,9 +1,5 @@
 #include "common.hlsl"
-
-#ifndef SURFEL_GI_CASCADE_COUNT
-    #define SURFEL_GI_CASCADE_COUNT 3
-#endif
-#define SURFEL_GI_CASCADE_PACKED_COUNT ((SURFEL_GI_CASCADE_COUNT + 3) / 4)
+#include "SurfelGIClipmapLookup.hlsl"
 
 // This shader is the bridge between surfel-space lighting and pixel-space shading.
 // Earlier passes store irradiance on surfels; this pass asks which surfels should influence
@@ -64,30 +60,9 @@ cbuffer ResolveCommon : register(b6, space0)
     ResolveUniformBuffer ResolveCommon;
 }
 
-// Cascade parameters are packed 4-at-a-time on the CPU to keep the uniform buffer compact.
-// These helpers unpack the lane that belongs to the current cascade index.
-float GetPackedFloat(float4 packedArray[SURFEL_GI_CASCADE_PACKED_COUNT], uint cascadeIndex)
-{
-    const uint c = min(cascadeIndex, (uint)(SURFEL_GI_CASCADE_COUNT - 1));
-    const uint packIndex = c >> 2u;
-    const uint lane = c & 3u;
-    const float4 packed = packedArray[packIndex];
-    return (lane == 0u) ? packed.x : ((lane == 1u) ? packed.y : ((lane == 2u) ? packed.z : packed.w));
-}
-
-int GetPackedInt(float4 packedArray[SURFEL_GI_CASCADE_PACKED_COUNT], uint cascadeIndex)
-{
-    return (int)round(GetPackedFloat(packedArray, cascadeIndex));
-}
-
-uint GetPackedUint(float4 packedArray[SURFEL_GI_CASCADE_PACKED_COUNT], uint cascadeIndex)
-{
-    return (uint)round(GetPackedFloat(packedArray, cascadeIndex));
-}
-
 uint GetDesiredSlotsPerCell(uint cascadeIndex)
 {
-    const float value = GetPackedFloat(ResolveCommon.SurfelsPerCellPacked, cascadeIndex);
+    const float value = SurfelGIGetPackedFloat(ResolveCommon.SurfelsPerCellPacked, cascadeIndex);
     return max((uint)round(value), 1u);
 }
 
@@ -111,89 +86,6 @@ uint GetCascadePartitionCapacity(uint maxSurfels, uint cascadeIndex)
     const uint base = maxSurfels / cascadeCount;
     const uint rem = maxSurfels % cascadeCount;
     return max(1u, base + ((c < rem) ? 1u : 0u));
-}
-
-float GetCascadeScale(uint cascadeIndex)
-{
-    float scale = 1.0;
-    [loop] for (uint i = 1u; i <= cascadeIndex && i < (uint)SURFEL_GI_CASCADE_COUNT; ++i)
-    {
-        scale *= max(GetPackedFloat(ResolveCommon.CascadeCellScaleFromPrevPacked, i), 1.0);
-    }
-    return scale;
-}
-
-int3 ModWrap3(int3 v, int3 dim)
-{
-    int3 r = v % dim;
-    if (r.x < 0) r.x += dim.x;
-    if (r.y < 0) r.y += dim.y;
-    if (r.z < 0) r.z += dim.z;
-    return r;
-}
-
-int3 GetCascadeDimDirect(uint cascadeIndex)
-{
-    return int3(
-        max(GetPackedInt(ResolveCommon.CascadeClipmapGridDimXPacked, cascadeIndex), 1),
-        max(GetPackedInt(ResolveCommon.CascadeClipmapGridDimYPacked, cascadeIndex), 1),
-        max(GetPackedInt(ResolveCommon.CascadeClipmapGridDimZPacked, cascadeIndex), 1));
-}
-
-int3 GetCascadeOriginCell(uint cascadeIndex)
-{
-    return int3(
-        GetPackedInt(ResolveCommon.CascadeOriginCellXPacked, cascadeIndex),
-        GetPackedInt(ResolveCommon.CascadeOriginCellYPacked, cascadeIndex),
-        GetPackedInt(ResolveCommon.CascadeOriginCellZPacked, cascadeIndex));
-}
-
-int3 GetCascadeRingOffset(uint cascadeIndex)
-{
-    return int3(
-        GetPackedInt(ResolveCommon.CascadeRingOffsetXPacked, cascadeIndex),
-        GetPackedInt(ResolveCommon.CascadeRingOffsetYPacked, cascadeIndex),
-        GetPackedInt(ResolveCommon.CascadeRingOffsetZPacked, cascadeIndex));
-}
-
-uint GetCascadeCellBase(uint cascadeIndex)
-{
-    return GetPackedUint(ResolveCommon.CascadeCellBasePacked, cascadeIndex);
-}
-
-bool TryWorldCellToLinear(int3 worldCell, uint cascadeIndex, out uint outCellLinear)
-{
-    // Clipmap cascades behave like scrolling ring buffers in world space.
-    // "local" is the logical cell coordinate, "phys" is the wrapped location inside the ring.
-    const int3 dim = GetCascadeDimDirect(cascadeIndex);
-    const int3 local = worldCell - GetCascadeOriginCell(cascadeIndex);
-    if (any(local < 0) || any(local >= dim))
-        return false;
-
-    const int3 phys = ModWrap3(local + GetCascadeRingOffset(cascadeIndex), dim);
-    const uint localLinear = (uint)(phys.x + dim.x * (phys.y + dim.y * phys.z));
-    outCellLinear = GetCascadeCellBase(cascadeIndex) + localLinear;
-    return true;
-}
-
-bool TryGetCellBaseIndex(int3 cellCoord, uint maxSurfels, uint cascadeIndex, out uint outCellBaseIndex)
-{
-    uint cellLinear = 0u;
-    if (!TryWorldCellToLinear(cellCoord, cascadeIndex, cellLinear))
-        return false;
-    if (cellLinear >= max((uint)ResolveCommon.SurfelPageTableCapacity, 1u))
-        return false;
-
-    const uint pageSize = min(max((uint)ResolveCommon.SurfelPageSize, 1u), maxSurfels);
-    if (cellLinear > ((maxSurfels - 1u) / max(pageSize, 1u)))
-        return false;
-
-    const uint base = cellLinear * pageSize;
-    if (base >= maxSurfels)
-        return false;
-
-    outCellBaseIndex = base;
-    return true;
 }
 
 float ComputeSurfelWeight(float3 pixelWorldPos, float3 pixelWorldNormal, SurfelData surfel, SurfelIrradianceData irradiance)
@@ -262,7 +154,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     // the surfel clipmap. The same cell-lookup logic is shared with visualization / hover select.
     [loop] for (uint cascadeIndex = 0u; cascadeIndex < (uint)SURFEL_GI_CASCADE_COUNT; ++cascadeIndex)
     {
-        const float cellSize = cascade0CellSize * GetCascadeScale(cascadeIndex);
+        const float cellSize = cascade0CellSize * SurfelGIGetCascadeScale(ResolveCommon.CascadeCellScaleFromPrevPacked, cascadeIndex);
         const int3 baseCellCoord = int3(floor(worldPos / cellSize));
         const uint desiredSlotsPerCell = GetDesiredSlotsPerCell(cascadeIndex);
         const uint cascadeCapacity = GetCascadePartitionCapacity(maxSurfels, cascadeIndex);
@@ -276,8 +168,26 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                 {
                     const int3 queryCellCoord = baseCellCoord + int3(x, y, z);
                     uint baseIndex = 0u;
-                    if (!TryGetCellBaseIndex(queryCellCoord, maxSurfels, cascadeIndex, baseIndex))
+                    if (!SurfelGITryGetCellBaseIndex(
+                        queryCellCoord,
+                        maxSurfels,
+                        (uint)ResolveCommon.SurfelPageSize,
+                        (uint)ResolveCommon.SurfelPageTableCapacity,
+                        cascadeIndex,
+                        ResolveCommon.CascadeClipmapGridDimXPacked,
+                        ResolveCommon.CascadeClipmapGridDimYPacked,
+                        ResolveCommon.CascadeClipmapGridDimZPacked,
+                        ResolveCommon.CascadeOriginCellXPacked,
+                        ResolveCommon.CascadeOriginCellYPacked,
+                        ResolveCommon.CascadeOriginCellZPacked,
+                        ResolveCommon.CascadeRingOffsetXPacked,
+                        ResolveCommon.CascadeRingOffsetYPacked,
+                        ResolveCommon.CascadeRingOffsetZPacked,
+                        ResolveCommon.CascadeCellBasePacked,
+                        baseIndex))
+                    {
                         continue;
+                    }
 
                     [loop] for (uint slot = 0u; slot < slotsPerCell; ++slot)
                     {
