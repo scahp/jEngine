@@ -36,6 +36,8 @@ IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderHitObjectVertexShader
 
 struct jShaderHitObjectPixelShader : public jShader
 {
+    static constexpr uint32 ShaderParameterSetBaseSpace = 1;
+
     DECLARE_SHADER_PARAMETER_SETS(
         jRenderObjectShaderParameters)
 
@@ -170,9 +172,15 @@ void jRenderer::HitObjectPass()
 		g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::HitObject_RT->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
 		g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::DEPTH_STENCIL_READ_ONLY);
 
-		// 6. Create draw commands for all static render objects
+		// 6. Create draw commands for static render objects and pickable debug billboards.
+		int32 NumHitObjectRenderObjects = static_cast<int32>(jObject::GetStaticRenderObject().size());
+		for (auto* debugObject : jObject::GetDebugObject())
+		{
+			NumHitObjectRenderObjects += static_cast<int32>(debugObject->RenderObjects.size());
+		}
+
 		std::vector<jDrawCommand> HitObjectDrawCommands;
-		HitObjectDrawCommands.resize(jObject::GetStaticRenderObject().size());
+		HitObjectDrawCommands.resize(NumHitObjectRenderObjects);
 
 		int32 i = 0;
 		for (auto iter : jObject::GetStaticRenderObject())
@@ -181,6 +189,16 @@ void jRenderer::HitObjectPass()
 				, HitObjectShader, &HitObjectPipelineStateFixed, nullptr, {}, nullptr);
 			HitObjectDrawCommands[i].PrepareToDraw(false);
 			++i;
+		}
+		for (auto* debugObject : jObject::GetDebugObject())
+		{
+			for (auto* renderObject : debugObject->RenderObjects)
+			{
+				new (&HitObjectDrawCommands[i]) jDrawCommand(RenderFrameContextPtr, &View, renderObject, HitObjectRenderPass
+					, HitObjectShader, &HitObjectPipelineStateFixed, nullptr, {}, nullptr);
+				HitObjectDrawCommands[i].PrepareToDraw(false);
+				++i;
+			}
 		}
 
 		// 7. Begin render pass and draw objects
@@ -201,31 +219,34 @@ void jRenderer::HitObjectPass()
 
 void jRenderer::ReadbackHitObject()
 {
+	static constexpr uint32 HitObjectReadbackRowPitch = 256;
+	static constexpr uint64 HitObjectReadbackBufferSize = HitObjectReadbackRowPitch;
+
 	// Transition HitObject_RT to TRANSFER_SRC for copy
 	g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer()
 		, jSceneRenderTarget::HitObject_RT->GetTexture(), EResourceLayout::TRANSFER_SRC);
 
 	RenderFrameContextPtr->GetActiveCommandBuffer()->FlushBarrierBatch();
 
-	// Create readback buffer (4 bytes for RGBA8)
+	// DX12 texture-to-buffer copies require a 256-byte aligned row pitch even for a 1x1 RGBA8 region.
 	static std::shared_ptr<jBuffer> ReadbackBuffer;
-	const uint64 ReadbackBufferSize = 4;  // RGBA8 = 4 bytes
 
-	if (!ReadbackBuffer)
+	if (!ReadbackBuffer || ReadbackBuffer->GetBufferSize() < HitObjectReadbackBufferSize)
 	{
-		ReadbackBuffer = g_rhi->CreateRawBuffer(ReadbackBufferSize, 0
+		ReadbackBuffer = g_rhi->CreateRawBuffer(HitObjectReadbackBufferSize, 0
 			, EBufferCreateFlag::Readback
 			, EResourceLayout::TRANSFER_DST
 			, nullptr
-			, ReadbackBufferSize
+			, HitObjectReadbackBufferSize
 			, jNameStatic("HitObject_ReadbackBuffer"));
 	}
 
 	jTextureCopyRegion copyRegion;
-	copyRegion.X = PickMouseX;
-	copyRegion.Y = PickMouseY;
+	copyRegion.X = Clamp(PickMouseX, 0, Max(0, SCR_WIDTH - 1));
+	copyRegion.Y = Clamp(PickMouseY, 0, Max(0, SCR_HEIGHT - 1));
 	copyRegion.Width = 1;
 	copyRegion.Height = 1;
+	copyRegion.DestRowPitchOverride = HitObjectReadbackRowPitch;
 
 	g_rhi->CopyTextureRegionToBuffer(RenderFrameContextPtr->GetActiveCommandBuffer()
 		, jSceneRenderTarget::HitObject_RT->GetTexture()

@@ -1467,10 +1467,8 @@ void jPlacementTool::SelectObject(jRenderObject* renderObj)
 
 	if (it != renderObjects.end())
 	{
-		SelectedRenderObjectIndex = static_cast<int32>(std::distance(renderObjects.begin(), it));
-
-		// Select the parent object as well
 		SelectObject(ownerObj);
+		SelectedRenderObjectIndex = static_cast<int32>(std::distance(renderObjects.begin(), it));
 	}
 	else
 	{
