@@ -317,6 +317,37 @@ void jSceneRenderTarget::Return()
         SurfelGI_Resolve_RT->Return();
 }
 
+void jSceneRenderTarget::ReleasePersistentResources()
+{
+    auto ReturnAndResetRenderTarget = [](std::shared_ptr<jRenderTarget>& InOutRenderTarget)
+    {
+        if (InOutRenderTarget)
+        {
+            InOutRenderTarget->Return();
+            InOutRenderTarget.reset();
+        }
+    };
+
+    ReturnAndResetRenderTarget(IrradianceMap);
+    ReturnAndResetRenderTarget(FilteredEnvMap);
+    ReturnAndResetRenderTarget(CubeEnvMap);
+    HistoryBuffer.reset();
+    HistoryDepthBuffer.reset();
+    GaussianV.reset();
+    GaussianH.reset();
+    ReturnAndResetRenderTarget(AOProjection);
+    ReturnAndResetRenderTarget(GIProjection);
+    ReturnAndResetRenderTarget(SSGI_RT);
+    for (std::shared_ptr<jRenderTarget>& AccumRT : SSGI_Accum_RT)
+        ReturnAndResetRenderTarget(AccumRT);
+    ReturnAndResetRenderTarget(SurfelGI_Debug_RT);
+    ReturnAndResetRenderTarget(SurfelGI_Attempt_RT);
+    ReturnAndResetRenderTarget(SurfelGI_Resolve_RT);
+    ReturnAndResetRenderTarget(AtmosphericShadow_RT);
+    ReturnAndResetRenderTarget(VBuffer_RT);
+    ReturnAndResetRenderTarget(HitObject_RT);
+}
+
 std::shared_ptr<jRenderTarget> jSceneRenderTarget::GetShadowMap(const jLight* InLight) const
 {
     auto it_find = LightShadowMapPtr.find(InLight);

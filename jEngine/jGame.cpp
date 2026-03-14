@@ -710,15 +710,8 @@ void jGame::Release()
     SpotLightInfo = nullptr;
 	DirectionalLightShadowMapUIDebug = nullptr;
 
-	// 임시
-    jSceneRenderTarget::IrradianceMap.reset();
-	jSceneRenderTarget::FilteredEnvMap.reset();
-	jSceneRenderTarget::CubeEnvMap.reset();
-	jSceneRenderTarget::HistoryBuffer.reset();
-	jSceneRenderTarget::HistoryDepthBuffer.reset();
-    jSceneRenderTarget::GaussianV.reset();
-    jSceneRenderTarget::GaussianH.reset();
-    jSceneRenderTarget::AOProjection.reset();
+    ReleaseSurfelGIResources();
+    jSceneRenderTarget::ReleasePersistentResources();
 }
 
 void jGame::SpawnTestPrimitives()

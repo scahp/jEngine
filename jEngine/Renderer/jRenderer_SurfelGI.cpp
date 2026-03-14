@@ -780,6 +780,27 @@ int32 GetSurfelGISampleDispatchDim(int32 InExtent)
     return Max(1, (InExtent + TileSize - 1) / TileSize);
 }
 
+void ResetSurfelGIRuntimeState()
+{
+    GSurfelPoolMaxCount = 0;
+    GSurfelIrradianceCapacity = 0;
+    GSurfelGuidingCapacity = 0;
+    GSurfelPageSize = 8;
+    GVisibleCellWorklistCapacity = 0;
+    GSurfelCellPageTableCapacity = 0;
+    GSurfelGICandidateCapacity = 0;
+    GSurfelGIWinnerCapacity = 0;
+    GSurfelGIActiveIndexCapacity = 0;
+    GSurfelClipmapForceClearAll = true;
+
+    for (jSurfelClipmapCascadeRuntimeState& RuntimeState : GSurfelClipmapRuntimeStates)
+        RuntimeState = {};
+    for (int32& CellBase : GSurfelCascadeCellBase)
+        CellBase = 0;
+    for (int32& CellCount : GSurfelCascadeCellCount)
+        CellCount = 0;
+}
+
 FORCEINLINE int32 PositiveModuloInt32(int32 value, int32 divisor)
 {
     if (divisor <= 0)
@@ -1457,6 +1478,27 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
     }
 
 }
+}
+
+void ReleaseSurfelGIResources()
+{
+    GSurfelPoolBuffer.reset();
+    GSurfelIrradianceBuffer.reset();
+    GSurfelGuidingBuffer.reset();
+    GVisibleCellWorklistBuffer.reset();
+    GVisibleCellCounterBuffer.reset();
+    GSurfelCellPageTableBuffer.reset();
+    GSurfelGICandidateBuffer.reset();
+    GSurfelGIWinnerScoreBuffer.reset();
+    GSurfelGIWinnerIndexBuffer.reset();
+    GSurfelGIWinnerLockBuffer.reset();
+    GSurfelGIStatsBuffer.reset();
+    GSurfelGIActiveIndexBuffer.reset();
+    GSurfelGIActiveCounterBuffer.reset();
+    GSurfelGIInlineRayDispatchArgsBuffer.reset();
+    GSurfelGIHoverSelectionBuffer.reset();
+    GSurfelGIHoverRayDebugBuffer.reset();
+    ResetSurfelGIRuntimeState();
 }
 
 void jRenderer::SurfelGIPass()

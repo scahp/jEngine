@@ -699,6 +699,7 @@ void jRHI_DX12::ReleaseRHI()
 	SamplerDescriptorHeaps.Release();
 
     OnlineDescriptorHeapManager.Release();
+    jShaderBindingLayout_DX12::ReleaseRootSignaturePool();
 
     Swapchain->Release();
     delete Swapchain;

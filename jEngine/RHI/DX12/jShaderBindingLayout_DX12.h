@@ -45,5 +45,6 @@ struct jShaderBindingLayout_DX12 : public jShaderBindingLayout
     static ID3D12RootSignature* CreateRootSignatureInternal(size_t InHash, FuncGetRootParameterExtractor InFunc, EShaderAccessStageFlag InShaderAccessStageFlag);
     static ID3D12RootSignature* CreateRootSignature(const jShaderBindingInstanceArray& InBindingInstanceArray, EShaderAccessStageFlag InShaderAccessStageFlag);
     static ID3D12RootSignature* CreateRootSignature(const jShaderBindingLayoutArray& InBindingLayoutArray, EShaderAccessStageFlag InShaderAccessStageFlag);
+    static void ReleaseRootSignaturePool();
 };
 

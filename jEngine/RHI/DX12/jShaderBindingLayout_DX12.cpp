@@ -411,3 +411,9 @@ ID3D12RootSignature* jShaderBindingLayout_DX12::CreateRootSignature(const jShade
             OutRootParameterExtractor.Extract(InBindingLayoutArray);
         }, InShaderAccessStageFlag);
 }
+
+void jShaderBindingLayout_DX12::ReleaseRootSignaturePool()
+{
+    jScopeWriteLock sw(&GRootSignatureLock);
+    GRootSignaturePool.clear();
+}

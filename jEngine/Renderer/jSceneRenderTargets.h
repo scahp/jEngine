@@ -67,6 +67,7 @@ struct jSceneRenderTarget : public std::enable_shared_from_this<jSceneRenderTarg
 
     void Create(const jSwapchainImage* InSwapchain, const std::vector<jLight*>* InLights = nullptr);
     void Return();
+    static void ReleasePersistentResources();
     std::shared_ptr<jRenderTarget> GetShadowMap(const jLight* InLight) const;
     std::shared_ptr<jShaderBindingInstance> PrepareGBufferShaderBindingInstance(bool InUseAsSubpassInput) const;
 };

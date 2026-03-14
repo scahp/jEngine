@@ -24,6 +24,8 @@ struct jShadowDrawInfo
     std::vector<jDrawCommand> DrawCommands;
 };
 
+void ReleaseSurfelGIResources();
+
 class IRenderer
 {
 public:
