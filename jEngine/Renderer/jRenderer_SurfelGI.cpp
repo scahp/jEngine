@@ -654,7 +654,7 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
             0,
             sizeof(jSurfelGPU),
             EBufferCreateFlag::UAV,
-            EResourceLayout::GENERAL,
+            EResourceLayout::UAV,
             InitialPool.data(),
             sizeof(jSurfelGPU) * (uint64)MaxSurfels,
             jNameStatic("SurfelGI_Pool"));
@@ -672,7 +672,7 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
             0,
             sizeof(jSurfelIrradianceGPU),
             EBufferCreateFlag::UAV,
-            EResourceLayout::GENERAL,
+            EResourceLayout::UAV,
             InitialIrradiance.data(),
             sizeof(jSurfelIrradianceGPU) * (uint64)MaxSurfels,
             jNameStatic("SurfelGI_Irradiance"));
@@ -689,7 +689,7 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
             0,
             sizeof(float),
             EBufferCreateFlag::UAV,
-            EResourceLayout::GENERAL,
+            EResourceLayout::UAV,
             nullptr,
             0,
             jNameStatic("SurfelGI_Guiding"));
@@ -707,7 +707,7 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
             0,
             sizeof(uint32),
             EBufferCreateFlag::UAV,
-            EResourceLayout::GENERAL,
+            EResourceLayout::UAV,
             InitialActiveIndices.data(),
             sizeof(uint32) * (uint64)MaxSurfels,
             jNameStatic("SurfelGI_ActiveIndex"));
@@ -721,7 +721,7 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
             0,
             sizeof(jSurfelActiveCounterGPU),
             EBufferCreateFlag::UAV,
-            EResourceLayout::GENERAL,
+            EResourceLayout::UAV,
             &InitialActiveCounter,
             sizeof(jSurfelActiveCounterGPU),
             jNameStatic("SurfelGI_ActiveCounter"));
@@ -735,7 +735,7 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
             0,
             sizeof(jSurfelInlineRayDispatchArgsGPU),
             EBufferCreateFlag::UAV | EBufferCreateFlag::IndirectCommand,
-            EResourceLayout::GENERAL,
+            EResourceLayout::UAV,
             &InitialDispatchArgs,
             sizeof(jSurfelInlineRayDispatchArgsGPU),
             jNameStatic("SurfelGI_InlineRayDispatchArgs"));
@@ -749,7 +749,7 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
             0,
             sizeof(jSurfelGIHoverSelectionGPU),
             EBufferCreateFlag::UAV,
-            EResourceLayout::GENERAL,
+            EResourceLayout::UAV,
             &InitialSelection,
             sizeof(jSurfelGIHoverSelectionGPU),
             jNameStatic("SurfelGI_HoverSelection"));
@@ -763,7 +763,7 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
             0,
             sizeof(jSurfelGIHoverRayDebugGPU),
             EBufferCreateFlag::UAV,
-            EResourceLayout::GENERAL,
+            EResourceLayout::UAV,
             &InitialHoverDebug,
             sizeof(jSurfelGIHoverRayDebugGPU),
             jNameStatic("SurfelGI_HoverRayDebug"));
@@ -780,7 +780,7 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
             0,
             sizeof(uint32),
             EBufferCreateFlag::UAV,
-            EResourceLayout::GENERAL,
+            EResourceLayout::UAV,
             InitialEntries.data(),
             sizeof(uint32) * (uint64)TotalCellCount,
             jNameStatic("SurfelGI_CellPageTable"));
@@ -853,7 +853,7 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
             0,
             sizeof(jSurfelCandidateGPU),
             EBufferCreateFlag::UAV,
-            EResourceLayout::GENERAL,
+            EResourceLayout::UAV,
             InitialCandidates.data(),
             sizeof(jSurfelCandidateGPU) * (uint64)CandidateCapacity,
             jNameStatic("SurfelGI_ReservoirCandidates"));
@@ -870,7 +870,7 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
             0,
             sizeof(uint32),
             EBufferCreateFlag::UAV,
-            EResourceLayout::GENERAL,
+            EResourceLayout::UAV,
             InitialWinnerScore.data(),
             sizeof(uint32) * (uint64)TotalCellCount,
             jNameStatic("SurfelGI_ReservoirWinnerScore"));
@@ -882,7 +882,7 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
             0,
             sizeof(uint32),
             EBufferCreateFlag::UAV,
-            EResourceLayout::GENERAL,
+            EResourceLayout::UAV,
             InitialWinnerIndex.data(),
             sizeof(uint32) * (uint64)TotalCellCount,
             jNameStatic("SurfelGI_ReservoirWinnerIndex"));
@@ -894,7 +894,7 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
             0,
             sizeof(uint32),
             EBufferCreateFlag::UAV,
-            EResourceLayout::GENERAL,
+            EResourceLayout::UAV,
             InitialWinnerLock.data(),
             sizeof(uint32) * (uint64)TotalCellCount,
             jNameStatic("SurfelGI_ReservoirWinnerLock"));
@@ -908,7 +908,7 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
             0,
             sizeof(jSurfelGIStatsGPU),
             EBufferCreateFlag::UAV,
-            EResourceLayout::GENERAL,
+            EResourceLayout::UAV,
             &InitialStats,
             sizeof(jSurfelGIStatsGPU),
             jNameStatic("SurfelGI_ReservoirStats"));
@@ -926,7 +926,7 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
             0,
             sizeof(jVisibleCellGPU),
             EBufferCreateFlag::UAV,
-            EResourceLayout::GENERAL,
+            EResourceLayout::UAV,
             InitialWorklist.data(),
             sizeof(jVisibleCellGPU) * (uint64)MaxVisibleCells,
             jNameStatic("SurfelGI_VisibleCellWorklist"));
@@ -940,7 +940,7 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
             0,
             sizeof(jVisibleCellCounterGPU),
             EBufferCreateFlag::UAV,
-            EResourceLayout::GENERAL,
+            EResourceLayout::UAV,
             &CounterInit,
             sizeof(jVisibleCellCounterGPU),
             jNameStatic("SurfelGI_VisibleCellCounter"));

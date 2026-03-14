@@ -27,6 +27,12 @@ std::shared_ptr<jCreatedResource> CreateBufferInternal(uint64 InSize, uint64 InA
         InLayout_DX12 = D3D12_RESOURCE_STATE_GENERIC_READ;
         InLayout = EResourceLayout::READ_ONLY;
     }
+    else
+    {
+        // Default-heap buffers start in COMMON and transition to their requested state later.
+        InLayout_DX12 = D3D12_RESOURCE_STATE_COMMON;
+        InLayout = EResourceLayout::GENERAL;
+    }
 
     if (!!(InBufferCreateFlag & EBufferCreateFlag::AccelerationStructure))
     {
@@ -146,8 +152,11 @@ std::shared_ptr<jBuffer_DX12> CreateBuffer(uint64 InSize, uint64 InAlignment, EB
             // Copy initial data
             commandBuffer->Get()->CopyBufferRegion((ID3D12Resource*)BufferPtr->GetHandle(), 0, StagingBuffer->Get(), 0, InSize);
             
-            g_rhi->TransitionLayout(BufferPtr.get(), InLayout);
-            commandBuffer->FlushBarrierBatch();
+            if (BufferPtr->GetLayout() != InLayout)
+            {
+                g_rhi->TransitionLayout(commandBuffer, BufferPtr.get(), InLayout);
+                commandBuffer->FlushBarrierBatch();
+            }
 
             g_rhi_dx12->EndSingleTimeCommands(commandBuffer);
         }
