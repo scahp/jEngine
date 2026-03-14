@@ -677,23 +677,25 @@ struct TShaderParameterHLSLTypeInfo<jSurfelGIHWRTDIBindlessUInt2>
 };
 
 BEGIN_SHADER_BINDLESS_SET(jSurfelGIHWRTDIBindlessParameters)
-    // space0 is reserved for jSurfelGIHWRTDIGlobalParameters; bindless tables start at space1.
-    SHADER_BINDLESS_STRUCTURED_BUFFER(jSurfelGIHWRTDIBindlessUInt2, VertexIndexOffsetArray, 1)
-    SHADER_BINDLESS_BUFFER(uint32, IndexBindlessArray, 2)
-    SHADER_BINDLESS_STRUCTURED_BUFFER(RenderObjectUniformBuffer, RenderObjParamArray, 3)
-    SHADER_BINDLESS_BYTEADDRESS_BUFFER(VerticesBindlessArray, 4)
-    SHADER_BINDLESS_UNIFORM_BUFFER(MaterialInstanceUniform, MaterialInstanceArray, 5)
-    SHADER_BINDLESS_TEXTURE2D(AlbedoTextureArray, 6)
-    SHADER_BINDLESS_TEXTURE2D(NormalTextureArray, 7)
-    SHADER_BINDLESS_TEXTURE2D(RMTextureArray, 8)
-    SHADER_BINDLESS_SAMPLER(AlbedoSamplerArray, 9)
-    SHADER_BINDLESS_SAMPLER(NormalSamplerArray, 10)
-    SHADER_BINDLESS_SAMPLER(RMSamplerArray, 11)
+    // Bindless tables are assigned consecutive spaces after the fixed SurfelGI sets.
+    SHADER_BINDLESS_STRUCTURED_BUFFER(jSurfelGIHWRTDIBindlessUInt2, VertexIndexOffsetArray)
+    SHADER_BINDLESS_BUFFER(uint32, IndexBindlessArray)
+    SHADER_BINDLESS_STRUCTURED_BUFFER(RenderObjectUniformBuffer, RenderObjParamArray)
+    SHADER_BINDLESS_BYTEADDRESS_BUFFER(VerticesBindlessArray)
+    SHADER_BINDLESS_UNIFORM_BUFFER(MaterialInstanceUniform, MaterialInstanceArray)
+    SHADER_BINDLESS_TEXTURE2D(AlbedoTextureArray)
+    SHADER_BINDLESS_TEXTURE2D(NormalTextureArray)
+    SHADER_BINDLESS_TEXTURE2D(RMTextureArray)
+    SHADER_BINDLESS_SAMPLER(AlbedoSamplerArray)
+    SHADER_BINDLESS_SAMPLER(NormalSamplerArray)
+    SHADER_BINDLESS_SAMPLER(RMSamplerArray)
 END_SHADER_BINDLESS_SET()
 
 struct jShaderSurfelGIGatherIrradianceHWRTCS : public jShader
 {
-    DECLARE_SHADER_PARAMETER_SETS(jSurfelGIHWRTDIGlobalParameters)
+    DECLARE_SHADER_PARAMETER_SETS(
+        jSurfelGIHWRTDIGlobalParameters,
+        jSurfelGIHWRTDIGatherParameters)
 
     DECLARE_DEFINE(USE_SURFEL_GI, 0, 1);
     DECLARE_DEFINE(USE_BINDLESS_RESOURCE, 0, 1);
@@ -705,7 +707,6 @@ struct jShaderSurfelGIGatherIrradianceHWRTCS : public jShader
     {
         if (InPermutation.Get<USE_BINDLESS_RESOURCE>() != 0)
             InOutBinder.AddBindless<jSurfelGIHWRTDIBindlessParameters>();
-        InOutBinder.Add<jSurfelGIHWRTDIGatherParameters>();
     }
 
     DECLARE_SHADER_WITH_PERMUTATION(jShaderSurfelGIGatherIrradianceHWRTCS, Permutation)
@@ -1093,11 +1094,11 @@ bool DispatchSurfelGIHWRTDIGather(
 
     jShaderBindingLayoutArray LayoutArray;
     LayoutArray.Add(GlobalShaderBindingInstance->ShaderBindingsLayouts);
+    LayoutArray.Add(SurfelGatherBindingInstance->ShaderBindingsLayouts);
     for (const auto& BindlessShaderBindingInstance : BindlessShaderBindingInstances)
     {
         LayoutArray.Add(BindlessShaderBindingInstance->ShaderBindingsLayouts);
     }
-    LayoutArray.Add(SurfelGatherBindingInstance->ShaderBindingsLayouts);
 
     jShaderSurfelGIGatherIrradianceHWRTCS::ShaderPermutation GatherPermutation;
     GatherPermutation.SetIndex<jShaderSurfelGIGatherIrradianceHWRTCS::USE_SURFEL_GI>(1);
@@ -1108,11 +1109,11 @@ bool DispatchSurfelGIHWRTDIGather(
 
     jShaderBindingInstanceArray InstanceArray;
     InstanceArray.Add(GlobalShaderBindingInstance.get());
+    InstanceArray.Add(SurfelGatherBindingInstance.get());
     for (const auto& BindlessShaderBindingInstance : BindlessShaderBindingInstances)
     {
         InstanceArray.Add(BindlessShaderBindingInstance.get());
     }
-    InstanceArray.Add(SurfelGatherBindingInstance.get());
 
     jShaderBindingInstanceCombiner ShaderBindingCombiner;
     ShaderBindingCombiner.ShaderBindingInstanceArray = &InstanceArray;

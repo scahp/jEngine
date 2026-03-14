@@ -89,14 +89,14 @@ BEGIN_SHADER_STRUCT(LightUniformBuffer)
 END_SHADER_STRUCT()
 
 BEGIN_SHADER_BINDLESS_SET(jPathTracingBindlessParameters)
-    // space0 is reserved for jPathTracingGlobalParameters; bindless tables start at space1.
-    SHADER_BINDLESS_STRUCTURED_BUFFER(jPathTracingBindlessUInt2, VertexIndexOffsetArray, 1)
-    SHADER_BINDLESS_BUFFER(uint32, IndexBindlessArray, 2)
-    SHADER_BINDLESS_STRUCTURED_BUFFER(RenderObjectUniformBuffer, RenderObjParamArray, 3)
-    SHADER_BINDLESS_BYTEADDRESS_BUFFER(VerticesBindlessArray, 4)
-    SHADER_BINDLESS_UNIFORM_BUFFER(MaterialUniformBuffer, MaterialBindlessArray, 5)
-    SHADER_BINDLESS_UNIFORM_BUFFER(LightUniformBuffer, LightBindlessArray, 6)
-    SHADER_BINDLESS_TEXTURE2D(TextureBindlessArray, 7)
+    // Bindless tables are assigned consecutive spaces starting at the binder's current space.
+    SHADER_BINDLESS_STRUCTURED_BUFFER(jPathTracingBindlessUInt2, VertexIndexOffsetArray)
+    SHADER_BINDLESS_BUFFER(uint32, IndexBindlessArray)
+    SHADER_BINDLESS_STRUCTURED_BUFFER(RenderObjectUniformBuffer, RenderObjParamArray)
+    SHADER_BINDLESS_BYTEADDRESS_BUFFER(VerticesBindlessArray)
+    SHADER_BINDLESS_UNIFORM_BUFFER(MaterialUniformBuffer, MaterialBindlessArray)
+    SHADER_BINDLESS_UNIFORM_BUFFER(LightUniformBuffer, LightBindlessArray)
+    SHADER_BINDLESS_TEXTURE2D(TextureBindlessArray)
 END_SHADER_BINDLESS_SET()
 
 namespace

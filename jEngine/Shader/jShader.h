@@ -236,13 +236,10 @@ void AppendShaderParameterSetToInfo(jShaderInfo& InOutShaderInfo, uint32 InSpace
 namespace jShaderBindlessSet
 {
     template <typename TBindlessSet>
-    void AppendToShaderInfo(jShaderInfo& InOutShaderInfo);
+    void AppendToShaderInfo(jShaderInfo& InOutShaderInfo, uint32 InBaseSpace);
 
     template <typename TBindlessSet>
-    uint32 GetMinSpace();
-
-    template <typename TBindlessSet>
-    uint32 GetNextSpaceAfter();
+    uint32 GetSpaceCount();
 }
 
 struct jShaderParameterBinder
@@ -262,10 +259,8 @@ struct jShaderParameterBinder
     template <typename TBindlessSet>
     void AddBindless()
     {
-        const uint32 MinSpace = jShaderBindlessSet::GetMinSpace<TBindlessSet>();
-        check(NextSpace <= MinSpace);
-        jShaderBindlessSet::AppendToShaderInfo<TBindlessSet>(ShaderInfo);
-        NextSpace = jShaderBindlessSet::GetNextSpaceAfter<TBindlessSet>();
+        jShaderBindlessSet::AppendToShaderInfo<TBindlessSet>(ShaderInfo, NextSpace);
+        NextSpace += jShaderBindlessSet::GetSpaceCount<TBindlessSet>();
     }
 
     uint32 GetNextSpace() const { return NextSpace; }
@@ -607,7 +602,8 @@ struct jShaderPointLightPixelShader : public jShader
 {
     DECLARE_SHADER_PARAMETER_SETS(
         jViewShaderParameters,
-        jPointLightShaderParameters)
+        jPointLightShaderParameters,
+        jLightVolumeVertexShaderParameters)
 
     DECLARE_DEFINE(USE_SUBPASS, 0, 1);
     DECLARE_DEFINE(USE_SHADOW_MAP, 0, 1);
@@ -623,9 +619,10 @@ struct jShaderPointLightPixelShader : public jShader
 
 struct jShaderPointLightVertexShader : public jShader
 {
-    static constexpr uint32 ShaderParameterSetBaseSpace = 3;
-
-    DECLARE_SHADER_PARAMETER_SETS(jLightVolumeVertexShaderParameters)
+    DECLARE_SHADER_PARAMETER_SETS(
+        jViewShaderParameters,
+        jPointLightShaderParameters,
+        jLightVolumeVertexShaderParameters)
 
     using ShaderPermutation = jPermutation<>;
     ShaderPermutation Permutation;
@@ -637,7 +634,8 @@ struct jShaderSpotLightPixelShader : public jShader
 {
     DECLARE_SHADER_PARAMETER_SETS(
         jViewShaderParameters,
-        jSpotLightShaderParameters)
+        jSpotLightShaderParameters,
+        jLightVolumeVertexShaderParameters)
 
     DECLARE_DEFINE(USE_SUBPASS, 0, 1);
     DECLARE_DEFINE(USE_SHADOW_MAP, 0, 1);
@@ -654,9 +652,10 @@ struct jShaderSpotLightPixelShader : public jShader
 
 struct jShaderSpotLightVertexShader : public jShader
 {
-    static constexpr uint32 ShaderParameterSetBaseSpace = 3;
-
-    DECLARE_SHADER_PARAMETER_SETS(jLightVolumeVertexShaderParameters)
+    DECLARE_SHADER_PARAMETER_SETS(
+        jViewShaderParameters,
+        jSpotLightShaderParameters,
+        jLightVolumeVertexShaderParameters)
 
     using ShaderPermutation = jPermutation<>;
     ShaderPermutation Permutation;

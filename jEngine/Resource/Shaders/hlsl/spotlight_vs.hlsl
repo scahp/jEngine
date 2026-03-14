@@ -1,3 +1,5 @@
+#include "common.hlsl"
+
 //struct PushConsts
 //{
 //    float2 Pos;

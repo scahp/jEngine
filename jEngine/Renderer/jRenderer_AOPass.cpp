@@ -236,16 +236,16 @@ namespace
 }
 
 BEGIN_SHADER_BINDLESS_SET(jRTAOBindlessParameters)
-    // space0 is reserved for jRTAOGlobalParameters; bindless tables start at space1.
-    SHADER_BINDLESS_TEXTURECUBE(IrradianceMapArray, 1)
-    SHADER_BINDLESS_TEXTURECUBE(PrefilteredEnvMapArray, 2)
-    SHADER_BINDLESS_STRUCTURED_BUFFER(jRTAOBindlessUInt2, VertexIndexOffsetArray, 3)
-    SHADER_BINDLESS_BUFFER(uint32, IndexBindlessArray, 4)
-    SHADER_BINDLESS_STRUCTURED_BUFFER(RenderObjectUniformBuffer, RenderObjParamArray, 5)
-    SHADER_BINDLESS_BYTEADDRESS_BUFFER(VerticesBindlessArray, 6)
-    SHADER_BINDLESS_TEXTURE2D(AlbedoTextureArray, 7)
-    SHADER_BINDLESS_TEXTURE2D(NormalTextureArray, 8)
-    SHADER_BINDLESS_TEXTURE2D(RMTextureArray, 9)
+    // Bindless tables are assigned consecutive spaces starting at the binder's current space.
+    SHADER_BINDLESS_TEXTURECUBE(IrradianceMapArray)
+    SHADER_BINDLESS_TEXTURECUBE(PrefilteredEnvMapArray)
+    SHADER_BINDLESS_STRUCTURED_BUFFER(jRTAOBindlessUInt2, VertexIndexOffsetArray)
+    SHADER_BINDLESS_BUFFER(uint32, IndexBindlessArray)
+    SHADER_BINDLESS_STRUCTURED_BUFFER(RenderObjectUniformBuffer, RenderObjParamArray)
+    SHADER_BINDLESS_BYTEADDRESS_BUFFER(VerticesBindlessArray)
+    SHADER_BINDLESS_TEXTURE2D(AlbedoTextureArray)
+    SHADER_BINDLESS_TEXTURE2D(NormalTextureArray)
+    SHADER_BINDLESS_TEXTURE2D(RMTextureArray)
 END_SHADER_BINDLESS_SET()
 
 namespace

@@ -76,18 +76,18 @@ namespace
     END_SHADER_PARAMETER_SET()
 
     BEGIN_SHADER_BINDLESS_SET(jHWRTDIBindlessParameters)
-        // space0 is reserved for jHWRTDIGlobalParameters; bindless tables start at space1.
-        SHADER_BINDLESS_STRUCTURED_BUFFER(jHWRTDIBindlessUInt2, VertexIndexOffsetArray, 1)
-        SHADER_BINDLESS_BUFFER(uint32, IndexBindlessArray, 2)
-        SHADER_BINDLESS_STRUCTURED_BUFFER(RenderObjectUniformBuffer, RenderObjParamArray, 3)
-        SHADER_BINDLESS_BYTEADDRESS_BUFFER(VerticesBindlessArray, 4)
-        SHADER_BINDLESS_UNIFORM_BUFFER(MaterialInstanceUniform, MaterialInstanceArray, 5)
-        SHADER_BINDLESS_TEXTURE2D(AlbedoTextureArray, 6)
-        SHADER_BINDLESS_TEXTURE2D(NormalTextureArray, 7)
-        SHADER_BINDLESS_TEXTURE2D(RMTextureArray, 8)
-        SHADER_BINDLESS_SAMPLER(AlbedoSamplerArray, 9)
-        SHADER_BINDLESS_SAMPLER(NormalSamplerArray, 10)
-        SHADER_BINDLESS_SAMPLER(RMSamplerArray, 11)
+        // Bindless tables are assigned consecutive spaces starting at the binder's current space.
+        SHADER_BINDLESS_STRUCTURED_BUFFER(jHWRTDIBindlessUInt2, VertexIndexOffsetArray)
+        SHADER_BINDLESS_BUFFER(uint32, IndexBindlessArray)
+        SHADER_BINDLESS_STRUCTURED_BUFFER(RenderObjectUniformBuffer, RenderObjParamArray)
+        SHADER_BINDLESS_BYTEADDRESS_BUFFER(VerticesBindlessArray)
+        SHADER_BINDLESS_UNIFORM_BUFFER(MaterialInstanceUniform, MaterialInstanceArray)
+        SHADER_BINDLESS_TEXTURE2D(AlbedoTextureArray)
+        SHADER_BINDLESS_TEXTURE2D(NormalTextureArray)
+        SHADER_BINDLESS_TEXTURE2D(RMTextureArray)
+        SHADER_BINDLESS_SAMPLER(AlbedoSamplerArray)
+        SHADER_BINDLESS_SAMPLER(NormalSamplerArray)
+        SHADER_BINDLESS_SAMPLER(RMSamplerArray)
     END_SHADER_BINDLESS_SET()
 
     struct jShaderHWRTDIPrimaryMissShader : public jShader

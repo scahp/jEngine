@@ -80,9 +80,6 @@ void jSpotLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* OutDestDr
     jShaderBindingInstanceArray CopyShaderBindingInstances = ShaderBindingInstances;
     CopyShaderBindingInstances.Add(InLightView.ShaderBindingInstance.get());
 
-    SceneTextureShaderBindingInstance = InRenderFrameContextPtr->SceneRenderTargetPtr->PrepareGBufferShaderBindingInstance(gOptions.UseSubpass);
-    CopyShaderBindingInstances.Add(SceneTextureShaderBindingInstance.get());
-
     //////////////////////////////////////////////////////////////////////////
     UniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
         jNameStatic("jSpotLightPushConstant"), jLifeTimeType::OneFrame, sizeof(jLightVolumeVertexUniformBuffer)));
@@ -95,6 +92,9 @@ void jSpotLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* OutDestDr
     ShaderBindingInstance = jShaderParameterSet::CreateShaderBindingInstance(Parameters, EShaderAccessStageFlag::VERTEX, jShaderBindingInstanceType::SingleFrame);
     CopyShaderBindingInstances.Add(ShaderBindingInstance.get());
     //////////////////////////////////////////////////////////////////////////
+
+    SceneTextureShaderBindingInstance = InRenderFrameContextPtr->SceneRenderTargetPtr->PrepareGBufferShaderBindingInstance(gOptions.UseSubpass);
+    CopyShaderBindingInstances.Add(SceneTextureShaderBindingInstance.get());
 
     check(OutDestDrawCommand);
     new (OutDestDrawCommand) jDrawCommand(InRenderFrameContextPtr, &InLightView, SpotLightCone->RenderObjects[0], InRenderPass

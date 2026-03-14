@@ -521,7 +521,6 @@ struct jShaderBindlessMemberMeta
 
     const char* Name = nullptr;
     const char* HLSLTypeName = nullptr;
-    uint32 Space = 0;
     AppendTypeDeclarationFunc AppendTypeDeclaration = nullptr;
     AppendHLSLFunc AppendHLSL = nullptr;
     BuildBindingFunc BuildBinding = nullptr;
@@ -1270,7 +1269,7 @@ namespace jShaderParameterDetail
         SetType::__jShaderParameterMeta(TShaderParameterTag<SetType, Line>{});
     };
 
-    template <typename SetType, typename ParameterType, ParameterType SetType::* MemberPtr, typename NameProvider, uint32 SpaceValue>
+    template <typename SetType, typename ParameterType, ParameterType SetType::* MemberPtr, typename NameProvider>
     struct TShaderBindlessMemberEntry
     {
         static void AppendTypeDeclaration(std::string& Out)
@@ -1295,7 +1294,6 @@ namespace jShaderParameterDetail
             return {
                 NameProvider::Get(),
                 TShaderBindlessTypeHandler<ParameterType>::GetHLSLTypeName(),
-                SpaceValue,
                 &AppendTypeDeclaration,
                 &AppendHLSL,
                 &BuildBinding
@@ -1514,55 +1512,13 @@ namespace jShaderParameterSet
 namespace jShaderBindlessSet
 {
     template <typename TBindlessSet>
-    uint32 GetMinSpace()
+    uint32 GetSpaceCount()
     {
-        bool HasSpace = false;
-        uint32 MinSpace = 0;
-        for (const jShaderBindlessMemberMeta& Meta : TBindlessSet::GetShaderBindlessMembers())
-        {
-            if (!HasSpace)
-            {
-                MinSpace = Meta.Space;
-                HasSpace = true;
-            }
-            else if (Meta.Space < MinSpace)
-            {
-                MinSpace = Meta.Space;
-            }
-        }
-        check(HasSpace);
-        return MinSpace;
+        return static_cast<uint32>(TBindlessSet::GetShaderBindlessMembers().size());
     }
 
     template <typename TBindlessSet>
-    uint32 GetMaxSpace()
-    {
-        bool HasSpace = false;
-        uint32 MaxSpace = 0;
-        for (const jShaderBindlessMemberMeta& Meta : TBindlessSet::GetShaderBindlessMembers())
-        {
-            if (!HasSpace)
-            {
-                MaxSpace = Meta.Space;
-                HasSpace = true;
-            }
-            else if (Meta.Space > MaxSpace)
-            {
-                MaxSpace = Meta.Space;
-            }
-        }
-        check(HasSpace);
-        return MaxSpace;
-    }
-
-    template <typename TBindlessSet>
-    uint32 GetNextSpaceAfter()
-    {
-        return GetMaxSpace<TBindlessSet>() + 1u;
-    }
-
-    template <typename TBindlessSet>
-    std::string GenerateHLSL()
+    std::string GenerateHLSL(uint32 InBaseSpace)
     {
         std::string Result;
         std::unordered_set<std::string_view> GeneratedTypeDeclarations;
@@ -1580,16 +1536,17 @@ namespace jShaderBindlessSet
             }
         }
 
+        uint32 Space = InBaseSpace;
         for (const jShaderBindlessMemberMeta& Meta : TBindlessSet::GetShaderBindlessMembers())
         {
             check(Meta.AppendHLSL);
-            Meta.AppendHLSL(Result, Meta.Name, Meta.Space);
+            Meta.AppendHLSL(Result, Meta.Name, Space++);
         }
         return Result;
     }
 
     template <typename TBindlessSet>
-    void AppendToShaderInfo(jShaderInfo& InOutShaderInfo)
+    void AppendToShaderInfo(jShaderInfo& InOutShaderInfo, uint32 InBaseSpace)
     {
         std::string InjectedShaderText;
         if (const char* Existing = InOutShaderInfo.GetInjectedShaderText().ToStr())
@@ -1597,7 +1554,7 @@ namespace jShaderBindlessSet
 
         if (!InjectedShaderText.empty() && InjectedShaderText.back() != '\n')
             InjectedShaderText += "\r\n";
-        InjectedShaderText += GenerateHLSL<TBindlessSet>();
+        InjectedShaderText += GenerateHLSL<TBindlessSet>(InBaseSpace);
         InOutShaderInfo.SetInjectedShaderText(jName(InjectedShaderText));
     }
 
@@ -1790,7 +1747,7 @@ private: \
     static constexpr int __jShaderBindlessBeginLine = __LINE__; \
 public:
 
-#define JSHADER_DECLARE_BINDLESS_PARAMETER(Line, ParameterType, Name, Space) \
+#define JSHADER_DECLARE_BINDLESS_PARAMETER(Line, ParameterType, Name) \
     ParameterType Name{}; \
 private: \
     struct JSHADER_CONCAT(__jShaderBindlessName_, Line) \
@@ -1800,18 +1757,18 @@ private: \
 public: \
     static constexpr jShaderBindlessMemberMeta __jShaderBindlessMeta(TShaderBindlessTag<jShaderBindlessSetThisType, Line>) \
     { \
-        using jShaderBindlessEntry = jShaderParameterDetail::TShaderBindlessMemberEntry<jShaderBindlessSetThisType, ParameterType, &jShaderBindlessSetThisType::Name, JSHADER_CONCAT(__jShaderBindlessName_, Line), Space>; \
+        using jShaderBindlessEntry = jShaderParameterDetail::TShaderBindlessMemberEntry<jShaderBindlessSetThisType, ParameterType, &jShaderBindlessSetThisType::Name, JSHADER_CONCAT(__jShaderBindlessName_, Line)>; \
         return jShaderBindlessEntry::GetMeta(); \
     } \
 public:
 
-#define SHADER_BINDLESS_BUFFER(HLSLType, Name, Space) JSHADER_DECLARE_BINDLESS_PARAMETER(__LINE__, jShaderParameterBindlessBuffer<HLSLType>, Name, Space)
-#define SHADER_BINDLESS_STRUCTURED_BUFFER(StructType, Name, Space) JSHADER_DECLARE_BINDLESS_PARAMETER(__LINE__, jShaderParameterBindlessStructuredBuffer<StructType>, Name, Space)
-#define SHADER_BINDLESS_BYTEADDRESS_BUFFER(Name, Space) JSHADER_DECLARE_BINDLESS_PARAMETER(__LINE__, jShaderParameterBindlessByteAddressBuffer, Name, Space)
-#define SHADER_BINDLESS_UNIFORM_BUFFER(BufferType, Name, Space) JSHADER_DECLARE_BINDLESS_PARAMETER(__LINE__, jShaderParameterBindlessUniformBuffer<BufferType>, Name, Space)
-#define SHADER_BINDLESS_TEXTURE2D(Name, Space) JSHADER_DECLARE_BINDLESS_PARAMETER(__LINE__, jShaderParameterBindlessTexture2DSRV, Name, Space)
-#define SHADER_BINDLESS_TEXTURECUBE(Name, Space) JSHADER_DECLARE_BINDLESS_PARAMETER(__LINE__, jShaderParameterBindlessTextureCubeSRV, Name, Space)
-#define SHADER_BINDLESS_SAMPLER(Name, Space) JSHADER_DECLARE_BINDLESS_PARAMETER(__LINE__, jShaderParameterBindlessSampler, Name, Space)
+#define SHADER_BINDLESS_BUFFER(HLSLType, Name) JSHADER_DECLARE_BINDLESS_PARAMETER(__LINE__, jShaderParameterBindlessBuffer<HLSLType>, Name)
+#define SHADER_BINDLESS_STRUCTURED_BUFFER(StructType, Name) JSHADER_DECLARE_BINDLESS_PARAMETER(__LINE__, jShaderParameterBindlessStructuredBuffer<StructType>, Name)
+#define SHADER_BINDLESS_BYTEADDRESS_BUFFER(Name) JSHADER_DECLARE_BINDLESS_PARAMETER(__LINE__, jShaderParameterBindlessByteAddressBuffer, Name)
+#define SHADER_BINDLESS_UNIFORM_BUFFER(BufferType, Name) JSHADER_DECLARE_BINDLESS_PARAMETER(__LINE__, jShaderParameterBindlessUniformBuffer<BufferType>, Name)
+#define SHADER_BINDLESS_TEXTURE2D(Name) JSHADER_DECLARE_BINDLESS_PARAMETER(__LINE__, jShaderParameterBindlessTexture2DSRV, Name)
+#define SHADER_BINDLESS_TEXTURECUBE(Name) JSHADER_DECLARE_BINDLESS_PARAMETER(__LINE__, jShaderParameterBindlessTextureCubeSRV, Name)
+#define SHADER_BINDLESS_SAMPLER(Name) JSHADER_DECLARE_BINDLESS_PARAMETER(__LINE__, jShaderParameterBindlessSampler, Name)
 
 #define END_SHADER_BINDLESS_SET() \
 private: \

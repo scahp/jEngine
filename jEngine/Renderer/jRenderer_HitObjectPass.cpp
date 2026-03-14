@@ -36,9 +36,8 @@ IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderHitObjectVertexShader
 
 struct jShaderHitObjectPixelShader : public jShader
 {
-    static constexpr uint32 ShaderParameterSetBaseSpace = 1;
-
     DECLARE_SHADER_PARAMETER_SETS(
+        jViewShaderParameters,
         jRenderObjectShaderParameters)
 
     using ShaderPermutation = jPermutation<>;
