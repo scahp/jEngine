@@ -13,101 +13,6 @@
     #define SURFEL_GI_ENABLE_STATE1_RETRY 1
 #endif
 
-struct CommonComputeUniformBuffer
-{
-    float4x4 InvP;
-    float4x4 V;
-    float4x4 InvV;
-    float2 ScreenSize;
-    float NormalThreshold;
-    float DepthEdgeScale;
-    float NormalEdgeScale;
-    int PreferCellCenterForFirstPlacement;
-    float MinRadius;
-    float MaxDistance;
-    int FrameNumber;
-    int TileSize;
-    int MaxSurfels;
-    int SurfelPageSize;
-    int SurfelPageTableCapacity;
-    int SpawnBudget;
-    int TTLInFrames;
-    float GridCellSize;
-    float4 CascadeCellScaleFromPrevPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeStartDistancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRadiusScalePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    int OutOfViewKeepFrames;
-    float RadiusScale;
-    float FaceMarginRadiusScale;
-    float4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 SurfelsPerCellPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeCellBasePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeCellCountPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeDeltaCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeDeltaCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeDeltaCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClearAllPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-};
-
-struct SurfelData
-{
-    float4 PositionRadius;
-    float4 NormalSeenFrame;
-    float4 AlbedoWeight;
-    float4 Extra;
-};
-
-struct SurfelGIStats
-{
-    uint ActiveCount;
-    uint DormantCount;
-    uint MismatchCount;
-    uint TTLRetireCount;
-    uint PageGCCount;
-    uint PageEvictCount;
-    uint ReservoirOverflowCount;
-    uint ReservoirRejectedCount;
-};
-
-struct SurfelCandidate
-{
-    SurfelData Surfel;
-    int4 CellCascade;
-    uint Priority;
-    uint3 Padding;
-};
-
-Texture2D DepthTexture : register(t0, space0);
-SamplerState DepthTextureSampler : register(s0, space0);
-Texture2D GBuffer0 : register(t1, space0);
-SamplerState GBuffer0Sampler : register(s1, space0);
-Texture2D GBuffer1 : register(t2, space0);
-SamplerState GBuffer1Sampler : register(s2, space0);
-Texture2D LinearDepthTexture : register(t3, space0);
-
-cbuffer ComputeCommon : register(b4, space0)
-{
-    CommonComputeUniformBuffer ComputeCommon;
-}
-
-RWStructuredBuffer<SurfelData> SurfelPool : register(u5, space0);
-RWTexture2D<float4> DebugOutput : register(u6, space0);
-RWTexture2D<float4> AttemptOutput : register(u7, space0);
-RWStructuredBuffer<uint> SurfelCellPageTable : register(u8, space0);
-RWStructuredBuffer<SurfelGIStats> SurfelGIStatsBuffer : register(u9, space0);
-RWStructuredBuffer<SurfelCandidate> CandidateBuffer : register(u10, space0);
-RWStructuredBuffer<uint> WinnerScoreBuffer : register(u11, space0);
-RWStructuredBuffer<uint> WinnerIndexBuffer : register(u12, space0);
-RWStructuredBuffer<uint> WinnerLockBuffer : register(u13, space0);
-
 uint HashU32(uint x)
 {
     x ^= x >> 16;
@@ -480,7 +385,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         const uint idx = base + i;
         if (idx >= maxSurfels)
             break;
-        const SurfelData s = SurfelPool[idx];
+        const jSurfelGPU s = SurfelPool[idx];
         if (s.Extra.y <= 0.5)
             continue;
         if ((uint)round(s.Extra.w) != cascadeIndex)
@@ -565,14 +470,19 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         return;
     }
 
-    SurfelCandidate c;
+    jSurfelCandidateGPU c;
     c.Surfel.PositionRadius = float4(worldPos, radius);
     c.Surfel.NormalSeenFrame = float4(worldNormal, (float)ComputeCommon.FrameNumber);
     c.Surfel.AlbedoWeight = float4(albedo, 1.0);
     c.Surfel.Extra = float4(0.0, 1.0, 0.0, (float)cascadeIndex);
-    c.CellCascade = int4(cellCoord, (int)cascadeIndex);
+    c.CellX = cellCoord.x;
+    c.CellY = cellCoord.y;
+    c.CellZ = cellCoord.z;
+    c.Cascade = (int)cascadeIndex;
     c.Priority = priority;
-    c.Padding = uint3(0u, 0u, 0u);
+    c.Padding0 = 0u;
+    c.Padding1 = 0u;
+    c.Padding2 = 0u;
     CandidateBuffer[candidateIndex] = c;
 
     uint prevWinnerScore = 0u;

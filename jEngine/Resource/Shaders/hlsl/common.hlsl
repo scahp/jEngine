@@ -2,6 +2,8 @@
 #define TWO_PI 6.283185307179586476925286766559
 #define INV_PI 0.31830988618379067153776752674503
 
+#ifndef JENGINE_GENERATED_TYPE_RenderObjectUniformBuffer
+#define JENGINE_GENERATED_TYPE_RenderObjectUniformBuffer 1
 struct RenderObjectUniformBuffer
 {
     float4x4 M;
@@ -11,7 +13,10 @@ struct RenderObjectUniformBuffer
     uint ObjectID;
     uint RenderObjectID;
 };
+#endif
 
+#ifndef JENGINE_GENERATED_TYPE_ViewUniformBuffer
+#define JENGINE_GENERATED_TYPE_ViewUniformBuffer 1
 struct ViewUniformBuffer
 {
     float4x4 V;
@@ -23,6 +28,7 @@ struct ViewUniformBuffer
     float padding0;
     float4 ScreenRect;
 };
+#endif
 
 struct jDirectionalLightUniformBuffer
 {

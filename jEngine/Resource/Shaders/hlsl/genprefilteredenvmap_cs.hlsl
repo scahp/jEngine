@@ -2,19 +2,6 @@
 #include "Sphericalmap.hlsl"
 #include "PBR.hlsl"
 
-struct MipUniformBuffer
-{
-    int width;
-    int height;
-    int mip;
-    int maxMip;
-};
-
-TextureCube<float4> TexHDR : register(t0, space0);
-SamplerState TexHDRSamplerState : register(s0, space0);
-RWTexture2DArray<float4> Result : register(u1, space0);
-cbuffer MipParam : register(b2, space0) { MipUniformBuffer MipParam; }
-
 [numthreads(8, 8, 1)]
 void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_GroupID)
 {
@@ -56,7 +43,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_Gro
 #endif
 
         float roughness = (float)MipParam.mip / (float)(MipParam.maxMip - 1);
-        float3 PrefilteredColor = PrefilterEnvMap(roughness, dir, TexHDR, TexHDRSamplerState);
+        float3 PrefilteredColor = PrefilterEnvMap(roughness, dir, TexHDR, TexHDRSampler);
         Result[int3(GlobalInvocationID.xy, i)] = float4(PrefilteredColor, 0.0);
     }
 }

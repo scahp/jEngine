@@ -1,19 +1,3 @@
-RWTexture2D<float4> resultImage : register(u0);
-Texture2D inputImage : register(t1);
-
-struct CommonComputeUniformBuffer
-{
-    int Width;
-    int Height;
-    int Padding0;
-    float Padding1;
-};
-
-cbuffer ComputeCommon : register(b2)
-{
-    CommonComputeUniformBuffer ComputeCommon;
-}
-
 [numthreads(8, 8, 1)]
 void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {   

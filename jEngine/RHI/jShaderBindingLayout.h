@@ -88,12 +88,12 @@ struct jUniformBufferResourceBindless : public jShaderBindingResource
 struct jBufferResourceBindless : public jShaderBindingResource
 {
     jBufferResourceBindless() = default;
-    jBufferResourceBindless(std::vector<const jBuffer*>& InBuffers) : Buffers(&InBuffers) {}
+    jBufferResourceBindless(const std::vector<const jBuffer*>& InBuffers) : Buffers(&InBuffers) {}
     virtual ~jBufferResourceBindless() {}
     virtual const void* GetResource(int32 InIndex) const { return (*Buffers)[InIndex]; }
     virtual bool IsBindless() const { return true; }
 
-    std::vector<const jBuffer*>* Buffers;
+    const std::vector<const jBuffer*>* Buffers = nullptr;
 };
 
 struct jSamplerResourceBindless : public jShaderBindingResource

@@ -7,6 +7,96 @@
 #include "jPrimitiveUtil.h"
 #include "jOptions.h"
 #include "Scene/jRenderObject.h"
+#include "Shader/jShaderParameterSet.h"
+
+BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jCubeMapMipUniformBuffer)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, width)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, height)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, mip)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, maxMip)
+END_SHADER_UNIFORM_BUFFER_STRUCT()
+
+BEGIN_SHADER_PARAMETER_SET(jGenCubemapFromSphericalProbeCSParameters)
+    SHADER_TEXTURE2D(EnvMap)
+    SHADER_RW_TEXTURE2DARRAY(Result)
+    SHADER_UNIFORM_BUFFER(jCubeMapMipUniformBuffer, MipParam)
+END_SHADER_PARAMETER_SET()
+
+BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jIrradianceMapSizeUniformBuffer)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, width)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, height)
+END_SHADER_UNIFORM_BUFFER_STRUCT()
+
+BEGIN_SHADER_PARAMETER_SET(jGenIrradianceMapCSParameters)
+    SHADER_TEXTURECUBE(TexHDR)
+    SHADER_RW_TEXTURE2DARRAY(IrradianceMap)
+    SHADER_UNIFORM_BUFFER(jIrradianceMapSizeUniformBuffer, RTSizeParam)
+END_SHADER_PARAMETER_SET()
+
+BEGIN_SHADER_PARAMETER_SET(jGenFilteredEnvMapCSParameters)
+    SHADER_TEXTURECUBE(TexHDR)
+    SHADER_RW_TEXTURE2DARRAY(Result)
+    SHADER_UNIFORM_BUFFER(jCubeMapMipUniformBuffer, MipParam)
+END_SHADER_PARAMETER_SET()
+
+BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jCopyCSUniformBuffer)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, Width)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, Height)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, Padding0)
+    SHADER_UNIFORM_BUFFER_MEMBER(float, Padding1)
+END_SHADER_UNIFORM_BUFFER_STRUCT()
+
+BEGIN_SHADER_PARAMETER_SET(jCopyCSParameters)
+    SHADER_RW_TEXTURE2D(resultImage)
+    SHADER_TEXTURE2D(inputImage)
+    SHADER_UNIFORM_BUFFER(jCopyCSUniformBuffer, ComputeCommon)
+END_SHADER_PARAMETER_SET()
+
+BEGIN_SHADER_PARAMETER_SET(jSingleTexturePSParameters)
+    SHADER_TEXTURE2D(Texture)
+END_SHADER_PARAMETER_SET()
+
+namespace
+{
+template <typename TShaderParameters>
+void DispatchShaderParameterComputePass(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jName InShaderPath
+    , const TShaderParameters& InParameters, uint32 NumGroupsX, uint32 NumGroupsY, uint32 NumGroupsZ)
+{
+    auto CurrentBindingInstance = jShaderParameterSet::CreateShaderBindingInstance(
+        InParameters, EShaderAccessStageFlag::COMPUTE, jShaderBindingInstanceType::SingleFrame);
+
+    jShaderInfo ShaderInfo;
+    ShaderInfo.SetName(InShaderPath);
+    ShaderInfo.SetShaderFilepath(InShaderPath);
+    ShaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
+    jShaderParameterSet::AppendToShaderInfo<TShaderParameters>(ShaderInfo, 0);
+    jShader* Shader = g_rhi->CreateShader(ShaderInfo);
+
+    jShaderBindingLayoutArray ShaderBindingLayoutArray;
+    ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
+
+    jPipelineStateInfo* ComputePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingLayoutArray, {});
+    ComputePipelineStateInfo->Bind(InRenderFrameContextPtr);
+
+    jShaderBindingInstanceArray ShaderBindingInstanceArray;
+    ShaderBindingInstanceArray.Add(CurrentBindingInstance.get());
+
+    jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
+    for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
+    {
+        ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
+        const std::vector<uint32>* DynamicOffsets = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
+        if (DynamicOffsets && DynamicOffsets->size())
+        {
+            ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)DynamicOffsets->data(), (int32)DynamicOffsets->size());
+        }
+    }
+    ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
+
+    g_rhi->BindComputeShaderBindingInstances(InRenderFrameContextPtr->GetActiveCommandBuffer(), ComputePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
+    g_rhi->DispatchCompute(InRenderFrameContextPtr, NumGroupsX, NumGroupsY, NumGroupsZ);
+}
+}
 
 namespace jRHIUtil
 {
@@ -60,83 +150,27 @@ std::shared_ptr<jRenderTarget> ConvertToCubeMap(jName InDestFilePath, Vector2i I
         g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InTwoMirrorBallSphereMap, EResourceLayout::SHADER_READ_ONLY);
         g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), CubeMap->GetTexture(), EResourceLayout::UAV);
 
-        struct jMipUniformBuffer
-        {
-            int32 Width;
-            int32 Height;
-            int32 mip;
-            int32 maxMip;
-        };
-        jMipUniformBuffer MipUBO;
+        jCubeMapMipUniformBuffer MipUBO;
         MipUBO.maxMip = jTexture::GetMipLevels(CubeMap->Info.Width, CubeMap->Info.Height);
 
         for (int32 i = 0; i < MipUBO.maxMip; ++i)
         {
-            MipUBO.Width = CubeMap->Info.Width >> i;
-            MipUBO.Height = CubeMap->Info.Height >> i;
+            MipUBO.width = CubeMap->Info.Width >> i;
+            MipUBO.height = CubeMap->Info.Height >> i;
             MipUBO.mip = i;
 
-            std::shared_ptr<jShaderBindingInstance> CurrentBindingInstance = nullptr;
-            int32 BindingPoint = 0;
-            jShaderBindingArray ShaderBindingArray;
-            jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
-
-            // Binding 0
-            if (ensure(InTwoMirrorBallSphereMap))
-            {
-                ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-                    , ResourceInlineAllactor.Alloc<jTextureResource>(InTwoMirrorBallSphereMap, nullptr)));
-            }
-
-            // Binding 1
-            if (ensure(CubeMap && CubeMap->GetTexture()))
-            {
-                ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
-                    , ResourceInlineAllactor.Alloc<jTextureResource>(CubeMap->GetTexture(), nullptr, i)));
-            }
-
-            // Binding 2
             auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(
                 g_rhi->CreateUniformBufferBlock(jNameStatic("MipUniformBuffer"), jLifeTimeType::OneFrame, sizeof(MipUBO)));
             OneFrameUniformBuffer->UpdateBufferData(&MipUBO, sizeof(MipUBO));
-            ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
-                , ResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
 
-            CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
+            jGenCubemapFromSphericalProbeCSParameters Parameters;
+            Parameters.EnvMap = { InTwoMirrorBallSphereMap, nullptr };
+            Parameters.Result = { CubeMap->GetTexture(), i };
+            Parameters.MipParam.Buffer = OneFrameUniformBuffer;
 
-            jShaderInfo shaderInfo;
-            shaderInfo.SetName(jNameStatic("GenCubemapFromSphericalProbe"));
-            shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/gencubemapfromsphericalprobe_cs.hlsl"));
-            shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
-            static jShader* Shader = g_rhi->CreateShader(shaderInfo);
-
-            jShaderBindingLayoutArray ShaderBindingLayoutArray;
-            ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
-
-            jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingLayoutArray, {});
-
-            computePipelineStateInfo->Bind(InRenderFrameContextPtr);
-
-            jShaderBindingInstanceArray ShaderBindingInstanceArray;
-            ShaderBindingInstanceArray.Add(CurrentBindingInstance.get());
-
-            jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
-            for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
-            {
-                // Add ShaderBindingInstanceCombiner data : DescriptorSets, DynamicOffsets
-                ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
-                const std::vector<uint32>* pDynamicOffsetTest = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
-                if (pDynamicOffsetTest && pDynamicOffsetTest->size())
-                {
-                    ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)pDynamicOffsetTest->data(), (int32)pDynamicOffsetTest->size());
-                }
-            }
-            ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
-
-            g_rhi->BindComputeShaderBindingInstances(InRenderFrameContextPtr->GetActiveCommandBuffer(), computePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
-            g_rhi->DispatchCompute(InRenderFrameContextPtr
-                , MipUBO.Width / 16 + ((MipUBO.Width % 16) ? 1 : 0)
-                , MipUBO.Height / 16 + ((MipUBO.Height % 16) ? 1 : 0)
+            DispatchShaderParameterComputePass(InRenderFrameContextPtr, jNameStatic("Resource/Shaders/hlsl/gencubemapfromsphericalprobe_cs.hlsl"), Parameters
+                , MipUBO.width / 16 + ((MipUBO.width % 16) ? 1 : 0)
+                , MipUBO.height / 16 + ((MipUBO.height % 16) ? 1 : 0)
                 , 6);
         }
     }
@@ -195,76 +229,21 @@ std::shared_ptr<jRenderTarget> GenerateIrradianceMap(jName InDestFilePath, Vecto
         g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InCubemap, EResourceLayout::SHADER_READ_ONLY);
         g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), IrradianceMap->GetTexture(), EResourceLayout::UAV);
 
-        struct jRTSizeUniformBuffer
-        {
-            int32 Width;
-            int32 Height;
-        };
-        jRTSizeUniformBuffer RTSizeUBO;
-        RTSizeUBO.Width = Info.Width;
-        RTSizeUBO.Height = Info.Height;
+        jIrradianceMapSizeUniformBuffer RTSizeUBO;
+        RTSizeUBO.width = Info.Width;
+        RTSizeUBO.height = Info.Height;
 
-        std::shared_ptr<jShaderBindingInstance> CurrentBindingInstance = nullptr;
-        int32 BindingPoint = 0;
-        jShaderBindingArray ShaderBindingArray;
-        jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
-
-        // Binding 0
-        if (ensure(InCubemap))
-        {
-            ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-                , ResourceInlineAllactor.Alloc<jTextureResource>(InCubemap, nullptr)));
-        }
-
-        // Binding 1
-        if (ensure(IrradianceMap && IrradianceMap->GetTexture()))
-        {
-            ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
-                , ResourceInlineAllactor.Alloc<jTextureResource>(IrradianceMap->GetTexture(), nullptr)));
-        }
-
-        // Binding 2
         auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(jNameStatic("MipUniformBuffer"), jLifeTimeType::OneFrame, sizeof(RTSizeUBO)));
         OneFrameUniformBuffer->UpdateBufferData(&RTSizeUBO, sizeof(RTSizeUBO));
-        ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
-            , ResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
 
-        CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
-
-        jShaderInfo shaderInfo;
-        shaderInfo.SetName(jNameStatic("GenIrradianceMap"));
-        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/genirradiancemap_cs.hlsl"));
-        shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
-        static jShader* Shader = g_rhi->CreateShader(shaderInfo);
-
-        jShaderBindingLayoutArray ShaderBindingLayoutArray;
-        ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
-
-        jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingLayoutArray, {});
-
-        computePipelineStateInfo->Bind(InRenderFrameContextPtr);
-
-        jShaderBindingInstanceArray ShaderBindingInstanceArray;
-        ShaderBindingInstanceArray.Add(CurrentBindingInstance.get());
-
-        jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
-        for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
-        {
-            // Add ShaderBindingInstanceCombiner data : DescriptorSets, DynamicOffsets
-            ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
-            const std::vector<uint32>* pDynamicOffsetTest = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
-            if (pDynamicOffsetTest && pDynamicOffsetTest->size())
-            {
-                ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)pDynamicOffsetTest->data(), (int32)pDynamicOffsetTest->size());
-            }
-        }
-        ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
-
-        g_rhi->BindComputeShaderBindingInstances(InRenderFrameContextPtr->GetActiveCommandBuffer(), computePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
+        jGenIrradianceMapCSParameters Parameters;
+        Parameters.TexHDR = { InCubemap, nullptr };
+        Parameters.IrradianceMap = { IrradianceMap->GetTexture() };
+        Parameters.RTSizeParam.Buffer = OneFrameUniformBuffer;
 
         int32 X = (Info.Width / 16) + ((Info.Width % 16) ? 1 : 0);
         int32 Y = (Info.Height / 16) + ((Info.Height % 16) ? 1 : 0);
-        g_rhi->DispatchCompute(InRenderFrameContextPtr, X, Y, 6);
+        DispatchShaderParameterComputePass(InRenderFrameContextPtr, jNameStatic("Resource/Shaders/hlsl/genirradiancemap_cs.hlsl"), Parameters, X, Y, 6);
     }
 
     // Flush all render command
@@ -321,83 +300,26 @@ std::shared_ptr<jRenderTarget> GenerateFilteredEnvironmentMap(jName InDestFilePa
         g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InCubemap, EResourceLayout::SHADER_READ_ONLY);
         g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), FilteredEnvMap->GetTexture(), EResourceLayout::UAV);
 
-        struct jMipUniformBuffer
-        {
-            int32 Width;
-            int32 Height;
-            int32 mip;
-            int32 maxMip;
-        };
-        jMipUniformBuffer MipUBO;
+        jCubeMapMipUniformBuffer MipUBO;
         MipUBO.maxMip = jTexture::GetMipLevels(FilteredEnvMap->Info.Width, FilteredEnvMap->Info.Height);
 
         for (int32 i = 0; i < MipUBO.maxMip; ++i)
         {
-            MipUBO.Width = FilteredEnvMap->Info.Width >> i;
-            MipUBO.Height = FilteredEnvMap->Info.Height >> i;
+            MipUBO.width = FilteredEnvMap->Info.Width >> i;
+            MipUBO.height = FilteredEnvMap->Info.Height >> i;
             MipUBO.mip = i;
 
-            std::shared_ptr<jShaderBindingInstance> CurrentBindingInstance = nullptr;
-            int32 BindingPoint = 0;
-            jShaderBindingArray ShaderBindingArray;
-            jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
-
-            // Binding 0
-            if (ensure(InCubemap))
-            {
-                ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-                    , ResourceInlineAllactor.Alloc<jTextureResource>(InCubemap, nullptr)));
-            }
-
-            // Binding 1
-            if (ensure(FilteredEnvMap && FilteredEnvMap->GetTexture()))
-            {
-                ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
-                    , ResourceInlineAllactor.Alloc<jTextureResource>(FilteredEnvMap->GetTexture(), nullptr, i)));
-            }
-
-            // Binding 2
             auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(jNameStatic("MipUniformBuffer"), jLifeTimeType::OneFrame, sizeof(MipUBO)));
             OneFrameUniformBuffer->UpdateBufferData(&MipUBO, sizeof(MipUBO));
-            ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
-                , ResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
 
-            CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
+            jGenFilteredEnvMapCSParameters Parameters;
+            Parameters.TexHDR = { InCubemap, nullptr };
+            Parameters.Result = { FilteredEnvMap->GetTexture(), i };
+            Parameters.MipParam.Buffer = OneFrameUniformBuffer;
 
-            jShaderInfo shaderInfo;
-            shaderInfo.SetName(jNameStatic("GenFilteredEnvMap"));
-            shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/genprefilteredenvmap_cs.hlsl"));
-            shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
-            static jShader* Shader = g_rhi->CreateShader(shaderInfo);
-
-            jShaderBindingLayoutArray ShaderBindingLayoutArray;
-            ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
-
-            jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingLayoutArray, {});
-
-            computePipelineStateInfo->Bind(InRenderFrameContextPtr);
-
-            jShaderBindingInstanceArray ShaderBindingInstanceArray;
-            ShaderBindingInstanceArray.Add(CurrentBindingInstance.get());
-
-            jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
-            for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
-            {
-                // Add ShaderBindingInstanceCombiner data : DescriptorSets, DynamicOffsets
-                ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
-                const std::vector<uint32>* pDynamicOffsetTest = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
-                if (pDynamicOffsetTest && pDynamicOffsetTest->size())
-                {
-                    ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)pDynamicOffsetTest->data(), (int32)pDynamicOffsetTest->size());
-                }
-            }
-            ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
-
-            g_rhi->BindComputeShaderBindingInstances(InRenderFrameContextPtr->GetActiveCommandBuffer(), computePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
-
-            int32 X = (MipUBO.Width / 16) + ((MipUBO.Width % 16) ? 1 : 0);
-            int32 Y = (MipUBO.Height / 16) + ((MipUBO.Height % 16) ? 1 : 0);
-            g_rhi->DispatchCompute(InRenderFrameContextPtr, X, Y, 6);
+            int32 X = (MipUBO.width / 16) + ((MipUBO.width % 16) ? 1 : 0);
+            int32 Y = (MipUBO.height / 16) + ((MipUBO.height % 16) ? 1 : 0);
+            DispatchShaderParameterComputePass(InRenderFrameContextPtr, jNameStatic("Resource/Shaders/hlsl/genprefilteredenvmap_cs.hlsl"), Parameters, X, Y, 6);
         }
     }
 
@@ -419,6 +341,46 @@ std::shared_ptr<jRenderTarget> GenerateFilteredEnvironmentMap(jName InDestFilePa
     g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), FilteredEnvMap->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 
     return FilteredEnvMap;
+}
+
+void CopyTexture2D(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jTexture* InDestTexture, jTexture* InSourceTexture)
+{
+    check(InRenderFrameContextPtr);
+    check(InDestTexture);
+    check(InSourceTexture);
+
+    jCopyCSUniformBuffer UniformBufferData;
+    UniformBufferData.Width = InDestTexture->Width;
+    UniformBufferData.Height = InDestTexture->Height;
+
+    auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
+        jNameStatic("CopyCSOneFrameUniformBuffer"), jLifeTimeType::OneFrame, sizeof(UniformBufferData)));
+    OneFrameUniformBuffer->UpdateBufferData(&UniformBufferData, sizeof(UniformBufferData));
+
+    g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InSourceTexture, EResourceLayout::SHADER_READ_ONLY);
+
+    jCopyCSParameters Parameters;
+    Parameters.resultImage = { InDestTexture };
+    Parameters.inputImage = { InSourceTexture, nullptr };
+    Parameters.ComputeCommon.Buffer = OneFrameUniformBuffer;
+
+    const int32 X = (InDestTexture->Width / 8) + ((InDestTexture->Width % 8) ? 1 : 0);
+    const int32 Y = (InDestTexture->Height / 8) + ((InDestTexture->Height % 8) ? 1 : 0);
+    DispatchShaderParameterComputePass(InRenderFrameContextPtr, jNameStatic("Resource/Shaders/hlsl/copy_cs.hlsl"), Parameters, X, Y, 1);
+}
+
+void BuildSingleTextureFragmentBindings(jTexture* InTexture, const jSamplerStateInfo* InSamplerState
+    , jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllocator)
+{
+    jSingleTexturePSParameters Parameters;
+    Parameters.Texture.Texture = InTexture;
+    Parameters.Texture.SamplerState = InSamplerState;
+    jShaderParameterSet::BuildShaderBindings(Parameters, EShaderAccessStageFlag::FRAGMENT, InOutShaderBindingArray, InOutResourceInlineAllocator);
+}
+
+void AppendSingleTextureFragmentShaderInfo(jShaderInfo& InOutShaderInfo, int32 InSpace)
+{
+    jShaderParameterSet::AppendToShaderInfo<jSingleTexturePSParameters>(InOutShaderInfo, InSpace);
 }
 
 void CreateDefaultFixedPipelineStates(jRasterizationStateInfo*& OutRasterState, jBlendingStateInfo*& OutBlendState, jDepthStencilStateInfo*& OutDepthStencilState)
@@ -539,11 +501,7 @@ void DrawQuad(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPt
 
 	jGraphicsPipelineShader Shader;
 	{
-		jShaderInfo shaderInfo;
-		shaderInfo.SetName(jNameStatic("DrawQuadVS"));
-		shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"));
-		shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
-		Shader.VertexShader = g_rhi->CreateShader(shaderInfo);
+		Shader.VertexShader = jShaderFullscreenQuadVertexShader::CreateShader(jShaderFullscreenQuadVertexShader::ShaderPermutation());
 
 		Shader.PixelShader = InFuncCreateShaders(InRenderFrameContextPtr);
 	}

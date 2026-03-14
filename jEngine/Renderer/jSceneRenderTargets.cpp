@@ -5,6 +5,7 @@
 #include "Scene/Light/jDirectionalLight.h"
 #include "Scene/Light/jPointLight.h"
 #include "Scene/Light/jSpotLight.h"
+#include "Shader/jLightingShaderParameters.h"
 #include "jOptions.h"
 
 // 임시
@@ -164,11 +165,14 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
     }
 
     {
+        const int32 AtmosphericResolutionPercent = Clamp(atoi(gOptions.AtmosphereResolution), 1, 100);
+        const int32 AtmosphericWidth = Max(1, (SCR_WIDTH * AtmosphericResolutionPercent + 99) / 100);
+        const int32 AtmosphericHeight = Max(1, (SCR_HEIGHT * AtmosphericResolutionPercent + 99) / 100);
         jRenderTargetInfo Info = {
             .Type = ETextureType::TEXTURE_2D,
             .Format = ETextureFormat::R16F,
-            .Width = SCR_WIDTH / 2,
-            .Height = SCR_HEIGHT / 2,
+            .Width = AtmosphericWidth,
+            .Height = AtmosphericHeight,
             .LayerCount = 1,
             .IsGenerateMipmap = false,
             .SampleCount = g_rhi->GetSelectedMSAASamples(),
@@ -325,42 +329,25 @@ std::shared_ptr<jRenderTarget> jSceneRenderTarget::GetShadowMap(const jLight* In
 
 std::shared_ptr<jShaderBindingInstance> jSceneRenderTarget::PrepareGBufferShaderBindingInstance(bool InUseAsSubpassInput) const
 {
-    int32 BindingPoint = 0;
-    jShaderBindingArray ShaderBindingArray;
-    jShaderBindingResourceInlineAllocator ResourceInlineAllocator;
-
-    for (int32 i = 0; i < _countof(GBuffer); ++i)
-    {
-        if (InUseAsSubpassInput)
-        {
-            ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::SUBPASS_INPUT_ATTACHMENT, EShaderAccessStageFlag::FRAGMENT
-                , ResourceInlineAllocator.Alloc<jTextureResource>(GBuffer[i]->GetTexture(), nullptr)));
-        }
-        else
-        {
-            const jSamplerStateInfo* ShadowSamplerStateInfo = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
-                , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
-                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
-
-            ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
-                , ResourceInlineAllocator.Alloc<jTextureResource>(GBuffer[i]->GetTexture(), ShadowSamplerStateInfo)));
-        }
-    }
-
     if (InUseAsSubpassInput)
     {
-        ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::SUBPASS_INPUT_ATTACHMENT, EShaderAccessStageFlag::FRAGMENT
-            , ResourceInlineAllocator.Alloc<jTextureResource>(DepthPtr->GetTexture(), nullptr)));
+        jSceneSubpassInputShaderParameters Parameters;
+        Parameters.GBuffer0 = { GBuffer[0]->GetTexture() };
+        Parameters.GBuffer1 = { GBuffer[1]->GetTexture() };
+        Parameters.GBuffer2 = { GBuffer[2]->GetTexture() };
+        Parameters.DepthTexture = { DepthPtr->GetTexture() };
+        return jShaderParameterSet::CreateShaderBindingInstance(Parameters, EShaderAccessStageFlag::FRAGMENT, jShaderBindingInstanceType::SingleFrame);
     }
     else
     {
-        const jSamplerStateInfo* ShadowSamplerStateInfo = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+        const jSamplerStateInfo* GBufferSamplerStateInfo = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
             , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
             , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
-
-        ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
-            , ResourceInlineAllocator.Alloc<jTextureResource>(DepthPtr->GetTexture(), ShadowSamplerStateInfo)));
+        jSceneTexturesShaderParameters Parameters;
+        Parameters.GBuffer0 = { GBuffer[0]->GetTexture(), GBufferSamplerStateInfo };
+        Parameters.GBuffer1 = { GBuffer[1]->GetTexture(), GBufferSamplerStateInfo };
+        Parameters.GBuffer2 = { GBuffer[2]->GetTexture(), GBufferSamplerStateInfo };
+        Parameters.DepthTexture = { DepthPtr->GetTexture(), GBufferSamplerStateInfo };
+        return jShaderParameterSet::CreateShaderBindingInstance(Parameters, EShaderAccessStageFlag::ALL_GRAPHICS, jShaderBindingInstanceType::SingleFrame);
     }
-
-    return g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
 }

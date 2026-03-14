@@ -38,5 +38,6 @@ public:
     jGraphicsPipelineShader Shader;
     std::shared_ptr<IUniformBufferBlock> UniformBuffer;
     std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance;
+    std::shared_ptr<jShaderBindingInstance> SceneTextureShaderBindingInstance;
     const jShaderBindingInstanceArray& ShaderBindingInstances;
 };

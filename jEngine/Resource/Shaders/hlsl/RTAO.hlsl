@@ -9,39 +9,6 @@
 #define USE_BINDLESS_RESOURCE 0
 #endif
 
-struct SceneConstantBuffer
-{
-    float4x4 projectionToWorld;
-    float4 ViewRect;
-    float3 cameraPosition;
-    float AORadius;
-    int Clear;
-    uint RayPerPixel;
-    float2 HaltonJitter;
-    int FrameNumber;
-    float3 Padding0;        // for 16 byte align
-};
-
-RaytracingAccelerationStructure Scene : register(t0, space0);
-RWTexture2D<float2> RenderTarget : register(u1, space0);
-Texture2D DepthTexture : register(t2, space0);
-Texture2D GBuffer0_Normal : register(t3, space0);
-ConstantBuffer<SceneConstantBuffer> g_sceneCB : register(b4, space0);
-SamplerState AlbedoTextureSampler : register(s5, space0);
-SamplerState PBRSamplerState : register(s6, space0);
-
-#if USE_BINDLESS_RESOURCE
-TextureCube<float4> IrradianceMapArray[] : register(t0, space1);
-TextureCube<float4> PrefilteredEnvMapArray[] : register(t0, space2);
-StructuredBuffer<uint2> VertexIndexOffsetArray[] : register(t0, space3);
-Buffer<uint> IndexBindlessArray[] : register(t0, space4);
-StructuredBuffer<RenderObjectUniformBuffer> RenderObjParamArray[] : register(t0, space5);
-ByteAddressBuffer VerticesBindlessArray[] : register(t0, space6);
-Texture2D AlbedoTextureArray[] : register(t0, space7);
-Texture2D NormalTextureArray[] : register(t0, space8);
-Texture2D RMTextureArray[] : register(t0, space9);
-#endif // USE_BINDLESS_RESOURCE
-
 typedef BuiltInTriangleIntersectionAttributes MyAttributes;
 struct RayPayload
 {

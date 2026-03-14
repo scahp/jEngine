@@ -4,32 +4,6 @@
 #define USE_GAUSSIAN_INSTEAD 0
 #endif // USE_GAUSSIAN_INSTEAD
 
-RWTexture2D<float4> resultImage : register(u0);
-Texture2D inputImage : register(t1);
-Texture2D DepthBuffer : register(t2);
-SamplerState DepthSampler : register(s2);
-
-struct CommonComputeUniformBuffer
-{
-    int Width;
-    int Height;
-    float Sigma;
-    int KernalSize;
-    float SigmaForBilateral;
-    float3 Padding0;            // for 16 byte alignment
-};
-
-cbuffer ComputeCommon : register(b3)
-{
-    CommonComputeUniformBuffer ComputeCommon;
-}
-
-struct jKernel
-{
-    float4 Data[150];
-};
-cbuffer KernelBuffer : register(b4) { jKernel Kernal; }
-
 float Gaussian1D(float x, float sigma)
 {
     return exp(-(x * x) / (2 * sigma * sigma)) / (sqrt(2 * PI) * sigma);
@@ -47,7 +21,7 @@ float GetIntensity(float3 LinearColor)
 
 float GetGaussian2DKernel(int x, int y)
 {
-    int LinearIndex = x + y * ComputeCommon.KernalSize;
+    int LinearIndex = x + y * ComputeCommon.KernelSize;
     return Kernal.Data[LinearIndex / 4][LinearIndex % 4];
 }
 
@@ -57,11 +31,11 @@ void Bilateral(uint3 GlobalInvocationID : SV_DispatchThreadID)
     if (GlobalInvocationID.x >= ComputeCommon.Width || GlobalInvocationID.y >= ComputeCommon.Height)
         return;
 
-    int kernelSize = ComputeCommon.KernalSize;
+    int kernelSize = ComputeCommon.KernelSize;
     int center = kernelSize / 2;
     int2 PixelPos = int2(GlobalInvocationID.xy);
     float2 CenterUV = PixelPos / float2(ComputeCommon.Width, ComputeCommon.Height);
-    float CenterDepth = DepthBuffer.SampleLevel(DepthSampler, CenterUV, 0).x;
+    float CenterDepth = DepthBuffer.SampleLevel(DepthBufferSampler, CenterUV, 0).x;
     
     float3 Color = float3(0, 0, 0);
     float TotalWeight = 0;
@@ -78,7 +52,7 @@ void Bilateral(uint3 GlobalInvocationID : SV_DispatchThreadID)
             
             // Bilateral with depth
             float2 CurUV = CurPixelPos / float2(ComputeCommon.Width, ComputeCommon.Height);
-            float DepthDifference = abs(DepthBuffer.SampleLevel(DepthSampler, CurUV, 0).x - CenterDepth);
+            float DepthDifference = abs(DepthBuffer.SampleLevel(DepthBufferSampler, CurUV, 0).x - CenterDepth);
             float Gi = Gaussian1D(DepthDifference, ComputeCommon.SigmaForBilateral);
             
             #if USE_GAUSSIAN_INSTEAD

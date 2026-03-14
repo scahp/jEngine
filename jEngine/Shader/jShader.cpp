@@ -1,6 +1,16 @@
 ﻿#include "pch.h"
 #include "jShader.h"
 #include "FileLoader/jFile.h"
+#include "Shader/jAOShaderParameters.h"
+#include "Shader/jCommonShaderParameters.h"
+#include "Shader/jLightingShaderParameters.h"
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderFullscreenQuadVertexShader
+    , "DrawQuadVS"
+    , "Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"
+    , ""
+    , "main"
+    , EShaderAccessStageFlag::VERTEX)
 
 bool jShader::IsRunningCheckUpdateShaderThread = false;
 std::thread jShader::CheckUpdateShaderThread;
@@ -237,6 +247,30 @@ void jShader::Initialize()
 	verify(g_rhi->CreateShaderInternal(this, ShaderInfo));
 }
 
+void jShaderDirectionalLightPixelShader::AppendConditionalShaderParameterSets(jShaderParameterBinder& InOutBinder, const ShaderPermutation& InPermutation)
+{
+    if (InPermutation.Get<jShaderDirectionalLightPixelShader::USE_SUBPASS>() == 0)
+        InOutBinder.Add<jSceneTexturesShaderParameters>();
+    else
+        InOutBinder.Add<jSceneSubpassInputShaderParameters>();
+}
+
+void jShaderPointLightPixelShader::AppendConditionalShaderParameterSets(jShaderParameterBinder& InOutBinder, const ShaderPermutation& InPermutation)
+{
+    if (InPermutation.Get<jShaderPointLightPixelShader::USE_SUBPASS>() == 0)
+        InOutBinder.Add<jSceneTexturesShaderParameters>();
+    else
+        InOutBinder.Add<jSceneSubpassInputShaderParameters>();
+}
+
+void jShaderSpotLightPixelShader::AppendConditionalShaderParameterSets(jShaderParameterBinder& InOutBinder, const ShaderPermutation& InPermutation)
+{
+    if (InPermutation.Get<jShaderSpotLightPixelShader::USE_SUBPASS>() == 0)
+        InOutBinder.Add<jSceneTexturesShaderParameters>();
+    else
+        InOutBinder.Add<jSceneSubpassInputShaderParameters>();
+}
+
 //////////////////////////////////////////////////////////////////////////
 IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderForwardPixelShader
 	, "ForwardPS"
@@ -261,6 +295,79 @@ IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderGBufferPixelShader
 	, EShaderAccessStageFlag::FRAGMENT)
 
 //////////////////////////////////////////////////////////////////////////
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderDebugObjectVertexShader
+    , "DebugObjectVS"
+    , "Resource/Shaders/hlsl/debug_object_vs.hlsl"
+    , ""
+    , "main"
+    , EShaderAccessStageFlag::VERTEX)
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderDebugObjectPixelShader
+    , "DebugObjectPS"
+    , "Resource/Shaders/hlsl/debug_object_fs.hlsl"
+    , ""
+    , "main"
+    , EShaderAccessStageFlag::FRAGMENT)
+
+//////////////////////////////////////////////////////////////////////////
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderForwardVertexShader
+    , "ForwardVS"
+    , "Resource/Shaders/hlsl/shader_vs.hlsl"
+    , ""
+    , "main"
+    , EShaderAccessStageFlag::VERTEX)
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderForwardInstancingVertexShader
+    , "ForwardInstancingVS"
+    , "Resource/Shaders/hlsl/shader_instancing_vs.hlsl"
+    , ""
+    , "main"
+    , EShaderAccessStageFlag::VERTEX)
+
+//////////////////////////////////////////////////////////////////////////
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderOmniShadowVertexShader
+    , "OmniShadowVS"
+    , "Resource/Shaders/hlsl/omni_shadow_vs.hlsl"
+    , ""
+    , "main"
+    , EShaderAccessStageFlag::VERTEX)
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderOmniShadowPixelShader
+    , "OmniShadowPS"
+    , "Resource/Shaders/hlsl/omni_shadow_fs.hlsl"
+    , ""
+    , "main"
+    , EShaderAccessStageFlag::FRAGMENT)
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderSpotShadowVertexShader
+    , "SpotShadowVS"
+    , "Resource/Shaders/hlsl/spot_shadow_vs.hlsl"
+    , ""
+    , "main"
+    , EShaderAccessStageFlag::VERTEX)
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderDirectionalShadowVertexShader
+    , "DirectionalShadowVS"
+    , "Resource/Shaders/hlsl/shadow_vs.hlsl"
+    , ""
+    , "main"
+    , EShaderAccessStageFlag::VERTEX)
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderShadowPixelShader
+    , "ShadowPS"
+    , "Resource/Shaders/hlsl/shadow_fs.hlsl"
+    , ""
+    , "main"
+    , EShaderAccessStageFlag::FRAGMENT)
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderShadowInstancingVertexShader
+    , "ShadowInstancingVS"
+    , "Resource/Shaders/hlsl/shadow_instancing_vs.hlsl"
+    , ""
+    , "main"
+    , EShaderAccessStageFlag::VERTEX)
+
+//////////////////////////////////////////////////////////////////////////
 IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderDirectionalLightPixelShader
     , "DirectionalLightShaderPS"
     , "Resource/Shaders/hlsl/directionallight_fs.hlsl"
@@ -276,6 +383,13 @@ IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderPointLightPixelShader
 	, "main"
     , EShaderAccessStageFlag::FRAGMENT)
 
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderPointLightVertexShader
+    , "PointLightShaderVS"
+    , "Resource/Shaders/hlsl/pointlight_vs.hlsl"
+    , ""
+    , "main"
+    , EShaderAccessStageFlag::VERTEX)
+
 //////////////////////////////////////////////////////////////////////////
 IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderSpotLightPixelShader
     , "SpotLightShaderPS"
@@ -283,6 +397,13 @@ IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderSpotLightPixelShader
     , ""
 	, "main"
     , EShaderAccessStageFlag::FRAGMENT)
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderSpotLightVertexShader
+    , "SpotLightShaderVS"
+    , "Resource/Shaders/hlsl/spotlight_vs.hlsl"
+    , ""
+    , "main"
+    , EShaderAccessStageFlag::VERTEX)
 
 //////////////////////////////////////////////////////////////////////////
 IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderBilateralComputeShader

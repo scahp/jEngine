@@ -33,4 +33,5 @@ public:
     const jShaderBindingInstanceArray& ShaderBindingInstances;
 
     std::shared_ptr<jShaderBindingInstance> temp;
+    std::shared_ptr<jShaderBindingInstance> SceneTextureShaderBindingInstance;
 };

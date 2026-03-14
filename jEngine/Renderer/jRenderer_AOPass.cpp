@@ -16,23 +16,506 @@
 #include "RHI/jRHIUtil.h"
 #include "FileLoader/jImageFileLoader.h"
 #include "RHI/jRenderTargetPool.h"
+#include "Shader/jAOShaderParameters.h"
+#include "Shader/jShaderParameterSet.h"
 
 static float RTScale = 0.0f;
 static int32 RayRTWidth = 0;
 static int32 RayRTHeight = 0;
 
+BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jGaussianBlurCommonComputeUniformBuffer)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, Width)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, Height)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, KernelSize)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, Padding0)
+END_SHADER_UNIFORM_BUFFER_STRUCT()
+
+BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jGaussianBlurKernelUniformBuffer)
+    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, Data, 20)
+END_SHADER_UNIFORM_BUFFER_STRUCT()
+
+BEGIN_SHADER_PARAMETER_SET(jGaussianBlurCSParameters)
+    SHADER_RW_TEXTURE2D(resultImage)
+    SHADER_TEXTURE2D(inputImage)
+    SHADER_UNIFORM_BUFFER(jGaussianBlurCommonComputeUniformBuffer, ComputeCommon)
+    SHADER_UNIFORM_BUFFER(jGaussianBlurKernelUniformBuffer, KernelBuffer)
+END_SHADER_PARAMETER_SET()
+
+BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jSSGIAccumulateUniformBuffer)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, g_Width)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, g_Height)
+    SHADER_UNIFORM_BUFFER_MEMBER(float, g_SSGIAccumBlendFactor)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, g_Padding)
+END_SHADER_UNIFORM_BUFFER_STRUCT()
+
+BEGIN_SHADER_PARAMETER_SET(jSSGIAccumulateCSParameters)
+    SHADER_RW_TEXTURE2D(OutSSGIAccum)
+    SHADER_TEXTURE2D(InSSGI)
+    SHADER_TEXTURE2D(InPrevSSGIAccum)
+    SHADER_UNIFORM_BUFFER(jSSGIAccumulateUniformBuffer, SSGIAccumUniformBuffer)
+END_SHADER_PARAMETER_SET()
+
+BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jAOApplyCommonUniformBuffer)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, Width)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, Height)
+    SHADER_UNIFORM_BUFFER_MEMBER(float, AOIntensity)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, Padding0)
+END_SHADER_UNIFORM_BUFFER_STRUCT()
+
+BEGIN_SHADER_PARAMETER_SET(jAOApplyCSParameters)
+    SHADER_RW_TEXTURE2D(resultImage)
+    SHADER_TEXTURE2D(inputImage)
+    SHADER_UNIFORM_BUFFER(jAOApplyCommonUniformBuffer, ComputeCommon)
+END_SHADER_PARAMETER_SET()
+
+BEGIN_SHADER_PARAMETER_SET(jAOApplyPSParameters)
+    SHADER_TEXTURE2D(AOTexture)
+    SHADER_UNIFORM_BUFFER(jAOApplyCommonUniformBuffer, ComputeCommon)
+END_SHADER_PARAMETER_SET()
+
+BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jAOReprojectionCommonUniformBuffer)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, Width)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, Height)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, FrameNumber)
+    SHADER_UNIFORM_BUFFER_MEMBER(float, InvScaleToOriginBuffer)
+END_SHADER_UNIFORM_BUFFER_STRUCT()
+
+BEGIN_SHADER_PARAMETER_SET(jAOReprojectionCSParameters)
+    SHADER_RW_TEXTURE2D(resultImage)
+    SHADER_TEXTURE2D(HistoryBuffer)
+    SHADER_TEXTURE2D(VelocityBuffer)
+    SHADER_TEXTURE2D(DepthBuffer)
+    SHADER_RW_TEXTURE2D_FLOAT(HistoryDepthBuffer)
+    SHADER_UNIFORM_BUFFER(jAOReprojectionCommonUniformBuffer, ComputeCommon)
+END_SHADER_PARAMETER_SET()
+
+BEGIN_SHADER_PARAMETER_SET(jAOReprojectionPSParameters)
+    SHADER_TEXTURE2D(CurrentTexture)
+    SHADER_TEXTURE2D(HistoryBuffer)
+    SHADER_TEXTURE2D(VelocityBuffer)
+    SHADER_TEXTURE2D(DepthBuffer)
+    SHADER_TEXTURE2D(HistoryDepthBuffer)
+    SHADER_UNIFORM_BUFFER(jAOReprojectionCommonUniformBuffer, ComputeCommon)
+END_SHADER_PARAMETER_SET()
+
+BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jSSAOCommonUniformBuffer)
+    SHADER_UNIFORM_BUFFER_MEMBER(Matrix, InvP)
+    SHADER_UNIFORM_BUFFER_MEMBER(Matrix, V)
+    SHADER_UNIFORM_BUFFER_MEMBER(Matrix, P)
+    SHADER_UNIFORM_BUFFER_MEMBER(float, Radius)
+    SHADER_UNIFORM_BUFFER_MEMBER(float, Bias)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector2, NoiseUVScale)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, Width)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, Height)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, FrameNumber)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, Padding0)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector, CameraPos)
+    SHADER_UNIFORM_BUFFER_MEMBER(float, Padding1)
+END_SHADER_UNIFORM_BUFFER_STRUCT()
+
+BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jSSAOKernelUniformBuffer)
+    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, Data, 64)
+END_SHADER_UNIFORM_BUFFER_STRUCT()
+
+BEGIN_SHADER_PARAMETER_SET(jSSAOCSParameters)
+    SHADER_RW_TEXTURE2D(Result)
+    SHADER_TEXTURE2D(DepthTexture)
+    SHADER_TEXTURE2D(GBuffer0_Normal)
+    SHADER_TEXTURE2D(Noise)
+    SHADER_UNIFORM_BUFFER(jSSAOCommonUniformBuffer, ComputeCommon)
+    SHADER_UNIFORM_BUFFER(jSSAOKernelUniformBuffer, Kernel)
+END_SHADER_PARAMETER_SET()
+
+BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jSSGICommonUniformBuffer)
+    SHADER_UNIFORM_BUFFER_MEMBER(Matrix, InvP)
+    SHADER_UNIFORM_BUFFER_MEMBER(Matrix, V)
+    SHADER_UNIFORM_BUFFER_MEMBER(Matrix, P)
+    SHADER_UNIFORM_BUFFER_MEMBER(Matrix, InvV)
+    SHADER_UNIFORM_BUFFER_MEMBER(float, Radius)
+    SHADER_UNIFORM_BUFFER_MEMBER(float, Bias)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector2, NoiseUVScale)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, Width)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, Height)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, FrameNumber)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, SSGI_MaxSteps)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector, CameraPos)
+    SHADER_UNIFORM_BUFFER_MEMBER(float, SSGI_MaxDistance)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, SSGI_RayCount)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, UseAttenuation)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, Padding1)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, Padding2)
+END_SHADER_UNIFORM_BUFFER_STRUCT()
+
+BEGIN_SHADER_PARAMETER_SET(jSSGICSParameters)
+    SHADER_RW_TEXTURE2D(Result)
+    SHADER_TEXTURE2D(DepthTexture)
+    SHADER_TEXTURE2D(GBuffer0)
+    SHADER_TEXTURE2D(GBuffer1)
+    SHADER_TEXTURE2D(GBuffer2)
+    SHADER_TEXTURE2D(ColorTexture)
+    SHADER_TEXTURE2D(Noise)
+    SHADER_UNIFORM_BUFFER(jSSGICommonUniformBuffer, ComputeCommon)
+END_SHADER_PARAMETER_SET()
+
+BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jSSGIReprojectionUniformBuffer)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, Width)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, Height)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, FrameNumber)
+    SHADER_UNIFORM_BUFFER_MEMBER(float, BlendFactor)
+END_SHADER_UNIFORM_BUFFER_STRUCT()
+
+BEGIN_SHADER_PARAMETER_SET(jSSGIReprojectionCSParameters)
+    SHADER_RW_TEXTURE2D(resultImage)
+    SHADER_TEXTURE2D(HistoryBuffer)
+    SHADER_TEXTURE2D(VelocityBuffer)
+    SHADER_TEXTURE2D(DepthBuffer)
+    SHADER_RW_TEXTURE2D_FLOAT(HistoryDepthBuffer)
+    SHADER_UNIFORM_BUFFER(jSSGIReprojectionUniformBuffer, ComputeCommon)
+END_SHADER_PARAMETER_SET()
+
+BEGIN_SHADER_PARAMETER_SET(jSSGIReprojectionPSParameters)
+    SHADER_TEXTURE2D(CurrentTexture)
+    SHADER_TEXTURE2D(HistoryBuffer)
+    SHADER_TEXTURE2D(VelocityBuffer)
+    SHADER_TEXTURE2D(DepthBuffer)
+    SHADER_TEXTURE2D(HistoryDepthBuffer)
+    SHADER_UNIFORM_BUFFER(jSSGIReprojectionUniformBuffer, ComputeCommon)
+END_SHADER_PARAMETER_SET()
+
+BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jATrousUniformBuffer)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, g_StepSize)
+    SHADER_UNIFORM_BUFFER_MEMBER(float, g_Sigma_Color)
+    SHADER_UNIFORM_BUFFER_MEMBER(float, g_Sigma_Normal)
+    SHADER_UNIFORM_BUFFER_MEMBER(float, g_Sigma_Depth)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, g_KernelSize)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector, padding)
+END_SHADER_UNIFORM_BUFFER_STRUCT()
+
+BEGIN_SHADER_PARAMETER_SET(jSSGIATrousCSParameters)
+    SHADER_RW_TEXTURE2D(OutTexture)
+    SHADER_TEXTURE2D(InTexture)
+    SHADER_TEXTURE2D(NormalTexture)
+    SHADER_TEXTURE2D(DepthTexture)
+    SHADER_UNIFORM_BUFFER(jATrousUniformBuffer, A_TrousUniformBuffer)
+END_SHADER_PARAMETER_SET()
+
+BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jRTAOSceneConstantBuffer)
+    SHADER_UNIFORM_BUFFER_MEMBER(Matrix, projectionToWorld)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, ViewRect)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector, cameraPosition)
+    SHADER_UNIFORM_BUFFER_MEMBER(float, AORadius)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, Clear)
+    SHADER_UNIFORM_BUFFER_MEMBER(uint32, RayPerPixel)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector2, HaltonJitter)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, FrameNumber)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector, Padding0)
+END_SHADER_UNIFORM_BUFFER_STRUCT()
+
+BEGIN_SHADER_PARAMETER_SET(jRTAOGlobalParameters)
+    SHADER_ACCELERATION_STRUCTURE(Scene)
+    SHADER_RW_TEXTURE2D_FLOAT2(RenderTarget)
+    SHADER_TEXTURE2D_SRV(DepthTexture)
+    SHADER_TEXTURE2D_SRV(GBuffer0_Normal)
+    SHADER_UNIFORM_BUFFER(jRTAOSceneConstantBuffer, g_sceneCB)
+    SHADER_SAMPLER(AlbedoTextureSampler)
+    SHADER_SAMPLER(PBRSamplerState)
+END_SHADER_PARAMETER_SET()
+
+namespace
+{
+    struct jRTAOBindlessUInt2
+    {
+    };
+
+    template <>
+    struct TShaderParameterHLSLTypeInfo<jRTAOBindlessUInt2>
+    {
+        static constexpr const char* GetTypeName() { return "uint2"; }
+        static void AppendTypeDeclaration(std::string&) {}
+    };
+}
+
+BEGIN_SHADER_BINDLESS_SET(jRTAOBindlessParameters)
+    // space0 is reserved for jRTAOGlobalParameters; bindless tables start at space1.
+    SHADER_BINDLESS_TEXTURECUBE(IrradianceMapArray, 1)
+    SHADER_BINDLESS_TEXTURECUBE(PrefilteredEnvMapArray, 2)
+    SHADER_BINDLESS_STRUCTURED_BUFFER(jRTAOBindlessUInt2, VertexIndexOffsetArray, 3)
+    SHADER_BINDLESS_BUFFER(uint32, IndexBindlessArray, 4)
+    SHADER_BINDLESS_STRUCTURED_BUFFER(RenderObjectUniformBuffer, RenderObjParamArray, 5)
+    SHADER_BINDLESS_BYTEADDRESS_BUFFER(VerticesBindlessArray, 6)
+    SHADER_BINDLESS_TEXTURE2D(AlbedoTextureArray, 7)
+    SHADER_BINDLESS_TEXTURE2D(NormalTextureArray, 8)
+    SHADER_BINDLESS_TEXTURE2D(RMTextureArray, 9)
+END_SHADER_BINDLESS_SET()
+
+namespace
+{
+struct jRTAORaytracingShaderBase : public jShader
+{
+    using jShader::jShader;
+
+    DECLARE_SHADER_PARAMETER_SETS(jRTAOGlobalParameters)
+
+    DECLARE_DEFINE(USE_BINDLESS_RESOURCE, 0, 1);
+
+    using ShaderPermutation = jPermutation<USE_BINDLESS_RESOURCE>;
+    ShaderPermutation Permutation;
+
+    static void AppendConditionalShaderParameterSets(jShaderParameterBinder& InOutBinder, const ShaderPermutation& InPermutation)
+    {
+        if (InPermutation.Get<USE_BINDLESS_RESOURCE>() != 0)
+            InOutBinder.AddBindless<jRTAOBindlessParameters>();
+    }
+};
+
+struct jShaderRTAOMissShader : public jRTAORaytracingShaderBase
+{
+    DECLARE_SHADER_WITH_PERMUTATION_EX(jShaderRTAOMissShader, jRTAORaytracingShaderBase, Permutation)
+};
+
+struct jShaderRTAORaygenShader : public jRTAORaytracingShaderBase
+{
+    DECLARE_SHADER_WITH_PERMUTATION_EX(jShaderRTAORaygenShader, jRTAORaytracingShaderBase, Permutation)
+};
+
+struct jShaderRTAOClosestHitShader : public jRTAORaytracingShaderBase
+{
+    DECLARE_SHADER_WITH_PERMUTATION_EX(jShaderRTAOClosestHitShader, jRTAORaytracingShaderBase, Permutation)
+};
+
+struct jShaderRTAOAnyHitShader : public jRTAORaytracingShaderBase
+{
+    DECLARE_SHADER_WITH_PERMUTATION_EX(jShaderRTAOAnyHitShader, jRTAORaytracingShaderBase, Permutation)
+};
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderRTAOMissShader
+    , "Miss"
+    , "Resource/Shaders/hlsl/RTAO.hlsl"
+    , ""
+    , "MyMissShader"
+    , EShaderAccessStageFlag::RAYTRACING_MISS)
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderRTAORaygenShader
+    , "Raygen"
+    , "Resource/Shaders/hlsl/RTAO.hlsl"
+    , ""
+    , "MyRaygenShader"
+    , EShaderAccessStageFlag::RAYTRACING_RAYGEN)
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderRTAOClosestHitShader
+    , "ClosestHit"
+    , "Resource/Shaders/hlsl/RTAO.hlsl"
+    , ""
+    , "MyClosestHitShader"
+    , EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT)
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderRTAOAnyHitShader
+    , "AnyHit"
+    , "Resource/Shaders/hlsl/RTAO.hlsl"
+    , ""
+    , "MyAnyHitShader"
+    , EShaderAccessStageFlag::RAYTRACING_ANYHIT)
+
+struct jShaderShowAOOnlyBase : public jShader
+{
+    using jShader::jShader;
+
+    DECLARE_DEFINE(SHOW_AO_ONLY, 0, 1);
+
+    using ShaderPermutation = jPermutation<SHOW_AO_ONLY>;
+    ShaderPermutation Permutation;
+};
+
+struct jShaderAOApplyComputeShader : public jShaderShowAOOnlyBase
+{
+    DECLARE_SHADER_PARAMETER_SETS(jAOApplyCSParameters)
+    DECLARE_SHADER_WITH_PERMUTATION_EX(jShaderAOApplyComputeShader, jShaderShowAOOnlyBase, Permutation)
+};
+
+struct jShaderAOApplyPixelShader : public jShaderShowAOOnlyBase
+{
+    DECLARE_SHADER_PARAMETER_SETS(jAOApplyPSParameters)
+    DECLARE_SHADER_WITH_PERMUTATION_EX(jShaderAOApplyPixelShader, jShaderShowAOOnlyBase, Permutation)
+};
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderAOApplyComputeShader
+    , "AOApplyCS"
+    , "Resource/Shaders/hlsl/AOApply_cs.hlsl"
+    , ""
+    , "AOApplyCS"
+    , EShaderAccessStageFlag::COMPUTE)
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderAOApplyPixelShader
+    , "AOApplyPS"
+    , "Resource/Shaders/hlsl/AOApply_cs.hlsl"
+    , ""
+    , "AOApplyPS"
+    , EShaderAccessStageFlag::FRAGMENT)
+
+struct jShaderDiscontinuityWeightBase : public jShader
+{
+    using jShader::jShader;
+
+    DECLARE_DEFINE(USE_DISCONTINUITY_WEIGHT, 0, 1);
+
+    using ShaderPermutation = jPermutation<USE_DISCONTINUITY_WEIGHT>;
+    ShaderPermutation Permutation;
+};
+
+struct jShaderAOReprojectionComputeShader : public jShaderDiscontinuityWeightBase
+{
+    DECLARE_SHADER_PARAMETER_SETS(jAOReprojectionCSParameters)
+    DECLARE_SHADER_WITH_PERMUTATION_EX(jShaderAOReprojectionComputeShader, jShaderDiscontinuityWeightBase, Permutation)
+};
+
+struct jShaderAOReprojectionPixelShader : public jShaderDiscontinuityWeightBase
+{
+    DECLARE_SHADER_PARAMETER_SETS(jAOReprojectionPSParameters)
+    DECLARE_SHADER_WITH_PERMUTATION_EX(jShaderAOReprojectionPixelShader, jShaderDiscontinuityWeightBase, Permutation)
+};
+
+struct jShaderSSGIReprojectionComputeShader : public jShaderDiscontinuityWeightBase
+{
+    DECLARE_SHADER_PARAMETER_SETS(jSSGIReprojectionCSParameters)
+    DECLARE_SHADER_WITH_PERMUTATION_EX(jShaderSSGIReprojectionComputeShader, jShaderDiscontinuityWeightBase, Permutation)
+};
+
+struct jShaderSSGIReprojectionPixelShader : public jShaderDiscontinuityWeightBase
+{
+    DECLARE_SHADER_PARAMETER_SETS(jSSGIReprojectionPSParameters)
+    DECLARE_SHADER_WITH_PERMUTATION_EX(jShaderSSGIReprojectionPixelShader, jShaderDiscontinuityWeightBase, Permutation)
+};
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderAOReprojectionComputeShader
+    , "ReProjectionAOCS"
+    , "Resource/Shaders/hlsl/AOReprojection_cs.hlsl"
+    , ""
+    , "main"
+    , EShaderAccessStageFlag::COMPUTE)
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderAOReprojectionPixelShader
+    , "ReProjectionAOPS"
+    , "Resource/Shaders/hlsl/AOReprojection_cs.hlsl"
+    , ""
+    , "AOReprojectionPS"
+    , EShaderAccessStageFlag::FRAGMENT)
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderSSGIReprojectionComputeShader
+    , "ReProjectionSSGICS"
+    , "Resource/Shaders/hlsl/SSGIReprojection_cs.hlsl"
+    , ""
+    , "main"
+    , EShaderAccessStageFlag::COMPUTE)
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderSSGIReprojectionPixelShader
+    , "ReProjectionSSGIPS"
+    , "Resource/Shaders/hlsl/SSGIReprojection_cs.hlsl"
+    , ""
+    , "SSGIReprojectionPS"
+    , EShaderAccessStageFlag::FRAGMENT)
+
+template <typename TShaderParameters>
+void DispatchShaderParameterComputePass(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr
+    , jName InShaderName, jName InShaderFilePath, jName InEntryPoint, const TShaderParameters& InParameters
+    , uint32 NumGroupsX, uint32 NumGroupsY, uint32 NumGroupsZ, const std::string& InPreProcessors = {})
+{
+    auto CurrentBindingInstance = jShaderParameterSet::CreateShaderBindingInstance(
+        InParameters, EShaderAccessStageFlag::COMPUTE, jShaderBindingInstanceType::SingleFrame);
+
+    jShaderInfo ShaderInfo;
+    ShaderInfo.SetName(InShaderName);
+    ShaderInfo.SetShaderFilepath(InShaderFilePath);
+    ShaderInfo.SetEntryPoint(InEntryPoint);
+    ShaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
+    if (!InPreProcessors.empty())
+        ShaderInfo.SetPreProcessors(jName(InPreProcessors));
+    jShaderParameterSet::AppendToShaderInfo<TShaderParameters>(ShaderInfo, 0);
+    jShader* Shader = g_rhi->CreateShader(ShaderInfo);
+
+    jShaderBindingLayoutArray ShaderBindingLayoutArray;
+    ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
+
+    jPipelineStateInfo* ComputePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingLayoutArray, {});
+    ComputePipelineStateInfo->Bind(InRenderFrameContextPtr);
+
+    jShaderBindingInstanceArray ShaderBindingInstanceArray;
+    ShaderBindingInstanceArray.Add(CurrentBindingInstance.get());
+
+    jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
+    for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
+    {
+        ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
+        const std::vector<uint32>* DynamicOffsets = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
+        if (DynamicOffsets && DynamicOffsets->size())
+        {
+            ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)DynamicOffsets->data(), (int32)DynamicOffsets->size());
+        }
+    }
+    ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
+
+    g_rhi->BindComputeShaderBindingInstances(InRenderFrameContextPtr->GetActiveCommandBuffer(), ComputePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
+    g_rhi->DispatchCompute(InRenderFrameContextPtr, NumGroupsX, NumGroupsY, NumGroupsZ);
+}
+
+template <typename TShaderClass, typename TShaderParameters>
+void DispatchShaderParameterComputePass(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr
+    , const TShaderParameters& InParameters, const typename TShaderClass::ShaderPermutation& InPermutation
+    , uint32 NumGroupsX, uint32 NumGroupsY, uint32 NumGroupsZ)
+{
+    auto CurrentBindingInstance = jShaderParameterSet::CreateShaderBindingInstance(
+        InParameters, EShaderAccessStageFlag::COMPUTE, jShaderBindingInstanceType::SingleFrame);
+
+    jShader* Shader = TShaderClass::CreateShader(InPermutation);
+
+    jShaderBindingLayoutArray ShaderBindingLayoutArray;
+    ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
+
+    jPipelineStateInfo* ComputePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingLayoutArray, {});
+    ComputePipelineStateInfo->Bind(InRenderFrameContextPtr);
+
+    jShaderBindingInstanceArray ShaderBindingInstanceArray;
+    ShaderBindingInstanceArray.Add(CurrentBindingInstance.get());
+
+    jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
+    for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
+    {
+        ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
+        const std::vector<uint32>* DynamicOffsets = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
+        if (DynamicOffsets && DynamicOffsets->size())
+        {
+            ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)DynamicOffsets->data(), (int32)DynamicOffsets->size());
+        }
+    }
+    ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
+
+    g_rhi->BindComputeShaderBindingInstances(InRenderFrameContextPtr->GetActiveCommandBuffer(), ComputePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
+    g_rhi->DispatchCompute(InRenderFrameContextPtr, NumGroupsX, NumGroupsY, NumGroupsZ);
+}
+
+void DispatchGaussianBlurPass(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jTexture* InDestTexture, jTexture* InSourceTexture
+    , const std::shared_ptr<IUniformBufferBlock>& InCommonUniformBuffer, const std::shared_ptr<IUniformBufferBlock>& InKernelUniformBuffer
+    , jName InShaderName, jName InEntryPoint)
+{
+    g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InSourceTexture, EResourceLayout::SHADER_READ_ONLY);
+
+    jGaussianBlurCSParameters Parameters;
+    Parameters.resultImage = { InDestTexture };
+    Parameters.inputImage = { InSourceTexture, nullptr };
+    Parameters.ComputeCommon.Buffer = InCommonUniformBuffer;
+    Parameters.KernelBuffer.Buffer = InKernelUniformBuffer;
+
+    const uint32 GroupX = InDestTexture->Width / 8 + ((InDestTexture->Width % 8) ? 1 : 0);
+    const uint32 GroupY = InDestTexture->Height / 8 + ((InDestTexture->Height % 8) ? 1 : 0);
+    DispatchShaderParameterComputePass(InRenderFrameContextPtr, InShaderName
+        , jNameStatic("Resource/Shaders/hlsl/gaussianblur_cs.hlsl"), InEntryPoint, Parameters, GroupX, GroupY, 1);
+}
+}
+
 std::shared_ptr<jTexture> ReprojectionAO(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const std::shared_ptr<jTexture>& InTexture)
 {
 	if (gOptions.UseAOReprojection)
 	{
-		struct CommonComputeUniformBuffer
-		{
-			int32 Width;
-			int32 Height;
-			int32 FrameNumber;
-			float InvScaleToOriginBuffer;           // InvScale for HistoryBuffer, it will be always 1.0 when no scaling options(RTScale == 1).
-		};
-		CommonComputeUniformBuffer CommonComputeData;
+		jAOReprojectionCommonUniformBuffer CommonComputeData;
 		CommonComputeData.Width = InTexture->Width;
 		CommonComputeData.Height = InTexture->Height;
 		CommonComputeData.FrameNumber = g_rhi->GetCurrentFrameNumber();
@@ -48,50 +531,65 @@ std::shared_ptr<jTexture> ReprojectionAO(const std::shared_ptr<jRenderFrameConte
 			SCOPE_CPU_PROFILE(ReprojectionAO);
 			SCOPE_GPU_PROFILE(InRenderFrameContextPtr, ReprojectionAO);
 
-			jRHIUtil::DrawFullScreen(InRenderFrameContextPtr, jSceneRenderTarget::AOProjection
-				, [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
-				{
-					const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
-						, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
-						, 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
+            bool IsAOReprojectionCompute = false;
+            if (IsAOReprojectionCompute)
+            {
+                auto* CommandBuffer = InRenderFrameContextPtr->GetActiveCommandBuffer();
+                g_rhi->TransitionLayout(CommandBuffer, jSceneRenderTarget::AOProjection->GetTexture(), EResourceLayout::UAV);
+                g_rhi->TransitionLayout(CommandBuffer, jSceneRenderTarget::HistoryBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
+                g_rhi->TransitionLayout(CommandBuffer, InTexture.get(), EResourceLayout::SHADER_READ_ONLY);
+                g_rhi->TransitionLayout(CommandBuffer, InRenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::VELOCITY)->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+                g_rhi->TransitionLayout(CommandBuffer, jSceneRenderTarget::HistoryDepthBuffer.get(), EResourceLayout::UAV);
+                g_rhi->TransitionLayout(CommandBuffer, InRenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 
-					g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::HistoryBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
-					g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InTexture.get(), EResourceLayout::SHADER_READ_ONLY);
-					g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InRenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::VELOCITY)->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
-					g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::HistoryDepthBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
-					g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InRenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+                jAOReprojectionCSParameters Parameters;
+                Parameters.resultImage = { jSceneRenderTarget::AOProjection->GetTexture() };
+                Parameters.HistoryBuffer = { jSceneRenderTarget::HistoryBuffer.get(), nullptr };
+                Parameters.VelocityBuffer = { InRenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::VELOCITY)->GetTexture(), nullptr };
+                Parameters.DepthBuffer = { InRenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), nullptr };
+                Parameters.HistoryDepthBuffer = { jSceneRenderTarget::HistoryDepthBuffer.get() };
+                Parameters.ComputeCommon.Buffer = OneFrameUniformBuffer;
 
-					InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
-						, InOutResourceInlineAllactor.Alloc<jTextureResource>(InTexture.get(), SamplerState)));
+                jShaderAOReprojectionComputeShader::ShaderPermutation Permutation;
+                Permutation.SetIndex<jShaderAOReprojectionComputeShader::USE_DISCONTINUITY_WEIGHT>(gOptions.UseDiscontinuityWeight ? 1 : 0);
+                const uint32 GroupX = jSceneRenderTarget::AOProjection->GetTexture()->Width / 8 + ((jSceneRenderTarget::AOProjection->GetTexture()->Width % 8) ? 1 : 0);
+                const uint32 GroupY = jSceneRenderTarget::AOProjection->GetTexture()->Height / 8 + ((jSceneRenderTarget::AOProjection->GetTexture()->Height % 8) ? 1 : 0);
+                DispatchShaderParameterComputePass<jShaderAOReprojectionComputeShader>(InRenderFrameContextPtr
+                    , Parameters
+                    , Permutation
+                    , GroupX, GroupY, 1);
+            }
+            else
+            {
+                const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+                    , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
+                    , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
 
-					InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
-						, InOutResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::HistoryBuffer.get(), SamplerState)));
+                jAOReprojectionPSParameters Parameters;
+                Parameters.CurrentTexture = { InTexture.get(), SamplerState };
+                Parameters.HistoryBuffer = { jSceneRenderTarget::HistoryBuffer.get(), SamplerState };
+                Parameters.VelocityBuffer = { InRenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::VELOCITY)->GetTexture(), SamplerState };
+                Parameters.DepthBuffer = { InRenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), SamplerState };
+                Parameters.HistoryDepthBuffer = { jSceneRenderTarget::HistoryDepthBuffer.get(), SamplerState };
+                Parameters.ComputeCommon.Buffer = OneFrameUniformBuffer;
 
-					InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::FRAGMENT
-						, InOutResourceInlineAllactor.Alloc<jTextureResource>(InRenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::VELOCITY)->GetTexture(), nullptr)));
-
-					InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::FRAGMENT
-						, InOutResourceInlineAllactor.Alloc<jTextureResource>(InRenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), nullptr)));
-
-					InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::FRAGMENT
-						, InOutResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::HistoryDepthBuffer.get(), nullptr)));
-
-					InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::FRAGMENT
-						, InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
-				}
-				, [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
-					{
-						jShaderInfo shaderInfo;
-						shaderInfo.SetName(jNameStatic("ReProjectionAOPS"));
-						shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/AOReprojection_cs.hlsl"));
-						shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
-						shaderInfo.SetEntryPoint(jNameStatic("AOReprojectionPS"));
-						if (gOptions.UseDiscontinuityWeight)
-						{
-							shaderInfo.SetPreProcessors(jNameStatic("#define USE_DISCONTINUITY_WEIGHT 1"));
-						}
-						return g_rhi->CreateShader(shaderInfo);
-					});
+                jRHIUtil::DrawFullScreen(InRenderFrameContextPtr, jSceneRenderTarget::AOProjection
+                    , [&, Parameters](const std::shared_ptr<jRenderFrameContext>& InInRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
+                    {
+                        g_rhi->TransitionLayout(InInRenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::HistoryBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
+                        g_rhi->TransitionLayout(InInRenderFrameContextPtr->GetActiveCommandBuffer(), InTexture.get(), EResourceLayout::SHADER_READ_ONLY);
+                        g_rhi->TransitionLayout(InInRenderFrameContextPtr->GetActiveCommandBuffer(), InInRenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::VELOCITY)->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+                        g_rhi->TransitionLayout(InInRenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::HistoryDepthBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
+                        g_rhi->TransitionLayout(InInRenderFrameContextPtr->GetActiveCommandBuffer(), InInRenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+                        jShaderParameterSet::BuildShaderBindings(Parameters, EShaderAccessStageFlag::FRAGMENT, InOutShaderBindingArray, InOutResourceInlineAllactor);
+                    }
+                    , [](const std::shared_ptr<jRenderFrameContext>&)
+                    {
+                        jShaderAOReprojectionPixelShader::ShaderPermutation Permutation;
+                        Permutation.SetIndex<jShaderAOReprojectionPixelShader::USE_DISCONTINUITY_WEIGHT>(gOptions.UseDiscontinuityWeight ? 1 : 0);
+                        return jShaderAOReprojectionPixelShader::CreateShader(Permutation);
+                    });
+            }
 		}
 		return jSceneRenderTarget::AOProjection->GetTexturePtr();
 	}
@@ -134,27 +632,16 @@ std::shared_ptr<jTexture> jRenderer::Denoise(const std::shared_ptr<jTexture>& In
 		std::vector<float> GaussianKernel = createGaussianKernel(InKernelSize, InKernelSigma);
 
 		// Create GaussianBlurKernel uniformbuffer
-		struct jGaussianBlurKernel
-		{
-			Vector4 Width[20];
-		};
-		jGaussianBlurKernel KernelData;
-		check(sizeof(KernelData.Width) >= GaussianKernel.size() * sizeof(float));
-		memcpy(KernelData.Width, GaussianKernel.data(), GaussianKernel.size() * sizeof(float));
+		jGaussianBlurKernelUniformBuffer KernelData;
+		check(sizeof(KernelData.Data) >= GaussianKernel.size() * sizeof(float));
+		memcpy(KernelData.Data, GaussianKernel.data(), GaussianKernel.size() * sizeof(float));
 
 		auto OneFrameGaussianKernelUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
 			jNameStatic("GaussianKernel"), jLifeTimeType::OneFrame, sizeof(KernelData)));
 		OneFrameGaussianKernelUniformBuffer->UpdateBufferData(&KernelData, sizeof(KernelData));
 
 		// Create common uniformbuffer
-		struct CommonComputeUniformBuffer
-		{
-			int32 Width;
-			int32 Height;
-			int32 KernelSize;
-			int32 Padding0;
-		};
-		CommonComputeUniformBuffer CommonComputeData;
+		jGaussianBlurCommonComputeUniformBuffer CommonComputeData;
 		CommonComputeData.Width = RayRTWidth;
 		CommonComputeData.Height = RayRTHeight;
 		CommonComputeData.KernelSize = (int32)GaussianKernel.size();
@@ -169,31 +656,8 @@ std::shared_ptr<jTexture> jRenderer::Denoise(const std::shared_ptr<jTexture>& In
 			SCOPE_CPU_PROFILE(Vertical);
 			SCOPE_GPU_PROFILE(RenderFrameContextPtr, Vertical);
 
-			jRHIUtil::DispatchCompute(RenderFrameContextPtr, jSceneRenderTarget::GaussianV.get()
-				, [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
-				{
-					g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InTexture.get(), EResourceLayout::SHADER_READ_ONLY);
-
-					InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-						, InOutResourceInlineAllactor.Alloc<jTextureResource>(InTexture.get(), nullptr)));
-
-					InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
-						, InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
-
-					InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
-						, InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameGaussianKernelUniformBuffer.get()), true));
-				}
-				, [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
-					{
-						jShaderInfo shaderInfo;
-						shaderInfo.SetName(jNameStatic("GaussianV"));
-						shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/gaussianblur_cs.hlsl"));
-						shaderInfo.SetEntryPoint(jNameStatic("Vertical"));
-						shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
-						jShader* Shader = g_rhi->CreateShader(shaderInfo);
-						return Shader;
-					}
-				);
+			DispatchGaussianBlurPass(RenderFrameContextPtr, jSceneRenderTarget::GaussianV.get(), InTexture.get()
+				, OneFrameUniformBuffer, OneFrameGaussianKernelUniformBuffer, jNameStatic("GaussianV"), jNameStatic("Vertical"));
 		}
 
 		g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::GaussianV.get());
@@ -207,32 +671,8 @@ std::shared_ptr<jTexture> jRenderer::Denoise(const std::shared_ptr<jTexture>& In
 				jNameStatic("CommonComputeUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
 			OneFrameUniformBuffer->UpdateBufferData(&CommonComputeData, sizeof(CommonComputeData));
 
-			jRHIUtil::DispatchCompute(RenderFrameContextPtr, jSceneRenderTarget::GaussianH.get()
-				, [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
-				{
-					jTexture* InGaussianVTexture = jSceneRenderTarget::GaussianV.get();
-					g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InGaussianVTexture, EResourceLayout::SHADER_READ_ONLY);
-
-					InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-						, InOutResourceInlineAllactor.Alloc<jTextureResource>(InGaussianVTexture, nullptr)));
-
-					InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
-						, InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
-
-					InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
-						, InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameGaussianKernelUniformBuffer.get()), true));
-				}
-				, [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
-					{
-						jShaderInfo shaderInfo;
-						shaderInfo.SetName(jNameStatic("GaussianH"));
-						shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/gaussianblur_cs.hlsl"));
-						shaderInfo.SetEntryPoint(jNameStatic("Horizon"));
-						shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
-						jShader* Shader = g_rhi->CreateShader(shaderInfo);
-						return Shader;
-					}
-				);
+			DispatchGaussianBlurPass(RenderFrameContextPtr, jSceneRenderTarget::GaussianH.get(), jSceneRenderTarget::GaussianV.get()
+				, OneFrameUniformBuffer, OneFrameGaussianKernelUniformBuffer, jNameStatic("GaussianH"), jNameStatic("Horizon"));
 		}
 		return jSceneRenderTarget::GaussianH;
 	}
@@ -275,16 +715,7 @@ std::shared_ptr<jTexture> jRenderer::Denoise(const std::shared_ptr<jTexture>& In
 		SCOPE_GPU_PROFILE_NAME(RenderFrameContextPtr, ProfileTitle);
 		g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), InTexture.get());
 		{
-			struct CommonComputeUniformBuffer
-			{
-				int32 Width;
-				int32 Height;
-				float Sigma;
-				int KernelSize;
-				float SigmaForBilateral;
-				Vector Padding0;
-			};
-			CommonComputeUniformBuffer CommonComputeData;
+			jBilateralCommonComputeUniformBuffer CommonComputeData;
 			CommonComputeData.Width = jSceneRenderTarget::GaussianH->Width;
 			CommonComputeData.Height = jSceneRenderTarget::GaussianH->Height;
 			CommonComputeData.Sigma = InKernelSigma;
@@ -295,49 +726,36 @@ std::shared_ptr<jTexture> jRenderer::Denoise(const std::shared_ptr<jTexture>& In
 				jNameStatic("CommonComputeUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
 			OneFrameUniformBuffer->UpdateBufferData(&CommonComputeData, sizeof(CommonComputeData));
 
-			// Create GaussianBlurKernel uniformbuffer
-			struct jGaussianBlurKernel
-			{
-				Vector4 Width[150];
-			};
-			jGaussianBlurKernel KernelData;
-			check(sizeof(KernelData.Width) >= GaussianKernel.size() * sizeof(float));
-			memcpy(KernelData.Width, GaussianKernel.data(), GaussianKernel.size() * sizeof(float));
+			jBilateralKernelUniformBuffer KernelData;
+			check(sizeof(KernelData.Data) >= GaussianKernel.size() * sizeof(float));
+			memcpy(KernelData.Data, GaussianKernel.data(), GaussianKernel.size() * sizeof(float));
 
 			auto OneFrameGaussianKernelUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
 				jNameStatic("GaussianKernel"), jLifeTimeType::OneFrame, sizeof(KernelData)));
 			OneFrameGaussianKernelUniformBuffer->UpdateBufferData(&KernelData, sizeof(KernelData));
 
-			jRHIUtil::DispatchCompute(RenderFrameContextPtr, jSceneRenderTarget::GaussianH.get()
-				, [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
-				{
-					g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InTexture.get(), EResourceLayout::SHADER_READ_ONLY);
-					g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InRenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), InTexture.get(), EResourceLayout::SHADER_READ_ONLY);
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 
-					const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
-						, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT
-						, 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
+            const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+                , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT
+                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
 
-					InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::COMPUTE
-						, InOutResourceInlineAllactor.Alloc<jTextureResource>(InTexture.get(), nullptr)));
+            jBilateralFilteringCSParameters Parameters;
+            Parameters.resultImage = { jSceneRenderTarget::GaussianH.get() };
+            Parameters.inputImage = { InTexture.get(), nullptr };
+            Parameters.DepthBuffer = { RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), SamplerState };
+            Parameters.ComputeCommon.Buffer = OneFrameUniformBuffer;
+            Parameters.Kernal.Buffer = OneFrameGaussianKernelUniformBuffer;
 
-					InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-						, InOutResourceInlineAllactor.Alloc<jTextureResource>(InRenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), SamplerState)));
-
-					InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
-						, InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
-
-					InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
-						, InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameGaussianKernelUniformBuffer.get()), true));
-				}
-				, [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
-					{
-						jShaderBilateralComputeShader::ShaderPermutation ShaderPermutation;
-						ShaderPermutation.SetIndex<jShaderBilateralComputeShader::USE_GAUSSIAN_INSTEAD>(gOptions.IsDenoiserGuassian());
-						jShader* Shader = jShaderBilateralComputeShader::CreateShader(ShaderPermutation);
-						return Shader;
-					}
-				);
+            jShaderBilateralComputeShader::ShaderPermutation Permutation;
+            Permutation.SetIndex<jShaderBilateralComputeShader::USE_GAUSSIAN_INSTEAD>(gOptions.IsDenoiserGuassian() ? 1 : 0);
+            DispatchShaderParameterComputePass<jShaderBilateralComputeShader>(RenderFrameContextPtr
+                , Parameters
+                , Permutation
+                , jSceneRenderTarget::GaussianH->Width / 8 + ((jSceneRenderTarget::GaussianH->Width % 8) ? 1 : 0)
+                , jSceneRenderTarget::GaussianH->Height / 8 + ((jSceneRenderTarget::GaussianH->Height % 8) ? 1 : 0)
+                , 1);
 		}
 
 		g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::GaussianH.get());
@@ -354,42 +772,7 @@ std::shared_ptr<jTexture> UpdateHistoryBuffer(const std::shared_ptr<jRenderFrame
 	SCOPE_CPU_PROFILE(CopyHistoryBuffer);
 	SCOPE_GPU_PROFILE(InRenderFrameContextPtr, CopyHistoryBuffer);
 
-	struct CommonComputeUniformBuffer
-	{
-		int32 Width;
-		int32 Height;
-		int32 Paading0;
-		float Padding1;
-	};
-	CommonComputeUniformBuffer CommonComputeData;
-	CommonComputeData.Width = jSceneRenderTarget::HistoryBuffer->Width;
-	CommonComputeData.Height = jSceneRenderTarget::HistoryBuffer->Height;
-
-	auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
-		jNameStatic("CopyCSOneFrameUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
-	OneFrameUniformBuffer->UpdateBufferData(&CommonComputeData, sizeof(CommonComputeData));
-
-	jRHIUtil::DispatchCompute(InRenderFrameContextPtr, jSceneRenderTarget::HistoryBuffer.get()
-		, [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
-		{
-			g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InTexture.get(), EResourceLayout::SHADER_READ_ONLY);
-
-			InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::COMPUTE
-				, InOutResourceInlineAllactor.Alloc<jTextureResource>(InTexture.get(), nullptr)));
-
-			InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
-				, InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
-		}
-		, [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
-			{
-				jShaderInfo shaderInfo;
-				shaderInfo.SetName(jNameStatic("CopyCS"));
-				shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/copy_cs.hlsl"));
-				shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
-				jShader* Shader = g_rhi->CreateShader(shaderInfo);
-				return Shader;
-			}
-		);
+	jRHIUtil::CopyTexture2D(InRenderFrameContextPtr, jSceneRenderTarget::HistoryBuffer.get(), InTexture.get());
 
 	return InTexture;
 }
@@ -413,22 +796,7 @@ std::shared_ptr<jTexture> jRenderer::SSAO()
 	});
 
 	// 1. SSAO
-    struct CommonComputeUniformBuffer
-    {
-        Matrix InvP;
-        Matrix V;
-        Matrix P;
-        float Radius;
-        float Bias;
-        Vector2 NoiseUVScale;
-        int32 Width;
-        int32 Height;
-        int32 FrameNumber;
-        int32 Padding0;
-        Vector CameraPos;
-        float Padding1;
-    };
-    CommonComputeUniformBuffer CommonComputeData;
+    jSSAOCommonUniformBuffer CommonComputeData;
 
 	auto mainCamera = jCamera::GetMainCamera();
 	CommonComputeData.InvP = mainCamera->Projection.GetInverse();
@@ -441,7 +809,7 @@ std::shared_ptr<jTexture> jRenderer::SSAO()
 	CommonComputeData.Width = SSAO_RT->Info.Width;
 	CommonComputeData.Height = SSAO_RT->Info.Height;
 	CommonComputeData.FrameNumber = (int32)g_rhi->GetCurrentFrameNumber();
-	CommonComputeData.CameraPos = Vector4(mainCamera->Pos, 0.0f);
+	CommonComputeData.CameraPos = mainCamera->Pos;
 
 	auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
 		jNameStatic("OnFrameUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
@@ -466,60 +834,48 @@ std::shared_ptr<jTexture> jRenderer::SSAO()
             ssaoKernelData[i] = Vector4(sample * scale, 0.0f);
         }
     }
+    jSSAOKernelUniformBuffer KernelData;
+    check(sizeof(KernelData.Data) >= ssaoKernelData.size() * sizeof(Vector4));
+    memcpy(KernelData.Data, ssaoKernelData.data(), ssaoKernelData.size() * sizeof(Vector4));
+
     auto SSAOKernelOneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
-        jNameStatic("SSAOKernelOneFrameUniformBuffer"), jLifeTimeType::OneFrame, ssaoKernelData.size() * sizeof(Vector4)));
-    SSAOKernelOneFrameUniformBuffer->UpdateBufferData(ssaoKernelData.data(), ssaoKernelData.size() * sizeof(Vector4));
+        jNameStatic("SSAOKernelOneFrameUniformBuffer"), jLifeTimeType::OneFrame, sizeof(KernelData)));
+    SSAOKernelOneFrameUniformBuffer->UpdateBufferData(&KernelData, sizeof(KernelData));
 
-    jRHIUtil::DispatchCompute(RenderFrameContextPtr, SSAO_RT->GetTexture()
-        , [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
-        {
-            g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InRenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::DEPTH_STENCIL_READ_ONLY);
-            g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InRenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[0]->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
-            g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), GNoiseTexture.get(), EResourceLayout::SHADER_READ_ONLY);
+    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), SSAO_RT->GetTexture(), EResourceLayout::UAV);
+    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::DEPTH_STENCIL_READ_ONLY);
+    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[0]->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GNoiseTexture.get(), EResourceLayout::SHADER_READ_ONLY);
 
-            const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
-                , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::REPEAT
-                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
+    const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+        , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::REPEAT
+        , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
 
-            const jSamplerStateInfo* RepeatSamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
-                , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT
-                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
+    const jSamplerStateInfo* RepeatSamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+        , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT
+        , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
 
-            InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-                , InOutResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), SamplerState)));
+    jSSAOCSParameters Parameters;
+    Parameters.Result = { SSAO_RT->GetTexture() };
+    Parameters.DepthTexture = { RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), SamplerState };
+    Parameters.GBuffer0_Normal = { RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[0]->GetTexture(), SamplerState };
+    Parameters.Noise = { GNoiseTexture.get(), RepeatSamplerState };
+    Parameters.ComputeCommon.Buffer = OneFrameUniformBuffer;
+    Parameters.Kernel.Buffer = SSAOKernelOneFrameUniformBuffer;
 
-            InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-                , InOutResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[0]->GetTexture(), SamplerState)));
+    std::string ShaderPreProcessors;
+    ShaderPreProcessors += "#define SSAO_KERNEL_SIZE ";
+    ShaderPreProcessors += std::to_string(SSAO_KERNEL_SIZE);
 
-            InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-                , InOutResourceInlineAllactor.Alloc<jTextureResource>(GNoiseTexture.get(), RepeatSamplerState)));
-
-            InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
-                , InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
-
-            InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
-                , InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(SSAOKernelOneFrameUniformBuffer.get()), true));
-        }
-        , [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
-            {
-                jShaderInfo shaderInfo;
-                shaderInfo.SetName(jNameStatic("SSAO_CS"));
-                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/SSAO_cs.hlsl"));
-                shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
-                shaderInfo.SetEntryPoint(jNameStatic("main"));
-
-				shaderInfo.SetPreProcessors(jNameStatic([]() -> std::string
-				{
-					std::string Define;
-					Define += "#define SSAO_KERNEL_SIZE ";
-					Define += std::to_string(SSAO_KERNEL_SIZE);
-					return Define;
-				}()));
-
-                jShader* Shader = g_rhi->CreateShader(shaderInfo);
-                return Shader;
-            }
-        );
+    const uint32 GroupX = SSAO_RT->GetTexture()->Width / 8 + ((SSAO_RT->GetTexture()->Width % 8) ? 1 : 0);
+    const uint32 GroupY = SSAO_RT->GetTexture()->Height / 8 + ((SSAO_RT->GetTexture()->Height % 8) ? 1 : 0);
+    DispatchShaderParameterComputePass(RenderFrameContextPtr
+        , jNameStatic("SSAO_CS")
+        , jNameStatic("Resource/Shaders/hlsl/SSAO_cs.hlsl")
+        , jNameStatic("main")
+        , Parameters
+        , GroupX, GroupY, 1
+        , ShaderPreProcessors);
 
     g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), SSAO_RT->GetTexture());
 
@@ -565,20 +921,7 @@ std::shared_ptr<jTexture> jRenderer::RTAO()
 			, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
 			, 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
 
-		struct SceneConstantBuffer
-		{
-			Matrix projectionToWorld;
-			Vector4 ViewRect;
-			Vector cameraPosition;
-			float AORadius;
-			int32 Clear;
-			uint32 RayPerPixel;
-			Vector2 HaltonJitter;
-			int32 FrameNumber;
-			Vector Padding0;			// for 16 byte align
-		};
-
-		SceneConstantBuffer m_sceneCB;
+		jRTAOSceneConstantBuffer m_sceneCB;
 		auto mainCamera = jCamera::GetMainCamera();
 		m_sceneCB.cameraPosition = mainCamera->Pos;
 		m_sceneCB.projectionToWorld = mainCamera->GetInverseViewProjectionMatrix();
@@ -653,28 +996,20 @@ std::shared_ptr<jTexture> jRenderer::RTAO()
 			// Record normal resources
 			jShaderBindingArray ShaderBindingArray;
 			jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
-			ShaderBindingArray.Add(jShaderBinding::Create(0, 1, EShaderBindingType::ACCELERATION_STRUCTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-				ResourceInlineAllactor.Alloc<jBufferResource>(RenderFrameContextPtr->RaytracingScene->TLASBufferPtr.get()), true));
-			ShaderBindingArray.Add(jShaderBinding::Create(1, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::ALL_RAYTRACING,
-				ResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr.get(), nullptr), false));
-			ShaderBindingArray.Add(jShaderBinding::Create(2, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-				ResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), nullptr), false));
-			ShaderBindingArray.Add(jShaderBinding::Create(3, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-				ResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::NORMAL)->GetTexture(), nullptr), false));
-			ShaderBindingArray.Add(jShaderBinding::Create(4, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_RAYTRACING,
-				ResourceInlineAllactor.Alloc<jUniformBufferResource>(SceneUniformBufferPtr.get()), true));
-			ShaderBindingArray.Add(jShaderBinding::Create(5, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_RAYTRACING,
-				ResourceInlineAllactor.Alloc<jSamplerResource>(SamplerState), false));
-			ShaderBindingArray.Add(jShaderBinding::Create(6, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_RAYTRACING,
-				ResourceInlineAllactor.Alloc<jSamplerResource>(PBRSamplerStateInfo), false));
+			jRTAOGlobalParameters GlobalParameters;
+			GlobalParameters.Scene.Buffer = RenderFrameContextPtr->RaytracingScene->TLASBufferPtr.get();
+			GlobalParameters.RenderTarget.Texture = RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr.get();
+			GlobalParameters.DepthTexture.Texture = RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture();
+			GlobalParameters.GBuffer0_Normal.Texture = RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::NORMAL)->GetTexture();
+			GlobalParameters.g_sceneCB.Buffer = SceneUniformBufferPtr;
+			GlobalParameters.AlbedoTextureSampler.SamplerState = SamplerState;
+			GlobalParameters.PBRSamplerState.SamplerState = PBRSamplerStateInfo;
+			jShaderParameterSet::BuildShaderBindings(GlobalParameters, EShaderAccessStageFlag::ALL_RAYTRACING, ShaderBindingArray, ResourceInlineAllactor);
 
 #define TURN_ON_BINDLESS 1
 
 #if TURN_ON_BINDLESS
 			// Bindless resources
-			// Record bindless resources
-			jShaderBindingArray BindlessShaderBindingArray[9];
-
 			std::vector<jTextureResourceBindless::jTextureBindData> IrradianceMapTextures;
 			jTextureResourceBindless::jTextureBindData IrradianceTextureBindData;
 			IrradianceTextureBindData.Texture = jSceneRenderTarget::IrradianceMap2;
@@ -684,12 +1019,6 @@ std::shared_ptr<jTexture> jRenderer::RTAO()
 			jTextureResourceBindless::jTextureBindData FilteredEnvMapBindData;
 			FilteredEnvMapBindData.Texture = jSceneRenderTarget::FilteredEnvMap2;
 			FilteredEnvMapTextures.push_back(FilteredEnvMapBindData);
-
-			// Below Two textures have only 1 texture each, but this is just test code for bindless resouces so I will remove this from bindless resource range.
-			BindlessShaderBindingArray[0].Add(jShaderBinding::CreateBindless(0, (uint32)IrradianceMapTextures.size(), EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-				ResourceInlineAllactor.Alloc<jTextureResourceBindless>(IrradianceMapTextures), false));
-			BindlessShaderBindingArray[1].Add(jShaderBinding::CreateBindless(0, (uint32)FilteredEnvMapTextures.size(), EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-				ResourceInlineAllactor.Alloc<jTextureResourceBindless>(FilteredEnvMapTextures), false));
 
 			std::vector<const jBuffer*> VertexAndInexOffsetBuffers;
 			std::vector<const jBuffer*> IndexBuffers;
@@ -721,42 +1050,36 @@ std::shared_ptr<jTexture> jRenderer::RTAO()
 				auto Material = RObj->MaterialPtr ? RObj->MaterialPtr : GDefaultMaterial;
 				check(Material);
                 AlbedoTextures.push_back({.Texture = Material->GetTexture<jTexture>(jMaterial::EMaterialTextureType::Albedo), .SamplerState = nullptr});
-                NormalTextures.push_back({.Texture = Material->GetTexture<jTexture>(jMaterial::EMaterialTextureType::Normal), .SamplerState = nullptr});
+				NormalTextures.push_back({.Texture = Material->GetTexture<jTexture>(jMaterial::EMaterialTextureType::Normal), .SamplerState = nullptr});
 				MetallicTextures.push_back({.Texture = Material->GetTexture<jTexture>(jMaterial::EMaterialTextureType::Metallic), .SamplerState = nullptr});
 			}
-			BindlessShaderBindingArray[2].Add(jShaderBinding::CreateBindless(0, (uint32)VertexAndInexOffsetBuffers.size(), EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-				ResourceInlineAllactor.Alloc<jBufferResourceBindless>(VertexAndInexOffsetBuffers), false));
-			BindlessShaderBindingArray[3].Add(jShaderBinding::CreateBindless(0, (uint32)IndexBuffers.size(), EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-				ResourceInlineAllactor.Alloc<jBufferResourceBindless>(IndexBuffers), false));
-			BindlessShaderBindingArray[4].Add(jShaderBinding::CreateBindless(0, (uint32)TestUniformBuffers.size(), EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-				ResourceInlineAllactor.Alloc<jBufferResourceBindless>(TestUniformBuffers), false));
-			BindlessShaderBindingArray[5].Add(jShaderBinding::CreateBindless(0, (uint32)VertexBuffers.size(), EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-				ResourceInlineAllactor.Alloc<jBufferResourceBindless>(VertexBuffers), false));
-			BindlessShaderBindingArray[6].Add(jShaderBinding::CreateBindless(0, (uint32)AlbedoTextures.size(), EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-				ResourceInlineAllactor.Alloc<jTextureResourceBindless>(AlbedoTextures)));
-			BindlessShaderBindingArray[7].Add(jShaderBinding::CreateBindless(0, (uint32)NormalTextures.size(), EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-				ResourceInlineAllactor.Alloc<jTextureResourceBindless>(NormalTextures)));
-			BindlessShaderBindingArray[8].Add(jShaderBinding::CreateBindless(0, (uint32)MetallicTextures.size(), EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-				ResourceInlineAllactor.Alloc<jTextureResourceBindless>(MetallicTextures)));
+
+			jRTAOBindlessParameters BindlessParameters;
+			BindlessParameters.IrradianceMapArray.Textures = IrradianceMapTextures;
+			BindlessParameters.PrefilteredEnvMapArray.Textures = FilteredEnvMapTextures;
+			BindlessParameters.VertexIndexOffsetArray.Buffers = VertexAndInexOffsetBuffers;
+			BindlessParameters.IndexBindlessArray.Buffers = IndexBuffers;
+			BindlessParameters.RenderObjParamArray.Buffers = TestUniformBuffers;
+			BindlessParameters.VerticesBindlessArray.Buffers = VertexBuffers;
+			BindlessParameters.AlbedoTextureArray.Textures = AlbedoTextures;
+			BindlessParameters.NormalTextureArray.Textures = NormalTextures;
+			BindlessParameters.RMTextureArray.Textures = MetallicTextures;
 #endif // TURN_ON_BINDLESS
 
 			// Create ShaderBindingLayout and ShaderBindingInstance Instance for this draw call
 			std::shared_ptr<jShaderBindingInstance> GlobalShaderBindingInstance;
 			GlobalShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
 #if TURN_ON_BINDLESS
-			std::shared_ptr<jShaderBindingInstance> GlobalShaderBindingInstanceBindless[9];
-			for (int32 i = 0; i < 9; ++i)
-			{
-				GlobalShaderBindingInstanceBindless[i] = g_rhi->CreateShaderBindingInstance(BindlessShaderBindingArray[i], jShaderBindingInstanceType::SingleFrame);
-			}
+			std::vector<std::shared_ptr<jShaderBindingInstance>> BindlessShaderBindingInstances =
+				jShaderBindlessSet::CreateShaderBindingInstances(BindlessParameters, EShaderAccessStageFlag::ALL_RAYTRACING, jShaderBindingInstanceType::SingleFrame);
 #endif // TURN_ON_BINDLESS
 
 			jShaderBindingLayoutArray GlobalShaderBindingLayoutArray;
 			GlobalShaderBindingLayoutArray.Add(GlobalShaderBindingInstance->ShaderBindingsLayouts);
 #if TURN_ON_BINDLESS
-			for (int32 i = 0; i < 9; ++i)
+			for (const auto& BindlessShaderBindingInstance : BindlessShaderBindingInstances)
 			{
-				GlobalShaderBindingLayoutArray.Add(GlobalShaderBindingInstanceBindless[i]->ShaderBindingsLayouts);
+				GlobalShaderBindingLayoutArray.Add(BindlessShaderBindingInstance->ShaderBindingsLayouts);
 			}
 #endif // TURN_ON_BINDLESS
 
@@ -764,47 +1087,21 @@ std::shared_ptr<jTexture> jRenderer::RTAO()
 			std::vector<jRaytracingPipelineShader> RaytracingShaders;
 			{
 				jRaytracingPipelineShader NewShader;
-				jShaderInfo shaderInfo;
 
 				// First hit gorup
-				shaderInfo.SetName(jNameStatic("Miss"));
-				shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RTAO.hlsl"));
-				shaderInfo.SetEntryPoint(jNameStatic("MyMissShader"));
-				shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_MISS);
-#if TURN_ON_BINDLESS
-				shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
-#endif // TURN_ON_BINDLESS
-				NewShader.MissShader = g_rhi->CreateShader(shaderInfo);
+                jRTAORaytracingShaderBase::ShaderPermutation RaytracingPermutation;
+                RaytracingPermutation.SetIndex<jRTAORaytracingShaderBase::USE_BINDLESS_RESOURCE>(TURN_ON_BINDLESS ? 1 : 0);
+
+				NewShader.MissShader = jShaderRTAOMissShader::CreateShader(RaytracingPermutation);
 				NewShader.MissEntryPoint = TEXT("MyMissShader");
 
-				shaderInfo.SetName(jNameStatic("Raygen"));
-				shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RTAO.hlsl"));
-				shaderInfo.SetEntryPoint(jNameStatic("MyRaygenShader"));
-				shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_RAYGEN);
-#if TURN_ON_BINDLESS
-				shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
-#endif
-				NewShader.RaygenShader = g_rhi->CreateShader(shaderInfo);
+				NewShader.RaygenShader = jShaderRTAORaygenShader::CreateShader(RaytracingPermutation);
 				NewShader.RaygenEntryPoint = TEXT("MyRaygenShader");
 
-				shaderInfo.SetName(jNameStatic("ClosestHit"));
-				shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RTAO.hlsl"));
-				shaderInfo.SetEntryPoint(jNameStatic("MyClosestHitShader"));
-				shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT);
-#if TURN_ON_BINDLESS
-				shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
-#endif // TURN_ON_BINDLESS
-				NewShader.ClosestHitShader = g_rhi->CreateShader(shaderInfo);
+				NewShader.ClosestHitShader = jShaderRTAOClosestHitShader::CreateShader(RaytracingPermutation);
 				NewShader.ClosestHitEntryPoint = TEXT("MyClosestHitShader");
 
-				shaderInfo.SetName(jNameStatic("AnyHit"));
-				shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/RTAO.hlsl"));
-				shaderInfo.SetEntryPoint(jNameStatic("MyAnyHitShader"));
-				shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_ANYHIT);
-#if TURN_ON_BINDLESS
-				shaderInfo.SetPreProcessors(jNameStatic("#define USE_BINDLESS_RESOURCE 1"));
-#endif // TURN_ON_BINDLESS
-				NewShader.AnyHitShader = g_rhi->CreateShader(shaderInfo);
+				NewShader.AnyHitShader = jShaderRTAOAnyHitShader::CreateShader(RaytracingPermutation);
 				NewShader.AnyHitEntryPoint = TEXT("MyAnyHitShader");
 
 				NewShader.HitGroupName = TEXT("DefaultHit");
@@ -824,9 +1121,9 @@ std::shared_ptr<jTexture> jRenderer::RTAO()
 			jShaderBindingInstanceArray ShaderBindingInstanceArray;
 			ShaderBindingInstanceArray.Add(GlobalShaderBindingInstance.get());
 #if TURN_ON_BINDLESS
-			for (int32 i = 0; i < _countof(GlobalShaderBindingInstanceBindless); ++i)
+			for (const auto& BindlessShaderBindingInstance : BindlessShaderBindingInstances)
 			{
-				ShaderBindingInstanceArray.Add(GlobalShaderBindingInstanceBindless[i].get());
+				ShaderBindingInstanceArray.Add(BindlessShaderBindingInstance.get());
 			}
 #endif // TURN_ON_BINDLESS
 
@@ -882,14 +1179,7 @@ void ApplyAOToFinalColor(const std::shared_ptr<jRenderFrameContext>& InRenderFra
     SCOPE_CPU_PROFILE(ApplyAO);
     SCOPE_GPU_PROFILE(InRenderFrameContextPtr, ApplyAO);
 
-    struct CommonComputeUniformBuffer
-    {
-        int32 Width;
-        int32 Height;
-        float AOIntensity;
-        int32 Padding0;
-    };
-    CommonComputeUniformBuffer CommonComputeData;
+    jAOApplyCommonUniformBuffer CommonComputeData;
     CommonComputeData.Width = InTexture->Width;
     CommonComputeData.Height = InTexture->Height;
     CommonComputeData.AOIntensity = gOptions.AOIntensity;
@@ -901,59 +1191,44 @@ void ApplyAOToFinalColor(const std::shared_ptr<jRenderFrameContext>& InRenderFra
     bool IsApplyAOCompute = false;
     if (IsApplyAOCompute)
 	{
-        jRHIUtil::DispatchCompute(InRenderFrameContextPtr, InRenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture()
-			, [&](const std::shared_ptr<jRenderFrameContext>& InInRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
-			{
-				g_rhi->TransitionLayout(InInRenderFrameContextPtr->GetActiveCommandBuffer(), InTexture.get(), EResourceLayout::SHADER_READ_ONLY);
+        g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InRenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), EResourceLayout::UAV);
+        g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InTexture.get(), EResourceLayout::SHADER_READ_ONLY);
 
-				InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::COMPUTE
-					, InOutResourceInlineAllactor.Alloc<jTextureResource>(InTexture.get(), nullptr)));
+        jAOApplyCSParameters Parameters;
+        Parameters.resultImage = { InRenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture() };
+        Parameters.inputImage = { InTexture.get(), nullptr };
+        Parameters.ComputeCommon.Buffer = OneFrameUniformBuffer;
 
-				InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
-					, InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
-			}
-			, [](const std::shared_ptr<jRenderFrameContext>& InInRenderFrameContextPtr)
-			{
-				jShaderInfo shaderInfo;
-				shaderInfo.SetName(jNameStatic("AOApplyCS"));
-				shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/AOApply_cs.hlsl"));
-				shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
-                shaderInfo.SetEntryPoint(jNameStatic("AOApplyCS"));
-				if (gOptions.ShowAOOnly)
-					shaderInfo.SetPreProcessors(jNameStatic("#define SHOW_AO_ONLY 1"));
-				jShader* Shader = g_rhi->CreateShader(shaderInfo);
-				return Shader;
-			}
-        );
+        jShaderAOApplyComputeShader::ShaderPermutation Permutation;
+        Permutation.SetIndex<jShaderAOApplyComputeShader::SHOW_AO_ONLY>(gOptions.ShowAOOnly ? 1 : 0);
+        const uint32 GroupX = InRenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture()->Width / 8 + ((InRenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture()->Width % 8) ? 1 : 0);
+        const uint32 GroupY = InRenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture()->Height / 8 + ((InRenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture()->Height % 8) ? 1 : 0);
+        DispatchShaderParameterComputePass<jShaderAOApplyComputeShader>(InRenderFrameContextPtr
+            , Parameters
+            , Permutation
+            , GroupX, GroupY, 1);
 	}
     else
     {
+        const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+            , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
+            , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
+
+        jAOApplyPSParameters Parameters;
+        Parameters.AOTexture = { InTexture.get(), SamplerState };
+        Parameters.ComputeCommon.Buffer = OneFrameUniformBuffer;
+
         jRHIUtil::DrawFullScreen(InRenderFrameContextPtr, InRenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr
-        , [&](const std::shared_ptr<jRenderFrameContext>& InInRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
+        , [&, Parameters](const std::shared_ptr<jRenderFrameContext>& InInRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
         {
-            const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
-                , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
-                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
-
             g_rhi->TransitionLayout(InInRenderFrameContextPtr->GetActiveCommandBuffer(), InTexture.get(), EResourceLayout::SHADER_READ_ONLY);
-
-            InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
-                , InOutResourceInlineAllactor.Alloc<jTextureResource>(InTexture.get(), SamplerState)));
-
-            InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
-                , InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
+            jShaderParameterSet::BuildShaderBindings(Parameters, EShaderAccessStageFlag::ALL_GRAPHICS, InOutShaderBindingArray, InOutResourceInlineAllactor);
         }
-        , [](const std::shared_ptr<jRenderFrameContext>& InInRenderFrameContextPtr)
+        , [](const std::shared_ptr<jRenderFrameContext>&)
             {
-                jShaderInfo shaderInfo;
-                shaderInfo.SetName(jNameStatic("AOApplyPS"));
-                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/AOApply_cs.hlsl"));
-                shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
-                shaderInfo.SetEntryPoint(jNameStatic("AOApplyPS"));
-                if (gOptions.ShowAOOnly)
-                    shaderInfo.SetPreProcessors(jNameStatic("#define SHOW_AO_ONLY 1"));
-                jShader* Shader = g_rhi->CreateShader(shaderInfo);
-                return Shader;
+                jShaderAOApplyPixelShader::ShaderPermutation Permutation;
+                Permutation.SetIndex<jShaderAOApplyPixelShader::SHOW_AO_ONLY>(gOptions.ShowAOOnly ? 1 : 0);
+                return jShaderAOApplyPixelShader::CreateShader(Permutation);
             }
         , [](jRasterizationStateInfo*& OutRasterState, jBlendingStateInfo*& OutBlendState, jDepthStencilStateInfo*& OutDepthStencilState)
             {
@@ -1055,27 +1330,7 @@ void jRenderer::SSGIPass()
 		});
     }
 
-    struct CommonComputeUniformBuffer
-    {
-        Matrix InvP;
-        Matrix V;
-        Matrix P;
-        Matrix InvV;
-        float Radius;
-        float Bias;
-        Vector2 NoiseUVScale;
-        int32 Width;
-        int32 Height;
-        int32 FrameNumber;
-        int32 SSGI_MaxSteps;
-        Vector CameraPos;
-        float SSGI_MaxDistance;
-        int32 SSGI_RayCount;
-        int32 UseAttenuation;
-        int32 Padding1;
-        int32 Padding2;
-    };
-    CommonComputeUniformBuffer CommonComputeData;
+    jSSGICommonUniformBuffer CommonComputeData;
 
     auto mainCamera = jCamera::GetMainCamera();
     CommonComputeData.InvP = mainCamera->Projection.GetInverse();
@@ -1090,7 +1345,7 @@ void jRenderer::SSGIPass()
     CommonComputeData.Height = SSGI_RT->Info.Height;
     CommonComputeData.FrameNumber = (int32)g_rhi->GetCurrentFrameNumber();
     CommonComputeData.SSGI_MaxSteps = gOptions.SSGIMaxSteps;
-    CommonComputeData.CameraPos = Vector4(mainCamera->Pos, 0.0f);
+    CommonComputeData.CameraPos = mainCamera->Pos;
     CommonComputeData.SSGI_MaxDistance = gOptions.SSGIMaxDistance;
     CommonComputeData.SSGI_RayCount = gOptions.SSGIRayCount;
     CommonComputeData.UseAttenuation = gOptions.UseSSGIAttenuation ? 1 : 0;
@@ -1101,50 +1356,35 @@ void jRenderer::SSGIPass()
         jNameStatic("SSGI_OnFrameUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
     OneFrameUniformBuffer->UpdateBufferData(&CommonComputeData, sizeof(CommonComputeData));
 
-    jRHIUtil::DispatchCompute(RenderFrameContextPtr, SSGI_RT->GetTexture()
-        , [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
-        {
-            g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InRenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), SSGI_RT->GetTexture(), EResourceLayout::UAV);
+    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 
-            const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
-                , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::REPEAT
-                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
+    const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+        , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::REPEAT
+        , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
 
-            const jSamplerStateInfo* RepeatSamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
-                , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT
-                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
+    const jSamplerStateInfo* RepeatSamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+        , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT
+        , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
 
-            InOutShaderBindingArray.Add(jShaderBinding::Create(1, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-                , InOutResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), SamplerState)));
+    jSSGICSParameters Parameters;
+    Parameters.Result = { SSGI_RT->GetTexture() };
+    Parameters.DepthTexture = { RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), SamplerState };
+    Parameters.GBuffer0 = { RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::NORMAL)->GetTexture(), SamplerState };
+    Parameters.GBuffer1 = { RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::ALBEDO)->GetTexture(), SamplerState };
+    Parameters.GBuffer2 = { RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::VELOCITY)->GetTexture(), SamplerState };
+    Parameters.ColorTexture = { RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), SamplerState };
+    Parameters.Noise = { GNoiseTexture.get(), RepeatSamplerState };
+    Parameters.ComputeCommon.Buffer = OneFrameUniformBuffer;
 
-            InOutShaderBindingArray.Add(jShaderBinding::Create(2, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-                , InOutResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::NORMAL)->GetTexture(), SamplerState)));
-
-            InOutShaderBindingArray.Add(jShaderBinding::Create(3, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-                , InOutResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::ALBEDO)->GetTexture(), SamplerState)));
-
-            InOutShaderBindingArray.Add(jShaderBinding::Create(4, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-                , InOutResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::VELOCITY)->GetTexture(), SamplerState)));
-
-            InOutShaderBindingArray.Add(jShaderBinding::Create(5, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-                , InOutResourceInlineAllactor.Alloc<jTextureResource>(RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), SamplerState)));
-
-            InOutShaderBindingArray.Add(jShaderBinding::Create(6, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-                , InOutResourceInlineAllactor.Alloc<jTextureResource>(GNoiseTexture.get(), RepeatSamplerState)));
-
-            InOutShaderBindingArray.Add(jShaderBinding::Create(7, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
-                , InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
-        }
-        , [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
-            {
-                jShaderInfo shaderInfo;
-                shaderInfo.SetName(jNameStatic("SSGI_CS"));
-                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/SSGI_cs.hlsl"));
-                shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
-                shaderInfo.SetEntryPoint(jNameStatic("main"));
-                return g_rhi->CreateShader(shaderInfo);
-            }
-        );
+    const uint32 GroupX = SSGI_RT->GetTexture()->Width / 8 + ((SSGI_RT->GetTexture()->Width % 8) ? 1 : 0);
+    const uint32 GroupY = SSGI_RT->GetTexture()->Height / 8 + ((SSGI_RT->GetTexture()->Height % 8) ? 1 : 0);
+    DispatchShaderParameterComputePass(RenderFrameContextPtr
+        , jNameStatic("SSGI_CS")
+        , jNameStatic("Resource/Shaders/hlsl/SSGI_cs.hlsl")
+        , jNameStatic("main")
+        , Parameters
+        , GroupX, GroupY, 1);
 
     g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), SSGI_RT->GetTexture());
 }
@@ -1191,14 +1431,7 @@ void jRenderer::SSGIAccumulatePass()
 
     if (gOptions.UseSSGIReprojection)
     {
-        struct CommonComputeUniformBuffer
-        {
-            int32 Width;
-            int32 Height;
-            int32 FrameNumber;
-            float BlendFactor;
-        };
-        CommonComputeUniformBuffer CommonComputeData;
+        jSSGIReprojectionUniformBuffer CommonComputeData;
         CommonComputeData.Width = SSGI_Accum_RT_Dest->Info.Width;
         CommonComputeData.Height = SSGI_Accum_RT_Dest->Info.Height;
         CommonComputeData.FrameNumber = g_rhi->GetCurrentFrameNumber();
@@ -1208,99 +1441,98 @@ void jRenderer::SSGIAccumulatePass()
             jNameStatic("ReprojectionSSGIUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
         OneFrameUniformBuffer->UpdateBufferData(&CommonComputeData, sizeof(CommonComputeData));
 
-        jRHIUtil::DrawFullScreen(RenderFrameContextPtr, SSGI_Accum_RT_Dest
-            , [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
-            {
-                const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
-                    , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
-                    , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
+        bool IsSSGIReprojectionCompute = false;
+        if (IsSSGIReprojectionCompute)
+        {
+            auto* CommandBuffer = RenderFrameContextPtr->GetActiveCommandBuffer();
+            g_rhi->TransitionLayout(CommandBuffer, SSGI_Accum_RT_Dest->GetTexture(), EResourceLayout::UAV);
+            g_rhi->TransitionLayout(CommandBuffer, SSGI_Accum_RT_Prev->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+            g_rhi->TransitionLayout(CommandBuffer, jSceneRenderTarget::SSGI_RT->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+            g_rhi->TransitionLayout(CommandBuffer, RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::VELOCITY)->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+            g_rhi->TransitionLayout(CommandBuffer, jSceneRenderTarget::HistoryDepthBuffer.get(), EResourceLayout::UAV);
+            g_rhi->TransitionLayout(CommandBuffer, RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 
-                g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), SSGI_Accum_RT_Prev->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
-                g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::SSGI_RT->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
-                g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InRenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::VELOCITY)->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
-                g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::HistoryDepthBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
-                g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InRenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+            jSSGIReprojectionCSParameters Parameters;
+            Parameters.resultImage = { SSGI_Accum_RT_Dest->GetTexture() };
+            Parameters.HistoryBuffer = { SSGI_Accum_RT_Prev->GetTexture(), nullptr };
+            Parameters.VelocityBuffer = { RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::VELOCITY)->GetTexture(), nullptr };
+            Parameters.DepthBuffer = { RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), nullptr };
+            Parameters.HistoryDepthBuffer = { jSceneRenderTarget::HistoryDepthBuffer.get() };
+            Parameters.ComputeCommon.Buffer = OneFrameUniformBuffer;
 
-                InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
-                    , InOutResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::SSGI_RT->GetTexture(), SamplerState)));
+            jShaderSSGIReprojectionComputeShader::ShaderPermutation Permutation;
+            Permutation.SetIndex<jShaderSSGIReprojectionComputeShader::USE_DISCONTINUITY_WEIGHT>(gOptions.UseDiscontinuityWeightForSSGI ? 1 : 0);
+            const uint32 GroupX = SSGI_Accum_RT_Dest->GetTexture()->Width / 8 + ((SSGI_Accum_RT_Dest->GetTexture()->Width % 8) ? 1 : 0);
+            const uint32 GroupY = SSGI_Accum_RT_Dest->GetTexture()->Height / 8 + ((SSGI_Accum_RT_Dest->GetTexture()->Height % 8) ? 1 : 0);
+            DispatchShaderParameterComputePass<jShaderSSGIReprojectionComputeShader>(RenderFrameContextPtr
+                , Parameters
+                , Permutation
+                , GroupX, GroupY, 1);
+        }
+        else
+        {
+            const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+                , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
+                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
 
-                InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
-                    , InOutResourceInlineAllactor.Alloc<jTextureResource>(SSGI_Accum_RT_Prev->GetTexture(), SamplerState)));
+            jSSGIReprojectionPSParameters Parameters;
+            Parameters.CurrentTexture = { jSceneRenderTarget::SSGI_RT->GetTexture(), SamplerState };
+            Parameters.HistoryBuffer = { SSGI_Accum_RT_Prev->GetTexture(), SamplerState };
+            Parameters.VelocityBuffer = { RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::VELOCITY)->GetTexture(), SamplerState };
+            Parameters.DepthBuffer = { RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), SamplerState };
+            Parameters.HistoryDepthBuffer = { jSceneRenderTarget::HistoryDepthBuffer.get(), SamplerState };
+            Parameters.ComputeCommon.Buffer = OneFrameUniformBuffer;
 
-                InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::FRAGMENT
-                    , InOutResourceInlineAllactor.Alloc<jTextureResource>(InRenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::VELOCITY)->GetTexture(), nullptr)));
-
-                InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::FRAGMENT
-                    , InOutResourceInlineAllactor.Alloc<jTextureResource>(InRenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), nullptr)));
-
-                InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::FRAGMENT
-                    , InOutResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::HistoryDepthBuffer.get(), nullptr)));
-
-                InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::FRAGMENT
-                    , InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
-            }
-        , [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
-            {
-                jShaderInfo shaderInfo;
-                shaderInfo.SetName(jNameStatic("ReProjectionSSGIPS"));
-                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/SSGIReprojection_cs.hlsl"));
-                shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
-                shaderInfo.SetEntryPoint(jNameStatic("SSGIReprojectionPS"));
-                if (gOptions.UseDiscontinuityWeightForSSGI)
+            jRHIUtil::DrawFullScreen(RenderFrameContextPtr, SSGI_Accum_RT_Dest
+                , [&, Parameters](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
                 {
-                    shaderInfo.SetPreProcessors(jNameStatic("#define USE_DISCONTINUITY_WEIGHT 1"));
+                    g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), SSGI_Accum_RT_Prev->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+                    g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::SSGI_RT->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+                    g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InRenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::VELOCITY)->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+                    g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::HistoryDepthBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
+                    g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InRenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+                    jShaderParameterSet::BuildShaderBindings(Parameters, EShaderAccessStageFlag::FRAGMENT, InOutShaderBindingArray, InOutResourceInlineAllactor);
                 }
-                return g_rhi->CreateShader(shaderInfo);
-            });
+            , [](const std::shared_ptr<jRenderFrameContext>&)
+                {
+                    jShaderSSGIReprojectionPixelShader::ShaderPermutation Permutation;
+                    Permutation.SetIndex<jShaderSSGIReprojectionPixelShader::USE_DISCONTINUITY_WEIGHT>(gOptions.UseDiscontinuityWeightForSSGI ? 1 : 0);
+                    return jShaderSSGIReprojectionPixelShader::CreateShader(Permutation);
+                });
+        }
     }
     else
     {
-        struct CommonComputeUniformBuffer
-        {
-            int32 Width;
-            int32 Height;
-            float BlendFactor;
-            int32 Padding;
-        };
-
-        CommonComputeUniformBuffer CommonComputeData;
-        CommonComputeData.Width = SSGI_Accum_RT_Dest->Info.Width;
-        CommonComputeData.Height = SSGI_Accum_RT_Dest->Info.Height;
-        CommonComputeData.BlendFactor = gOptions.SSGIAccumBlendFactor;
+        jSSGIAccumulateUniformBuffer CommonComputeData;
+        CommonComputeData.g_Width = SSGI_Accum_RT_Dest->Info.Width;
+        CommonComputeData.g_Height = SSGI_Accum_RT_Dest->Info.Height;
+        CommonComputeData.g_SSGIAccumBlendFactor = gOptions.SSGIAccumBlendFactor;
 
         auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
             jNameStatic("SSGIAccum_OnFrameUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
         OneFrameUniformBuffer->UpdateBufferData(&CommonComputeData, sizeof(CommonComputeData));
 
-        jRHIUtil::DispatchCompute(RenderFrameContextPtr, SSGI_Accum_RT_Dest->GetTexture()
-            , [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
-            {
-                const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
-                    , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
-                    , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
+        const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+            , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
+            , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
 
-                g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::SSGI_RT->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
-                g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), SSGI_Accum_RT_Prev->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+        g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::SSGI_RT->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+        g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), SSGI_Accum_RT_Prev->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 
-                InOutShaderBindingArray.Add(jShaderBinding::Create(1, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-                    , InOutResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::SSGI_RT->GetTexture(), SamplerState)));
+        jSSGIAccumulateCSParameters Parameters;
+        Parameters.OutSSGIAccum = { SSGI_Accum_RT_Dest->GetTexture() };
+        Parameters.InSSGI = { jSceneRenderTarget::SSGI_RT->GetTexture(), SamplerState };
+        Parameters.InPrevSSGIAccum = { SSGI_Accum_RT_Prev->GetTexture(), SamplerState };
+        Parameters.SSGIAccumUniformBuffer.Buffer = OneFrameUniformBuffer;
 
-                InOutShaderBindingArray.Add(jShaderBinding::Create(2, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-                    , InOutResourceInlineAllactor.Alloc<jTextureResource>(SSGI_Accum_RT_Prev->GetTexture(), SamplerState)));
-
-                InOutShaderBindingArray.Add(jShaderBinding::Create(3, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
-                    , InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
-            }
-            , [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
-            {
-                jShaderInfo shaderInfo;
-                shaderInfo.SetName(jNameStatic("SSGI_Accumulate_CS"));
-                shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/SSGI_Accumulate_cs.hlsl"));
-                shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
-                shaderInfo.SetEntryPoint(jNameStatic("main"));
-                return g_rhi->CreateShader(shaderInfo);
-            }
-        );
+        DispatchShaderParameterComputePass(RenderFrameContextPtr
+            , jNameStatic("SSGI_Accumulate_CS")
+            , jNameStatic("Resource/Shaders/hlsl/SSGI_Accumulate_cs.hlsl")
+            , jNameStatic("main")
+            , Parameters
+            , SSGI_Accum_RT_Dest->GetTexture()->Width / 8 + ((SSGI_Accum_RT_Dest->GetTexture()->Width % 8) ? 1 : 0)
+            , SSGI_Accum_RT_Dest->GetTexture()->Height / 8 + ((SSGI_Accum_RT_Dest->GetTexture()->Height % 8) ? 1 : 0)
+            , 1);
     }
 
     g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), SSGI_Accum_RT_Dest->GetTexture());
@@ -1338,27 +1570,16 @@ std::shared_ptr<jRenderTarget> SeparableGaussianBlur(const std::shared_ptr<jRend
     std::vector<float> GaussianKernel = createGaussianKernel(InKernelSize, InKernelSigma);
 
     // Create GaussianBlurKernel uniformbuffer
-    struct jGaussianBlurKernel
-    {
-        Vector4 Width[20];
-    };
-    jGaussianBlurKernel KernelData;
-    check(sizeof(KernelData.Width) >= GaussianKernel.size() * sizeof(float));
-    memcpy(KernelData.Width, GaussianKernel.data(), GaussianKernel.size() * sizeof(float));
+    jGaussianBlurKernelUniformBuffer KernelData;
+    check(sizeof(KernelData.Data) >= GaussianKernel.size() * sizeof(float));
+    memcpy(KernelData.Data, GaussianKernel.data(), GaussianKernel.size() * sizeof(float));
 
     auto OneFrameGaussianKernelUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
         jNameStatic("GaussianKernel"), jLifeTimeType::OneFrame, sizeof(KernelData)));
     OneFrameGaussianKernelUniformBuffer->UpdateBufferData(&KernelData, sizeof(KernelData));
 
     // Create common uniformbuffer
-    struct CommonComputeUniformBuffer
-    {
-        int32 Width;
-        int32 Height;
-        int32 KernelSize;
-        int32 Padding0;
-    };
-    CommonComputeUniformBuffer CommonComputeData;
+    jGaussianBlurCommonComputeUniformBuffer CommonComputeData;
     CommonComputeData.Width = InTexture->Width;
     CommonComputeData.Height = InTexture->Height;
     CommonComputeData.KernelSize = (int32)GaussianKernel.size();
@@ -1396,31 +1617,8 @@ std::shared_ptr<jRenderTarget> SeparableGaussianBlur(const std::shared_ptr<jRend
         SCOPE_CPU_PROFILE(Vertical);
         SCOPE_GPU_PROFILE(InRenderFrameContextPtr, Vertical);
 
-        jRHIUtil::DispatchCompute(InRenderFrameContextPtr, GaussianV->GetTexture()
-            , [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
-            {
-                g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InTexture.get(), EResourceLayout::SHADER_READ_ONLY);
-
-                InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-                    , InOutResourceInlineAllactor.Alloc<jTextureResource>(InTexture.get(), nullptr)));
-
-                InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
-                    , InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
-
-                InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
-                    , InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameGaussianKernelUniformBuffer.get()), true));
-            }
-            , [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
-                {
-                    jShaderInfo shaderInfo;
-                    shaderInfo.SetName(jNameStatic("GaussianV"));
-                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/gaussianblur_cs.hlsl"));
-                    shaderInfo.SetEntryPoint(jNameStatic("Vertical"));
-                    shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
-                    jShader* Shader = g_rhi->CreateShader(shaderInfo);
-                    return Shader;
-                }
-            );
+        DispatchGaussianBlurPass(InRenderFrameContextPtr, GaussianV->GetTexture(), InTexture.get()
+            , OneFrameUniformBuffer, OneFrameGaussianKernelUniformBuffer, jNameStatic("GaussianV"), jNameStatic("Vertical"));
     }
 
     g_rhi->UAVBarrier(InRenderFrameContextPtr->GetActiveCommandBuffer(), GaussianV->GetTexture());
@@ -1434,32 +1632,8 @@ std::shared_ptr<jRenderTarget> SeparableGaussianBlur(const std::shared_ptr<jRend
             jNameStatic("CommonComputeUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
         OneFrameUniformBuffer->UpdateBufferData(&CommonComputeData, sizeof(CommonComputeData));
 
-        jRHIUtil::DispatchCompute(InRenderFrameContextPtr, GaussianH->GetTexture()
-            , [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
-            {
-                jTexture* InGaussianVTexture = GaussianV->GetTexture();
-                g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InGaussianVTexture, EResourceLayout::SHADER_READ_ONLY);
-
-                InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-                    , InOutResourceInlineAllactor.Alloc<jTextureResource>(InGaussianVTexture, nullptr)));
-
-                InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
-                    , InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
-
-                InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
-                    , InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameGaussianKernelUniformBuffer.get()), true));
-            }
-            , [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
-                {
-                    jShaderInfo shaderInfo;
-                    shaderInfo.SetName(jNameStatic("GaussianH"));
-                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/gaussianblur_cs.hlsl"));
-                    shaderInfo.SetEntryPoint(jNameStatic("Horizon"));
-                    shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
-                    jShader* Shader = g_rhi->CreateShader(shaderInfo);
-                    return Shader;
-                }
-            );
+        DispatchGaussianBlurPass(InRenderFrameContextPtr, GaussianH->GetTexture(), GaussianV->GetTexture()
+            , OneFrameUniformBuffer, OneFrameGaussianKernelUniformBuffer, jNameStatic("GaussianH"), jNameStatic("Horizon"));
     }
     return GaussianH;
 }
@@ -1509,16 +1683,7 @@ std::shared_ptr<jTexture> jRenderer::BlurSSGI(const std::shared_ptr<jRenderTarge
 
         g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), InRenderTarget->GetTexture());
         {
-            struct CommonComputeUniformBuffer
-            {
-                int32 Width;
-                int32 Height;
-                float Sigma;
-                int KernelSize;
-                float SigmaForBilateral;
-                Vector Padding0;
-            };
-            CommonComputeUniformBuffer CommonComputeData;
+            jBilateralCommonComputeUniformBuffer CommonComputeData;
             CommonComputeData.Width = DenoiseTarget->Info.Width;
             CommonComputeData.Height = DenoiseTarget->Info.Height;
             CommonComputeData.Sigma = gOptions.SSGIDenoiserKernelSigma;
@@ -1529,49 +1694,36 @@ std::shared_ptr<jTexture> jRenderer::BlurSSGI(const std::shared_ptr<jRenderTarge
                 jNameStatic("CommonComputeUniformBuffer"), jLifeTimeType::OneFrame, sizeof(CommonComputeData)));
             OneFrameUniformBuffer->UpdateBufferData(&CommonComputeData, sizeof(CommonComputeData));
 
-            // Create GaussianBlurKernel uniformbuffer
-            struct jGaussianBlurKernel
-            {
-                Vector4 Width[150];
-            };
-            jGaussianBlurKernel KernelData;
-            check(sizeof(KernelData.Width) >= GaussianKernel.size() * sizeof(float));
-            memcpy(KernelData.Width, GaussianKernel.data(), GaussianKernel.size() * sizeof(float));
+            jBilateralKernelUniformBuffer KernelData;
+            check(sizeof(KernelData.Data) >= GaussianKernel.size() * sizeof(float));
+            memcpy(KernelData.Data, GaussianKernel.data(), GaussianKernel.size() * sizeof(float));
 
             auto OneFrameGaussianKernelUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
                 jNameStatic("GaussianKernel"), jLifeTimeType::OneFrame, sizeof(KernelData)));
             OneFrameGaussianKernelUniformBuffer->UpdateBufferData(&KernelData, sizeof(KernelData));
 
-            jRHIUtil::DispatchCompute(RenderFrameContextPtr, DenoiseTarget->GetTexture()
-                , [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
-                {
-                    g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InRenderTarget->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
-                    g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InRenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), InRenderTarget->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 
-                    const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
-                        , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT
-                        , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
+            const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+                , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT
+                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
 
-                    InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::COMPUTE
-                        , InOutResourceInlineAllactor.Alloc<jTextureResource>(InRenderTarget->GetTexture(), nullptr)));
+            jBilateralFilteringCSParameters Parameters;
+            Parameters.resultImage = { DenoiseTarget->GetTexture() };
+            Parameters.inputImage = { InRenderTarget->GetTexture(), nullptr };
+            Parameters.DepthBuffer = { RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), SamplerState };
+            Parameters.ComputeCommon.Buffer = OneFrameUniformBuffer;
+            Parameters.Kernal.Buffer = OneFrameGaussianKernelUniformBuffer;
 
-                    InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-                        , InOutResourceInlineAllactor.Alloc<jTextureResource>(InRenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), SamplerState)));
-
-                    InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
-                        , InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
-
-                    InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
-                        , InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameGaussianKernelUniformBuffer.get()), true));
-                }
-            , [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
-                {
-                    jShaderBilateralComputeShader::ShaderPermutation ShaderPermutation;
-                    ShaderPermutation.SetIndex<jShaderBilateralComputeShader::USE_GAUSSIAN_INSTEAD>(gOptions.IsSSGIDenoiserGuassian());
-                    jShader* Shader = jShaderBilateralComputeShader::CreateShader(ShaderPermutation);
-                    return Shader;
-                }
-            );
+            jShaderBilateralComputeShader::ShaderPermutation Permutation;
+            Permutation.SetIndex<jShaderBilateralComputeShader::USE_GAUSSIAN_INSTEAD>(gOptions.IsSSGIDenoiserGuassian() ? 1 : 0);
+            DispatchShaderParameterComputePass<jShaderBilateralComputeShader>(RenderFrameContextPtr
+                , Parameters
+                , Permutation
+                , DenoiseTarget->Info.Width / 8 + ((DenoiseTarget->Info.Width % 8) ? 1 : 0)
+                , DenoiseTarget->Info.Height / 8 + ((DenoiseTarget->Info.Height % 8) ? 1 : 0)
+                , 1);
         }
 
         g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), DenoiseTarget->GetTexture());
@@ -1586,16 +1738,7 @@ std::shared_ptr<jTexture> jRenderer::BlurSSGI(const std::shared_ptr<jRenderTarge
 
         auto DenoiseTarget = jRenderTargetPool::GetRenderTargetForOneFrame(InRenderTarget->Info);
 
-        struct CommonComputeUniformBuffer
-        {
-            int32 Width;
-            int32 Height;
-            float Sigma;
-            int KernelSize;
-            float SigmaForBilateral;
-            Vector Padding0;
-        };
-        CommonComputeUniformBuffer CommonComputeData;
+        jBilateralCommonComputeUniformBuffer CommonComputeData;
         CommonComputeData.Width = DenoiseTarget->Info.Width;
         CommonComputeData.Height = DenoiseTarget->Info.Height;
         CommonComputeData.Sigma = gOptions.SSGIDenoiserKernelSigma;
@@ -1616,14 +1759,11 @@ std::shared_ptr<jTexture> jRenderer::BlurSSGI(const std::shared_ptr<jRenderTarge
                     , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
                     , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
 
-                InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::FRAGMENT
-                    , InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
-
-                InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
-                    , InOutResourceInlineAllactor.Alloc<jTextureResource>(InRenderTarget->GetTexture(), SamplerState)));
-
-                InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
-                    , InOutResourceInlineAllactor.Alloc<jTextureResource>(InRenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), nullptr)));
+                jBilateralPSParameters Parameters;
+                Parameters.Param.Buffer = OneFrameUniformBuffer;
+                Parameters.InTexture = { InRenderTarget->GetTexture(), SamplerState };
+                Parameters.DepthTexture = { InRenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), SamplerState };
+                jShaderParameterSet::BuildShaderBindings(Parameters, EShaderAccessStageFlag::FRAGMENT, InOutShaderBindingArray, InOutResourceInlineAllactor);
             },
             [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
             {
@@ -1632,6 +1772,7 @@ std::shared_ptr<jTexture> jRenderer::BlurSSGI(const std::shared_ptr<jRenderTarge
                 shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/bilateral_ps.hlsl"));
                 shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
                 shaderInfo.SetEntryPoint(jNameStatic("PS"));
+                jShaderParameterSet::AppendToShaderInfo<jBilateralPSParameters>(shaderInfo, 0);
                 return g_rhi->CreateShader(shaderInfo);
             }
         );
@@ -1650,16 +1791,6 @@ std::shared_ptr<jTexture> jRenderer::BlurSSGI(const std::shared_ptr<jRenderTarge
         std::shared_ptr<jTexture> CurrentInput = InRenderTarget->GetTexturePtr();
         std::shared_ptr<jRenderTarget> CurrentOutput = RT1;
 
-        struct jATrousUniformBuffer
-        {
-            int32 g_StepSize;
-            float g_Sigma_Color;
-            float g_Sigma_Normal;
-            float g_Sigma_Depth;
-            int g_KernelSize;
-            Vector padding;
-        };
-
         for (int32 i = 0; i < gOptions.SSGIBlurQuality; ++i)
         {
             g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), CurrentInput.get());
@@ -1671,42 +1802,33 @@ std::shared_ptr<jTexture> jRenderer::BlurSSGI(const std::shared_ptr<jRenderTarge
             UniformData.g_Sigma_Depth = gOptions.SSGIATrousSigmaDepth;
             UniformData.g_KernelSize = gOptions.SSGIDenoiserKernelSize;
 
-            auto UniformBuffer = g_rhi->CreateUniformBufferBlock(jNameStatic("A_TrousUniformBuffer"), jLifeTimeType::OneFrame, sizeof(UniformData));
+            auto UniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(jNameStatic("A_TrousUniformBuffer"), jLifeTimeType::OneFrame, sizeof(UniformData)));
             UniformBuffer->UpdateBufferData(&UniformData, sizeof(UniformData));
 
-            jRHIUtil::DispatchCompute(RenderFrameContextPtr, CurrentOutput->GetTexture(),
-                [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
-                {
-                    g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), CurrentInput.get(), EResourceLayout::SHADER_READ_ONLY);
-                    g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InRenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::NORMAL)->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
-                    g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InRenderFrameContextPtr->SceneRenderTargetPtr->LinearDepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), CurrentOutput->GetTexture(), EResourceLayout::UAV);
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), CurrentInput.get(), EResourceLayout::SHADER_READ_ONLY);
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::NORMAL)->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->LinearDepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 
-                    const jSamplerStateInfo* LinearSamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
-                        , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
-                        , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
+            const jSamplerStateInfo* LinearSamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+                , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
+                , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
 
-                    InOutShaderBindingArray.Add(jShaderBinding::Create(0, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::COMPUTE
-                        , InOutResourceInlineAllactor.Alloc<jTextureResource>(CurrentInput.get(), nullptr)));
+            jSSGIATrousCSParameters Parameters;
+            Parameters.OutTexture = { CurrentOutput->GetTexture() };
+            Parameters.InTexture = { CurrentInput.get(), nullptr };
+            Parameters.NormalTexture = { RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::NORMAL)->GetTexture(), LinearSamplerState };
+            Parameters.DepthTexture = { RenderFrameContextPtr->SceneRenderTargetPtr->LinearDepthPtr->GetTexture(), LinearSamplerState };
+            Parameters.A_TrousUniformBuffer.Buffer = UniformBuffer;
 
-                    InOutShaderBindingArray.Add(jShaderBinding::Create(1, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-                        , InOutResourceInlineAllactor.Alloc<jTextureResource>(InRenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::NORMAL)->GetTexture(), LinearSamplerState)));
-
-                    InOutShaderBindingArray.Add(jShaderBinding::Create(2, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-                        , InOutResourceInlineAllactor.Alloc<jTextureResource>(InRenderFrameContextPtr->SceneRenderTargetPtr->LinearDepthPtr->GetTexture(), LinearSamplerState)));
-
-                    InOutShaderBindingArray.Add(jShaderBinding::Create(4, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
-                        , InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(UniformBuffer.get()), true));
-                },
-                [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
-                {
-                    jShaderInfo shaderInfo;
-                    shaderInfo.SetName(jNameStatic("SSGI_ATrous_CS"));
-                    shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/SSGI_ATrous_cs.hlsl"));
-                    shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
-                    shaderInfo.SetEntryPoint(jNameStatic("main"));
-                    return g_rhi->CreateShader(shaderInfo);
-                }
-            );
+            const uint32 GroupX = CurrentOutput->GetTexture()->Width / 8 + ((CurrentOutput->GetTexture()->Width % 8) ? 1 : 0);
+            const uint32 GroupY = CurrentOutput->GetTexture()->Height / 8 + ((CurrentOutput->GetTexture()->Height % 8) ? 1 : 0);
+            DispatchShaderParameterComputePass(RenderFrameContextPtr
+                , jNameStatic("SSGI_ATrous_CS")
+                , jNameStatic("Resource/Shaders/hlsl/SSGI_ATrous_cs.hlsl")
+                , jNameStatic("main")
+                , Parameters
+                , GroupX, GroupY, 1);
 
             CurrentInput = CurrentOutput->GetTexturePtr();
             CurrentOutput = (CurrentOutput == RT1) ? RT2 : RT1;
@@ -1744,8 +1866,7 @@ std::shared_ptr<jTexture> jRenderer::BlurSSGI(const std::shared_ptr<jRenderTarge
                         , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
                         , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
 
-                    InOutShaderBindingArray.Add(jShaderBinding::Create(0, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
-                        , InOutResourceInlineAllactor.Alloc<jTextureResource>(InRT->GetTexture(), SamplerState)));
+                    jRHIUtil::BuildSingleTextureFragmentBindings(InRT->GetTexture(), SamplerState, InOutShaderBindingArray, InOutResourceInlineAllactor);
                 },
                 [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
                 {
@@ -1753,6 +1874,7 @@ std::shared_ptr<jTexture> jRenderer::BlurSSGI(const std::shared_ptr<jRenderTarge
                     shaderInfo.SetName(jNameStatic("CopyPS"));
                     shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/copy_ps.hlsl"));
                     shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
+                    jRHIUtil::AppendSingleTextureFragmentShaderInfo(shaderInfo);
                     return g_rhi->CreateShader(shaderInfo);
                 }
             );
@@ -1813,8 +1935,7 @@ std::shared_ptr<jTexture> jRenderer::BlurSSGI(const std::shared_ptr<jRenderTarge
                             , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
                             , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
 
-                        InOutShaderBindingArray.Add(jShaderBinding::Create(0, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
-                            , InOutResourceInlineAllactor.Alloc<jTextureResource>(Upsampled->GetTexture(), SamplerState)));
+                        jRHIUtil::BuildSingleTextureFragmentBindings(Upsampled->GetTexture(), SamplerState, InOutShaderBindingArray, InOutResourceInlineAllactor);
                         InOutShaderBindingArray.Add(jShaderBinding::Create(0, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::FRAGMENT
                             , InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(UniformBuffer.get())));
                     },
@@ -1824,6 +1945,7 @@ std::shared_ptr<jTexture> jRenderer::BlurSSGI(const std::shared_ptr<jRenderTarge
                         shaderInfo.SetName(jNameStatic("CopyPS"));
                         shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/copy_ps.hlsl"));
                         shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
+                        jRHIUtil::AppendSingleTextureFragmentShaderInfo(shaderInfo);
                         return g_rhi->CreateShader(shaderInfo);
                     },
                     [](jRasterizationStateInfo*& OutRasterState, jBlendingStateInfo*& OutBlendState, jDepthStencilStateInfo*& OutDepthStencilState)
@@ -1842,5 +1964,3 @@ std::shared_ptr<jTexture> jRenderer::BlurSSGI(const std::shared_ptr<jRenderTarge
     }
     return InRenderTarget->GetTexturePtr();
 }
-
-

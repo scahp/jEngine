@@ -4,11 +4,6 @@ struct VSOutput
     float2 TexCoord : TEXCOORD0;
 };
 
-Texture2D Texture : register(t0, space0);
-SamplerState TextureSampler : register(s0, space0);
-Texture2D PreEyeAdaptionTexture : register(t1, space0);
-SamplerState PreEyeAdaptionTextureSampler : register(s1, space0);
-
 float GetLuminance(float3 LinearColor)
 {
     return dot(LinearColor, float3(0.3, 0.59, 0.11));

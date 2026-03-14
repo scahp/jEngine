@@ -14,6 +14,7 @@ enum class EDenoiser : int32
 
 extern const char* GDenoisers[(int32)EDenoiser::MAX];
 extern const char* GAOResolution[3];
+extern const char* GAtmosphereResolution[3];
 extern const char* GWaitPrerequsiteGraphicsQueueTask[4];
 extern const char* GAOType[3];
 extern const char* GHWRTDebugViewModes[14];
@@ -62,6 +63,13 @@ struct jOptions
     Vector DirectionalLightColor;
     float DirectionalLightIntensity;
     float AnisoG;
+    bool UseAtmosphericShadowing;
+    const char* AtmosphereResolution;
+    float AtmosphericShadowSlopeOfDist;
+    float AtmosphericShadowInScatteringLambda;
+    float AtmosphericShadowApplyIntensity;
+    int32 AtmosphericShadowTravelCount;
+    bool AtmosphericShadowUseNoise;
     bool EarthQuake;
     float FocalDistance;
     float LensRadius;

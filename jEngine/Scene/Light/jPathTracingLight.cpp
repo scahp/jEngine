@@ -1,32 +1,41 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jPathTracingLight.h"
+#include "Shader/jShaderParameterSet.h"
+
+template <>
+struct TShaderParameterHLSLTypeInfo<jPathTracingLightUniformBufferData>
+{
+    static constexpr const char* GetTypeName() { return "jPathTracingLightUniformBufferData"; }
+    static void AppendTypeDeclaration(std::string&) {}
+};
+
+BEGIN_SHADER_PARAMETER_SET(jPathTracingLightShaderParameters)
+    SHADER_UNIFORM_BUFFER(jPathTracingLightUniformBufferData, PathTracingLight)
+END_SHADER_PARAMETER_SET()
 
 void jPathTracingLight::Initialize(const jPathTracingLightUniformBufferData& InData)
 {
-	LightData = InData;
+    LightData = InData;
 }
 
 const std::shared_ptr<jShaderBindingInstance>& jPathTracingLight::PrepareShaderBindingInstance(jTexture* InShadowMap)
 {
-	if (IsNeedToUpdateShaderBindingInstance)
-	{
-		IsNeedToUpdateShaderBindingInstance = false;
+    if (IsNeedToUpdateShaderBindingInstance)
+    {
+        IsNeedToUpdateShaderBindingInstance = false;
 
-		LightDataUniformBufferPtr = std::shared_ptr<IUniformBufferBlock>(
-			g_rhi->CreateUniformBufferBlock(jNameStatic("PathTracingLightBlock"), jLifeTimeType::MultiFrame, sizeof(jPathTracingLightUniformBufferData)));
-		LightDataUniformBufferPtr->UpdateBufferData(&LightData, sizeof(LightData));
+        LightDataUniformBufferPtr = std::shared_ptr<IUniformBufferBlock>(
+            g_rhi->CreateUniformBufferBlock(jNameStatic("PathTracingLightBlock"), jLifeTimeType::MultiFrame, sizeof(jPathTracingLightUniformBufferData)));
+        LightDataUniformBufferPtr->UpdateBufferData(&LightData, sizeof(LightData));
 
-		int32 BindingPoint = 0;
-		jShaderBindingArray ShaderBindingArray;
-		jShaderBindingResourceInlineAllocator ResourceInlineAllocator;
+        if (ShaderBindingInstanceDataPtr)
+            ShaderBindingInstanceDataPtr->Free();
 
-		ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
-			, ResourceInlineAllocator.Alloc<jUniformBufferResource>(LightDataUniformBufferPtr.get())));
+        jPathTracingLightShaderParameters Parameters;
+        Parameters.PathTracingLight.Buffer = LightDataUniformBufferPtr;
+        ShaderBindingInstanceDataPtr = jShaderParameterSet::CreateShaderBindingInstance(
+            Parameters, EShaderAccessStageFlag::ALL_GRAPHICS, jShaderBindingInstanceType::MultiFrame);
+    }
 
-		if (ShaderBindingInstanceDataPtr)
-			ShaderBindingInstanceDataPtr->Free();
-		ShaderBindingInstanceDataPtr = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::MultiFrame);
-	}
-
-	return ShaderBindingInstanceDataPtr;
+    return ShaderBindingInstanceDataPtr;
 }

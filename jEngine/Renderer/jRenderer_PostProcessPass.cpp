@@ -10,11 +10,177 @@
 #include "jOptions.h"
 #include "Scene/jRenderObject.h"
 #include "Profiler/jPerformanceProfile.h"
+#include "Shader/jShader.h"
+#include "Shader/jShaderParameterSet.h"
+
+BEGIN_SHADER_PARAMETER_SET(jTonemapPSParameters)
+    SHADER_TEXTURE2D(BloomTexture)
+    SHADER_TEXTURE2D(Texture)
+    SHADER_TEXTURE2D(EyeAdaptationTexture)
+END_SHADER_PARAMETER_SET()
+
+BEGIN_SHADER_PARAMETER_SET(jBloomSetupPSParameters)
+    SHADER_TEXTURE2D(Texture)
+    SHADER_TEXTURE2D(PreEyeAdaptionTexture)
+END_SHADER_PARAMETER_SET()
+
+BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jBloomUniformBuffer)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, BufferSizeAndInvSize)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, TintA)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, TintB)
+    SHADER_UNIFORM_BUFFER_MEMBER(float, BloomIntensity)
+END_SHADER_UNIFORM_BUFFER_STRUCT()
+
+BEGIN_SHADER_PARAMETER_SET(jBloomDownPSParameters)
+    SHADER_UNIFORM_BUFFER(jBloomUniformBuffer, BloomParam)
+    SHADER_TEXTURE2D(Texture)
+END_SHADER_PARAMETER_SET()
+
+BEGIN_SHADER_PARAMETER_SET(jBloomUpPSParameters)
+    SHADER_UNIFORM_BUFFER(jBloomUniformBuffer, BloomParam)
+    SHADER_TEXTURE2D(Texture)
+END_SHADER_PARAMETER_SET()
+
+BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jEyeAdaptationUniformBuffer)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector2, ViewportMin)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector2, ViewportMax)
+    SHADER_UNIFORM_BUFFER_MEMBER(float, MinLuminanceAverage)
+    SHADER_UNIFORM_BUFFER_MEMBER(float, MaxLuminanceAverage)
+    SHADER_UNIFORM_BUFFER_MEMBER(float, DeltaFrametime)
+    SHADER_UNIFORM_BUFFER_MEMBER(float, AdaptationSpeed)
+    SHADER_UNIFORM_BUFFER_MEMBER(float, ExposureCompensation)
+END_SHADER_UNIFORM_BUFFER_STRUCT()
+
+BEGIN_SHADER_PARAMETER_SET(jEyeAdaptationCSParameters)
+    SHADER_TEXTURE2D(SceneColor)
+    SHADER_TEXTURE2D(EyeAdaptationTexture)
+    SHADER_RW_TEXTURE2D(RWEyeAdaptationTexture)
+    SHADER_UNIFORM_BUFFER(jEyeAdaptationUniformBuffer, EyeAdaptation)
+END_SHADER_PARAMETER_SET()
+
+struct jShaderBloomSetupPixelShader : public jShader
+{
+    DECLARE_SHADER_PARAMETER_SETS(jBloomSetupPSParameters)
+
+    using ShaderPermutation = jPermutation<>;
+    ShaderPermutation Permutation;
+
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderBloomSetupPixelShader, Permutation)
+};
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderBloomSetupPixelShader
+    , "BloomSetupPS"
+    , "Resource/Shaders/hlsl/bloom_and_eyeadaptation_setup_ps.hlsl"
+    , ""
+    , "main"
+    , EShaderAccessStageFlag::FRAGMENT)
+
+struct jShaderBloomDownVertexShader : public jShader
+{
+    DECLARE_SHADER_PARAMETER_SETS(jBloomDownPSParameters)
+
+    using ShaderPermutation = jPermutation<>;
+    ShaderPermutation Permutation;
+
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderBloomDownVertexShader, Permutation)
+};
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderBloomDownVertexShader
+    , "BloomDownVS"
+    , "Resource/Shaders/hlsl/bloom_down_vs.hlsl"
+    , ""
+    , "main"
+    , EShaderAccessStageFlag::VERTEX)
+
+struct jShaderBloomDownPixelShader : public jShader
+{
+    DECLARE_SHADER_PARAMETER_SETS(jBloomDownPSParameters)
+
+    using ShaderPermutation = jPermutation<>;
+    ShaderPermutation Permutation;
+
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderBloomDownPixelShader, Permutation)
+};
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderBloomDownPixelShader
+    , "BloomDownPS"
+    , "Resource/Shaders/hlsl/bloom_down_ps.hlsl"
+    , ""
+    , "main"
+    , EShaderAccessStageFlag::FRAGMENT)
+
+struct jShaderBloomUpVertexShader : public jShader
+{
+    DECLARE_SHADER_PARAMETER_SETS(jBloomUpPSParameters)
+
+    using ShaderPermutation = jPermutation<>;
+    ShaderPermutation Permutation;
+
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderBloomUpVertexShader, Permutation)
+};
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderBloomUpVertexShader
+    , "BloomUpVS"
+    , "Resource/Shaders/hlsl/bloom_up_vs.hlsl"
+    , ""
+    , "main"
+    , EShaderAccessStageFlag::VERTEX)
+
+struct jShaderBloomUpPixelShader : public jShader
+{
+    DECLARE_SHADER_PARAMETER_SETS(jBloomUpPSParameters)
+
+    using ShaderPermutation = jPermutation<>;
+    ShaderPermutation Permutation;
+
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderBloomUpPixelShader, Permutation)
+};
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderBloomUpPixelShader
+    , "BloomUpPS"
+    , "Resource/Shaders/hlsl/bloom_up_ps.hlsl"
+    , ""
+    , "main"
+    , EShaderAccessStageFlag::FRAGMENT)
+
+struct jShaderTonemapPixelShader : public jShader
+{
+    DECLARE_SHADER_PARAMETER_SETS(jTonemapPSParameters)
+
+    using ShaderPermutation = jPermutation<>;
+    ShaderPermutation Permutation;
+
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderTonemapPixelShader, Permutation)
+};
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderTonemapPixelShader
+    , "TonemapPS"
+    , "Resource/Shaders/hlsl/tonemap_ps.hlsl"
+    , ""
+    , "main"
+    , EShaderAccessStageFlag::FRAGMENT)
+
+struct jShaderEyeAdaptationComputeShader : public jShader
+{
+    DECLARE_SHADER_PARAMETER_SETS(jEyeAdaptationCSParameters)
+
+    using ShaderPermutation = jPermutation<>;
+    ShaderPermutation Permutation;
+
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderEyeAdaptationComputeShader, Permutation)
+};
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderEyeAdaptationComputeShader
+    , "EyeAdaptationCS"
+    , "Resource/Shaders/hlsl/eyeadaptation_cs.hlsl"
+    , ""
+    , "main"
+    , EShaderAccessStageFlag::COMPUTE)
 
 void jRenderer::PostProcess()
 {
-	auto AddFullQuadPass = [&](const char* InDebugName, const std::vector<jTexture*> InShaderInputs, const std::shared_ptr<jRenderTarget> InRenderTargetPtr
-		, jName VertexShader, jName PixelShader, bool IsBloom = false, Vector InBloomTintA = Vector::ZeroVector, Vector InBloomTintB = Vector::ZeroVector)
+	auto AddShaderParameterFullscreenPass = [&](const char* InDebugName, const std::shared_ptr<jRenderTarget> InRenderTargetPtr
+		, jShader* InVertexShader, jShader* InPixelShader, const auto& InParameters)
 		{
 			DEBUG_EVENT(RenderFrameContextPtr, InDebugName);
 
@@ -77,69 +243,14 @@ void jRenderer::PostProcess()
 			// Create RenderPass
 			jRenderPass* RenderPass = g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { RTWidth, RTHeight });
 
-			int32 BindingPoint = 0;
-			jShaderBindingArray ShaderBindingArray;
-			jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
 			jShaderBindingInstanceArray ShaderBindingInstanceArray;
-
-			struct jBloomUniformBuffer
-			{
-				Vector4 BufferSizeAndInvSize;
-				Vector4 TintA;
-				Vector4 TintB;
-				float BloomIntensity;
-			};
-			jBloomUniformBuffer ubo;
-			ubo.BufferSizeAndInvSize.x = (float)RTWidth;
-			ubo.BufferSizeAndInvSize.y = (float)RTHeight;
-			ubo.BufferSizeAndInvSize.z = 1.0f / (float)RTWidth;
-			ubo.BufferSizeAndInvSize.w = 1.0f / (float)RTHeight;
-			ubo.TintA = Vector4(InBloomTintA, 0.0);
-			ubo.TintB = Vector4(InBloomTintB, 0.0);
-			ubo.BloomIntensity = 0.675f;
-
-			auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(jNameStatic("BloomUniformBuffer"), jLifeTimeType::OneFrame, sizeof(ubo)));
-			if (IsBloom)
-			{
-				OneFrameUniformBuffer->UpdateBufferData(&ubo, sizeof(ubo));
-			}
-
-			std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance;
-			{
-				if (IsBloom)
-				{
-					ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
-						, ResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
-				}
-
-				const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
-					, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
-					, 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
-
-				for (int32 i = 0; i < (int32)InShaderInputs.size(); ++i)
-				{
-					ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
-						, ResourceInlineAllactor.Alloc<jTextureResource>(InShaderInputs[i], SamplerState)));
-
-					g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), InShaderInputs[i], EResourceLayout::SHADER_READ_ONLY);
-				}
-
-				ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
-				ShaderBindingInstanceArray.Add(ShaderBindingInstance.get());
-			}
+			auto ShaderBindingInstance = jShaderParameterSet::CreateShaderBindingInstance(InParameters, EShaderAccessStageFlag::ALL_GRAPHICS, jShaderBindingInstanceType::SingleFrame);
+			ShaderBindingInstanceArray.Add(ShaderBindingInstance.get());
 
 			jGraphicsPipelineShader Shader;
 			{
-				jShaderInfo shaderInfo;
-				shaderInfo.SetName(VertexShader);
-				shaderInfo.SetShaderFilepath(VertexShader);
-				shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
-				Shader.VertexShader = g_rhi->CreateShader(shaderInfo);
-
-				shaderInfo.SetName(PixelShader);
-				shaderInfo.SetShaderFilepath(PixelShader);
-				shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
-				Shader.PixelShader = g_rhi->CreateShader(shaderInfo);
+				Shader.VertexShader = InVertexShader;
+				Shader.PixelShader = InPixelShader;
 			}
 
 			jDrawCommand DrawCommand(RenderFrameContextPtr, jSceneRenderTarget::GlobalFullscreenPrimitive->RenderObjects[0], RenderPass
@@ -152,6 +263,73 @@ void jRenderer::PostProcess()
 				DrawCommand.Draw();
 				RenderPass->EndRenderPass();
 			}
+		};
+
+	auto AddShaderParameterComputePass = [&](const char* InDebugName, jShader* InComputeShader, const auto& InParameters
+		, uint32 NumGroupsX, uint32 NumGroupsY, uint32 NumGroupsZ)
+		{
+			DEBUG_EVENT(RenderFrameContextPtr, InDebugName);
+
+			auto CurrentBindingInstance = jShaderParameterSet::CreateShaderBindingInstance(InParameters, EShaderAccessStageFlag::COMPUTE, jShaderBindingInstanceType::SingleFrame);
+
+			jShaderBindingLayoutArray ShaderBindingLayoutArray;
+			ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
+
+			jPipelineStateInfo* ComputePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(InComputeShader, ShaderBindingLayoutArray, {});
+			ComputePipelineStateInfo->Bind(RenderFrameContextPtr);
+
+			jShaderBindingInstanceArray ShaderBindingInstanceArray;
+			ShaderBindingInstanceArray.Add(CurrentBindingInstance.get());
+
+			jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
+			for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
+			{
+				ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
+				const std::vector<uint32>* DynamicOffsets = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
+				if (DynamicOffsets && DynamicOffsets->size())
+				{
+					ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)DynamicOffsets->data(), (int32)DynamicOffsets->size());
+				}
+			}
+			ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
+
+			g_rhi->BindComputeShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), ComputePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
+			g_rhi->DispatchCompute(RenderFrameContextPtr, NumGroupsX, NumGroupsY, NumGroupsZ);
+		};
+
+	const jSamplerStateInfo* PostProcessSamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+		, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
+		, 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
+
+	jShaderFullscreenQuadVertexShader::ShaderPermutation FullscreenQuadVertexShaderPermutation;
+	jShader* const FullscreenQuadVertexShader = jShaderFullscreenQuadVertexShader::CreateShader(FullscreenQuadVertexShaderPermutation);
+	jShaderBloomSetupPixelShader::ShaderPermutation BloomSetupPixelShaderPermutation;
+	jShader* const BloomSetupPixelShader = jShaderBloomSetupPixelShader::CreateShader(BloomSetupPixelShaderPermutation);
+	jShaderBloomDownVertexShader::ShaderPermutation BloomDownVertexShaderPermutation;
+	jShader* const BloomDownVertexShader = jShaderBloomDownVertexShader::CreateShader(BloomDownVertexShaderPermutation);
+	jShaderBloomDownPixelShader::ShaderPermutation BloomDownPixelShaderPermutation;
+	jShader* const BloomDownPixelShader = jShaderBloomDownPixelShader::CreateShader(BloomDownPixelShaderPermutation);
+	jShaderBloomUpVertexShader::ShaderPermutation BloomUpVertexShaderPermutation;
+	jShader* const BloomUpVertexShader = jShaderBloomUpVertexShader::CreateShader(BloomUpVertexShaderPermutation);
+	jShaderBloomUpPixelShader::ShaderPermutation BloomUpPixelShaderPermutation;
+	jShader* const BloomUpPixelShader = jShaderBloomUpPixelShader::CreateShader(BloomUpPixelShaderPermutation);
+	jShaderTonemapPixelShader::ShaderPermutation TonemapPixelShaderPermutation;
+	jShader* const TonemapPixelShader = jShaderTonemapPixelShader::CreateShader(TonemapPixelShaderPermutation);
+	jShaderEyeAdaptationComputeShader::ShaderPermutation EyeAdaptationComputeShaderPermutation;
+	jShader* const EyeAdaptationComputeShader = jShaderEyeAdaptationComputeShader::CreateShader(EyeAdaptationComputeShaderPermutation);
+
+	auto CreateBloomUniformBufferBlock = [&](int32 InWidth, int32 InHeight, Vector InTintA = Vector::ZeroVector, Vector InTintB = Vector::ZeroVector)
+		{
+			jBloomUniformBuffer UniformBufferData;
+			UniformBufferData.BufferSizeAndInvSize = Vector4((float)InWidth, (float)InHeight, 1.0f / (float)InWidth, 1.0f / (float)InHeight);
+			UniformBufferData.TintA = Vector4(InTintA, 0.0f);
+			UniformBufferData.TintB = Vector4(InTintB, 0.0f);
+			UniformBufferData.BloomIntensity = 0.675f;
+
+			auto UniformBufferBlock = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
+				jNameStatic("BloomUniformBuffer"), jLifeTimeType::OneFrame, sizeof(UniformBufferData)));
+			UniformBufferBlock->UpdateBufferData(&UniformBufferData, sizeof(UniformBufferData));
+			return UniformBufferBlock;
 		};
 
 	SCOPE_CPU_PROFILE(PostProcess);
@@ -219,8 +397,12 @@ void jRenderer::PostProcess()
 				SourceRT = SceneRT->ColorPtr->GetTexture();
 
 				sprintf_s(szDebugEventTemp, sizeof(szDebugEventTemp), "BloomEyeAdaptationSetup %dx%d", SceneRT->BloomSetup->Info.Width, SceneRT->BloomSetup->Info.Height);
-				AddFullQuadPass(szDebugEventTemp, { SourceRT, EyeAdaptationTextureOld }, SceneRT->BloomSetup
-					, jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/bloom_and_eyeadaptation_setup_ps.hlsl"));
+				jBloomSetupPSParameters BloomSetupParameters;
+				BloomSetupParameters.Texture = { SourceRT, PostProcessSamplerState };
+				BloomSetupParameters.PreEyeAdaptionTexture = { EyeAdaptationTextureOld, PostProcessSamplerState };
+				AddShaderParameterFullscreenPass(szDebugEventTemp, SceneRT->BloomSetup
+					, FullscreenQuadVertexShader, BloomSetupPixelShader
+					, BloomSetupParameters);
 				SourceRT = SceneRT->BloomSetup->GetTexture();
 
 				g_rhi->TransitionLayout(CommandBuffer, SourceRT, EResourceLayout::SHADER_READ_ONLY);
@@ -229,8 +411,12 @@ void jRenderer::PostProcess()
 				{
 					const auto& RTInfo = SceneRT->DownSample[i]->Info;
 					sprintf_s(szDebugEventTemp, sizeof(szDebugEventTemp), "BloomDownsample %dx%d", RTInfo.Width, RTInfo.Height);
-					AddFullQuadPass(szDebugEventTemp, { SourceRT }, SceneRT->DownSample[i]
-						, jNameStatic("Resource/Shaders/hlsl/bloom_down_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/bloom_down_ps.hlsl"), true);
+					jBloomDownPSParameters BloomDownParameters;
+					BloomDownParameters.BloomParam.Buffer = CreateBloomUniformBufferBlock(RTInfo.Width, RTInfo.Height);
+					BloomDownParameters.Texture = { SourceRT, PostProcessSamplerState };
+					AddShaderParameterFullscreenPass(szDebugEventTemp, SceneRT->DownSample[i]
+						, BloomDownVertexShader, BloomDownPixelShader
+						, BloomDownParameters);
 					SourceRT = SceneRT->DownSample[i]->GetTexture();
 
 					g_rhi->TransitionLayout(CommandBuffer, SourceRT, EResourceLayout::SHADER_READ_ONLY);
@@ -242,50 +428,10 @@ void jRenderer::PostProcess()
 			if (1)
 			{
 				sprintf_s(szDebugEventTemp, sizeof(szDebugEventTemp), "EyeAdaptationCS %dx%d", EyeAdaptationTextureCurrent->Width, EyeAdaptationTextureCurrent->Height);
-				DEBUG_EVENT(RenderFrameContextPtr, szDebugEventTemp);
-				//////////////////////////////////////////////////////////////////////////
-				// Compute Pipeline
 
 				g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), SourceRT, EResourceLayout::SHADER_READ_ONLY);
 				g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), EyeAdaptationTextureCurrent, EResourceLayout::UAV);
 
-				std::shared_ptr<jShaderBindingInstance> CurrentBindingInstance = nullptr;
-				int32 BindingPoint = 0;
-				jShaderBindingArray ShaderBindingArray;
-				jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
-
-				// Binding 0 : Source Log2Average Image
-				if (ensure(SourceRT))
-				{
-					ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-						, ResourceInlineAllactor.Alloc<jTextureResource>(SourceRT, nullptr)));
-				}
-
-				// Binding 1 : Prev frame EyeAdaptation Image
-				if (ensure(EyeAdaptationTextureOld))
-				{
-					ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::COMPUTE
-						, ResourceInlineAllactor.Alloc<jTextureResource>(EyeAdaptationTextureOld, nullptr)));
-				}
-
-				// Binding 2 : Current frame EyeAdaptation Image
-				if (ensure(EyeAdaptationTextureCurrent))
-				{
-					ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::COMPUTE
-						, ResourceInlineAllactor.Alloc<jTextureResource>(EyeAdaptationTextureCurrent, nullptr)));
-				}
-
-				// Binding 3 : CommonComputeUniformBuffer
-				struct jEyeAdaptationUniformBuffer
-				{
-					Vector2 ViewportMin;
-					Vector2 ViewportMax;
-					float MinLuminanceAverage;
-					float MaxLuminanceAverage;
-					float DeltaFrametime;
-					float AdaptationSpeed;
-					float ExposureCompensation;
-				};
 				jEyeAdaptationUniformBuffer EyeAdaptationUniformBuffer;
 				EyeAdaptationUniformBuffer.ViewportMin = Vector2(0.0f, 0.0f);
 				EyeAdaptationUniformBuffer.ViewportMax = Vector2((float)SourceRT->Width, (float)SourceRT->Height);
@@ -295,51 +441,17 @@ void jRenderer::PostProcess()
 				EyeAdaptationUniformBuffer.AdaptationSpeed = 1.0f;
 				EyeAdaptationUniformBuffer.ExposureCompensation = exp2(gOptions.AutoExposureKeyValueScale);
 
-				auto OneFrameUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
+				auto EyeAdaptationUniformBufferBlock = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
 					jNameStatic("EyeAdaptationUniformBuffer"), jLifeTimeType::OneFrame, sizeof(EyeAdaptationUniformBuffer)));
-				OneFrameUniformBuffer->UpdateBufferData(&EyeAdaptationUniformBuffer, sizeof(EyeAdaptationUniformBuffer));
-				{
-					ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::COMPUTE
-						, ResourceInlineAllactor.Alloc<jUniformBufferResource>(OneFrameUniformBuffer.get()), true));
-				}
+				EyeAdaptationUniformBufferBlock->UpdateBufferData(&EyeAdaptationUniformBuffer, sizeof(EyeAdaptationUniformBuffer));
 
-				CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
-
-				jShaderInfo shaderInfo;
-				shaderInfo.SetName(jNameStatic("eyeadaptation"));
-				shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/eyeadaptation_cs.hlsl"));
-				shaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
-				static jShader* Shader = g_rhi->CreateShader(shaderInfo);
-
-				jShaderBindingLayoutArray ShaderBindingLayoutArray;
-				ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
-
-				jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingLayoutArray, {});
-
-				computePipelineStateInfo->Bind(RenderFrameContextPtr);
-
-				//CurrentBindingInstance->BindCompute(RenderFrameContextPtr, (VkPipelineLayout)computePipelineStateInfo->GetPipelineLayoutHandle());
-
-				jShaderBindingInstanceArray ShaderBindingInstanceArray;
-				ShaderBindingInstanceArray.Add(CurrentBindingInstance.get());
-
-				jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
-				for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
-				{
-					// Add ShaderBindingInstanceCombiner data : DescriptorSets, DynamicOffsets
-					ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
-					const std::vector<uint32>* pDynamicOffsetTest = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
-					if (pDynamicOffsetTest && pDynamicOffsetTest->size())
-					{
-						ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)pDynamicOffsetTest->data(), (int32)pDynamicOffsetTest->size());
-					}
-				}
-				ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
-
-				g_rhi->BindComputeShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), computePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
-				g_rhi->DispatchCompute(RenderFrameContextPtr, 1, 1, 1);
+				jEyeAdaptationCSParameters EyeAdaptationParameters;
+				EyeAdaptationParameters.SceneColor = { SourceRT, nullptr };
+				EyeAdaptationParameters.EyeAdaptationTexture = { EyeAdaptationTextureOld, nullptr };
+				EyeAdaptationParameters.RWEyeAdaptationTexture = { EyeAdaptationTextureCurrent };
+				EyeAdaptationParameters.EyeAdaptation.Buffer = EyeAdaptationUniformBufferBlock;
+				AddShaderParameterComputePass(szDebugEventTemp, EyeAdaptationComputeShader, EyeAdaptationParameters, 1, 1, 1);
 			}
-			//////////////////////////////////////////////////////////////////////////
 
 			if (1)
 			{
@@ -360,8 +472,12 @@ void jRenderer::PostProcess()
 				{
 					const auto& RTInfo = SceneRT->UpSample[i]->Info;
 					sprintf_s(szDebugEventTemp, sizeof(szDebugEventTemp), "BloomUpsample %dx%d", RTInfo.Width, RTInfo.Height);
-					AddFullQuadPass(szDebugEventTemp, { SourceRT }, SceneRT->UpSample[i]
-						, jNameStatic("Resource/Shaders/hlsl/bloom_up_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/bloom_up_ps.hlsl"), true, UpscaleBloomTintA[i], UpscaleBloomTintB[i]);
+					jBloomUpPSParameters BloomUpParameters;
+					BloomUpParameters.BloomParam.Buffer = CreateBloomUniformBufferBlock(RTInfo.Width, RTInfo.Height, UpscaleBloomTintA[i], UpscaleBloomTintB[i]);
+					BloomUpParameters.Texture = { SourceRT, PostProcessSamplerState };
+					AddShaderParameterFullscreenPass(szDebugEventTemp, SceneRT->UpSample[i]
+						, BloomUpVertexShader, BloomUpPixelShader
+						, BloomUpParameters);
 					SourceRT = SceneRT->UpSample[i]->GetTexture();
 
 					g_rhi->TransitionLayout(CommandBuffer, SourceRT, EResourceLayout::SHADER_READ_ONLY);
@@ -376,7 +492,16 @@ void jRenderer::PostProcess()
 			EyeAdaptationTextureCurrent = GWhiteTexture.get();
 		}
 		sprintf_s(szDebugEventTemp, sizeof(szDebugEventTemp), "Tonemap %dx%d", SceneRT->FinalColorPtr->Info.Width, SceneRT->FinalColorPtr->Info.Height);
-		AddFullQuadPass(szDebugEventTemp, { SourceRT, SceneRT->ColorPtr->GetTexture(), EyeAdaptationTextureCurrent }, SceneRT->FinalColorPtr
-			, jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"), jNameStatic("Resource/Shaders/hlsl/tonemap_ps.hlsl"));
+		g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), SourceRT, EResourceLayout::SHADER_READ_ONLY);
+		g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), SceneRT->ColorPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+		g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), EyeAdaptationTextureCurrent, EResourceLayout::SHADER_READ_ONLY);
+
+		jTonemapPSParameters TonemapParameters;
+		TonemapParameters.BloomTexture = { SourceRT, PostProcessSamplerState };
+		TonemapParameters.Texture = { SceneRT->ColorPtr->GetTexture(), PostProcessSamplerState };
+		TonemapParameters.EyeAdaptationTexture = { EyeAdaptationTextureCurrent, PostProcessSamplerState };
+		AddShaderParameterFullscreenPass(szDebugEventTemp, SceneRT->FinalColorPtr
+			, FullscreenQuadVertexShader, TonemapPixelShader
+			, TonemapParameters);
 	}
 }

@@ -23,17 +23,6 @@ struct VSOutput
     float3x3 TBN : TEXCOORD2;
 };
 
-cbuffer ViewParam : register(b0, space0) { ViewUniformBuffer ViewParam; }
-cbuffer RenderObjectParam : register(b0, space1) { RenderObjectUniformBuffer RenderObjectParam; }
-#if USE_ALBEDO_TEXTURE
-Texture2D DiffuseTexture : register(t0, space2);
-SamplerState DiffuseTextureSampler : register(s0, space2);
-Texture2D NormalTexture : register(t1, space2);
-SamplerState NormalTextureSampler : register(s1, space2);
-Texture2D RMTexture : register(t2, space2);     // Metallic, Roughness
-SamplerState RMTextureSampler : register(s2, space2);
-#endif
-
 struct PushConsts
 {
     float4 Color;

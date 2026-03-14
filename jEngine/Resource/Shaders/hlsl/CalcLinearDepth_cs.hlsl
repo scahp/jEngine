@@ -1,20 +1,5 @@
 #include "Common.hlsl"
 
-Texture2D InDepthTexture : register(t1);
-RWTexture2D<float> OutLinearDepthTexture : register(u0);
-
-struct jLinearDepthUniformBuffer
-{
-    float4x4 InvP;
-    float2 ScreenSize;
-    float2 Padding;
-};
-
-cbuffer ComputeParam : register(b2)
-{
-    jLinearDepthUniformBuffer ComputeParam;
-}
-
 [numthreads(8, 8, 1)]
 void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 {

@@ -4,6 +4,7 @@
 #include "Scene/Light/jDirectionalLight.h"
 #include "Scene/jCamera.h"
 #include "Material/jMaterial.h"
+#include "Shader/jCommonShaderParameters.h"
 #include "jRHIType.h"
 #include "FileLoader/jImageFileLoader.h"
 
@@ -217,20 +218,7 @@ jView::jView(const jCamera* camera, const std::vector<jLight*>& InLights)
 
 void jView::PrepareViewUniformBufferShaderBindingInstance()
 {
-    // Prepare & Get ViewUniformBuffer
-    struct jViewUniformBuffer
-    {
-        Matrix V;
-        Matrix P;
-        Matrix VP;
-        Matrix InvVP;
-        Matrix PrevVP;
-		Vector EyeWorld;
-		float padding0;
-        Vector4 ScreenRect;
-    };
-
-    jViewUniformBuffer ubo;
+    ViewUniformBuffer ubo;
     ubo.P = Camera->Projection;
     ubo.V = Camera->View;
     ubo.VP = Camera->ViewProjection;
@@ -242,14 +230,9 @@ void jView::PrepareViewUniformBufferShaderBindingInstance()
     ViewUniformBufferPtr = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(jNameStatic("ViewUniformParameters"), jLifeTimeType::OneFrame, sizeof(ubo)));
     ViewUniformBufferPtr->UpdateBufferData(&ubo, sizeof(ubo));
 
-    int32 BindingPoint = 0;
-    jShaderBindingArray ShaderBindingArray;
-    jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
-
-    ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
-        , ResourceInlineAllactor.Alloc<jUniformBufferResource>(ViewUniformBufferPtr.get()), true));
-
-	ViewUniformBufferShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
+    jViewShaderParameters Parameters;
+    Parameters.ViewParam.Buffer = ViewUniformBufferPtr;
+	ViewUniformBufferShaderBindingInstance = jShaderParameterSet::CreateShaderBindingInstance(Parameters, EShaderAccessStageFlag::ALL_GRAPHICS, jShaderBindingInstanceType::SingleFrame);
 }
 
 void jView::GetShaderBindingInstance(jShaderBindingInstanceArray& OutShaderBindingInstanceArray, bool InIsForwardRenderer) const

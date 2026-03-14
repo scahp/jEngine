@@ -261,7 +261,11 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     <ClInclude Include="Scene\Light\jPathTracingLight.h" />
     <ClInclude Include="Scene\Light\jPointLight.h" />
     <ClInclude Include="Scene\Light\jSpotLight.h" />
+    <ClInclude Include="Shader\jAOShaderParameters.h" />
+    <ClInclude Include="Shader\jCommonShaderParameters.h" />
+    <ClInclude Include="Shader\jLightingShaderParameters.h" />
     <ClInclude Include="Shader\jShader.h" />
+    <ClInclude Include="Shader\jShaderParameterSet.h" />
     <ClInclude Include="Shader\Spirv\jSpirvHelper.h" />
   </ItemGroup>
   <ItemGroup>
@@ -512,12 +516,6 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     </None>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Resource\Shaders\hlsl\emboss_cs.hlsl">
-      <FileType>Document</FileType>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
     <None Include="Resource\Shaders\hlsl\shader_instancing_vs.hlsl">
       <FileType>Document</FileType>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
@@ -599,12 +597,6 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </None>
     <None Include="Resource\Shaders\hlsl\spotlight_vs.hlsl">
-      <FileType>Document</FileType>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resource\Shaders\hlsl\tonemap_cs.hlsl">
       <FileType>Document</FileType>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </None>
@@ -771,12 +763,6 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
   </ItemGroup>
   <ItemGroup>
     <None Include="Resource\Shaders\hlsl\AtmosphericShadowingApply_cs.hlsl">
-      <FileType>Document</FileType>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resource\Shaders\hlsl\AsyncComputeTest_cs.hlsl">
       <FileType>Document</FileType>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </None>

@@ -6,79 +6,6 @@
 #define SURFEL_GI_CASCADE_PACKED_COUNT ((SURFEL_GI_CASCADE_COUNT + 3) / 4)
 #define SURFEL_GI_ENABLE_OVERFLOW 0
 
-struct CommonComputeUniformBuffer
-{
-    float4x4 InvP;
-    float4x4 V;
-    float4x4 InvV;
-    float2 ScreenSize;
-    float NormalThreshold;
-    float DepthEdgeScale;
-    float NormalEdgeScale;
-    int PreferCellCenterForFirstPlacement;
-    float MinRadius;
-    float MaxDistance;
-    int FrameNumber;
-    int TileSize;
-    int MaxSurfels;
-    int SurfelPageSize;
-    int SurfelPageTableCapacity;
-    int SpawnBudget;
-    int TTLInFrames;
-    float GridCellSize;
-    float4 CascadeCellScaleFromPrevPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeStartDistancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRadiusScalePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    int OutOfViewKeepFrames;
-    float RadiusScale;
-    float FaceMarginRadiusScale;
-    float4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 SurfelsPerCellPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeCellBasePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeCellCountPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeDeltaCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeDeltaCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeDeltaCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClearAllPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-};
-
-struct SurfelData
-{
-    float4 PositionRadius;
-    float4 NormalSeenFrame;
-    float4 AlbedoWeight;
-    float4 Extra;
-};
-
-struct VisibleCellEntry
-{
-    int4 CellCascade;
-};
-
-struct VisibleCellCounter
-{
-    uint Count;
-    uint3 Padding;
-};
-
-StructuredBuffer<VisibleCellEntry> VisibleCellWorklist : register(t0, space0);
-StructuredBuffer<VisibleCellCounter> VisibleCellCounterBuffer : register(t1, space0);
-RWStructuredBuffer<SurfelData> SurfelPool : register(u3, space0);
-StructuredBuffer<uint> SurfelCellPageTable : register(t4, space0);
-
-cbuffer ComputeCommon : register(b2, space0)
-{
-    CommonComputeUniformBuffer ComputeCommon;
-}
-
 uint HashU32(uint x)
 {
     x ^= x >> 16;
@@ -334,7 +261,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     if (worklistIndex >= workCount)
         return;
 
-    const VisibleCellEntry entry = VisibleCellWorklist[worklistIndex];
+    const jVisibleCellGPU entry = VisibleCellWorklist[worklistIndex];
     const int3 cellCoord = entry.CellCascade.xyz;
     const uint cascadeIndex = (uint)clamp(entry.CellCascade.w, 0, SURFEL_GI_CASCADE_COUNT - 1);
     const uint maxSurfels = max((uint)ComputeCommon.MaxSurfels, 1u);
@@ -350,7 +277,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     [loop] for (uint slot = 0u; slot < slotsPerCell; ++slot)
     {
         const uint surfelIndex = cellBaseIndex + slot;
-        SurfelData s = SurfelPool[surfelIndex];
+        jSurfelGPU s = SurfelPool[surfelIndex];
         if ((uint)round(s.Extra.w) != cascadeIndex)
             continue;
 
@@ -391,7 +318,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
             break;
 
         OverflowNode node = OverflowNodes[nodeIndex];
-        SurfelData s = node.Surfel;
+        jSurfelGPU s = node.Surfel;
         if ((uint)round(s.Extra.w) != cascadeIndex)
         {
             overflowNode = node.Next;

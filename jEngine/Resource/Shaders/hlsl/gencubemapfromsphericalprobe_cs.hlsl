@@ -2,23 +2,6 @@
 #include "Sphericalmap.hlsl"
 #include "PBR.hlsl"
 
-// Mipmap info of Cubemap
-struct MipUniformBuffer
-{
-    int width;
-    int height;
-    int mip;
-    int maxMip;
-};
-
-// Spheremap_TwoMirrorBall(From)
-Texture2D EnvMap : register(t0, space0);
-SamplerState EnvMapSampler : register(s0, space0);
-
-// Cubemap(To)
-RWTexture2DArray<float4> Result : register(u1, space0);
-cbuffer MipParam : register(b2, space0) { MipUniformBuffer MipParam; }
-
 [numthreads(8, 8, 1)]
 void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_GroupID)
 {

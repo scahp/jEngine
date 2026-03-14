@@ -6,93 +6,14 @@
 #define SURFEL_GI_CASCADE_PACKED_COUNT ((SURFEL_GI_CASCADE_COUNT + 3) / 4)
 #define SURFEL_GI_ENABLE_OVERFLOW 0
 
+#define SURFEL_GI_HOVER_DEBUG_MAX_RAYS 16
+
 // This shader is purely for debugging and teaching the system.
 // It visualizes several very different concepts:
 // - clipmap occupancy / underfilled cells
 // - spawn attempts and placement behavior
 // - MSME irradiance state per surfel
 // - hovered-surface ray segments fired by the inline-ray gather pass
-struct VisualizeUniformBuffer
-{
-    float4x4 InvP;
-    float4x4 InvV;
-    float4x4 ViewProj;
-    float2 ScreenSize;
-    float BlendAlpha;
-    float GridCellSize;
-    float4 CascadeCellScaleFromPrevPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeStartDistancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    int MaxSurfels;
-    int SurfelPageSize;
-    int SurfelPageTableCapacity;
-    int NeighborCellRadius;
-    int BlendWithScene;
-    int ShowStateDebug;
-    float4 SurfelsPerCellPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeCellBasePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeCellCountPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    int ShowCellDebug;
-    int ShowUnderfilledCellDebug;
-    int ShowCellGrid;
-    int ShowSpawnAttemptDebug;
-    int ShowIrradianceDebug;
-    int IrradianceDebugMode;
-    int ShowHoverRayDebug;
-    int ShowHoverRayRadianceColor;
-    float HoverRayLength;
-    int Padding0;
-};
-
-struct SurfelData
-{
-    float4 PositionRadius;
-    float4 NormalSeenFrame;
-    float4 AlbedoWeight;
-    float4 Extra;
-};
-
-struct SurfelIrradianceData
-{
-    float4 IrradianceAndCount;
-    float4 MSMEData0;
-    float4 MSMEData1;
-};
-
-#define SURFEL_GI_HOVER_DEBUG_MAX_RAYS 16
-
-struct SurfelHoverRayDebugData
-{
-    float4 OriginAndCount;
-    float4 RayDirAndType[SURFEL_GI_HOVER_DEBUG_MAX_RAYS];
-    float4 RayColor[SURFEL_GI_HOVER_DEBUG_MAX_RAYS];
-};
-
-RWTexture2D<float4> Result : register(u0, space0);
-Texture2D DepthTexture : register(t1, space0);
-SamplerState DepthTextureSampler : register(s1, space0);
-Texture2D LinearDepthTexture : register(t2, space0);
-StructuredBuffer<SurfelData> SurfelPool : register(t3, space0);
-Texture2D SpawnAttemptTexture : register(t4, space0);
-StructuredBuffer<uint> SurfelCellPageTable : register(t6, space0);
-StructuredBuffer<SurfelIrradianceData> SurfelIrradianceBuffer : register(t7, space0);
-StructuredBuffer<uint> WinnerScoreBuffer : register(t8, space0);
-StructuredBuffer<uint> WinnerIndexBuffer : register(t9, space0);
-Texture2D GBufferNormalTexture : register(t10, space0);
-StructuredBuffer<SurfelHoverRayDebugData> HoverRayDebugBuffer : register(t11, space0);
-
-cbuffer VisualizeCommon : register(b5, space0)
-{
-    VisualizeUniformBuffer VisualizeCommon;
-}
 
 uint HashU32(uint x)
 {
@@ -530,7 +451,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                     [loop] for (uint slot = 0u; slot < slotsPerCell; ++slot)
                     {
                         const uint surfelIndex = baseIndex + slot;
-                        const SurfelData s = SurfelPool[surfelIndex];
+                        const jSurfelGPU s = SurfelPool[surfelIndex];
                         const bool isDormant = (s.Extra.y < 0.5) && (abs(s.Extra.x - 5.0) < 0.5);
                         if (s.Extra.y < 0.5 && !isDormant)
                             continue;
@@ -564,7 +485,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                             bestCascadeIndex = (int)cascadeIndex;
                             if (VisualizeCommon.ShowIrradianceDebug != 0)
                             {
-                                const SurfelIrradianceData irradianceData = SurfelIrradianceBuffer[surfelIndex];
+                                const jSurfelIrradianceGPU irradianceData = SurfelIrradianceBuffer[surfelIndex];
                                 const float3 meanIrradiance = max(irradianceData.IrradianceAndCount.xyz, 0.0);
                                 const float3 shortMeanIrradiance = max(irradianceData.MSMEData0.xyz, 0.0);
                                 const float3 variance = max(irradianceData.MSMEData1.xyz, 0.0);
@@ -637,7 +558,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                             break;
 
                         const OverflowNode node = OverflowNodes[nodeIndex];
-                        const SurfelData s = node.Surfel;
+                        const jSurfelGPU s = node.Surfel;
                         const bool isDormant = (s.Extra.y < 0.5) && (abs(s.Extra.x - 5.0) < 0.5);
                         if (s.Extra.y < 0.5 && !isDormant)
                         {
@@ -722,7 +643,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         [loop] for (uint slot = 0u; slot < debugSlotsPerCell && hasDebugCellPage; ++slot)
         {
             const uint surfelIndex = debugBaseIndex + slot;
-            const SurfelData s = SurfelPool[surfelIndex];
+            const jSurfelGPU s = SurfelPool[surfelIndex];
             if (s.Extra.y <= 0.5)
                 continue;
 
@@ -817,7 +738,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         // HoverRayDebugBuffer[0] is written by the gather pass for exactly one surfel: the surfel
         // chosen by the hover-select pass. Each entry stores a world-space direction and a type:
         // 0 = baseline/cosine, 1 = guided, 2 = surfel normal debug.
-        const SurfelHoverRayDebugData hoverRayDebug = HoverRayDebugBuffer[0];
+        const jSurfelGIHoverRayDebugGPU hoverRayDebug = HoverRayDebugBuffer[0];
         const uint hoverRayCount = min((uint)round(hoverRayDebug.OriginAndCount.w), (uint)SURFEL_GI_HOVER_DEBUG_MAX_RAYS);
         if (hoverRayCount > 0u)
         {

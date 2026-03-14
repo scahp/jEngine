@@ -5,6 +5,8 @@
 #include "Scene/jCamera.h"
 #include "Scene/Light/jLight.h"
 #include "Scene/jRenderObject.h"
+#include "Shader/jLightingShaderParameters.h"
+#include "jSceneRenderTargets.h"
 
 jObject* jPointLightDrawCommandGenerator::PointLightSphere = nullptr;
 
@@ -42,11 +44,8 @@ void jPointLightDrawCommandGenerator::Initialize(int32 InRTWidth, int32 InRTHeig
         , jViewport(0.0f, 0.0f, (float)InRTWidth, (float)InRTHeight), jScissor(0, 0, InRTWidth, InRTHeight), gOptions.UseVRS);
 
     {
-        jShaderInfo shaderInfo;
-        shaderInfo.SetName(jNameStatic("PointLightShaderVS"));
-        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/pointlight_vs.hlsl"));
-        shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
-        Shader.VertexShader = g_rhi->CreateShader(shaderInfo);
+        jShaderPointLightVertexShader::ShaderPermutation ShaderPermutation;
+        Shader.VertexShader = jShaderPointLightVertexShader::CreateShader(ShaderPermutation);
     }
 }
 
@@ -66,21 +65,19 @@ void jPointLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* OutDestD
     jShaderBindingInstanceArray CopyShaderBindingInstances = ShaderBindingInstances;
     CopyShaderBindingInstances.Add(InLightView.ShaderBindingInstance.get());
 
+    SceneTextureShaderBindingInstance = InRenderFrameContextPtr->SceneRenderTargetPtr->PrepareGBufferShaderBindingInstance(gOptions.UseSubpass);
+    CopyShaderBindingInstances.Add(SceneTextureShaderBindingInstance.get());
+
     //////////////////////////////////////////////////////////////////////////
-    int32 BindingPoint = 0;
-    jShaderBindingArray ShaderBindingArray;
-    jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
-
     UniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
-        jNameStatic("jPointLightPushConstant"), jLifeTimeType::OneFrame, sizeof(jPointLightPushConstant)));
-    auto PushConstantData = jPointLightPushConstant(InView->Camera->Projection * InView->Camera->View * (*InLightView.Light->GetLightWorldMatrix()));
-    UniformBuffer->UpdateBufferData(&PushConstantData, sizeof(jPointLightPushConstant));
+        jNameStatic("jPointLightPushConstant"), jLifeTimeType::OneFrame, sizeof(jLightVolumeVertexUniformBuffer)));
+    jLightVolumeVertexUniformBuffer PushConstantData;
+    PushConstantData.MVP = InView->Camera->Projection * InView->Camera->View * (*InLightView.Light->GetLightWorldMatrix());
+    UniformBuffer->UpdateBufferData(&PushConstantData, sizeof(PushConstantData));
 
-    // todo : 인라인 아닌것도 지원해야 됨
-    ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_GRAPHICS
-        , ResourceInlineAllactor.Alloc<jUniformBufferResource>(UniformBuffer.get()), true));
-
-    ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
+    jLightVolumeVertexShaderParameters Parameters;
+    Parameters.PushConsts.Buffer = UniformBuffer;
+    ShaderBindingInstance = jShaderParameterSet::CreateShaderBindingInstance(Parameters, EShaderAccessStageFlag::VERTEX, jShaderBindingInstanceType::SingleFrame);
     CopyShaderBindingInstances.Add(ShaderBindingInstance.get());
     ////////////////////////////////////////////////////////////////////////////
 

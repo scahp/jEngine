@@ -1,22 +1,5 @@
 #include "common.hlsl"
 
-struct ApplyVisualizeUniformBuffer
-{
-    float BlendAlpha;
-    int SceneWidth;
-    int SceneHeight;
-    int Padding0;
-};
-
-RWTexture2D<float4> OutSceneColor : register(u0);
-Texture2D SceneColorInput : register(t1);
-Texture2D SurfelVisualizeInput : register(t2);
-
-cbuffer ApplyVisualizeCommon : register(b3)
-{
-    ApplyVisualizeUniformBuffer ApplyCommon;
-}
-
 [numthreads(8, 8, 1)]
 void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {

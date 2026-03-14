@@ -12,34 +12,6 @@ struct VSOutput
     float4 ClipPos : TEXCOORD0;
 };
 
-// space 0
-#if USE_SUBPASS
-[[vk::input_attachment_index(0)]] [[vk::binding(0)]] SubpassInput GBuffer0;
-[[vk::input_attachment_index(1)]] [[vk::binding(1)]] SubpassInput GBuffer1;
-[[vk::input_attachment_index(2)]] [[vk::binding(2)]] SubpassInput GBuffer2;
-[[vk::input_attachment_index(3)]] [[vk::binding(3)]] SubpassInput<float> DepthTexture;
-#else // USE_SUBPASS
-Texture2D GBuffer0 : register(t0, space0);
-SamplerState GBuffer0SamplerState : register(s0, space0);
-
-Texture2D GBuffer1 : register(t1, space0);
-SamplerState GBuffer1SamplerState : register(s1, space0);
-
-Texture2D GBuffer2 : register(t2, space0);
-SamplerState GBuffer2SamplerState : register(s2, space0);
-
-Texture2D DepthTexture : register(t3, space0);
-SamplerState DepthTextureSamplerState : register(s3, space0);
-#endif  // USE_SUBPASS
-
-cbuffer ViewParam : register(b0, space1) { ViewUniformBuffer ViewParam; }
-
-cbuffer SpotLight : register(b0, space2) { jSpotLightUniformBufferData SpotLight; }
-#if USE_SHADOW_MAP
-Texture2D SpotLightShadowMap : register(t1, space2);
-SamplerComparisonState SpotLightShadowMapSampler : register(s1, space2);
-#endif
-
 float4 main(VSOutput input) : SV_TARGET
 {
     float2 UV = (input.ClipPos.xy / input.ClipPos.w) * 0.5 + 0.5;
@@ -52,10 +24,10 @@ float4 main(VSOutput input) : SV_TARGET
     float4 GBufferData2 = GBuffer2.SubpassLoad();
     float DepthValue = DepthTexture.SubpassLoad();
 #else   // USE_SUBPASS
-    float3 GBufferData0 = GBuffer0.Sample(GBuffer0SamplerState, UV);
-    float3 GBufferData1 = GBuffer1.Sample(GBuffer1SamplerState, UV);
-    float4 GBufferData2 = GBuffer2.Sample(GBuffer1SamplerState, UV);
-    float DepthValue = DepthTexture.Sample(DepthTextureSamplerState, UV).x;
+    float3 GBufferData0 = GBuffer0.Sample(GBuffer0Sampler, UV);
+    float3 GBufferData1 = GBuffer1.Sample(GBuffer1Sampler, UV);
+    float4 GBufferData2 = GBuffer2.Sample(GBuffer2Sampler, UV);
+    float DepthValue = DepthTexture.Sample(DepthTextureSampler, UV).x;
 #endif  // USE_SUBPASS
 
     float3 WorldPos = CalcWorldPositionFromDepth(DepthValue, UV, ViewParam.InvVP);

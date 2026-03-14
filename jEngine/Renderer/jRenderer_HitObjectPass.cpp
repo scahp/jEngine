@@ -4,6 +4,7 @@
 #include "Scene/jObject.h"
 #include "Scene/jRenderObject.h"
 #include "Scene/jCamera.h"
+#include "Shader/jCommonShaderParameters.h"
 #include "Shader/jShader.h"
 #include "RHI/jRHIUtil.h"
 #include "jOptions.h"
@@ -11,6 +12,46 @@
 #ifdef ENABLE_EDITOR_FEATURES
 #include "Code/Engine/jEditor.h"
 #endif
+
+namespace
+{
+struct jShaderHitObjectVertexShader : public jShader
+{
+    DECLARE_SHADER_PARAMETER_SETS(
+        jViewShaderParameters,
+        jRenderObjectShaderParameters)
+
+    using ShaderPermutation = jPermutation<>;
+    ShaderPermutation Permutation;
+
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderHitObjectVertexShader, Permutation)
+};
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderHitObjectVertexShader
+    , "HitObject_vs"
+    , "Resource/Shaders/hlsl/HitObject_vs.hlsl"
+    , ""
+    , "main"
+    , EShaderAccessStageFlag::VERTEX)
+
+struct jShaderHitObjectPixelShader : public jShader
+{
+    DECLARE_SHADER_PARAMETER_SETS(
+        jRenderObjectShaderParameters)
+
+    using ShaderPermutation = jPermutation<>;
+    ShaderPermutation Permutation;
+
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderHitObjectPixelShader, Permutation)
+};
+
+IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderHitObjectPixelShader
+    , "HitObject_ps"
+    , "Resource/Shaders/hlsl/HitObject_ps.hlsl"
+    , ""
+    , "main"
+    , EShaderAccessStageFlag::FRAGMENT)
+}
 
 void jRenderer::RequestObjectPick(int32 mouseX, int32 mouseY)
 {
@@ -122,17 +163,8 @@ void jRenderer::HitObjectPass()
 
 		// 4. Create shaders
 		jGraphicsPipelineShader HitObjectShader;
-		jShaderInfo shaderInfo;
-
-		shaderInfo.SetName(jNameStatic("HitObject_vs"));
-		shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/HitObject_vs.hlsl"));
-		shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
-		HitObjectShader.VertexShader = g_rhi->CreateShader(shaderInfo);
-
-		shaderInfo.SetName(jNameStatic("HitObject_ps"));
-		shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/HitObject_ps.hlsl"));
-		shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
-		HitObjectShader.PixelShader = g_rhi->CreateShader(shaderInfo);
+		HitObjectShader.VertexShader = jShaderHitObjectVertexShader::CreateShader(jShaderHitObjectVertexShader::ShaderPermutation());
+		HitObjectShader.PixelShader = jShaderHitObjectPixelShader::CreateShader(jShaderHitObjectPixelShader::ShaderPermutation());
 
 		// 5. Transition layouts
 		g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::HitObject_RT->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);

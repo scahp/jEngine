@@ -4,9 +4,6 @@ struct VSOutput
     float4 TexCoord[8] : TEXCOORD0;
 };
 
-Texture2D Texture : register(t1, space0);
-SamplerState TextureSampler : register(s1, space0);
-
 // bloom down with gaussian blur from UE5
 float4 main(VSOutput input) : SV_TARGET
 {

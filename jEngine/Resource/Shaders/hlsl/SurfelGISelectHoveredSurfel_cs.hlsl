@@ -8,67 +8,6 @@
 // This pass selects the surfel that best corresponds to the mouse cursor's current surface point.
 // The gather pass uses the result to capture only one surfel's rays, which keeps the debug path
 // cheap and easy to understand.
-struct HoverSelectUniformBuffer
-{
-    float4x4 InvP;
-    float4x4 InvV;
-    float2 ScreenSize;
-    float GridCellSize;
-    float4 CascadeCellScaleFromPrevPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 SurfelsPerCellPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeCellBasePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    int MaxSurfels;
-    int SurfelPageSize;
-    int SurfelPageTableCapacity;
-    int NeighborCellRadius;
-    int MousePixelX;
-    int MousePixelY;
-    int MouseValid;
-    int Padding0;
-};
-
-struct SurfelData
-{
-    float4 PositionRadius;
-    float4 NormalSeenFrame;
-    float4 AlbedoWeight;
-    float4 Extra;
-};
-
-struct HoverSelectionData
-{
-    uint SurfelIndex;
-    uint Valid;
-    uint MousePixelX;
-    uint MousePixelY;
-};
-
-struct HoverRayDebugData
-{
-    float4 OriginAndCount;
-    float4 RayDirAndType[16];
-};
-
-Texture2D DepthTexture : register(t0, space0);
-SamplerState DepthTextureSampler : register(s0, space0);
-StructuredBuffer<SurfelData> SurfelPool : register(t1, space0);
-StructuredBuffer<uint> SurfelCellPageTable : register(t2, space0);
-RWStructuredBuffer<HoverSelectionData> HoverSelectionBuffer : register(u4, space0);
-RWStructuredBuffer<HoverRayDebugData> HoverRayDebugBuffer : register(u5, space0);
-
-cbuffer HoverSelectCommon : register(b3, space0)
-{
-    HoverSelectUniformBuffer HoverSelectCommon;
-}
 
 float GetPackedFloat(float4 packedArray[SURFEL_GI_CASCADE_PACKED_COUNT], uint cascadeIndex)
 {
@@ -198,8 +137,8 @@ void main(uint3 DispatchThreadID : SV_DispatchThreadID)
 {
     // Reset both outputs on the GPU every frame. This avoids relying on CPU-side buffer uploads
     // and guarantees that "no hovered surfel" is represented explicitly.
-    HoverSelectionData Result = (HoverSelectionData)0;
-    HoverRayDebugData HoverRayDebug = (HoverRayDebugData)0;
+    jSurfelGIHoverSelectionGPU Result = (jSurfelGIHoverSelectionGPU)0;
+    jSurfelGIHoverRayDebugGPU HoverRayDebug = (jSurfelGIHoverRayDebugGPU)0;
     Result.SurfelIndex = 0xffffffffu;
     Result.Valid = 0u;
     Result.MousePixelX = (HoverSelectCommon.MousePixelX >= 0) ? (uint)HoverSelectCommon.MousePixelX : 0u;
@@ -261,7 +200,7 @@ void main(uint3 DispatchThreadID : SV_DispatchThreadID)
                     [loop] for (uint slot = 0u; slot < slotsPerCell; ++slot)
                     {
                         const uint surfelIndex = baseIndex + slot;
-                        const SurfelData s = SurfelPool[surfelIndex];
+                        const jSurfelGPU s = SurfelPool[surfelIndex];
                         const bool isDormant = (s.Extra.y < 0.5) && (abs(s.Extra.x - 5.0) < 0.5);
                         if (s.Extra.y < 0.5 && !isDormant)
                             continue;

@@ -65,9 +65,8 @@ public:
 
     TextureData TexData[static_cast<int32>(EMaterialTextureType::Max)];
     
-    // Material specific uniform buffer data which is depend on material what data was set.
+    // Raw material payload used by RT/path tracing paths that manage their own uniform buffers.
     std::shared_ptr<jMaterialData> MaterialDataPtr;
-    std::shared_ptr<IUniformBufferBlock> MaterialDataUniformBufferPtr;
 
     bool bUseSphericalMap = false;
     bool bRaytracingAlphaTest = false;

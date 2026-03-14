@@ -16,16 +16,6 @@ float2 Circle(float Start, float Points, float Point)
     return float2(sin(Rad), cos(Rad));
 }
 
-struct BloomUniformBuffer
-{
-    float4 BufferSizeAndInvSize;
-    float4 TintA;
-    float4 TintB;
-    float BloomIntensity;
-};
-
-cbuffer BloomParam : register(b0, space0) { BloomUniformBuffer BloomParam; }
-
 VSOutput main(VSInput input)
 {
     VSOutput output = (VSOutput)0;

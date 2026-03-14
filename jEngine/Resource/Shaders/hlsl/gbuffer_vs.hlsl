@@ -26,9 +26,6 @@ struct VSInput
     [[vk::location((3+USE_VERTEX_COLOR+USE_VERTEX_BITANGENT))]] float2 TexCoord : TEXCOORD0;
 };
 
-cbuffer ViewParam : register(b0, space0) { ViewUniformBuffer ViewParam; }
-cbuffer RenderObjectParam : register(b0, space1) { RenderObjectUniformBuffer RenderObjectParam; }
-
 struct VSOutput
 {
     float4 Pos : SV_POSITION;

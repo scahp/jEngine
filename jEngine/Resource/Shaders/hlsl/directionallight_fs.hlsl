@@ -16,40 +16,6 @@ struct VSOutput
     float2 TexCoord : TEXCOORD0;
 };
 
-// space 0
-#if USE_SUBPASS
-[[vk::input_attachment_index(0)]] [[vk::binding(0)]] SubpassInput GBuffer0;
-[[vk::input_attachment_index(1)]] [[vk::binding(1)]] SubpassInput GBuffer1;
-[[vk::input_attachment_index(2)]] [[vk::binding(2)]] SubpassInput GBuffer2;
-[[vk::input_attachment_index(3)]] [[vk::binding(3)]] SubpassInput<float> DepthTexture;
-#else // USE_SUBPASS
-Texture2D GBuffer0 : register(t0, space0);
-SamplerState GBuffer0SamplerState : register(s0, space0);
-
-Texture2D GBuffer1 : register(t1, space0);
-SamplerState GBuffer1SamplerState : register(s1, space0);
-
-Texture2D GBuffer2 : register(t2, space0);
-SamplerState GBuffer2SamplerState : register(s2, space0);
-
-Texture2D DepthTexture : register(t3, space0);
-SamplerState DepthTextureSamplerState : register(s3, space0);
-#endif // USE_SUBPASS
-
-cbuffer ViewParam : register(b0, space1) { ViewUniformBuffer ViewParam; }
-
-cbuffer DirectionalLight : register(b0, space2) { jDirectionalLightUniformBuffer DirectionalLight; }
-#if USE_SHADOW_MAP
-Texture2D DirectionalLightShadowMap : register(t1, space2);
-SamplerComparisonState DirectionalLightShadowMapSampler : register(s1, space2);
-#endif
-
-TextureCube<float4> IrradianceMap : register(t0, space3);
-SamplerState IrradianceMapSamplerState : register(s0, space3);
-
-TextureCube<float4> PrefilteredEnvMap : register(t1, space3);
-SamplerState PrefilteredEnvSamplerState : register(s1, space3);
-
 float4 main(VSOutput input
 #if USE_VARIABLE_SHADING_RATE
     , uint shadingRate : SV_ShadingRate
@@ -64,10 +30,10 @@ float4 main(VSOutput input
     float4 GBufferData2 = GBuffer2.SubpassLoad();
     float DepthValue = DepthTexture.SubpassLoad();
 #else   // USE_SUBPASS
-    float3 GBufferData0 = GBuffer0.Sample(GBuffer0SamplerState, input.TexCoord);
-    float3 GBufferData1 = GBuffer1.Sample(GBuffer1SamplerState, input.TexCoord);
-    float4 GBufferData2 = GBuffer2.Sample(GBuffer2SamplerState, input.TexCoord);
-    float DepthValue = DepthTexture.Sample(DepthTextureSamplerState, input.TexCoord).x;
+    float3 GBufferData0 = GBuffer0.Sample(GBuffer0Sampler, input.TexCoord);
+    float3 GBufferData1 = GBuffer1.Sample(GBuffer1Sampler, input.TexCoord);
+    float4 GBufferData2 = GBuffer2.Sample(GBuffer2Sampler, input.TexCoord);
+    float DepthValue = DepthTexture.Sample(DepthTextureSampler, input.TexCoord).x;
 #endif  // USE_SUBPASS
 
     float3 WorldPos = CalcWorldPositionFromDepth(DepthValue, input.TexCoord, ViewParam.InvVP);
@@ -113,12 +79,12 @@ float4 main(VSOutput input
     if (0)
     {
         // todo : Need to split shader, because it is possible that IBL without directional light
-        float3 DiffusePart = IBL_DiffusePart(N, V, Albedo, Metallic, Roughness, IrradianceMap, IrradianceMapSamplerState);
+        float3 DiffusePart = IBL_DiffusePart(N, V, Albedo, Metallic, Roughness, IrradianceMap, IrradianceMapSampler);
 
         float NoV = saturate(dot(N, V));
         float3 R = 2 * dot(V, N) * N - V;
         R = normalize(R);
-        float3 PrefilteredColor = PrefilteredEnvMap.SampleLevel(PrefilteredEnvSamplerState, R, Roughness * (8 - 1)).rgb;
+        float3 PrefilteredColor = PrefilteredEnvMap.SampleLevel(PrefilteredEnvMapSampler, R, Roughness * (8 - 1)).rgb;
         
         float3 F0 = float3(0.04f, 0.04f, 0.04f);
         float3 SpecularColor = lerp(F0, Albedo, Metallic);

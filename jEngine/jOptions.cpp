@@ -8,6 +8,7 @@ int32 gSelectedSceneIndex = 0;
 
 const char* GDenoisers[(int32)EDenoiser::MAX] = { "None", "Gaussian", "GaussianSeparable", "Bilateral", "BilateralPS", "A-Trous" };
 const char* GAOResolution[3] = { "100", "75", "50" };
+const char* GAtmosphereResolution[3] = { "100", "75", "50" };
 extern const char* GAOType[3] = { "NoAO", "RTAO", "SSAO" };
 const char* GHWRTDirectLightingModes[2] = { "DispatchRays", "Inline RayQuery" };
 const char* GHWRTDebugViewModes[14] = {
@@ -64,10 +65,17 @@ jOptions::jOptions()
 	Metallic = 0.0f;
 	Roughness = 0.2f;
 	//SunDir = Vector(0.31f, -0.828f, -0.241f);
-    DefaultSunDir = Vector(0.049f, -0.953f, -0.263f);
+	DefaultSunDir = Vector(0.049f, -0.953f, -0.263f);
 	DirectionalLightColor = Vector(0.074f, 0.059f, 0.028f);
 	DirectionalLightIntensity = 30.0f;
-	AnisoG = 0.15f;
+    AnisoG = 0.15f;
+    UseAtmosphericShadowing = false;
+    AtmosphereResolution = GAtmosphereResolution[2];
+    AtmosphericShadowSlopeOfDist = 0.25f;
+    AtmosphericShadowInScatteringLambda = 0.001f;
+    AtmosphericShadowApplyIntensity = 0.1f;
+    AtmosphericShadowTravelCount = 256;
+    AtmosphericShadowUseNoise = true;
 	EarthQuake = false;
 	FocalDistance = 5.0f;
 	LensRadius = 0.05f;

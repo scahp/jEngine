@@ -499,6 +499,47 @@ void IRenderer::UIPass()
 				ImGui::EndTabItem();
 			}
 
+            if (ImGui::BeginTabItem("Atmosphere"))
+            {
+                ImGui::Checkbox("UseAtmosphericShadowing", &gOptions.UseAtmosphericShadowing);
+                if (ImGui::BeginCombo("Atmosphere RT Res(%)", gOptions.AtmosphereResolution, ImGuiComboFlags_None))
+                {
+                    for (int32 i = 0; i < _countof(GAtmosphereResolution); ++i)
+                    {
+                        const bool is_selected = (gOptions.AtmosphereResolution == GAtmosphereResolution[i]);
+                        if (ImGui::Selectable(GAtmosphereResolution[i], is_selected))
+                            gOptions.AtmosphereResolution = GAtmosphereResolution[i];
+                        if (is_selected)
+                            ImGui::SetItemDefaultFocus();
+                    }
+                    ImGui::EndCombo();
+                }
+
+                if (gOptions.UseAtmosphericShadowing)
+                {
+                    ImGui::Indent();
+                    ImGui::SliderFloat("AnisoG", &gOptions.AnisoG, -0.95f, 0.95f, "%.3f");
+                    AddCopyPasteContextMenu("AtmosphereAnisoGContext", gOptions.AnisoG);
+
+                    ImGui::SliderFloat("SlopeOfDist", &gOptions.AtmosphericShadowSlopeOfDist, 0.0f, 1.0f, "%.3f");
+                    AddCopyPasteContextMenu("AtmosphereSlopeOfDistContext", gOptions.AtmosphericShadowSlopeOfDist);
+
+                    ImGui::SliderFloat("InScatteringLambda", &gOptions.AtmosphericShadowInScatteringLambda, 0.0f, 0.01f, "%.6f");
+                    AddCopyPasteContextMenu("AtmosphereInScatteringLambdaContext", gOptions.AtmosphericShadowInScatteringLambda);
+
+                    ImGui::SliderFloat("ApplyIntensity", &gOptions.AtmosphericShadowApplyIntensity, 0.0f, 8.0f, "%.3f");
+                    AddCopyPasteContextMenu("AtmosphereApplyIntensityContext", gOptions.AtmosphericShadowApplyIntensity);
+
+                    ImGui::SliderInt("TravelCount", &gOptions.AtmosphericShadowTravelCount, 1, 256);
+                    ImGui::Checkbox("UseNoise", &gOptions.AtmosphericShadowUseNoise);
+                    ImGui::Unindent();
+                }
+
+                ImGui::Separator();
+                ImGui::TextWrapped("Applies directional-light atmospheric in-scattering as a fullscreen additive pass.");
+                ImGui::EndTabItem();
+            }
+
             if (ImGui::BeginTabItem("SSGI Options"))
             {
                 ImGui::Checkbox("UseSSGI", &gOptions.UseSSGI);

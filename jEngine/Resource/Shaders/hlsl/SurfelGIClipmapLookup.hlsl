@@ -135,6 +135,7 @@ bool SurfelGITryWorldCellToLinear(
     float4 cascadeCellBasePacked[SURFEL_GI_CASCADE_PACKED_COUNT],
     out uint outCellLinear)
 {
+    outCellLinear = 0u;
     const int3 dim = SurfelGIGetCascadeDim(
         cascadeClipmapGridDimXPacked,
         cascadeClipmapGridDimYPacked,
@@ -172,6 +173,7 @@ bool SurfelGITryWorldCellToLinearFromDims(
     float4 cascadeRingOffsetZPacked[SURFEL_GI_CASCADE_PACKED_COUNT],
     out uint outCellLinear)
 {
+    outCellLinear = 0u;
     const int3 dim = SurfelGIGetCascadeDim(
         cascadeClipmapGridDimXPacked,
         cascadeClipmapGridDimYPacked,
@@ -217,6 +219,7 @@ bool SurfelGITryGetCellBaseIndex(
     float4 cascadeCellBasePacked[SURFEL_GI_CASCADE_PACKED_COUNT],
     out uint outCellBaseIndex)
 {
+    outCellBaseIndex = 0u;
     uint cellLinear = 0u;
     if (!SurfelGITryWorldCellToLinear(
         cellCoord,
@@ -268,6 +271,7 @@ bool SurfelGITryGetCellBaseIndexFromDims(
     float4 cascadeRingOffsetZPacked[SURFEL_GI_CASCADE_PACKED_COUNT],
     out uint outCellBaseIndex)
 {
+    outCellBaseIndex = 0u;
     uint cellLinear = 0u;
     if (!SurfelGITryWorldCellToLinearFromDims(
         cellCoord,
@@ -300,3 +304,193 @@ bool SurfelGITryGetCellBaseIndexFromDims(
     outCellBaseIndex = base;
     return true;
 }
+
+#if SURFEL_GI_CASCADE_PACKED_COUNT == 1
+float SurfelGIGetPackedFloat(float4 packedArray, uint cascadeIndex)
+{
+    float4 temp[1] = { packedArray };
+    return SurfelGIGetPackedFloat(temp, cascadeIndex);
+}
+
+int SurfelGIGetPackedInt(float4 packedArray, uint cascadeIndex)
+{
+    float4 temp[1] = { packedArray };
+    return SurfelGIGetPackedInt(temp, cascadeIndex);
+}
+
+uint SurfelGIGetPackedUint(float4 packedArray, uint cascadeIndex)
+{
+    float4 temp[1] = { packedArray };
+    return SurfelGIGetPackedUint(temp, cascadeIndex);
+}
+
+float SurfelGIGetCascadeScale(float4 cascadeCellScaleFromPrevPacked, uint cascadeIndex)
+{
+    float4 temp[1] = { cascadeCellScaleFromPrevPacked };
+    return SurfelGIGetCascadeScale(temp, cascadeIndex);
+}
+
+float SurfelGIGetCascadeCellSize(float4 cascadeCellSizePacked, uint cascadeIndex)
+{
+    float4 temp[1] = { cascadeCellSizePacked };
+    return SurfelGIGetCascadeCellSize(temp, cascadeIndex);
+}
+
+uint SurfelGIGetCascadeIndexByDistance(float4 cascadeStartDistancePacked, float cameraDistance)
+{
+    float4 temp[1] = { cascadeStartDistancePacked };
+    return SurfelGIGetCascadeIndexByDistance(temp, cameraDistance);
+}
+
+int3 SurfelGIGetCascadeDim(float4 cascadeClipmapGridDimXPacked, float4 cascadeClipmapGridDimYPacked, float4 cascadeClipmapGridDimZPacked, uint cascadeIndex)
+{
+    float4 x[1] = { cascadeClipmapGridDimXPacked };
+    float4 y[1] = { cascadeClipmapGridDimYPacked };
+    float4 z[1] = { cascadeClipmapGridDimZPacked };
+    return SurfelGIGetCascadeDim(x, y, z, cascadeIndex);
+}
+
+int3 SurfelGIGetCascadeOriginCell(float4 cascadeOriginCellXPacked, float4 cascadeOriginCellYPacked, float4 cascadeOriginCellZPacked, uint cascadeIndex)
+{
+    float4 x[1] = { cascadeOriginCellXPacked };
+    float4 y[1] = { cascadeOriginCellYPacked };
+    float4 z[1] = { cascadeOriginCellZPacked };
+    return SurfelGIGetCascadeOriginCell(x, y, z, cascadeIndex);
+}
+
+int3 SurfelGIGetCascadeRingOffset(float4 cascadeRingOffsetXPacked, float4 cascadeRingOffsetYPacked, float4 cascadeRingOffsetZPacked, uint cascadeIndex)
+{
+    float4 x[1] = { cascadeRingOffsetXPacked };
+    float4 y[1] = { cascadeRingOffsetYPacked };
+    float4 z[1] = { cascadeRingOffsetZPacked };
+    return SurfelGIGetCascadeRingOffset(x, y, z, cascadeIndex);
+}
+
+uint SurfelGIGetCascadeCellBase(float4 cascadeCellBasePacked, uint cascadeIndex)
+{
+    float4 temp[1] = { cascadeCellBasePacked };
+    return SurfelGIGetCascadeCellBase(temp, cascadeIndex);
+}
+
+uint SurfelGIGetCascadeCellBaseFromDims(float4 cascadeClipmapGridDimXPacked, float4 cascadeClipmapGridDimYPacked, float4 cascadeClipmapGridDimZPacked, uint cascadeIndex)
+{
+    float4 x[1] = { cascadeClipmapGridDimXPacked };
+    float4 y[1] = { cascadeClipmapGridDimYPacked };
+    float4 z[1] = { cascadeClipmapGridDimZPacked };
+    return SurfelGIGetCascadeCellBaseFromDims(x, y, z, cascadeIndex);
+}
+
+bool SurfelGITryWorldCellToLinear(
+    int3 worldCell,
+    uint cascadeIndex,
+    float4 cascadeClipmapGridDimXPacked,
+    float4 cascadeClipmapGridDimYPacked,
+    float4 cascadeClipmapGridDimZPacked,
+    float4 cascadeOriginCellXPacked,
+    float4 cascadeOriginCellYPacked,
+    float4 cascadeOriginCellZPacked,
+    float4 cascadeRingOffsetXPacked,
+    float4 cascadeRingOffsetYPacked,
+    float4 cascadeRingOffsetZPacked,
+    float4 cascadeCellBasePacked,
+    out uint outCellLinear)
+{
+    float4 dimX[1] = { cascadeClipmapGridDimXPacked };
+    float4 dimY[1] = { cascadeClipmapGridDimYPacked };
+    float4 dimZ[1] = { cascadeClipmapGridDimZPacked };
+    float4 originX[1] = { cascadeOriginCellXPacked };
+    float4 originY[1] = { cascadeOriginCellYPacked };
+    float4 originZ[1] = { cascadeOriginCellZPacked };
+    float4 ringX[1] = { cascadeRingOffsetXPacked };
+    float4 ringY[1] = { cascadeRingOffsetYPacked };
+    float4 ringZ[1] = { cascadeRingOffsetZPacked };
+    float4 base[1] = { cascadeCellBasePacked };
+    return SurfelGITryWorldCellToLinear(worldCell, cascadeIndex, dimX, dimY, dimZ, originX, originY, originZ, ringX, ringY, ringZ, base, outCellLinear);
+}
+
+bool SurfelGITryWorldCellToLinearFromDims(
+    int3 worldCell,
+    uint cascadeIndex,
+    float4 cascadeClipmapGridDimXPacked,
+    float4 cascadeClipmapGridDimYPacked,
+    float4 cascadeClipmapGridDimZPacked,
+    float4 cascadeOriginCellXPacked,
+    float4 cascadeOriginCellYPacked,
+    float4 cascadeOriginCellZPacked,
+    float4 cascadeRingOffsetXPacked,
+    float4 cascadeRingOffsetYPacked,
+    float4 cascadeRingOffsetZPacked,
+    out uint outCellLinear)
+{
+    float4 dimX[1] = { cascadeClipmapGridDimXPacked };
+    float4 dimY[1] = { cascadeClipmapGridDimYPacked };
+    float4 dimZ[1] = { cascadeClipmapGridDimZPacked };
+    float4 originX[1] = { cascadeOriginCellXPacked };
+    float4 originY[1] = { cascadeOriginCellYPacked };
+    float4 originZ[1] = { cascadeOriginCellZPacked };
+    float4 ringX[1] = { cascadeRingOffsetXPacked };
+    float4 ringY[1] = { cascadeRingOffsetYPacked };
+    float4 ringZ[1] = { cascadeRingOffsetZPacked };
+    return SurfelGITryWorldCellToLinearFromDims(worldCell, cascadeIndex, dimX, dimY, dimZ, originX, originY, originZ, ringX, ringY, ringZ, outCellLinear);
+}
+
+bool SurfelGITryGetCellBaseIndex(
+    int3 cellCoord,
+    uint maxSurfels,
+    uint pageSize,
+    uint pageTableCapacity,
+    uint cascadeIndex,
+    float4 cascadeClipmapGridDimXPacked,
+    float4 cascadeClipmapGridDimYPacked,
+    float4 cascadeClipmapGridDimZPacked,
+    float4 cascadeOriginCellXPacked,
+    float4 cascadeOriginCellYPacked,
+    float4 cascadeOriginCellZPacked,
+    float4 cascadeRingOffsetXPacked,
+    float4 cascadeRingOffsetYPacked,
+    float4 cascadeRingOffsetZPacked,
+    float4 cascadeCellBasePacked,
+    out uint outCellBaseIndex)
+{
+    float4 dimX[1] = { cascadeClipmapGridDimXPacked };
+    float4 dimY[1] = { cascadeClipmapGridDimYPacked };
+    float4 dimZ[1] = { cascadeClipmapGridDimZPacked };
+    float4 originX[1] = { cascadeOriginCellXPacked };
+    float4 originY[1] = { cascadeOriginCellYPacked };
+    float4 originZ[1] = { cascadeOriginCellZPacked };
+    float4 ringX[1] = { cascadeRingOffsetXPacked };
+    float4 ringY[1] = { cascadeRingOffsetYPacked };
+    float4 ringZ[1] = { cascadeRingOffsetZPacked };
+    float4 base[1] = { cascadeCellBasePacked };
+    return SurfelGITryGetCellBaseIndex(cellCoord, maxSurfels, pageSize, pageTableCapacity, cascadeIndex, dimX, dimY, dimZ, originX, originY, originZ, ringX, ringY, ringZ, base, outCellBaseIndex);
+}
+
+bool SurfelGITryGetCellBaseIndexFromDims(
+    int3 cellCoord,
+    uint maxSurfels,
+    uint pageSize,
+    uint pageTableCapacity,
+    uint cascadeIndex,
+    float4 cascadeClipmapGridDimXPacked,
+    float4 cascadeClipmapGridDimYPacked,
+    float4 cascadeClipmapGridDimZPacked,
+    float4 cascadeOriginCellXPacked,
+    float4 cascadeOriginCellYPacked,
+    float4 cascadeOriginCellZPacked,
+    float4 cascadeRingOffsetXPacked,
+    float4 cascadeRingOffsetYPacked,
+    float4 cascadeRingOffsetZPacked,
+    out uint outCellBaseIndex)
+{
+    float4 dimX[1] = { cascadeClipmapGridDimXPacked };
+    float4 dimY[1] = { cascadeClipmapGridDimYPacked };
+    float4 dimZ[1] = { cascadeClipmapGridDimZPacked };
+    float4 originX[1] = { cascadeOriginCellXPacked };
+    float4 originY[1] = { cascadeOriginCellYPacked };
+    float4 originZ[1] = { cascadeOriginCellZPacked };
+    float4 ringX[1] = { cascadeRingOffsetXPacked };
+    float4 ringY[1] = { cascadeRingOffsetYPacked };
+    float4 ringZ[1] = { cascadeRingOffsetZPacked };
+    return SurfelGITryGetCellBaseIndexFromDims(cellCoord, maxSurfels, pageSize, pageTableCapacity, cascadeIndex, dimX, dimY, dimZ, originX, originY, originZ, ringX, ringY, ringZ, outCellBaseIndex);
+}
+#endif

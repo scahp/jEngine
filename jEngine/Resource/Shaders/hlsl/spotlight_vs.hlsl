@@ -12,9 +12,6 @@ struct PushConsts
 {
     float4x4 MVP;
 };
-//[[vk::push_constant]] PushConsts pushConsts;
-
-cbuffer PushConsts : register(b0, space3) { PushConsts pushConsts; }
 struct VSInput
 {
     //[[vk::location(0)]] float2 Position : POSITION0;
@@ -46,7 +43,7 @@ VSOutput main(VSInput input)
     //output.ClipPos = output.Pos;
     //return output;
 
-    output.Pos = mul(pushConsts.MVP, float4(input.Position, 1.0));
+    output.Pos = mul(PushConsts.MVP, float4(input.Position, 1.0));
     output.ClipPos = output.Pos;
     return output;
 }

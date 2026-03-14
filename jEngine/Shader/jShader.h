@@ -133,8 +133,8 @@ struct jShaderInfo
         if (Hash)
             return Hash;
 
-		Hash = GETHASH_FROM_INSTANT_STRUCT(Name.GetNameHash(), ShaderFilepath.GetNameHash()
-			, PreProcessors.GetNameHash(), EntryPoint.GetNameHash(), ShaderType, PermutationId);
+	Hash = GETHASH_FROM_INSTANT_STRUCT(Name.GetNameHash(), ShaderFilepath.GetNameHash()
+			, PreProcessors.GetNameHash(), InjectedShaderText.GetNameHash(), EntryPoint.GetNameHash(), ShaderType, PermutationId);
 		return Hash;
 	}
     mutable size_t Hash = 0;
@@ -142,6 +142,7 @@ struct jShaderInfo
     const jName& GetName() const { return Name; }
     const jName& GetShaderFilepath() const { return ShaderFilepath; }
     const jName& GetPreProcessors() const { return PreProcessors; }
+    const jName& GetInjectedShaderText() const { return InjectedShaderText; }
     const jName& GetEntryPoint() const { return EntryPoint; }
     const EShaderAccessStageFlag GetShaderType() const { return ShaderType; }
     const uint32& GetPermutationId() const { return PermutationId; }
@@ -150,6 +151,7 @@ struct jShaderInfo
     void SetName(const jName& InName) { Name = InName; Hash = 0; }
     void SetShaderFilepath(const jName& InShaderFilepath) { ShaderFilepath = InShaderFilepath; Hash = 0; }
     void SetPreProcessors(const jName& InPreProcessors) { PreProcessors = InPreProcessors; Hash = 0; }
+    void SetInjectedShaderText(const jName& InInjectedShaderText) { InjectedShaderText = InInjectedShaderText; Hash = 0; }
     void AddPreProcessor(const char* InDefine, const char* InValue);
     void SetEntryPoint(const jName& InEntryPoint) { EntryPoint = InEntryPoint; Hash = 0; }
     void SetShaderType(const EShaderAccessStageFlag InShaderType) { ShaderType = InShaderType; Hash = 0; }
@@ -159,6 +161,7 @@ struct jShaderInfo
 private:
 	jName Name;
     jName PreProcessors;
+    jName InjectedShaderText;
     jName EntryPoint = jNameStatic("main");
     jName ShaderFilepath;
     std::vector<jName> IncludeShaderFilePaths;
@@ -170,6 +173,21 @@ struct jCompiledShader
 {
 	virtual ~jCompiledShader() {}
 };
+
+struct jViewShaderParameters;
+struct jRenderObjectShaderParameters;
+struct jMaterialShaderParameters;
+struct jSceneTexturesShaderParameters;
+struct jSceneSubpassInputShaderParameters;
+struct jDirectionalLightShaderParameters;
+struct jDirectionalLightOnlyShaderParameters;
+struct jDirectionalLightIBLShaderParameters;
+struct jPointLightShaderParameters;
+struct jPointLightOnlyShaderParameters;
+struct jSpotLightShaderParameters;
+struct jSpotLightOnlyShaderParameters;
+struct jLightVolumeVertexShaderParameters;
+struct jBilateralFilteringCSParameters;
 
 struct jShader : public std::enable_shared_from_this<jShader>
 {
@@ -207,16 +225,153 @@ struct jShader : public std::enable_shared_from_this<jShader>
     jCompiledShader* CompiledShader = nullptr;
 };
 
-#define DECLARE_SHADER_WITH_PERMUTATION(ShaderClass, PermutationVariable) \
+template <typename... T>
+struct TShaderParameterSetList
+{
+};
+
+template <typename TShaderParameterSet>
+void AppendShaderParameterSetToInfo(jShaderInfo& InOutShaderInfo, uint32 InSpace);
+
+namespace jShaderBindlessSet
+{
+    template <typename TBindlessSet>
+    void AppendToShaderInfo(jShaderInfo& InOutShaderInfo);
+
+    template <typename TBindlessSet>
+    uint32 GetMinSpace();
+
+    template <typename TBindlessSet>
+    uint32 GetNextSpaceAfter();
+}
+
+struct jShaderParameterBinder
+{
+    explicit jShaderParameterBinder(jShaderInfo& InInfo, uint32 InStartSpace = 0)
+        : ShaderInfo(InInfo)
+        , NextSpace(InStartSpace)
+    {
+    }
+
+    template <typename TShaderParameterSet>
+    void Add()
+    {
+        AppendShaderParameterSetToInfo<TShaderParameterSet>(ShaderInfo, NextSpace++);
+    }
+
+    template <typename TBindlessSet>
+    void AddBindless()
+    {
+        const uint32 MinSpace = jShaderBindlessSet::GetMinSpace<TBindlessSet>();
+        check(NextSpace <= MinSpace);
+        jShaderBindlessSet::AppendToShaderInfo<TBindlessSet>(ShaderInfo);
+        NextSpace = jShaderBindlessSet::GetNextSpaceAfter<TBindlessSet>();
+    }
+
+    uint32 GetNextSpace() const { return NextSpace; }
+
+private:
+    jShaderInfo& ShaderInfo;
+    uint32 NextSpace = 0;
+};
+
+template <typename ShaderClass, typename = int>
+struct THasShaderParameterSets : std::false_type
+{
+};
+
+template <typename ShaderClass>
+struct THasShaderParameterSets<ShaderClass, decltype((void)sizeof(typename ShaderClass::ShaderParameterSets), 0)> : std::true_type
+{
+};
+
+template <typename ShaderClass, typename = int>
+struct THasAppendConditionalShaderParameterSets : std::false_type
+{
+};
+
+template <typename ShaderClass>
+struct THasAppendConditionalShaderParameterSets<ShaderClass, decltype((void)(&ShaderClass::AppendConditionalShaderParameterSets), 0)> : std::true_type
+{
+};
+
+template <typename ShaderClass, typename = int>
+struct THasShaderParameterSetBaseSpace : std::false_type
+{
+};
+
+template <typename ShaderClass>
+struct THasShaderParameterSetBaseSpace<ShaderClass, decltype((void)ShaderClass::ShaderParameterSetBaseSpace, 0)> : std::true_type
+{
+};
+
+template <typename TShaderParameterSetListType>
+struct TAppendShaderParameterSetListToInfo;
+
+template <typename... TShaderParameterSetTypes>
+struct TAppendShaderParameterSetListToInfo<TShaderParameterSetList<TShaderParameterSetTypes...>>
+{
+    static void Append(jShaderParameterBinder& InOutBinder)
+    {
+        int32 Dummy[] = { 0, (InOutBinder.Add<TShaderParameterSetTypes>(), 0)... };
+        (void)Dummy;
+    }
+};
+
+template <typename ShaderClass, typename = int>
+struct TShaderParameterSetBaseSpaceValue
+{
+    static constexpr uint32 Value = 0;
+};
+
+template <typename ShaderClass>
+struct TShaderParameterSetBaseSpaceValue<ShaderClass, decltype((void)ShaderClass::ShaderParameterSetBaseSpace, 0)>
+{
+    static constexpr uint32 Value = ShaderClass::ShaderParameterSetBaseSpace;
+};
+
+template <typename ShaderClass>
+inline typename std::enable_if<THasShaderParameterSets<ShaderClass>::value, void>::type ApplyShaderInfoCustomization(jShaderInfo& InOutShaderInfo)
+{
+    constexpr uint32 BaseSpace = TShaderParameterSetBaseSpaceValue<ShaderClass>::Value;
+    jShaderParameterBinder Binder(InOutShaderInfo, BaseSpace);
+    TAppendShaderParameterSetListToInfo<typename ShaderClass::ShaderParameterSets>::Append(Binder);
+
+    if constexpr (THasAppendConditionalShaderParameterSets<ShaderClass>::value)
+    {
+        typename ShaderClass::ShaderPermutation Permutation;
+        Permutation.SetFromPermutationId((int32)InOutShaderInfo.GetPermutationId());
+        ShaderClass::AppendConditionalShaderParameterSets(Binder, Permutation);
+    }
+}
+
+template <typename T>
+struct TShaderCustomizationMissing : std::false_type
+{
+};
+
+template <typename ShaderClass>
+inline typename std::enable_if<!THasShaderParameterSets<ShaderClass>::value, void>::type ApplyShaderInfoCustomization(jShaderInfo&)
+{
+    static_assert(TShaderCustomizationMissing<ShaderClass>::value, "Shader must declare ShaderParameterSets.");
+}
+
+#define DECLARE_SHADER_PARAMETER_SETS(...) \
+    using ShaderParameterSets = TShaderParameterSetList<__VA_ARGS__>;
+
+#define DECLARE_SHADER_WITH_PERMUTATION_EX(ShaderClass, BaseClass, PermutationVariable) \
 public: \
     static ShaderClass* Shaders[ShaderClass::ShaderPermutation::MaxPermutationCount]; \
     static jShaderInfo GShaderInfo; \
     static ShaderClass* CreateShader(const ShaderClass::ShaderPermutation& InPermutation); \
-    using jShader::jShader; \
+    using BaseClass::BaseClass; \
     virtual void SetPermutationId(int32 InPermutaitonId) override { PermutationVariable.SetFromPermutationId(InPermutaitonId); } \
     virtual int32 GetPermutationId() const override { return PermutationVariable.GetPermutationId(); } \
     virtual int32 GetPermutationCount() const override { return ShaderClass::ShaderPermutation::MaxPermutationCount; } \
     virtual void GetPermutationDefines(std::string& OutResult) const { PermutationVariable.GetPermutationDefines(OutResult); }
+
+#define DECLARE_SHADER_WITH_PERMUTATION(ShaderClass, PermutationVariable) \
+    DECLARE_SHADER_WITH_PERMUTATION_EX(ShaderClass, jShader, PermutationVariable)
 
 #define IMPLEMENT_SHADER_WITH_PERMUTATION(ShaderClass, Name, Filepath, Preprocessor, EntryName, ShaderAccesssStageFlag) \
 ShaderClass* ShaderClass::Shaders[ShaderClass::ShaderPermutation::MaxPermutationCount] = { nullptr, }; \
@@ -234,6 +389,7 @@ ShaderClass* ShaderClass::CreateShader(const ShaderClass::ShaderPermutation& InP
         return Shaders[PermutationId]; \
     jShaderInfo TempShaderInfo = GShaderInfo; \
     TempShaderInfo.SetPermutationId(PermutationId); \
+    ApplyShaderInfoCustomization<ShaderClass>(TempShaderInfo); \
     auto NewShader = g_rhi->CreateShader<ShaderClass>(TempShaderInfo); /* Don't need to care about thread-safe because CreateShader will care about this. */ \
     NewShader->Permutation = InPermutation; \
     Shaders[PermutationId] = NewShader; \
@@ -242,6 +398,14 @@ ShaderClass* ShaderClass::CreateShader(const ShaderClass::ShaderPermutation& InP
 
 struct jShaderForwardPixelShader : public jShader
 {
+    DECLARE_SHADER_PARAMETER_SETS(
+        jViewShaderParameters,
+        jDirectionalLightShaderParameters,
+        jPointLightShaderParameters,
+        jSpotLightShaderParameters,
+        jRenderObjectShaderParameters,
+        jMaterialShaderParameters)
+
 	DECLARE_DEFINE(USE_VARIABLE_SHADING_RATE, 0, 1);
     DECLARE_DEFINE(USE_REVERSEZ, 0, 1);
 
@@ -253,6 +417,10 @@ struct jShaderForwardPixelShader : public jShader
 
 struct jShaderGBufferVertexShader : public jShader
 {
+    DECLARE_SHADER_PARAMETER_SETS(
+        jViewShaderParameters,
+        jRenderObjectShaderParameters)
+
     DECLARE_DEFINE(USE_VERTEX_COLOR, 0, 1);
     DECLARE_DEFINE(USE_VERTEX_BITANGENT, 0, 1);
     DECLARE_DEFINE(USE_ALBEDO_TEXTURE, 0, 1);
@@ -266,6 +434,11 @@ struct jShaderGBufferVertexShader : public jShader
 
 struct jShaderGBufferPixelShader : public jShader
 {
+    DECLARE_SHADER_PARAMETER_SETS(
+        jViewShaderParameters,
+        jRenderObjectShaderParameters,
+        jMaterialShaderParameters)
+
     DECLARE_DEFINE(USE_VERTEX_COLOR, 0, 1);
     DECLARE_DEFINE(USE_ALBEDO_TEXTURE, 0, 1);
     DECLARE_DEFINE(USE_SRGB_ALBEDO_TEXTURE, 0, 1);
@@ -278,20 +451,164 @@ struct jShaderGBufferPixelShader : public jShader
     DECLARE_SHADER_WITH_PERMUTATION(jShaderGBufferPixelShader, Permutation)
 };
 
+struct jShaderDebugObjectVertexShader : public jShader
+{
+    DECLARE_SHADER_PARAMETER_SETS(
+        jViewShaderParameters,
+        jRenderObjectShaderParameters)
+
+    using ShaderPermutation = jPermutation<>;
+    ShaderPermutation Permutation;
+
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderDebugObjectVertexShader, Permutation)
+};
+
+struct jShaderDebugObjectPixelShader : public jShader
+{
+    DECLARE_SHADER_PARAMETER_SETS(
+        jViewShaderParameters,
+        jRenderObjectShaderParameters,
+        jMaterialShaderParameters)
+
+    using ShaderPermutation = jPermutation<>;
+    ShaderPermutation Permutation;
+
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderDebugObjectPixelShader, Permutation)
+};
+
+struct jShaderFullscreenQuadVertexShader : public jShader
+{
+    DECLARE_SHADER_PARAMETER_SETS()
+
+    using ShaderPermutation = jPermutation<>;
+    ShaderPermutation Permutation;
+
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderFullscreenQuadVertexShader, Permutation)
+};
+
+struct jShaderForwardVertexShader : public jShader
+{
+    DECLARE_SHADER_PARAMETER_SETS(
+        jViewShaderParameters,
+        jDirectionalLightShaderParameters,
+        jPointLightShaderParameters,
+        jSpotLightShaderParameters,
+        jRenderObjectShaderParameters)
+
+    using ShaderPermutation = jPermutation<>;
+    ShaderPermutation Permutation;
+
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderForwardVertexShader, Permutation)
+};
+
+struct jShaderForwardInstancingVertexShader : public jShader
+{
+    DECLARE_SHADER_PARAMETER_SETS(
+        jViewShaderParameters,
+        jDirectionalLightShaderParameters,
+        jPointLightShaderParameters,
+        jSpotLightShaderParameters,
+        jRenderObjectShaderParameters)
+
+    using ShaderPermutation = jPermutation<>;
+    ShaderPermutation Permutation;
+
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderForwardInstancingVertexShader, Permutation)
+};
+
+struct jShaderOmniShadowVertexShader : public jShader
+{
+    DECLARE_SHADER_PARAMETER_SETS(
+        jPointLightOnlyShaderParameters,
+        jRenderObjectShaderParameters)
+
+    using ShaderPermutation = jPermutation<>;
+    ShaderPermutation Permutation;
+
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderOmniShadowVertexShader, Permutation)
+};
+
+struct jShaderOmniShadowPixelShader : public jShader
+{
+    DECLARE_SHADER_PARAMETER_SETS(jPointLightOnlyShaderParameters)
+
+    using ShaderPermutation = jPermutation<>;
+    ShaderPermutation Permutation;
+
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderOmniShadowPixelShader, Permutation)
+};
+
+struct jShaderSpotShadowVertexShader : public jShader
+{
+    DECLARE_SHADER_PARAMETER_SETS(
+        jSpotLightOnlyShaderParameters,
+        jRenderObjectShaderParameters)
+
+    using ShaderPermutation = jPermutation<>;
+    ShaderPermutation Permutation;
+
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderSpotShadowVertexShader, Permutation)
+};
+
+struct jShaderDirectionalShadowVertexShader : public jShader
+{
+    DECLARE_SHADER_PARAMETER_SETS(
+        jDirectionalLightOnlyShaderParameters,
+        jRenderObjectShaderParameters)
+
+    using ShaderPermutation = jPermutation<>;
+    ShaderPermutation Permutation;
+
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderDirectionalShadowVertexShader, Permutation)
+};
+
+struct jShaderShadowPixelShader : public jShader
+{
+    DECLARE_SHADER_PARAMETER_SETS()
+
+    using ShaderPermutation = jPermutation<>;
+    ShaderPermutation Permutation;
+
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderShadowPixelShader, Permutation)
+};
+
+struct jShaderShadowInstancingVertexShader : public jShader
+{
+    DECLARE_SHADER_PARAMETER_SETS(
+        jDirectionalLightOnlyShaderParameters,
+        jRenderObjectShaderParameters)
+
+    using ShaderPermutation = jPermutation<>;
+    ShaderPermutation Permutation;
+
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderShadowInstancingVertexShader, Permutation)
+};
+
 struct jShaderDirectionalLightPixelShader : public jShader
 {
+    DECLARE_SHADER_PARAMETER_SETS(
+        jViewShaderParameters,
+        jDirectionalLightShaderParameters,
+        jDirectionalLightIBLShaderParameters)
+
     DECLARE_DEFINE(USE_SUBPASS, 0, 1);
     DECLARE_DEFINE(USE_SHADOW_MAP, 0, 1);
     DECLARE_DEFINE(USE_PBR, 0, 1);
 
     using ShaderPermutation = jPermutation<USE_SUBPASS, USE_SHADOW_MAP, USE_PBR>;
     ShaderPermutation Permutation;
+
+    static void AppendConditionalShaderParameterSets(jShaderParameterBinder& InOutBinder, const ShaderPermutation& InPermutation);
 
     DECLARE_SHADER_WITH_PERMUTATION(jShaderDirectionalLightPixelShader, Permutation)
 };
 
 struct jShaderPointLightPixelShader : public jShader
 {
+    DECLARE_SHADER_PARAMETER_SETS(
+        jViewShaderParameters,
+        jPointLightShaderParameters)
+
     DECLARE_DEFINE(USE_SUBPASS, 0, 1);
     DECLARE_DEFINE(USE_SHADOW_MAP, 0, 1);
     DECLARE_DEFINE(USE_PBR, 0, 1);
@@ -299,11 +616,29 @@ struct jShaderPointLightPixelShader : public jShader
     using ShaderPermutation = jPermutation<USE_SUBPASS, USE_SHADOW_MAP, USE_PBR>;
     ShaderPermutation Permutation;
 
+    static void AppendConditionalShaderParameterSets(jShaderParameterBinder& InOutBinder, const ShaderPermutation& InPermutation);
+
     DECLARE_SHADER_WITH_PERMUTATION(jShaderPointLightPixelShader, Permutation)
+};
+
+struct jShaderPointLightVertexShader : public jShader
+{
+    static constexpr uint32 ShaderParameterSetBaseSpace = 3;
+
+    DECLARE_SHADER_PARAMETER_SETS(jLightVolumeVertexShaderParameters)
+
+    using ShaderPermutation = jPermutation<>;
+    ShaderPermutation Permutation;
+
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderPointLightVertexShader, Permutation)
 };
 
 struct jShaderSpotLightPixelShader : public jShader
 {
+    DECLARE_SHADER_PARAMETER_SETS(
+        jViewShaderParameters,
+        jSpotLightShaderParameters)
+
     DECLARE_DEFINE(USE_SUBPASS, 0, 1);
     DECLARE_DEFINE(USE_SHADOW_MAP, 0, 1);
     DECLARE_DEFINE(USE_REVERSEZ, 0, 1);
@@ -312,11 +647,27 @@ struct jShaderSpotLightPixelShader : public jShader
     using ShaderPermutation = jPermutation<USE_SUBPASS, USE_SHADOW_MAP, USE_REVERSEZ, USE_PBR>;
     ShaderPermutation Permutation;
 
+    static void AppendConditionalShaderParameterSets(jShaderParameterBinder& InOutBinder, const ShaderPermutation& InPermutation);
+
     DECLARE_SHADER_WITH_PERMUTATION(jShaderSpotLightPixelShader, Permutation)
+};
+
+struct jShaderSpotLightVertexShader : public jShader
+{
+    static constexpr uint32 ShaderParameterSetBaseSpace = 3;
+
+    DECLARE_SHADER_PARAMETER_SETS(jLightVolumeVertexShaderParameters)
+
+    using ShaderPermutation = jPermutation<>;
+    ShaderPermutation Permutation;
+
+    DECLARE_SHADER_WITH_PERMUTATION(jShaderSpotLightVertexShader, Permutation)
 };
 
 struct jShaderBilateralComputeShader : public jShader
 {
+    DECLARE_SHADER_PARAMETER_SETS(jBilateralFilteringCSParameters)
+
     DECLARE_DEFINE(USE_GAUSSIAN_INSTEAD, 0, 1);
 
     using ShaderPermutation = jPermutation<USE_GAUSSIAN_INSTEAD>;

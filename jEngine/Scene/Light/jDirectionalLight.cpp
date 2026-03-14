@@ -1,5 +1,6 @@
 ﻿#include "pch.h"
 #include "jDirectionalLight.h"
+#include "Shader/jLightingShaderParameters.h"
 
 jDirectionalLight::jDirectionalLight() : jLight(ELightType::DIRECTIONAL)
 {
@@ -49,18 +50,14 @@ const std::shared_ptr<jShaderBindingInstance>& jDirectionalLight::PrepareShaderB
             g_rhi->CreateUniformBufferBlock(jNameStatic("DirectionalLightBlock"), jLifeTimeType::MultiFrame, sizeof(jDirectionalLightUniformBufferData)));
         LightDataUniformBlockPtr->UpdateBufferData(&LightData, sizeof(LightData));
 
-        int32 BindingPoint = 0;
-        jShaderBindingArray ShaderBindingArray;
-        jShaderBindingResourceInlineAllocator ResourceInlineAllocator;
-
-        ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
-            , ResourceInlineAllocator.Alloc<jUniformBufferResource>(LightDataUniformBlockPtr.get())));
-
         // Create LightOnlyData (without ShadowMap, for rendering shadowmap)
         {
             if (ShaderBindingInstanceOnlyLightData)
                 ShaderBindingInstanceOnlyLightData->Free();
-            ShaderBindingInstanceOnlyLightData = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::MultiFrame);
+
+            jDirectionalLightOnlyShaderParameters Parameters;
+            Parameters.DirectionalLight.Buffer = LightDataUniformBlockPtr;
+            ShaderBindingInstanceOnlyLightData = jShaderParameterSet::CreateShaderBindingInstance(Parameters, EShaderAccessStageFlag::ALL_GRAPHICS, jShaderBindingInstanceType::MultiFrame);
         }
 
         // Create WithShadowMap (for rendering lighting passes)
@@ -69,13 +66,13 @@ const std::shared_ptr<jShaderBindingInstance>& jDirectionalLight::PrepareShaderB
                 , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
                 , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), true, ECompareOp::LESS>::Create();
 
-            ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
-                , ResourceInlineAllocator.Alloc<jTextureResource>(InShadowMap, ShadowSamplerStateInfo)));
-
             if (ShaderBindingInstanceWithShadowMap)
                 ShaderBindingInstanceWithShadowMap->Free();
 
-            ShaderBindingInstanceWithShadowMap = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::MultiFrame);
+            jDirectionalLightShaderParameters Parameters;
+            Parameters.DirectionalLight.Buffer = LightDataUniformBlockPtr;
+            Parameters.DirectionalLightShadowMap = { InShadowMap ? InShadowMap : GWhiteTexture.get(), ShadowSamplerStateInfo };
+            ShaderBindingInstanceWithShadowMap = jShaderParameterSet::CreateShaderBindingInstance(Parameters, EShaderAccessStageFlag::ALL_GRAPHICS, jShaderBindingInstanceType::MultiFrame);
         }
     }
 

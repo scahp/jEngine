@@ -3,26 +3,7 @@
 #define USE_DISCONTINUITY_WEIGHT 0
 #endif // USE_DISCONTINUITY_WEIGHT
 
-struct CommonComputeUniformBuffer
-{
-    int Width;
-    int Height;
-    int FrameNumber;
-    float BlendFactor;
-};
-
 #if COMPUTE_SHADER
-RWTexture2D<float4> resultImage : register(u0);
-Texture2D HistoryBuffer : register(t1);
-Texture2D VelocityBuffer : register(t2);
-Texture2D DepthBuffer : register(t3);
-RWTexture2D<float> HistoryDepthBuffer : register(u4);
-
-cbuffer ComputeCommon : register(b5)
-{
-    CommonComputeUniformBuffer ComputeCommon;
-}
-
 float3 GetTexture(RWTexture2D<float4> Tex, int2 Pos)
 {
     //return (Tex[Pos].xyz + Tex[Pos + int2(1, 0)].xyz + Tex[Pos + int2(-1, 0)].xyz + Tex[Pos + int2(0, 1)].xyz + Tex[Pos + int2(0, -1)].xyz) / 5.0f;
@@ -70,25 +51,13 @@ struct VSOutput
     float2 TexCoord : TEXCOORD0;
 };
 
-Texture2D CurrentTexture : register(t0);
-SamplerState TextureSampler : register(s0);
-Texture2D HistoryBuffer : register(t1);
-Texture2D VelocityBuffer : register(t2);
-Texture2D DepthBuffer : register(t3);
-Texture2D HistoryDepthBuffer : register(t4);
-
-cbuffer ComputeCommon : register(b5)
-{
-    CommonComputeUniformBuffer ComputeCommon;
-}
-
 float4 SSGIReprojectionPS(VSOutput input) : SV_TARGET
 {
     //float2 ScreenOffsetToPrevUV = (VelocityBuffer.Sample(TextureSampler, input.TexCoord).xy * float2(2.0, 2.0) - float2(1.0, 1.0));
-    float2 ScreenOffsetToPrevUV = VelocityBuffer.Sample(TextureSampler, input.TexCoord).xy;
+    float2 ScreenOffsetToPrevUV = VelocityBuffer.Sample(VelocityBufferSampler, input.TexCoord).xy;
     float2 OldUV = input.TexCoord - ScreenOffsetToPrevUV;
     
-    float4 currentColor = CurrentTexture.Sample(TextureSampler, input.TexCoord);
+    float4 currentColor = CurrentTexture.Sample(CurrentTextureSampler, input.TexCoord);
 
     // Avoid ghosting from outside to inside pixels
     if (OldUV.x < 0 || OldUV.x > 1.0f || OldUV.y < 0 || OldUV.y > 1.0f)
@@ -96,11 +65,11 @@ float4 SSGIReprojectionPS(VSOutput input) : SV_TARGET
         return currentColor;
     }
 
-    float4 historyColor = HistoryBuffer.Sample(TextureSampler, OldUV);
+    float4 historyColor = HistoryBuffer.Sample(HistoryBufferSampler, OldUV);
     
     float ReprojectionWeight = ComputeCommon.BlendFactor;
 #if USE_DISCONTINUITY_WEIGHT
-    float DiscontinuityWeight = abs(DepthBuffer.Sample(TextureSampler, input.TexCoord).x - HistoryDepthBuffer.Sample(TextureSampler, input.TexCoord).x) < 0.01;
+    float DiscontinuityWeight = abs(DepthBuffer.Sample(DepthBufferSampler, input.TexCoord).x - HistoryDepthBuffer.Sample(HistoryDepthBufferSampler, input.TexCoord).x) < 0.01;
     ReprojectionWeight *= DiscontinuityWeight;
 #endif // USE_DISCONTINUITY_WEIGHT
     

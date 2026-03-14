@@ -14,40 +14,289 @@
 #include "Scene/Light/jSpotLight.h"
 #include "Material/jMaterial.h"
 #include "FileLoader/jImageFileLoader.h"
+#include "Shader/jShaderParameterSet.h"
 #include <unordered_map>
 
 namespace
 {
-    struct jHWRTDISceneConstantBuffer
+    BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jHWRTDISceneConstantBuffer)
+        SHADER_UNIFORM_BUFFER_MEMBER(Matrix, ProjectionToWorld)
+        SHADER_UNIFORM_BUFFER_MEMBER(Vector, CameraPosition)
+        SHADER_UNIFORM_BUFFER_MEMBER(float, NormalBias)
+        SHADER_UNIFORM_BUFFER_MEMBER(uint32, NumLights)
+        SHADER_UNIFORM_BUFFER_MEMBER(uint32, DebugViewMode)
+        SHADER_UNIFORM_BUFFER_MEMBER(uint32, ForceMipLevel0)
+        SHADER_UNIFORM_BUFFER_MEMBER(uint32, RenderWidth)
+        SHADER_UNIFORM_BUFFER_MEMBER(float, DebugLineWidth)
+        SHADER_UNIFORM_BUFFER_MEMBER(float, DebugUVScale)
+        SHADER_UNIFORM_BUFFER_MEMBER(float, DebugPrimitiveIDScale)
+        SHADER_UNIFORM_BUFFER_MEMBER(float, ShadowRayStartOffset)
+        SHADER_UNIFORM_BUFFER_MEMBER(uint32, RenderHeight)
+        SHADER_UNIFORM_BUFFER_MEMBER(float, Padding0)
+        SHADER_UNIFORM_BUFFER_MEMBER(float, Padding1)
+        SHADER_UNIFORM_BUFFER_MEMBER(float, Padding2)
+    END_SHADER_UNIFORM_BUFFER_STRUCT()
+
+    BEGIN_SHADER_STRUCT(MaterialInstanceUniform)
+        SHADER_STRUCT_MEMBER(uint32, MaterialFlags)
+        SHADER_STRUCT_MEMBER(uint32, AlbedoSamplerIndex)
+        SHADER_STRUCT_MEMBER(uint32, NormalSamplerIndex)
+        SHADER_STRUCT_MEMBER(uint32, RMSamplerIndex)
+        SHADER_STRUCT_MEMBER(float, AlphaCutoff)
+        SHADER_STRUCT_MEMBER(float, Padding0)
+        SHADER_STRUCT_MEMBER(float, Padding1)
+        SHADER_STRUCT_MEMBER(float, Padding2)
+    END_SHADER_STRUCT()
+
+    struct jHWRTDIBindlessUInt2
     {
-        Matrix ProjectionToWorld;
-        Vector CameraPosition;
-        float NormalBias = 0.1f;
-        uint32 NumLights = 0;
-        uint32 DebugViewMode = 0;
-        uint32 ForceMipLevel0 = 0;
-        uint32 RenderWidth = 0;
-        float DebugLineWidth = 0.02f;
-        float DebugUVScale = 16.0f;
-        float DebugPrimitiveIDScale = 1.0f;
-        float ShadowRayStartOffset = 0.001f;
-        uint32 RenderHeight = 0;
-        float Padding0 = 0.0f;
-        float Padding1 = 0.0f;
-        float Padding2 = 0.0f;
     };
 
-    struct jHWRTDIMaterialInstanceUniform
+    template <>
+    struct TShaderParameterHLSLTypeInfo<jHWRTDIBindlessUInt2>
     {
-        uint32 MaterialFlags = 0;
-        uint32 AlbedoSamplerIndex = 0;
-        uint32 NormalSamplerIndex = 0;
-        uint32 RMSamplerIndex = 0;
-        float AlphaCutoff = 0.5f;
-        float Padding0 = 0.0f;
-        float Padding1 = 0.0f;
-        float Padding2 = 0.0f;
+        static constexpr const char* GetTypeName() { return "uint2"; }
+        static void AppendTypeDeclaration(std::string&) {}
     };
+
+    BEGIN_SHADER_STRUCT(HWRTDILightData)
+        SHADER_STRUCT_MEMBER(Vector4, ColorAndType)
+        SHADER_STRUCT_MEMBER(Vector4, PositionAndMaxDistance)
+        SHADER_STRUCT_MEMBER(Vector4, DirectionAndPenumbra)
+        SHADER_STRUCT_MEMBER(Vector4, UmbraAndPadding)
+    END_SHADER_STRUCT()
+
+    BEGIN_SHADER_PARAMETER_SET(jHWRTDIGlobalParameters)
+        SHADER_ACCELERATION_STRUCTURE(Scene)
+        SHADER_RW_TEXTURE2D(RenderTarget)
+        SHADER_UNIFORM_BUFFER(jHWRTDISceneConstantBuffer, g_sceneCB)
+        SHADER_SAMPLER(DefaultSamplerState)
+        SHADER_TEXTURECUBE_SRV(EnvTexture)
+        SHADER_STRUCTURED_BUFFER(HWRTDILightData, LightBuffer)
+    END_SHADER_PARAMETER_SET()
+
+    BEGIN_SHADER_BINDLESS_SET(jHWRTDIBindlessParameters)
+        // space0 is reserved for jHWRTDIGlobalParameters; bindless tables start at space1.
+        SHADER_BINDLESS_STRUCTURED_BUFFER(jHWRTDIBindlessUInt2, VertexIndexOffsetArray, 1)
+        SHADER_BINDLESS_BUFFER(uint32, IndexBindlessArray, 2)
+        SHADER_BINDLESS_STRUCTURED_BUFFER(RenderObjectUniformBuffer, RenderObjParamArray, 3)
+        SHADER_BINDLESS_BYTEADDRESS_BUFFER(VerticesBindlessArray, 4)
+        SHADER_BINDLESS_UNIFORM_BUFFER(MaterialInstanceUniform, MaterialInstanceArray, 5)
+        SHADER_BINDLESS_TEXTURE2D(AlbedoTextureArray, 6)
+        SHADER_BINDLESS_TEXTURE2D(NormalTextureArray, 7)
+        SHADER_BINDLESS_TEXTURE2D(RMTextureArray, 8)
+        SHADER_BINDLESS_SAMPLER(AlbedoSamplerArray, 9)
+        SHADER_BINDLESS_SAMPLER(NormalSamplerArray, 10)
+        SHADER_BINDLESS_SAMPLER(RMSamplerArray, 11)
+    END_SHADER_BINDLESS_SET()
+
+    struct jShaderHWRTDIPrimaryMissShader : public jShader
+    {
+        DECLARE_SHADER_PARAMETER_SETS(jHWRTDIGlobalParameters)
+
+        DECLARE_DEFINE(USE_SURFEL_GI, 0, 1);
+        DECLARE_DEFINE(USE_BINDLESS_RESOURCE, 0, 1);
+
+        using ShaderPermutation = jPermutation<USE_SURFEL_GI, USE_BINDLESS_RESOURCE>;
+        ShaderPermutation Permutation;
+
+        static void AppendConditionalShaderParameterSets(jShaderParameterBinder& InOutBinder, const ShaderPermutation& InPermutation)
+        {
+            if (InPermutation.Get<USE_BINDLESS_RESOURCE>() != 0)
+                InOutBinder.AddBindless<jHWRTDIBindlessParameters>();
+        }
+
+        DECLARE_SHADER_WITH_PERMUTATION(jShaderHWRTDIPrimaryMissShader, Permutation)
+    };
+
+    struct jShaderHWRTDIRaygenShader : public jShader
+    {
+        DECLARE_SHADER_PARAMETER_SETS(jHWRTDIGlobalParameters)
+
+        DECLARE_DEFINE(USE_SURFEL_GI, 0, 1);
+        DECLARE_DEFINE(USE_BINDLESS_RESOURCE, 0, 1);
+
+        using ShaderPermutation = jPermutation<USE_SURFEL_GI, USE_BINDLESS_RESOURCE>;
+        ShaderPermutation Permutation;
+
+        static void AppendConditionalShaderParameterSets(jShaderParameterBinder& InOutBinder, const ShaderPermutation& InPermutation)
+        {
+            if (InPermutation.Get<USE_BINDLESS_RESOURCE>() != 0)
+                InOutBinder.AddBindless<jHWRTDIBindlessParameters>();
+        }
+
+        DECLARE_SHADER_WITH_PERMUTATION(jShaderHWRTDIRaygenShader, Permutation)
+    };
+
+    struct jShaderHWRTDIPrimaryClosestHitShader : public jShader
+    {
+        DECLARE_SHADER_PARAMETER_SETS(jHWRTDIGlobalParameters)
+
+        DECLARE_DEFINE(USE_SURFEL_GI, 0, 1);
+        DECLARE_DEFINE(USE_BINDLESS_RESOURCE, 0, 1);
+
+        using ShaderPermutation = jPermutation<USE_SURFEL_GI, USE_BINDLESS_RESOURCE>;
+        ShaderPermutation Permutation;
+
+        static void AppendConditionalShaderParameterSets(jShaderParameterBinder& InOutBinder, const ShaderPermutation& InPermutation)
+        {
+            if (InPermutation.Get<USE_BINDLESS_RESOURCE>() != 0)
+                InOutBinder.AddBindless<jHWRTDIBindlessParameters>();
+        }
+
+        DECLARE_SHADER_WITH_PERMUTATION(jShaderHWRTDIPrimaryClosestHitShader, Permutation)
+    };
+
+    struct jShaderHWRTDIPrimaryAnyHitShader : public jShader
+    {
+        DECLARE_SHADER_PARAMETER_SETS(jHWRTDIGlobalParameters)
+
+        DECLARE_DEFINE(USE_SURFEL_GI, 0, 1);
+        DECLARE_DEFINE(USE_BINDLESS_RESOURCE, 0, 1);
+
+        using ShaderPermutation = jPermutation<USE_SURFEL_GI, USE_BINDLESS_RESOURCE>;
+        ShaderPermutation Permutation;
+
+        static void AppendConditionalShaderParameterSets(jShaderParameterBinder& InOutBinder, const ShaderPermutation& InPermutation)
+        {
+            if (InPermutation.Get<USE_BINDLESS_RESOURCE>() != 0)
+                InOutBinder.AddBindless<jHWRTDIBindlessParameters>();
+        }
+
+        DECLARE_SHADER_WITH_PERMUTATION(jShaderHWRTDIPrimaryAnyHitShader, Permutation)
+    };
+
+    struct jShaderHWRTDIShadowMissShader : public jShader
+    {
+        DECLARE_SHADER_PARAMETER_SETS(jHWRTDIGlobalParameters)
+
+        DECLARE_DEFINE(USE_SURFEL_GI, 0, 1);
+        DECLARE_DEFINE(USE_BINDLESS_RESOURCE, 0, 1);
+
+        using ShaderPermutation = jPermutation<USE_SURFEL_GI, USE_BINDLESS_RESOURCE>;
+        ShaderPermutation Permutation;
+
+        static void AppendConditionalShaderParameterSets(jShaderParameterBinder& InOutBinder, const ShaderPermutation& InPermutation)
+        {
+            if (InPermutation.Get<USE_BINDLESS_RESOURCE>() != 0)
+                InOutBinder.AddBindless<jHWRTDIBindlessParameters>();
+        }
+
+        DECLARE_SHADER_WITH_PERMUTATION(jShaderHWRTDIShadowMissShader, Permutation)
+    };
+
+    struct jShaderHWRTDIShadowClosestHitShader : public jShader
+    {
+        DECLARE_SHADER_PARAMETER_SETS(jHWRTDIGlobalParameters)
+
+        DECLARE_DEFINE(USE_SURFEL_GI, 0, 1);
+        DECLARE_DEFINE(USE_BINDLESS_RESOURCE, 0, 1);
+
+        using ShaderPermutation = jPermutation<USE_SURFEL_GI, USE_BINDLESS_RESOURCE>;
+        ShaderPermutation Permutation;
+
+        static void AppendConditionalShaderParameterSets(jShaderParameterBinder& InOutBinder, const ShaderPermutation& InPermutation)
+        {
+            if (InPermutation.Get<USE_BINDLESS_RESOURCE>() != 0)
+                InOutBinder.AddBindless<jHWRTDIBindlessParameters>();
+        }
+
+        DECLARE_SHADER_WITH_PERMUTATION(jShaderHWRTDIShadowClosestHitShader, Permutation)
+    };
+
+    struct jShaderHWRTDIShadowAnyHitShader : public jShader
+    {
+        DECLARE_SHADER_PARAMETER_SETS(jHWRTDIGlobalParameters)
+
+        DECLARE_DEFINE(USE_SURFEL_GI, 0, 1);
+        DECLARE_DEFINE(USE_BINDLESS_RESOURCE, 0, 1);
+
+        using ShaderPermutation = jPermutation<USE_SURFEL_GI, USE_BINDLESS_RESOURCE>;
+        ShaderPermutation Permutation;
+
+        static void AppendConditionalShaderParameterSets(jShaderParameterBinder& InOutBinder, const ShaderPermutation& InPermutation)
+        {
+            if (InPermutation.Get<USE_BINDLESS_RESOURCE>() != 0)
+                InOutBinder.AddBindless<jHWRTDIBindlessParameters>();
+        }
+
+        DECLARE_SHADER_WITH_PERMUTATION(jShaderHWRTDIShadowAnyHitShader, Permutation)
+    };
+
+    struct jShaderHWRTDIInlineRayQueryComputeShader : public jShader
+    {
+        DECLARE_SHADER_PARAMETER_SETS(jHWRTDIGlobalParameters)
+
+        DECLARE_DEFINE(USE_SURFEL_GI, 0, 1);
+        DECLARE_DEFINE(USE_BINDLESS_RESOURCE, 0, 1);
+
+        using ShaderPermutation = jPermutation<USE_SURFEL_GI, USE_BINDLESS_RESOURCE>;
+        ShaderPermutation Permutation;
+
+        static void AppendConditionalShaderParameterSets(jShaderParameterBinder& InOutBinder, const ShaderPermutation& InPermutation)
+        {
+            if (InPermutation.Get<USE_BINDLESS_RESOURCE>() != 0)
+                InOutBinder.AddBindless<jHWRTDIBindlessParameters>();
+        }
+
+        DECLARE_SHADER_WITH_PERMUTATION(jShaderHWRTDIInlineRayQueryComputeShader, Permutation)
+    };
+
+    IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderHWRTDIPrimaryMissShader
+        , "HWRTDI_Miss"
+        , "Resource/Shaders/hlsl/HWRT_DI.hlsl"
+        , ""
+        , "PrimaryMissShader"
+        , EShaderAccessStageFlag::RAYTRACING_MISS)
+
+    IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderHWRTDIRaygenShader
+        , "HWRTDI_Raygen"
+        , "Resource/Shaders/hlsl/HWRT_DI.hlsl"
+        , ""
+        , "RaygenShader"
+        , EShaderAccessStageFlag::RAYTRACING_RAYGEN)
+
+    IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderHWRTDIPrimaryClosestHitShader
+        , "HWRTDI_ClosestHit"
+        , "Resource/Shaders/hlsl/HWRT_DI.hlsl"
+        , ""
+        , "PrimaryClosestHitShader"
+        , EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT)
+
+    IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderHWRTDIPrimaryAnyHitShader
+        , "HWRTDI_AnyHit"
+        , "Resource/Shaders/hlsl/HWRT_DI.hlsl"
+        , ""
+        , "PrimaryAnyHitShader"
+        , EShaderAccessStageFlag::RAYTRACING_ANYHIT)
+
+    IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderHWRTDIShadowMissShader
+        , "HWRTDI_ShadowMiss"
+        , "Resource/Shaders/hlsl/HWRT_DI.hlsl"
+        , ""
+        , "ShadowMissShader"
+        , EShaderAccessStageFlag::RAYTRACING_MISS)
+
+    IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderHWRTDIShadowClosestHitShader
+        , "HWRTDI_ShadowClosestHit"
+        , "Resource/Shaders/hlsl/HWRT_DI.hlsl"
+        , ""
+        , "ShadowClosestHitShader"
+        , EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT)
+
+    IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderHWRTDIShadowAnyHitShader
+        , "HWRTDI_ShadowAnyHit"
+        , "Resource/Shaders/hlsl/HWRT_DI.hlsl"
+        , ""
+        , "ShadowAnyHitShader"
+        , EShaderAccessStageFlag::RAYTRACING_ANYHIT)
+
+    IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderHWRTDIInlineRayQueryComputeShader
+        , "HWRTDI_InlineRayQueryCS"
+        , "Resource/Shaders/hlsl/HWRT_DI.hlsl"
+        , ""
+        , "InlineRayQueryCS"
+        , EShaderAccessStageFlag::COMPUTE)
 
     enum : uint32
     {
@@ -100,8 +349,7 @@ namespace
                     , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
                     , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
 
-                InOutShaderBindingArray.Add(jShaderBinding::Create(0, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
-                    , InOutResourceInlineAllocator.Alloc<jTextureResource>(InHWRTDIOutput, CopySamplerState)));
+                jRHIUtil::BuildSingleTextureFragmentBindings(InHWRTDIOutput, CopySamplerState, InOutShaderBindingArray, InOutResourceInlineAllocator);
             }
             , [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
             {
@@ -109,6 +357,7 @@ namespace
                 ShaderInfo.SetName(jNameStatic("HWRTDI_CopyPS"));
                 ShaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/copy_ps.hlsl"));
                 ShaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
+                jRHIUtil::AppendSingleTextureFragmentShaderInfo(ShaderInfo);
                 return g_rhi->CreateShader(ShaderInfo);
             });
     }
@@ -120,31 +369,28 @@ namespace
 
         {
             jRaytracingPipelineShader NewShader;
-            jShaderInfo ShaderInfo;
-
-            ShaderInfo.SetName(jNameStatic("HWRTDI_Miss"));
-            ShaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/HWRT_DI.hlsl"));
-            ShaderInfo.SetEntryPoint(jNameStatic("PrimaryMissShader"));
-            ShaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_MISS);
-            NewShader.MissShader = g_rhi->CreateShader(ShaderInfo);
+            jShaderHWRTDIPrimaryMissShader::ShaderPermutation MissPermutation;
+            MissPermutation.SetIndex<jShaderHWRTDIPrimaryMissShader::USE_SURFEL_GI>(0);
+            MissPermutation.SetIndex<jShaderHWRTDIPrimaryMissShader::USE_BINDLESS_RESOURCE>(1);
+            NewShader.MissShader = jShaderHWRTDIPrimaryMissShader::CreateShader(MissPermutation);
             NewShader.MissEntryPoint = TEXT("PrimaryMissShader");
 
-            ShaderInfo.SetName(jNameStatic("HWRTDI_Raygen"));
-            ShaderInfo.SetEntryPoint(jNameStatic("RaygenShader"));
-            ShaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_RAYGEN);
-            NewShader.RaygenShader = g_rhi->CreateShader(ShaderInfo);
+            jShaderHWRTDIRaygenShader::ShaderPermutation RaygenPermutation;
+            RaygenPermutation.SetIndex<jShaderHWRTDIRaygenShader::USE_SURFEL_GI>(0);
+            RaygenPermutation.SetIndex<jShaderHWRTDIRaygenShader::USE_BINDLESS_RESOURCE>(1);
+            NewShader.RaygenShader = jShaderHWRTDIRaygenShader::CreateShader(RaygenPermutation);
             NewShader.RaygenEntryPoint = TEXT("RaygenShader");
 
-            ShaderInfo.SetName(jNameStatic("HWRTDI_ClosestHit"));
-            ShaderInfo.SetEntryPoint(jNameStatic("PrimaryClosestHitShader"));
-            ShaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT);
-            NewShader.ClosestHitShader = g_rhi->CreateShader(ShaderInfo);
+            jShaderHWRTDIPrimaryClosestHitShader::ShaderPermutation ClosestHitPermutation;
+            ClosestHitPermutation.SetIndex<jShaderHWRTDIPrimaryClosestHitShader::USE_SURFEL_GI>(0);
+            ClosestHitPermutation.SetIndex<jShaderHWRTDIPrimaryClosestHitShader::USE_BINDLESS_RESOURCE>(1);
+            NewShader.ClosestHitShader = jShaderHWRTDIPrimaryClosestHitShader::CreateShader(ClosestHitPermutation);
             NewShader.ClosestHitEntryPoint = TEXT("PrimaryClosestHitShader");
 
-            ShaderInfo.SetName(jNameStatic("HWRTDI_AnyHit"));
-            ShaderInfo.SetEntryPoint(jNameStatic("PrimaryAnyHitShader"));
-            ShaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_ANYHIT);
-            NewShader.AnyHitShader = g_rhi->CreateShader(ShaderInfo);
+            jShaderHWRTDIPrimaryAnyHitShader::ShaderPermutation AnyHitPermutation;
+            AnyHitPermutation.SetIndex<jShaderHWRTDIPrimaryAnyHitShader::USE_SURFEL_GI>(0);
+            AnyHitPermutation.SetIndex<jShaderHWRTDIPrimaryAnyHitShader::USE_BINDLESS_RESOURCE>(1);
+            NewShader.AnyHitShader = jShaderHWRTDIPrimaryAnyHitShader::CreateShader(AnyHitPermutation);
             NewShader.AnyHitEntryPoint = TEXT("PrimaryAnyHitShader");
 
             NewShader.HitGroupName = TEXT("DefaultHit");
@@ -153,24 +399,22 @@ namespace
 
         {
             jRaytracingPipelineShader NewShader;
-            jShaderInfo ShaderInfo;
-            ShaderInfo.SetName(jNameStatic("HWRTDI_ShadowMiss"));
-            ShaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/HWRT_DI.hlsl"));
-            ShaderInfo.SetEntryPoint(jNameStatic("ShadowMissShader"));
-            ShaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_MISS);
-            NewShader.MissShader = g_rhi->CreateShader(ShaderInfo);
+            jShaderHWRTDIShadowMissShader::ShaderPermutation ShadowMissPermutation;
+            ShadowMissPermutation.SetIndex<jShaderHWRTDIShadowMissShader::USE_SURFEL_GI>(0);
+            ShadowMissPermutation.SetIndex<jShaderHWRTDIShadowMissShader::USE_BINDLESS_RESOURCE>(1);
+            NewShader.MissShader = jShaderHWRTDIShadowMissShader::CreateShader(ShadowMissPermutation);
             NewShader.MissEntryPoint = TEXT("ShadowMissShader");
 
-            ShaderInfo.SetName(jNameStatic("HWRTDI_ShadowClosestHit"));
-            ShaderInfo.SetEntryPoint(jNameStatic("ShadowClosestHitShader"));
-            ShaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT);
-            NewShader.ClosestHitShader = g_rhi->CreateShader(ShaderInfo);
+            jShaderHWRTDIShadowClosestHitShader::ShaderPermutation ShadowClosestHitPermutation;
+            ShadowClosestHitPermutation.SetIndex<jShaderHWRTDIShadowClosestHitShader::USE_SURFEL_GI>(0);
+            ShadowClosestHitPermutation.SetIndex<jShaderHWRTDIShadowClosestHitShader::USE_BINDLESS_RESOURCE>(1);
+            NewShader.ClosestHitShader = jShaderHWRTDIShadowClosestHitShader::CreateShader(ShadowClosestHitPermutation);
             NewShader.ClosestHitEntryPoint = TEXT("ShadowClosestHitShader");
 
-            ShaderInfo.SetName(jNameStatic("HWRTDI_ShadowAnyHit"));
-            ShaderInfo.SetEntryPoint(jNameStatic("ShadowAnyHitShader"));
-            ShaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_ANYHIT);
-            NewShader.AnyHitShader = g_rhi->CreateShader(ShaderInfo);
+            jShaderHWRTDIShadowAnyHitShader::ShaderPermutation ShadowAnyHitPermutation;
+            ShadowAnyHitPermutation.SetIndex<jShaderHWRTDIShadowAnyHitShader::USE_SURFEL_GI>(0);
+            ShadowAnyHitPermutation.SetIndex<jShaderHWRTDIShadowAnyHitShader::USE_BINDLESS_RESOURCE>(1);
+            NewShader.AnyHitShader = jShaderHWRTDIShadowAnyHitShader::CreateShader(ShadowAnyHitPermutation);
             NewShader.AnyHitEntryPoint = TEXT("ShadowAnyHitShader");
             NewShader.HitGroupName = TEXT("ShadowHit");
 
@@ -217,11 +461,6 @@ namespace
 
         jShaderBindingArray ShaderBindingArray;
         jShaderBindingResourceInlineAllocator ResourceInlineAllocator;
-
-        ShaderBindingArray.Add(jShaderBinding::Create(0, 1, EShaderBindingType::ACCELERATION_STRUCTURE_SRV, BindingShaderStageFlag
-            , ResourceInlineAllocator.Alloc<jBufferResource>(RaytracingScene->TLASBufferPtr.get()), true));
-        ShaderBindingArray.Add(jShaderBinding::Create(1, 1, EShaderBindingType::TEXTURE_UAV, BindingShaderStageFlag
-            , ResourceInlineAllocator.Alloc<jTextureResource>(HWRTDIOutput, nullptr), false));
 
         jHWRTDISceneConstantBuffer SceneCB;
         SceneCB.ProjectionToWorld = jCamera::GetMainCamera()->GetInverseViewProjectionMatrix();
@@ -310,7 +549,7 @@ namespace
             const jMaterial* Material = RenderObject->MaterialPtr ? RenderObject->MaterialPtr.get() : GDefaultMaterial.get();
             check(Material);
 
-            jHWRTDIMaterialInstanceUniform MaterialUniform;
+            MaterialInstanceUniform MaterialUniform;
             if (Material->TexData[(int32)jMaterial::EMaterialTextureType::Albedo].Texture)
                 MaterialUniform.MaterialFlags |= HWRTDI_MaterialFlag_HasAlbedoTexture;
             if (Material->TexData[(int32)jMaterial::EMaterialTextureType::Normal].Texture)
@@ -404,65 +643,51 @@ namespace
         SceneCB.NumLights = NumPackedLights;
 
         auto SceneUniformBuffer = CreateOneFrameUniformBuffer(jNameStatic("HWRTDI_SceneData"), &SceneCB, sizeof(SceneCB));
-        ShaderBindingArray.Add(jShaderBinding::Create(2, 1, EShaderBindingType::UNIFORMBUFFER, BindingShaderStageFlag
-            , ResourceInlineAllocator.Alloc<jUniformBufferResource>(SceneUniformBuffer.get()), true));
 
         const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
             , ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT, ETextureAddressMode::REPEAT
             , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
-        ShaderBindingArray.Add(jShaderBinding::Create(3, 1, EShaderBindingType::SAMPLER, BindingShaderStageFlag
-            , ResourceInlineAllocator.Alloc<jSamplerResource>(SamplerState)));
 
         jTexture* EnvTexture = jSceneRenderTarget::CubeEnvMap2 ? jSceneRenderTarget::CubeEnvMap2 : GWhiteCubeTexture.get();
-        ShaderBindingArray.Add(jShaderBinding::Create(4, 1, EShaderBindingType::TEXTURE_SRV, BindingShaderStageFlag
-            , ResourceInlineAllocator.Alloc<jTextureResource>(EnvTexture, nullptr)));
-        ShaderBindingArray.Add(jShaderBinding::Create(5, 1, EShaderBindingType::BUFFER_SRV, BindingShaderStageFlag
-            , ResourceInlineAllocator.Alloc<jBufferResource>(PackedLightBuffer.get())));
+
+        jHWRTDIGlobalParameters GlobalParameters;
+        GlobalParameters.Scene.Buffer = RaytracingScene->TLASBufferPtr.get();
+        GlobalParameters.RenderTarget.Texture = HWRTDIOutput;
+        GlobalParameters.g_sceneCB.Buffer = SceneUniformBuffer;
+        GlobalParameters.DefaultSamplerState.SamplerState = SamplerState;
+        GlobalParameters.EnvTexture.Texture = EnvTexture;
+        GlobalParameters.LightBuffer.Buffer = PackedLightBuffer.get();
+        jShaderParameterSet::BuildShaderBindings(GlobalParameters, BindingShaderStageFlag, ShaderBindingArray, ResourceInlineAllocator);
 
         std::shared_ptr<jShaderBindingInstance> GlobalShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
 
-        jShaderBindingArray BindlessShaderBindingArray[11];
-        BindlessShaderBindingArray[0].Add(jShaderBinding::CreateBindless(0, (uint32)VertexAndIndexOffsetBuffers.size(), EShaderBindingType::BUFFER_SRV, BindingShaderStageFlag
-            , ResourceInlineAllocator.Alloc<jBufferResourceBindless>(VertexAndIndexOffsetBuffers), false));
-        BindlessShaderBindingArray[1].Add(jShaderBinding::CreateBindless(0, (uint32)IndexBuffers.size(), EShaderBindingType::BUFFER_SRV, BindingShaderStageFlag
-            , ResourceInlineAllocator.Alloc<jBufferResourceBindless>(IndexBuffers), false));
-        BindlessShaderBindingArray[2].Add(jShaderBinding::CreateBindless(0, (uint32)RenderObjectBuffers.size(), EShaderBindingType::BUFFER_SRV, BindingShaderStageFlag
-            , ResourceInlineAllocator.Alloc<jBufferResourceBindless>(RenderObjectBuffers), false));
-        BindlessShaderBindingArray[3].Add(jShaderBinding::CreateBindless(0, (uint32)VertexBuffers.size(), EShaderBindingType::BUFFER_SRV, BindingShaderStageFlag
-            , ResourceInlineAllocator.Alloc<jBufferResourceBindless>(VertexBuffers), false));
-        BindlessShaderBindingArray[4].Add(jShaderBinding::CreateBindless(0, (uint32)MaterialInstanceBuffers.size(), EShaderBindingType::UNIFORMBUFFER, BindingShaderStageFlag
-            , ResourceInlineAllocator.Alloc<jUniformBufferResourceBindless>(MaterialInstanceBuffers)));
-        BindlessShaderBindingArray[5].Add(jShaderBinding::CreateBindless(0, (uint32)AlbedoTextures.size(), EShaderBindingType::TEXTURE_SRV, BindingShaderStageFlag
-            , ResourceInlineAllocator.Alloc<jTextureResourceBindless>(AlbedoTextures)));
-        BindlessShaderBindingArray[6].Add(jShaderBinding::CreateBindless(0, (uint32)NormalTextures.size(), EShaderBindingType::TEXTURE_SRV, BindingShaderStageFlag
-            , ResourceInlineAllocator.Alloc<jTextureResourceBindless>(NormalTextures)));
-        BindlessShaderBindingArray[7].Add(jShaderBinding::CreateBindless(0, (uint32)RMTextures.size(), EShaderBindingType::TEXTURE_SRV, BindingShaderStageFlag
-            , ResourceInlineAllocator.Alloc<jTextureResourceBindless>(RMTextures)));
-        BindlessShaderBindingArray[8].Add(jShaderBinding::CreateBindless(0, (uint32)AlbedoSamplerStates.size(), EShaderBindingType::SAMPLER, BindingShaderStageFlag
-            , ResourceInlineAllocator.Alloc<jSamplerResourceBindless>(AlbedoSamplerStates)));
-        BindlessShaderBindingArray[9].Add(jShaderBinding::CreateBindless(0, (uint32)NormalSamplerStates.size(), EShaderBindingType::SAMPLER, BindingShaderStageFlag
-            , ResourceInlineAllocator.Alloc<jSamplerResourceBindless>(NormalSamplerStates)));
-        BindlessShaderBindingArray[10].Add(jShaderBinding::CreateBindless(0, (uint32)RMSamplerStates.size(), EShaderBindingType::SAMPLER, BindingShaderStageFlag
-            , ResourceInlineAllocator.Alloc<jSamplerResourceBindless>(RMSamplerStates)));
-
-        std::shared_ptr<jShaderBindingInstance> GlobalShaderBindingInstanceBindless[_countof(BindlessShaderBindingArray)];
-        for (int32 i = 0; i < _countof(BindlessShaderBindingArray); ++i)
-        {
-            GlobalShaderBindingInstanceBindless[i] = g_rhi->CreateShaderBindingInstance(BindlessShaderBindingArray[i], jShaderBindingInstanceType::SingleFrame);
-        }
+        jHWRTDIBindlessParameters BindlessParameters;
+        BindlessParameters.VertexIndexOffsetArray.Buffers = VertexAndIndexOffsetBuffers;
+        BindlessParameters.IndexBindlessArray.Buffers = IndexBuffers;
+        BindlessParameters.RenderObjParamArray.Buffers = RenderObjectBuffers;
+        BindlessParameters.VerticesBindlessArray.Buffers = VertexBuffers;
+        BindlessParameters.MaterialInstanceArray.Buffers = MaterialInstanceBuffers;
+        BindlessParameters.AlbedoTextureArray.Textures = AlbedoTextures;
+        BindlessParameters.NormalTextureArray.Textures = NormalTextures;
+        BindlessParameters.RMTextureArray.Textures = RMTextures;
+        BindlessParameters.AlbedoSamplerArray.SamplerStates = AlbedoSamplerStates;
+        BindlessParameters.NormalSamplerArray.SamplerStates = NormalSamplerStates;
+        BindlessParameters.RMSamplerArray.SamplerStates = RMSamplerStates;
+        std::vector<std::shared_ptr<jShaderBindingInstance>> BindlessShaderBindingInstances =
+            jShaderBindlessSet::CreateShaderBindingInstances(BindlessParameters, BindingShaderStageFlag, jShaderBindingInstanceType::SingleFrame);
 
         jShaderBindingLayoutArray GlobalShaderBindingLayoutArray;
         GlobalShaderBindingLayoutArray.Add(GlobalShaderBindingInstance->ShaderBindingsLayouts);
-        for (int32 i = 0; i < _countof(GlobalShaderBindingInstanceBindless); ++i)
+        for (const auto& BindlessShaderBindingInstance : BindlessShaderBindingInstances)
         {
-            GlobalShaderBindingLayoutArray.Add(GlobalShaderBindingInstanceBindless[i]->ShaderBindingsLayouts);
+            GlobalShaderBindingLayoutArray.Add(BindlessShaderBindingInstance->ShaderBindingsLayouts);
         }
 
         jShaderBindingInstanceArray ShaderBindingInstanceArray;
         ShaderBindingInstanceArray.Add(GlobalShaderBindingInstance.get());
-        for (int32 i = 0; i < _countof(GlobalShaderBindingInstanceBindless); ++i)
+        for (const auto& BindlessShaderBindingInstance : BindlessShaderBindingInstances)
         {
-            ShaderBindingInstanceArray.Add(GlobalShaderBindingInstanceBindless[i].get());
+            ShaderBindingInstanceArray.Add(BindlessShaderBindingInstance.get());
         }
 
         jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
@@ -482,12 +707,10 @@ namespace
 
         if (InUseInlineRayQuery)
         {
-            jShaderInfo ShaderInfo;
-            ShaderInfo.SetName(jNameStatic("HWRTDI_InlineRayQueryCS"));
-            ShaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/HWRT_DI.hlsl"));
-            ShaderInfo.SetEntryPoint(jNameStatic("InlineRayQueryCS"));
-            ShaderInfo.SetShaderType(EShaderAccessStageFlag::COMPUTE);
-            jShader* InlineComputeShader = g_rhi->CreateShader(ShaderInfo);
+            jShaderHWRTDIInlineRayQueryComputeShader::ShaderPermutation InlinePermutation;
+            InlinePermutation.SetIndex<jShaderHWRTDIInlineRayQueryComputeShader::USE_SURFEL_GI>(0);
+            InlinePermutation.SetIndex<jShaderHWRTDIInlineRayQueryComputeShader::USE_BINDLESS_RESOURCE>(1);
+            jShader* InlineComputeShader = jShaderHWRTDIInlineRayQueryComputeShader::CreateShader(InlinePermutation);
             jPipelineStateInfo* InlineComputePipelineState = g_rhi->CreateComputePipelineStateInfo(InlineComputeShader, GlobalShaderBindingLayoutArray, nullptr);
             InlineComputePipelineState->Bind(InRenderer->RenderFrameContextPtr);
             g_rhi->BindComputeShaderBindingInstances(CmdBuffer, InlineComputePipelineState, ShaderBindingInstanceCombiner, 0);

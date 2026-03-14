@@ -1258,6 +1258,49 @@ bool jRHI_DX12::CreateShaderInternal(jShader* OutShader, const jShaderInfo& shad
                 return false;
             ShaderFile.ReadFileToBuffer(false);
             std::string ShaderText;
+            std::string ShaderSourceText = ShaderFile.GetBuffer();
+
+            if (shaderInfo.GetInjectedShaderText().GetStringLength() > 0)
+            {
+                const char* InjectedShaderText = shaderInfo.GetInjectedShaderText().ToStr();
+                check(InjectedShaderText);
+
+                size_t InsertPos = 0;
+                while (InsertPos < ShaderSourceText.size())
+                {
+                    const size_t LineEndPos = ShaderSourceText.find_first_of("\r\n", InsertPos);
+                    const size_t CurrentLineEndPos = (LineEndPos == std::string::npos) ? ShaderSourceText.size() : LineEndPos;
+                    const std::string_view CurrentLine(ShaderSourceText.data() + InsertPos, CurrentLineEndPos - InsertPos);
+
+                    const size_t FirstNonWhitespacePos = CurrentLine.find_first_not_of(" \t");
+                    if (FirstNonWhitespacePos == std::string_view::npos)
+                    {
+                        InsertPos = (LineEndPos == std::string::npos) ? ShaderSourceText.size() : (LineEndPos + 1);
+                        if (LineEndPos != std::string::npos && ShaderSourceText[LineEndPos] == '\r'
+                            && (LineEndPos + 1) < ShaderSourceText.size() && ShaderSourceText[LineEndPos + 1] == '\n')
+                        {
+                            ++InsertPos;
+                        }
+                        continue;
+                    }
+
+                    const std::string_view TrimmedLine = CurrentLine.substr(FirstNonWhitespacePos);
+                    if (!TrimmedLine.starts_with("#include"))
+                        break;
+
+                    InsertPos = (LineEndPos == std::string::npos) ? ShaderSourceText.size() : (LineEndPos + 1);
+                    if (LineEndPos != std::string::npos && ShaderSourceText[LineEndPos] == '\r'
+                        && (LineEndPos + 1) < ShaderSourceText.size() && ShaderSourceText[LineEndPos + 1] == '\n')
+                    {
+                        ++InsertPos;
+                    }
+                }
+
+                std::string InjectedText(InjectedShaderText);
+                if (!InjectedText.empty() && InjectedText.back() != '\n')
+                    InjectedText += "\r\n";
+                ShaderSourceText.insert(InsertPos, InjectedText);
+            }
 
             shaderInfo.GetShaderTypeDefines(ShaderText, shaderInfo.GetShaderType());
 
@@ -1269,7 +1312,7 @@ bool jRHI_DX12::CreateShaderInternal(jShader* OutShader, const jShaderInfo& shad
             ShaderText += PermutationDefines;
             ShaderText += "\r\n";
 
-            ShaderText += ShaderFile.GetBuffer();
+            ShaderText += ShaderSourceText;
 
             // Find relative file path
             constexpr char includePrefixString[] = "#include \"";

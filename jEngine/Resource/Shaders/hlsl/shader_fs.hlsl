@@ -15,24 +15,6 @@ struct VSOutput
     float4 WorldPos : TEXCOORD3;
 };
 
-cbuffer ViewParam : register(b0,space0) { ViewUniformBuffer ViewParam; }
-
-cbuffer DirectionalLight : register(b0, space1) { jDirectionalLightUniformBuffer DirectionalLight; }
-Texture2D DirectionalLightShadowMap : register(t1, space1);
-SamplerComparisonState DirectionalLightShadowMapSampler : register(s1, space1);
-
-cbuffer PointLight : register(b0, space2) { jPointLightUniformBufferData PointLight; }
-TextureCube PointLightShadowCubeMap : register(t1, space2);
-SamplerComparisonState PointLightShadowMapSampler : register(s1, space2);
-
-cbuffer SpotLight : register(b0, space3) { jSpotLightUniformBufferData SpotLight; }
-Texture2D SpotLightShadowMap : register(t1, space3);
-SamplerComparisonState SpotLightShadowMapSampler : register(s1, space3);
-
-cbuffer RenderObjectParam : register(b0, space4) { RenderObjectUniformBuffer RenderObjectParam; }
-Texture2D DiffuseTexture : register(t1, space4);
-SamplerState DiffuseTextureSampler : register(s1, space4);
-
 struct PushConsts
 {
     float4 Color;
@@ -148,7 +130,7 @@ float4 main(VSOutput input
         float NormalizedDistance = DistanceToLight / PointLight.MaxDistance;
 
         const float Bias = 0.005f;
-        float Shadow = PointLightShadowCubeMap.SampleCmpLevelZero(PointLightShadowMapSampler, LightDir.xyz, NormalizedDistance - Bias);
+        float Shadow = PointLightShadowCubeMap.SampleCmpLevelZero(PointLightShadowCubeMapSampler, LightDir.xyz, NormalizedDistance - Bias);
         if (Shadow > 0.0f)
         {
             PointLightLit = Shadow * GetPointLight(PointLight, input.Normal, input.WorldPos.xyz, ViewWorld);

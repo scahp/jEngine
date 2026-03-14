@@ -1,40 +1,18 @@
-RWTexture2D<float4> resultImage : register(u0);
-Texture2D inputImage : register(t1);
-
-struct CommonComputeUniformBuffer
-{
-    int Width;
-    int Height;
-    int KernalSize;
-    int Padding0;
-};
-
-cbuffer ComputeCommon : register(b2)
-{
-    CommonComputeUniformBuffer ComputeCommon;
-}
-
-struct jKernel
-{
-    float4 Data[20];
-};
-cbuffer KernelBuffer : register(b3) { jKernel Kernal; }
-
 [numthreads(8, 8, 1)]
 void Vertical(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {   
     if (GlobalInvocationID.x >= ComputeCommon.Width || GlobalInvocationID.y >= ComputeCommon.Height)
         return;
 
-    int kernelSize = ComputeCommon.KernalSize;
-	int center = ComputeCommon.KernalSize / 2;
+    int kernelSize = ComputeCommon.KernelSize;
+	int center = ComputeCommon.KernelSize / 2;
     int2 PixelPos = int2(GlobalInvocationID.xy);
 
     float TotalWeight = 0;
     float4 Color = float4(0, 0, 0, 0);
 	for (int j = 0; j < kernelSize; ++j)
     {
-        float4 K = Kernal.Data[j / 4];
+        float4 K = KernelBuffer.Data[j / 4];
         float CurrentKernel = K[j % 4];
         int y = (j - center);
         
@@ -53,15 +31,15 @@ void Horizon(uint3 GlobalInvocationID : SV_DispatchThreadID)
     if (GlobalInvocationID.x >= ComputeCommon.Width || GlobalInvocationID.y >= ComputeCommon.Height)
         return;
 
-    int kernelSize = ComputeCommon.KernalSize;
-	int center = ComputeCommon.KernalSize / 2;
+    int kernelSize = ComputeCommon.KernelSize;
+	int center = ComputeCommon.KernelSize / 2;
     int2 PixelPos = int2(GlobalInvocationID.xy);
 
     float TotalWeight = 0;
     float4 Color = float4(0, 0, 0, 0);
 	for (int j = 0; j < kernelSize; ++j)
     {
-        float4 K = Kernal.Data[j / 4];
+        float4 K = KernelBuffer.Data[j / 4];
         float CurrentKernel = K[j % 4];
         int x = (j - center);
         

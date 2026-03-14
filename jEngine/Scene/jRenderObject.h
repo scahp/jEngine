@@ -4,6 +4,7 @@
 #include "jBoundPrimitiveType.h"
 #include "jSceneObject.h"
 #include "jObjectTypes.h"
+#include "Shader/jCommonShaderParameters.h"
 
 struct jVertexBuffer;
 struct jIndexBuffer;
@@ -90,15 +91,7 @@ public:
     bool IsHiddenBoundBox = false;
 	//////////////////////////////////////////////////////////////////////////
 
-	struct jRenderObjectUniformBuffer
-	{
-		Matrix M;
-		Matrix InvM;
-		float Metallic;
-		float Roughness;
-		jObjectID ObjectID;
-		jRenderObjectID RenderObjectID;
-	};
+    using jRenderObjectUniformBuffer = RenderObjectUniformBuffer;
 
 	//////////////////////////////////////////////////////////////////////////
 	// RenderObjectUniformBuffer
@@ -121,4 +114,3 @@ private:
     float LastMetallic = 0.0f;
     float LastRoughness = 0.0f;
 };
-

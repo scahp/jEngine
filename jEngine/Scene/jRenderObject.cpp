@@ -13,6 +13,7 @@
 #include "RHI/DX12/jBufferUtil_DX12.h"
 #include "RHI/jRHI.h"
 #include "RHI/jRaytracingScene.h"
+#include "Shader/jCommonShaderParameters.h"
 
 // jRenderObject static members
 jRenderObjectID jRenderObject::s_NextRenderObjectID = 1;  // Start from 1, 0 means no RenderObject
@@ -240,17 +241,12 @@ const std::shared_ptr<jShaderBindingInstance>& jRenderObject::CreateShaderBindin
         LastMetallic = gOptions.Metallic;
         LastRoughness = gOptions.Roughness;
 
-        int32 BindingPoint = 0;
-        jShaderBindingArray ShaderBindingArray;
-        jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
-
-        ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
-            , ResourceInlineAllactor.Alloc<jUniformBufferResource>(RenderObjectUniformParametersPtr.get())));
-
         if (RenderObjectShaderBindingInstance)
             RenderObjectShaderBindingInstance->Free();
 
-        RenderObjectShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::MultiFrame);
+        jRenderObjectShaderParameters Parameters;
+        Parameters.RenderObjectParam.Buffer = RenderObjectUniformParametersPtr;
+        RenderObjectShaderBindingInstance = jShaderParameterSet::CreateShaderBindingInstance(Parameters, EShaderAccessStageFlag::ALL_GRAPHICS, jShaderBindingInstanceType::MultiFrame);
         check(RenderObjectShaderBindingInstance.get());
     }
 	
@@ -269,4 +265,3 @@ jRenderObject* jRenderObject::FindRenderObjectByID(jRenderObjectID id)
 		return it->second;
 	return nullptr;
 }
-

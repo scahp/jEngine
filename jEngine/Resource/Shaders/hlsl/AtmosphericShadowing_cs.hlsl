@@ -2,35 +2,6 @@
 #include "Sphericalmap.hlsl"
 #include "PBR.hlsl"
 
-struct jAtmosphericData
-{
-    float4x4 ShadowVP;
-    float4x4 VP;
-    float4x4 InvVP;
-    float3 CameraPos;
-    float CameraNear;
-    float3 LightCameraDirection;
-    float CameraFar;
-    float AnisoG;
-    float SlopeOfDist;
-    float InScatteringLambda;
-    float Dummy;
-    int TravelCount;
-    int RTWidth;
-    int RTHeight;
-    int UseNoise;  // todo : change to #define USE_NOISE
-};
-
-Texture2D DepthTexture : register(t0, space0);
-SamplerState DepthTextureSamplerState : register(s0, space0);
-
-Texture2D ShadowMapTexture : register(t1, space0);
-SamplerState ShadowMapSamplerState : register(s1, space0);
-
-cbuffer AtmosphericParam : register(b2, space0) { jAtmosphericData AtmosphericParam; }
-
-RWTexture2D<float4> Result : register(u3, space0);
-
 float3 TransformShdowMapTextureSpace(float3 InWorldPos)
 {
     float4 temp = mul(AtmosphericParam.ShadowVP, float4(InWorldPos, 1.0));
@@ -68,7 +39,7 @@ float AnisotropyIntensity(float3 InFromSurfaceToCamera)
 
 float GetAccumulatedInscatteringValue(float InTravelDist, float3 InToPixelNormalized, float2 InUV, int2 InScreenPixelPos)
 {
-    float Depth = DepthTexture.SampleLevel(DepthTextureSamplerState, InUV, 0).x;
+    float Depth = DepthTexture.SampleLevel(DepthTextureSampler, InUV, 0).x;
 
     float dt = 1.0 / AtmosphericParam.TravelCount;
     float dw = 2.0 * (1.0 - AtmosphericParam.SlopeOfDist) * dt;
@@ -86,7 +57,7 @@ float GetAccumulatedInscatteringValue(float InTravelDist, float3 InToPixelNormal
     float z2 = TransformNDC(AtmosphericParam.CameraPos + InToPixelNormalized * InTravelDist).z;
 
     // Start and end pos in shadowmap texture space
-    float3 p1 = TransformShdowMapTextureSpace(AtmosphericParam.CameraPos + AtmosphericParam.CameraNear);
+    float3 p1 = TransformShdowMapTextureSpace(AtmosphericParam.CameraPos + InToPixelNormalized * AtmosphericParam.CameraNear);
     float3 p2 = TransformShdowMapTextureSpace(AtmosphericParam.CameraPos + InToPixelNormalized * InTravelDist);
 
     float weight = AtmosphericParam.SlopeOfDist;	// first weight is always SlopeOfDist
@@ -102,7 +73,7 @@ float GetAccumulatedInscatteringValue(float InTravelDist, float3 InToPixelNormal
             break;
 
         float3 CurrentPosInShadowMapTS = lerp(p1, p2, u);
-        float ShadowMapDepth = ShadowMapTexture.SampleLevel(ShadowMapSamplerState, CurrentPosInShadowMapTS.xy, 0).x;
+        float ShadowMapDepth = ShadowMapTexture.SampleLevel(ShadowMapTextureSampler, CurrentPosInShadowMapTS.xy, 0).x;
         if (ShadowMapDepth > CurrentPosInShadowMapTS.z)
             AccumulatedValue += weight;
 
@@ -119,7 +90,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_Gro
         return;
 
     float2 uv = GlobalInvocationID.xy / float2(AtmosphericParam.RTWidth - 1, AtmosphericParam.RTHeight - 1);
-    float3 WorldPos = CalcWorldPositionFromDepth(DepthTexture, DepthTextureSamplerState, uv, AtmosphericParam.InvVP);
+    float3 WorldPos = CalcWorldPositionFromDepth(DepthTexture, DepthTextureSampler, uv, AtmosphericParam.InvVP);
 
     float3 ToPixel = (WorldPos - AtmosphericParam.CameraPos);
     float TravelDist = sqrt(dot(ToPixel, ToPixel));

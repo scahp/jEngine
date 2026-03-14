@@ -1,6 +1,8 @@
-﻿struct jTexture;
+struct jTexture;
+struct jSamplerStateInfo;
 struct jRenderFrameContext;
 struct jShader;
+struct jShaderInfo;
 
 namespace jRHIUtil
 {
@@ -18,6 +20,11 @@ std::shared_ptr<jRenderTarget> GenerateIrradianceMap(jName InDestFilePath, Vecto
 // Convert Cubemap to FilteredEnvironmentMap
 std::shared_ptr<jRenderTarget> GenerateFilteredEnvironmentMap(jName InDestFilePath, Vector2i InDestTextureSize
     , std::shared_ptr<jRenderFrameContext> InRenderFrameContextPtr, jTexture* InCubemap);
+
+void CopyTexture2D(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jTexture* InDestTexture, jTexture* InSourceTexture);
+void BuildSingleTextureFragmentBindings(jTexture* InTexture, const jSamplerStateInfo* InSamplerState
+    , jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllocator);
+void AppendSingleTextureFragmentShaderInfo(jShaderInfo& InOutShaderInfo, int32 InSpace = 0);
 
 typedef std::function<void(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)> FuncBindingShaderResources;
 typedef std::function<jShader*(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)> FuncCreateShaders;

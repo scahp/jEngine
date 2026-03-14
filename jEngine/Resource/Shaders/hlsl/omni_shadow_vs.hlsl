@@ -1,8 +1,5 @@
 #include "common.hlsl"
 
-cbuffer PointLight : register(b0, space0) { jPointLightUniformBufferData PointLight; }
-cbuffer RenderObjectParam : register(b0,space1) { RenderObjectUniformBuffer RenderObjectParam; }
-
 struct VSInput
 {
     [[vk::location(0)]] float3 Position : POSITION0;

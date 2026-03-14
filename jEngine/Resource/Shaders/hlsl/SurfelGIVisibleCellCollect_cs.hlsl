@@ -9,72 +9,6 @@
 // Temp debug switch: 0 keeps a single cascade assignment (no boundary dual emit).
 #define SURFEL_GI_ENABLE_BOUNDARY_OVERLAP 0
 
-struct CommonComputeUniformBuffer
-{
-    float4x4 InvP;
-    float4x4 V;
-    float4x4 InvV;
-    float2 ScreenSize;
-    float NormalThreshold;
-    float DepthEdgeScale;
-    float NormalEdgeScale;
-    int PreferCellCenterForFirstPlacement;
-    float MinRadius;
-    float MaxDistance;
-    int FrameNumber;
-    int TileSize;
-    int MaxSurfels;
-    int SurfelPageSize;
-    int SurfelPageTableCapacity;
-    int SpawnBudget;
-    int TTLInFrames;
-    float GridCellSize;
-    float4 CascadeCellScaleFromPrevPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeStartDistancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRadiusScalePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    int OutOfViewKeepFrames;
-    float RadiusScale;
-    float FaceMarginRadiusScale;
-    float4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 SurfelsPerCellPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeCellBasePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeCellCountPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeDeltaCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeDeltaCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeDeltaCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClearAllPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-};
-
-struct VisibleCellEntry
-{
-    int4 CellCascade;
-};
-
-struct VisibleCellCounter
-{
-    uint Count;
-    uint3 Padding;
-};
-
-Texture2D DepthTexture : register(t0, space0);
-SamplerState DepthTextureSampler : register(s0, space0);
-
-cbuffer ComputeCommon : register(b1, space0)
-{
-    CommonComputeUniformBuffer ComputeCommon;
-}
-
-RWStructuredBuffer<VisibleCellEntry> VisibleCellWorklist : register(u2, space0);
-RWStructuredBuffer<VisibleCellCounter> VisibleCellCounterBuffer : register(u3, space0);
-
 float GetCascadeScale(uint cascadeIndex)
 {
     float scale = 1.0;
@@ -215,7 +149,7 @@ void EmitVisibleCell(int3 cellCoord, uint cascadeIndex, uint maxVisibleCells)
 
     if (writeIndex < maxVisibleCells)
     {
-        VisibleCellEntry entry;
+        jVisibleCellGPU entry;
         entry.CellCascade = int4(cellCoord, (int)cascadeIndex);
         VisibleCellWorklist[writeIndex] = entry;
     }

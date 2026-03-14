@@ -5,9 +5,6 @@ struct VSInput
     [[vk::location((0))]] float3 Position : POSITION0;
 };
 
-cbuffer ViewParam : register(b0, space0) { ViewUniformBuffer ViewParam; }
-cbuffer RenderObjectParam : register(b0, space1) { RenderObjectUniformBuffer RenderObjectParam; }
-
 struct VSOutput
 {
     float4 Pos : SV_POSITION;

@@ -12,99 +12,6 @@
 // Replace only when normals are almost opposite (full flip): dot < -0.9.
 #define SURFEL_GI_NORMAL_MISMATCH_REPLACE_DOT_THRESHOLD -0.9
 
-struct CommonComputeUniformBuffer
-{
-    float4x4 InvP;
-    float4x4 V;
-    float4x4 InvV;
-    float2 ScreenSize;
-    float NormalThreshold;
-    float DepthEdgeScale;
-    float NormalEdgeScale;
-    int PreferCellCenterForFirstPlacement;
-    float MinRadius;
-    float MaxDistance;
-    int FrameNumber;
-    int TileSize;
-    int MaxSurfels;
-    int SurfelPageSize;
-    int SurfelPageTableCapacity;
-    int SpawnBudget;
-    int TTLInFrames;
-    float GridCellSize;
-    float4 CascadeCellScaleFromPrevPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeStartDistancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRadiusScalePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    int OutOfViewKeepFrames;
-    float RadiusScale;
-    float FaceMarginRadiusScale;
-    float4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 SurfelsPerCellPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeCellBasePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeCellCountPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeDeltaCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeDeltaCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeDeltaCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClearAllPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-};
-
-struct SurfelData
-{
-    float4 PositionRadius;
-    float4 NormalSeenFrame;
-    float4 AlbedoWeight;
-    float4 Extra;
-};
-
-struct SurfelGIStats
-{
-    uint ActiveCount;
-    uint DormantCount;
-    uint MismatchCount;
-    uint TTLRetireCount;
-    uint PageGCCount;
-    uint PageEvictCount;
-    uint ReservoirOverflowCount;
-    uint ReservoirRejectedCount;
-};
-
-struct SurfelIrradianceData
-{
-    float4 IrradianceAndCount;
-    float4 MSMEData0;
-    float4 MSMEData1;
-};
-
-struct SurfelCandidate
-{
-    SurfelData Surfel;
-    int4 CellCascade;
-    uint Priority;
-    uint3 Padding;
-};
-
-StructuredBuffer<SurfelCandidate> CandidateBuffer : register(t0, space0);
-StructuredBuffer<uint> WinnerScoreBuffer : register(t1, space0);
-StructuredBuffer<uint> WinnerIndexBuffer : register(t2, space0);
-StructuredBuffer<uint> SurfelCellPageTable : register(t3, space0);
-RWStructuredBuffer<SurfelData> SurfelPool : register(u4, space0);
-RWStructuredBuffer<SurfelGIStats> SurfelGIStatsBuffer : register(u5, space0);
-RWStructuredBuffer<SurfelIrradianceData> SurfelIrradianceBuffer : register(u7, space0);
-RWStructuredBuffer<float> SurfelGuidingBuffer : register(u8, space0);
-
-cbuffer ComputeCommon : register(b6, space0)
-{
-    CommonComputeUniformBuffer ComputeCommon;
-}
-
 uint GetDesiredSlotsPerCell(uint cascadeIndex)
 {
     const uint c = min(cascadeIndex, (uint)(SURFEL_GI_CASCADE_COUNT - 1));
@@ -157,7 +64,7 @@ float3 SafeNormalize3(float3 v, float3 fallback)
     return (lenSq > 1e-6) ? (v * rsqrt(lenSq)) : fallback;
 }
 
-float ComputeIrradianceSeedWeight(SurfelData candidateSurfel, SurfelData neighborSurfel, SurfelIrradianceData neighborIrradiance)
+float ComputeIrradianceSeedWeight(jSurfelGPU candidateSurfel, jSurfelGPU neighborSurfel, jSurfelIrradianceGPU neighborIrradiance)
 {
     const float3 candidateNormal = SafeNormalize3(candidateSurfel.NormalSeenFrame.xyz, float3(0.0, 1.0, 0.0));
     const float3 neighborNormal = SafeNormalize3(neighborSurfel.NormalSeenFrame.xyz, candidateNormal);
@@ -170,7 +77,7 @@ float ComputeIrradianceSeedWeight(SurfelData candidateSurfel, SurfelData neighbo
     return normalWeight * distanceWeight * confidenceWeight;
 }
 
-bool TrySeedIrradianceFromActiveCellSurfels(uint base, uint desiredSlots, uint maxSurfels, uint pageCascade, uint ignoreIndex, SurfelData candidateSurfel, out SurfelIrradianceData outSeed)
+bool TrySeedIrradianceFromActiveCellSurfels(uint base, uint desiredSlots, uint maxSurfels, uint pageCascade, uint ignoreIndex, jSurfelGPU candidateSurfel, out jSurfelIrradianceGPU outSeed)
 {
     float3 weightedIrradiance = 0.0;
     float weightSum = 0.0;
@@ -183,13 +90,13 @@ bool TrySeedIrradianceFromActiveCellSurfels(uint base, uint desiredSlots, uint m
         if (idx == ignoreIndex)
             continue;
 
-        const SurfelData neighborSurfel = SurfelPool[idx];
+        const jSurfelGPU neighborSurfel = SurfelPool[idx];
         if (neighborSurfel.Extra.y <= 0.5)
             continue;
         if ((uint)round(neighborSurfel.Extra.w) != pageCascade)
             continue;
 
-        const SurfelIrradianceData neighborIrradiance = SurfelIrradianceBuffer[idx];
+        const jSurfelIrradianceGPU neighborIrradiance = SurfelIrradianceBuffer[idx];
         if (neighborIrradiance.IrradianceAndCount.w <= 0.01)
             continue;
 
@@ -232,7 +139,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     if (winnerIndex == 0xffffffffu)
         return;
 
-    const SurfelCandidate c = CandidateBuffer[winnerIndex];
+    const jSurfelCandidateGPU c = CandidateBuffer[winnerIndex];
     if (c.Priority != winnerScore)
         return;
 
@@ -259,7 +166,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         const uint idx = base + i;
         if (idx >= maxSurfels)
             break;
-        const SurfelData s = SurfelPool[idx];
+        const jSurfelGPU s = SurfelPool[idx];
         if (s.Extra.y <= 0.5)
         {
             writeIndex = idx;
@@ -288,10 +195,10 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     if (!foundInactive && !foundNormalMismatchReplace)
         return;
 
-    const SurfelData existing = SurfelPool[writeIndex];
+    const jSurfelGPU existing = SurfelPool[writeIndex];
     const bool isDormantReuse = (existing.Extra.y <= 0.5) && (abs(existing.Extra.x - 5.0) < 0.5);
     const bool isNormalMismatchReplace = (!foundInactive && foundNormalMismatchReplace);
-    SurfelData outSurfel;
+    jSurfelGPU outSurfel;
     if (isDormantReuse)
     {
         // Re-activate dormant surfel in-place using the winner candidate's fresh attributes.
@@ -315,7 +222,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     }
     SurfelPool[writeIndex] = outSurfel;
 
-    SurfelIrradianceData outIrradiance;
+    jSurfelIrradianceGPU outIrradiance;
     if (!TrySeedIrradianceFromActiveCellSurfels(base, desiredSlots, maxSurfels, pageCascade, writeIndex, outSurfel, outIrradiance))
     {
         outIrradiance.IrradianceAndCount = float4(0.0, 0.0, 0.0, 0.0);

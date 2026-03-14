@@ -6,75 +6,6 @@
 #define SURFEL_GI_GUIDE_LOBE_COUNT (SURFEL_GI_GUIDE_DIM * SURFEL_GI_GUIDE_DIM)
 #define SURFEL_GI_GUIDE_TOTAL_FLOATS (SURFEL_GI_GUIDE_LOBE_COUNT + SURFEL_GI_GUIDE_DIM)
 
-struct CommonComputeUniformBuffer
-{
-    float4x4 InvP;
-    float4x4 V;
-    float4x4 InvV;
-    float2 ScreenSize;
-    float NormalThreshold;
-    float DepthEdgeScale;
-    float NormalEdgeScale;
-    int PreferCellCenterForFirstPlacement;
-    float MinRadius;
-    float MaxDistance;
-    int FrameNumber;
-    int TileSize;
-    int MaxSurfels;
-    int SurfelPageSize;
-    int SurfelPageTableCapacity;
-    int SpawnBudget;
-    int TTLInFrames;
-    float GridCellSize;
-    float4 CascadeCellScaleFromPrevPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeStartDistancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRadiusScalePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    int OutOfViewKeepFrames;
-    float RadiusScale;
-    float FaceMarginRadiusScale;
-    float4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 SurfelsPerCellPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeCellBasePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeCellCountPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeDeltaCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeDeltaCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeDeltaCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClearAllPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-};
-
-struct SurfelData
-{
-    float4 PositionRadius;
-    float4 NormalSeenFrame;
-    float4 AlbedoWeight;
-    float4 Extra;
-};
-
-struct SurfelIrradianceData
-{
-    float4 IrradianceAndCount;
-    float4 MSMEData0;
-    float4 MSMEData1;
-};
-
-RWStructuredBuffer<SurfelData> SurfelPool : register(u0, space0);
-RWStructuredBuffer<uint> CellSurfelCount : register(u1, space0);
-RWStructuredBuffer<SurfelIrradianceData> SurfelIrradianceBuffer : register(u2, space0);
-RWStructuredBuffer<float> SurfelGuidingBuffer : register(u3, space0);
-
-cbuffer ComputeCommon : register(b4, space0)
-{
-    CommonComputeUniformBuffer ComputeCommon;
-}
-
 float GetPackedFloat(float4 packedArray[SURFEL_GI_CASCADE_PACKED_COUNT], uint cascadeIndex)
 {
     const uint c = min(cascadeIndex, (uint)(SURFEL_GI_CASCADE_COUNT - 1));
@@ -226,14 +157,14 @@ void main(uint3 DTid : SV_DispatchThreadID)
         if (surfelIndex >= maxSurfels)
             break;
 
-        SurfelData s;
+        jSurfelGPU s;
         s.PositionRadius = float4(0.0, 0.0, 0.0, 0.0);
         s.NormalSeenFrame = float4(0.0, 0.0, 0.0, 0.0);
         s.AlbedoWeight = float4(0.0, 0.0, 0.0, 0.0);
         s.Extra = float4(0.0, 0.0, 0.0, 0.0);
         SurfelPool[surfelIndex] = s;
 
-        SurfelIrradianceData ir;
+        jSurfelIrradianceGPU ir;
         ir.IrradianceAndCount = float4(0.0, 0.0, 0.0, 0.0);
         ir.MSMEData0 = float4(0.0, 0.0, 0.0, 0.0);
         ir.MSMEData1 = float4(0.0, 0.0, 0.0, 0.0);

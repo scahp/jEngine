@@ -1,7 +1,5 @@
 #include "common.hlsl"
 
-cbuffer RenderObjectParam : register(b0, space1) { RenderObjectUniformBuffer RenderObjectParam; }
-
 struct PSInput
 {
     float4 Pos : SV_POSITION;

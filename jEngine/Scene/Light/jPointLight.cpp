@@ -1,5 +1,6 @@
 ﻿#include "pch.h"
 #include "jPointLight.h"
+#include "Shader/jLightingShaderParameters.h"
 
 jPointLight::jPointLight()
     : jLight(ELightType::POINT)
@@ -45,18 +46,13 @@ const std::shared_ptr<jShaderBindingInstance>& jPointLight::PrepareShaderBinding
             g_rhi->CreateUniformBufferBlock(jNameStatic("PointLightBlock"), jLifeTimeType::MultiFrame, sizeof(jPointLightUniformBufferData)));
         LightDataUniformBlockPtr->UpdateBufferData(&LightData, sizeof(LightData));
 
-        int32 BindingPoint = 0;
-        jShaderBindingArray ShaderBindingArray;
-        jShaderBindingResourceInlineAllocator ResourceInlineAllocator;
-
-        ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER_DYNAMIC, EShaderAccessStageFlag::ALL_GRAPHICS
-            , ResourceInlineAllocator.Alloc<jUniformBufferResource>(LightDataUniformBlockPtr.get())));
-
         // Create LightOnlyData (without ShadowMap, for rendering shadowmap)
         {
             if (ShaderBindingInstanceOnlyLightData)
                 ShaderBindingInstanceOnlyLightData->Free();
-            ShaderBindingInstanceOnlyLightData = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::MultiFrame);
+            jPointLightOnlyShaderParameters Parameters;
+            Parameters.PointLight.Buffer = LightDataUniformBlockPtr;
+            ShaderBindingInstanceOnlyLightData = jShaderParameterSet::CreateShaderBindingInstance(Parameters, EShaderAccessStageFlag::ALL_GRAPHICS, jShaderBindingInstanceType::MultiFrame);
         }
 
         // Create WithShadowMap (for rendering lighting passes)
@@ -65,12 +61,12 @@ const std::shared_ptr<jShaderBindingInstance>& jPointLight::PrepareShaderBinding
                 , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
                 , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f), true, ECompareOp::LESS>::Create();
 
-            ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
-                , ResourceInlineAllocator.Alloc<jTextureResource>(InShadowMap, ShadowSamplerStateInfo)));
-
             if (ShaderBindingInstanceWithShadowMap)
                 ShaderBindingInstanceWithShadowMap->Free();
-            ShaderBindingInstanceWithShadowMap = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::MultiFrame);
+            jPointLightShaderParameters Parameters;
+            Parameters.PointLight.Buffer = LightDataUniformBlockPtr;
+            Parameters.PointLightShadowCubeMap = { InShadowMap ? InShadowMap : GWhiteCubeTexture.get(), ShadowSamplerStateInfo };
+            ShaderBindingInstanceWithShadowMap = jShaderParameterSet::CreateShaderBindingInstance(Parameters, EShaderAccessStageFlag::ALL_GRAPHICS, jShaderBindingInstanceType::MultiFrame);
         }
     }
     return InShadowMap ? ShaderBindingInstanceWithShadowMap : ShaderBindingInstanceOnlyLightData;

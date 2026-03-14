@@ -1,23 +1,5 @@
 #include "common.hlsl"
 
-struct CommonComputeUniformBuffer
-{
-    int Width;
-    int Height;
-    float Sigma;
-    int KernelSize;
-    float SigmaForBilateral;
-};
-
-cbuffer Param : register(b0, space0)
-{
-    CommonComputeUniformBuffer Param;
-}
-
-Texture2D InTexture : register(t1, space0);
-SamplerState PointSampler : register(s1, space0);
-Texture2D DepthTexture : register(t2, space0);
-
 struct VS_OUT
 {
     float4 Pos : SV_POSITION;
@@ -36,11 +18,11 @@ VS_OUT VS(uint VertexID : SV_VertexID)
 float4 PS(VS_OUT In) : SV_Target
 {
     int2 TexelCoord = int2(In.UV * float2(Param.Width, Param.Height));
-    float CenterDepth = DepthTexture.Sample(PointSampler, In.UV).r;
+    float CenterDepth = DepthTexture.Sample(DepthTextureSampler, In.UV).r;
 
     if (CenterDepth >= 1.0) // Sky
     {
-        return InTexture.Sample(PointSampler, In.UV);
+        return InTexture.Sample(InTextureSampler, In.UV);
     }
 
     float4 FinalColor = float4(0.0, 0.0, 0.0, 0.0);
@@ -60,8 +42,8 @@ float4 PS(VS_OUT In) : SV_Target
             
             float2 SampleUV = (SampleCoord + 0.5) / float2(Param.Width, Param.Height);
 
-            float NeighborDepth = DepthTexture.Sample(PointSampler, SampleUV).r;
-            float4 NeighborColor = InTexture.Sample(PointSampler, SampleUV);
+            float NeighborDepth = DepthTexture.Sample(DepthTextureSampler, SampleUV).r;
+            float4 NeighborColor = InTexture.Sample(InTextureSampler, SampleUV);
 
             float DepthDiff = abs(CenterDepth - NeighborDepth);
             float DepthWeight = exp(-(DepthDiff * DepthDiff) / (2.0 * Param.SigmaForBilateral * Param.SigmaForBilateral));
@@ -82,7 +64,7 @@ float4 PS(VS_OUT In) : SV_Target
     }
     else
     {
-        FinalColor = InTexture.Sample(PointSampler, In.UV);
+        FinalColor = InTexture.Sample(InTextureSampler, In.UV);
     }
 
     return FinalColor;

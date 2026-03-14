@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "jMaterial.h"
 #include "RHI/jRHI.h"
+#include "Shader/jCommonShaderParameters.h"
 
 namespace
 {
@@ -81,37 +82,40 @@ const std::shared_ptr<jShaderBindingInstance>& jMaterial::CreateShaderBindingIns
     {
         NeedToUpdateShaderBindingInstance = false;
 
-        int32 BindingPoint = 0;
         jShaderBindingArray ShaderBindingArray;
         jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
+        jMaterialShaderParameters Parameters;
 
-        for (int32 i = 0; i < (int32)EMaterialTextureType::Max; ++i)
+        auto GetResolvedTexture = [this](EMaterialTextureType InType) -> jTexture*
         {
-            const TextureData& TextureDataRef = TexData[i];
-            const jTexture* Texture = TextureDataRef.GetTexture();
-
+            const jTexture* Texture = TexData[(int32)InType].GetTexture();
             if (!Texture)
             {
-                if ((int32)EMaterialTextureType::Normal == i)
+                if (InType == EMaterialTextureType::Normal)
                     Texture = GNormalTexture.get();
-                else if ((int32)EMaterialTextureType::Env == i)
+                else if (InType == EMaterialTextureType::Env)
                     Texture = GWhiteCubeTexture.get();
                 else
                     Texture = GWhiteTexture.get();
             }
+            return const_cast<jTexture*>(Texture);
+        };
 
-            jSamplerStateInfo* SamplerState = GetTextureSamplerState((EMaterialTextureType)i);
-            ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::ALL_GRAPHICS
-                , ResourceInlineAllactor.Alloc<jTextureResource>(Texture, SamplerState)));
-        }
-
-        if (MaterialDataPtr && MaterialDataPtr->GetData() && MaterialDataPtr->GetDataSizeInBytes() > 0)
+        auto CreateTextureParameter = [this, &GetResolvedTexture](EMaterialTextureType InType)
         {
-            MaterialDataUniformBufferPtr = g_rhi->CreateUniformBufferBlock(jNameStatic("MaterialDataUniformBuffer"), jLifeTimeType::MultiFrame, MaterialDataPtr->GetDataSizeInBytes());
-            MaterialDataUniformBufferPtr->UpdateBufferData(MaterialDataPtr->GetData(), MaterialDataPtr->GetDataSizeInBytes());
-			ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_GRAPHICS
-				, ResourceInlineAllactor.Alloc<jUniformBufferResource>(MaterialDataUniformBufferPtr.get())));
-        }
+            jShaderParameterTexture2D Result;
+            Result.Texture = GetResolvedTexture(InType);
+            Result.SamplerState = GetTextureSamplerState(InType);
+            return Result;
+        };
+
+        Parameters.DiffuseTexture = CreateTextureParameter(EMaterialTextureType::Albedo);
+        Parameters.NormalTexture = CreateTextureParameter(EMaterialTextureType::Normal);
+        Parameters.RMTexture = CreateTextureParameter(EMaterialTextureType::Metallic);
+        Parameters.EnvTexture.Texture = GetResolvedTexture(EMaterialTextureType::Env);
+        Parameters.EnvTexture.SamplerState = GetTextureSamplerState(EMaterialTextureType::Env);
+
+        jShaderParameterSet::BuildShaderBindings(Parameters, EShaderAccessStageFlag::ALL_GRAPHICS, ShaderBindingArray, ResourceInlineAllactor);
 
         if (ShaderBindingInstance)
             ShaderBindingInstance->Free();

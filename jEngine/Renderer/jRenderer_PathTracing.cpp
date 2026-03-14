@@ -13,6 +13,160 @@
 #include "jOptions.h"
 #include "PathTracingDataLoader/jPathTracingData.h"
 #include "FileLoader/jImageFileLoader.h"
+#include "Shader/jShader.h"
+#include "Shader/jShaderParameterSet.h"
+
+BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jPathTracingSceneConstantBuffer)
+    SHADER_UNIFORM_BUFFER_MEMBER(Matrix, projectionToWorld)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector, cameraPosition)
+    SHADER_UNIFORM_BUFFER_MEMBER(float, focalDistance)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector, cameraDirection)
+    SHADER_UNIFORM_BUFFER_MEMBER(float, lensRadius)
+    SHADER_UNIFORM_BUFFER_MEMBER(uint32, FrameNumber)
+    SHADER_UNIFORM_BUFFER_MEMBER(uint32, AccumulateNumber)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector2, HaltonJitter)
+END_SHADER_UNIFORM_BUFFER_STRUCT()
+
+BEGIN_SHADER_PARAMETER_SET(jPathTracingGlobalParameters)
+    SHADER_ACCELERATION_STRUCTURE(Scene)
+    SHADER_RW_TEXTURE2D(RenderTarget)
+    SHADER_UNIFORM_BUFFER(jPathTracingSceneConstantBuffer, g_sceneCB)
+    SHADER_SAMPLER(DefaultSamplerState)
+    SHADER_TEXTURECUBE_SRV(EnvTexture)
+END_SHADER_PARAMETER_SET()
+
+namespace
+{
+    struct jPathTracingBindlessUInt2
+    {
+    };
+
+    template <>
+    struct TShaderParameterHLSLTypeInfo<jPathTracingBindlessUInt2>
+    {
+        static constexpr const char* GetTypeName() { return "uint2"; }
+        static void AppendTypeDeclaration(std::string&) {}
+    };
+}
+
+BEGIN_SHADER_STRUCT(MaterialUniformBuffer)
+    SHADER_STRUCT_MEMBER(Vector, baseColor)
+    SHADER_STRUCT_MEMBER(float, anisotropic)
+    SHADER_STRUCT_MEMBER(Vector, emission)
+    SHADER_STRUCT_MEMBER(int32, lightId)
+    SHADER_STRUCT_MEMBER(float, metallic)
+    SHADER_STRUCT_MEMBER(float, roughness)
+    SHADER_STRUCT_MEMBER(float, subsurface)
+    SHADER_STRUCT_MEMBER(float, specularTint)
+    SHADER_STRUCT_MEMBER(float, sheen)
+    SHADER_STRUCT_MEMBER(float, sheenTint)
+    SHADER_STRUCT_MEMBER(float, clearcoat)
+    SHADER_STRUCT_MEMBER(float, clearcoatGloss)
+    SHADER_STRUCT_MEMBER(float, specTrans)
+    SHADER_STRUCT_MEMBER(float, ior)
+    SHADER_STRUCT_MEMBER(float, mediumType)
+    SHADER_STRUCT_MEMBER(float, mediumDensity)
+    SHADER_STRUCT_MEMBER(Vector, mediumColor)
+    SHADER_STRUCT_MEMBER(float, mediumAnisotropy)
+    SHADER_STRUCT_MEMBER(int32, baseColorTexId)
+    SHADER_STRUCT_MEMBER(int32, metallicRoughnessTexID)
+    SHADER_STRUCT_MEMBER(int32, normalmapTexID)
+    SHADER_STRUCT_MEMBER(int32, emissionmapTexID)
+    SHADER_STRUCT_MEMBER(float, opacity)
+    SHADER_STRUCT_MEMBER(float, alphaMode)
+    SHADER_STRUCT_MEMBER(float, alphaCutoff)
+    SHADER_STRUCT_MEMBER(float, padding2)
+END_SHADER_STRUCT()
+
+BEGIN_SHADER_STRUCT(LightUniformBuffer)
+    SHADER_STRUCT_MEMBER(Vector, position)
+    SHADER_STRUCT_MEMBER(float, radius)
+    SHADER_STRUCT_MEMBER(Vector, emission)
+    SHADER_STRUCT_MEMBER(float, area)
+    SHADER_STRUCT_MEMBER(Vector, u)
+    SHADER_STRUCT_MEMBER(int32, type)
+    SHADER_STRUCT_MEMBER(Vector, v)
+END_SHADER_STRUCT()
+
+BEGIN_SHADER_BINDLESS_SET(jPathTracingBindlessParameters)
+    // space0 is reserved for jPathTracingGlobalParameters; bindless tables start at space1.
+    SHADER_BINDLESS_STRUCTURED_BUFFER(jPathTracingBindlessUInt2, VertexIndexOffsetArray, 1)
+    SHADER_BINDLESS_BUFFER(uint32, IndexBindlessArray, 2)
+    SHADER_BINDLESS_STRUCTURED_BUFFER(RenderObjectUniformBuffer, RenderObjParamArray, 3)
+    SHADER_BINDLESS_BYTEADDRESS_BUFFER(VerticesBindlessArray, 4)
+    SHADER_BINDLESS_UNIFORM_BUFFER(MaterialUniformBuffer, MaterialBindlessArray, 5)
+    SHADER_BINDLESS_UNIFORM_BUFFER(LightUniformBuffer, LightBindlessArray, 6)
+    SHADER_BINDLESS_TEXTURE2D(TextureBindlessArray, 7)
+END_SHADER_BINDLESS_SET()
+
+namespace
+{
+    struct jPathTracingRaytracingShaderBase : public jShader
+    {
+        using jShader::jShader;
+
+        DECLARE_SHADER_PARAMETER_SETS(jPathTracingGlobalParameters)
+
+        DECLARE_DEFINE(USE_BINDLESS_RESOURCE, 0, 1);
+
+        using ShaderPermutation = jPermutation<USE_BINDLESS_RESOURCE>;
+        ShaderPermutation Permutation;
+
+        static void AppendConditionalShaderParameterSets(jShaderParameterBinder& InOutBinder, const ShaderPermutation& InPermutation)
+        {
+            if (InPermutation.Get<USE_BINDLESS_RESOURCE>() != 0)
+                InOutBinder.AddBindless<jPathTracingBindlessParameters>();
+        }
+    };
+
+    struct jShaderPathTracingMeshMissShader : public jPathTracingRaytracingShaderBase
+    {
+        DECLARE_SHADER_WITH_PERMUTATION_EX(jShaderPathTracingMeshMissShader, jPathTracingRaytracingShaderBase, Permutation)
+    };
+
+    IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderPathTracingMeshMissShader
+        , "Miss"
+        , "Resource/Shaders/hlsl/PathTracing.hlsl"
+        , ""
+        , "MeshMissShader"
+        , EShaderAccessStageFlag::RAYTRACING_MISS)
+
+    struct jShaderPathTracingRaygenShader : public jPathTracingRaytracingShaderBase
+    {
+        DECLARE_SHADER_WITH_PERMUTATION_EX(jShaderPathTracingRaygenShader, jPathTracingRaytracingShaderBase, Permutation)
+    };
+
+    IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderPathTracingRaygenShader
+        , "Raygen"
+        , "Resource/Shaders/hlsl/PathTracing.hlsl"
+        , ""
+        , "RaygenShader"
+        , EShaderAccessStageFlag::RAYTRACING_RAYGEN)
+
+    struct jShaderPathTracingMeshClosestHitShader : public jPathTracingRaytracingShaderBase
+    {
+        DECLARE_SHADER_WITH_PERMUTATION_EX(jShaderPathTracingMeshClosestHitShader, jPathTracingRaytracingShaderBase, Permutation)
+    };
+
+    IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderPathTracingMeshClosestHitShader
+        , "ClosestHit"
+        , "Resource/Shaders/hlsl/PathTracing.hlsl"
+        , ""
+        , "MeshClosestHitShader"
+        , EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT)
+
+    struct jShaderPathTracingLightClosestHitShader : public jPathTracingRaytracingShaderBase
+    {
+        DECLARE_SHADER_WITH_PERMUTATION_EX(jShaderPathTracingLightClosestHitShader, jPathTracingRaytracingShaderBase, Permutation)
+    };
+
+    IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderPathTracingLightClosestHitShader
+        , "ClosestHit"
+        , "Resource/Shaders/hlsl/PathTracing.hlsl"
+        , ""
+        , "LightClosestHitShader"
+        , EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT)
+}
 
 void jRenderer_PathTracing::Setup()
 {
@@ -76,32 +230,37 @@ void jRenderer_PathTracing::PathTracing()
 		// Create RaytracingShaders
 		std::vector<jRaytracingPipelineShader> RaytracingShaders;
 		{
+            jPathTracingRaytracingShaderBase::ShaderPermutation RaytracingPermutation;
+            RaytracingPermutation.SetIndex<jPathTracingRaytracingShaderBase::USE_BINDLESS_RESOURCE>(1);
+
 			{
 				jRaytracingPipelineShader NewShader;
 				jShaderInfo shaderInfo;
+
+                shaderInfo = jShaderPathTracingMeshMissShader::GShaderInfo;
+                shaderInfo.SetPermutationId(RaytracingPermutation.GetPermutationId());
 				shaderInfo.AddPreProcessor("MAX_RECURSION_DEPTH", std::to_string(gOptions.MaxRecursionDepthForPathTracing).c_str());
 				shaderInfo.AddPreProcessor("MAX_RAY_PER_PIXEL", std::to_string(gOptions.RayPerPixelForPathTracing).c_str());
+                ApplyShaderInfoCustomization<jShaderPathTracingMeshMissShader>(shaderInfo);
 
 				// First hit group for mesh
-				shaderInfo.SetName(jNameStatic("Miss"));
-				shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/PathTracing.hlsl"));
-				shaderInfo.SetEntryPoint(jNameStatic("MeshMissShader"));
-				shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_MISS);
-				NewShader.MissShader = g_rhi->CreateShader(shaderInfo);
+				NewShader.MissShader = g_rhi->CreateShader<jShaderPathTracingMeshMissShader>(shaderInfo);
 				NewShader.MissEntryPoint = TEXT("MeshMissShader");
 
-				shaderInfo.SetName(jNameStatic("Raygen"));
-				shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/PathTracing.hlsl"));
-				shaderInfo.SetEntryPoint(jNameStatic("RaygenShader"));
-				shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_RAYGEN);
-				NewShader.RaygenShader = g_rhi->CreateShader(shaderInfo);
+                shaderInfo = jShaderPathTracingRaygenShader::GShaderInfo;
+                shaderInfo.SetPermutationId(RaytracingPermutation.GetPermutationId());
+				shaderInfo.AddPreProcessor("MAX_RECURSION_DEPTH", std::to_string(gOptions.MaxRecursionDepthForPathTracing).c_str());
+				shaderInfo.AddPreProcessor("MAX_RAY_PER_PIXEL", std::to_string(gOptions.RayPerPixelForPathTracing).c_str());
+                ApplyShaderInfoCustomization<jShaderPathTracingRaygenShader>(shaderInfo);
+				NewShader.RaygenShader = g_rhi->CreateShader<jShaderPathTracingRaygenShader>(shaderInfo);
 				NewShader.RaygenEntryPoint = TEXT("RaygenShader");
 
-				shaderInfo.SetName(jNameStatic("ClosestHit"));
-				shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/PathTracing.hlsl"));
-				shaderInfo.SetEntryPoint(jNameStatic("MeshClosestHitShader"));
-				shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT);
-				NewShader.ClosestHitShader = g_rhi->CreateShader(shaderInfo);
+                shaderInfo = jShaderPathTracingMeshClosestHitShader::GShaderInfo;
+                shaderInfo.SetPermutationId(RaytracingPermutation.GetPermutationId());
+				shaderInfo.AddPreProcessor("MAX_RECURSION_DEPTH", std::to_string(gOptions.MaxRecursionDepthForPathTracing).c_str());
+				shaderInfo.AddPreProcessor("MAX_RAY_PER_PIXEL", std::to_string(gOptions.RayPerPixelForPathTracing).c_str());
+                ApplyShaderInfoCustomization<jShaderPathTracingMeshClosestHitShader>(shaderInfo);
+				NewShader.ClosestHitShader = g_rhi->CreateShader<jShaderPathTracingMeshClosestHitShader>(shaderInfo);
 				NewShader.ClosestHitEntryPoint = TEXT("MeshClosestHitShader");
 
 				NewShader.HitGroupName = TEXT("DefaultHit");
@@ -111,15 +270,14 @@ void jRenderer_PathTracing::PathTracing()
 			{
 				jRaytracingPipelineShader NewShader;
 				jShaderInfo shaderInfo;
+                shaderInfo = jShaderPathTracingLightClosestHitShader::GShaderInfo;
+                shaderInfo.SetPermutationId(RaytracingPermutation.GetPermutationId());
                 shaderInfo.AddPreProcessor("MAX_RECURSION_DEPTH", std::to_string(gOptions.MaxRecursionDepthForPathTracing).c_str());
 				shaderInfo.AddPreProcessor("MAX_RAY_PER_PIXEL", std::to_string(gOptions.RayPerPixelForPathTracing).c_str());
+                ApplyShaderInfoCustomization<jShaderPathTracingLightClosestHitShader>(shaderInfo);
 
 				// Second hit gorup for light
-				shaderInfo.SetName(jNameStatic("ClosestHit"));
-				shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/PathTracing.hlsl"));
-				shaderInfo.SetEntryPoint(jNameStatic("LightClosestHitShader"));
-				shaderInfo.SetShaderType(EShaderAccessStageFlag::RAYTRACING_CLOSESTHIT);
-				NewShader.ClosestHitShader = g_rhi->CreateShader(shaderInfo);
+				NewShader.ClosestHitShader = g_rhi->CreateShader<jShaderPathTracingLightClosestHitShader>(shaderInfo);
 				NewShader.ClosestHitEntryPoint = TEXT("LightClosestHitShader");
 
 				NewShader.HitGroupName = TEXT("LightHit");
@@ -131,27 +289,7 @@ void jRenderer_PathTracing::PathTracing()
 		jShaderBindingArray ShaderBindingArray;
 		jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
 
-		// Bind TLAS
-		ShaderBindingArray.Add(jShaderBinding::Create(0, 1, EShaderBindingType::ACCELERATION_STRUCTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-			ResourceInlineAllactor.Alloc<jBufferResource>(RenderFrameContextPtr->RaytracingScene->TLASBufferPtr.get()), true));
-
-		// Bind PathTracingOutput
-		ShaderBindingArray.Add(jShaderBinding::Create(1, 1, EShaderBindingType::TEXTURE_UAV, EShaderAccessStageFlag::ALL_RAYTRACING,
-			ResourceInlineAllactor.Alloc<jTextureResource>(PathTracingOutput, nullptr), false));
-
-		struct SceneConstantBuffer
-		{
-			Matrix projectionToWorld;
-			Vector cameraPosition;
-			float focalDistance;
-			Vector cameraDirection;
-			float lensRadius;
-			uint32 FrameNumber;
-			uint32 AccumulateNumber;
-			Vector2 HaltonJitter;
-		};
-
-		SceneConstantBuffer sceneCB;
+		jPathTracingSceneConstantBuffer sceneCB;
 		auto mainCamera = jCamera::GetMainCamera();
 		sceneCB.cameraPosition = mainCamera->Pos;
 		sceneCB.projectionToWorld = mainCamera->GetInverseViewProjectionMatrix();
@@ -203,20 +341,18 @@ void jRenderer_PathTracing::PathTracing()
 		auto SceneUniformBufferPtr = g_rhi->CreateUniformBufferBlock(jNameStatic("SceneData"), jLifeTimeType::OneFrame, sizeof(sceneCB));
 		SceneUniformBufferPtr->UpdateBufferData(&sceneCB, sizeof(sceneCB));
 
-		// Bind SceneUniformBuffer
-		ShaderBindingArray.Add(jShaderBinding::Create(2, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_RAYTRACING,
-			ResourceInlineAllactor.Alloc<jUniformBufferResource>(SceneUniformBufferPtr.get()), true));
-
-		// Bind DefaultSampler
 		const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
 			, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
 			, 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
-		ShaderBindingArray.Add(jShaderBinding::Create(3, 1, EShaderBindingType::SAMPLER, EShaderAccessStageFlag::ALL_RAYTRACING,
-			ResourceInlineAllactor.Alloc<jSamplerResource>(SamplerState)));
 
 		jSceneRenderTarget::CubeEnvMap2 = jImageFileLoader::GetInstance().LoadTextureFromFile(jNameStatic("Resource/stpeters_probe_cubemp.dds")).lock().get();
-        ShaderBindingArray.Add(jShaderBinding::Create(3, 1, EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-            ResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::CubeEnvMap2, nullptr)));
+		jPathTracingGlobalParameters GlobalParameters;
+		GlobalParameters.Scene.Buffer = RenderFrameContextPtr->RaytracingScene->TLASBufferPtr.get();
+		GlobalParameters.RenderTarget.Texture = PathTracingOutput;
+		GlobalParameters.g_sceneCB.Buffer = SceneUniformBufferPtr;
+		GlobalParameters.DefaultSamplerState.SamplerState = SamplerState;
+		GlobalParameters.EnvTexture.Texture = jSceneRenderTarget::CubeEnvMap2;
+		jShaderParameterSet::BuildShaderBindings(GlobalParameters, EShaderAccessStageFlag::ALL_RAYTRACING, ShaderBindingArray, ResourceInlineAllactor);
 
 		// Create ShaderBindingLayout and ShaderBindingInstance Instance for this draw call
 		std::shared_ptr<jShaderBindingInstance> GlobalShaderBindingInstance;
@@ -226,7 +362,6 @@ void jRenderer_PathTracing::PathTracing()
 		GlobalShaderBindingLayoutArray.Add(GlobalShaderBindingInstance->ShaderBindingsLayouts);
 
 		// Bindless
-		jShaderBindingArray BindlessShaderBindingArray[7];
 		std::vector<const jBuffer*> VertexAndInexOffsetBuffers;
 		std::vector<const jBuffer*> IndexBuffers;
 		std::vector<const jBuffer*> TestUniformBuffers;
@@ -297,32 +432,22 @@ void jRenderer_PathTracing::PathTracing()
 					Textures[i].Texture = gPathTracingScene->textures[i];
 				}
 			}
-
-			BindlessShaderBindingArray[0].Add(jShaderBinding::CreateBindless(0, (uint32)VertexAndInexOffsetBuffers.size(), EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-				ResourceInlineAllactor.Alloc<jBufferResourceBindless>(VertexAndInexOffsetBuffers), false));
-			BindlessShaderBindingArray[1].Add(jShaderBinding::CreateBindless(0, (uint32)IndexBuffers.size(), EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-				ResourceInlineAllactor.Alloc<jBufferResourceBindless>(IndexBuffers), false));
-			BindlessShaderBindingArray[2].Add(jShaderBinding::CreateBindless(0, (uint32)TestUniformBuffers.size(), EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-				ResourceInlineAllactor.Alloc<jBufferResourceBindless>(TestUniformBuffers), false));
-			BindlessShaderBindingArray[3].Add(jShaderBinding::CreateBindless(0, (uint32)VertexBuffers.size(), EShaderBindingType::BUFFER_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-				ResourceInlineAllactor.Alloc<jBufferResourceBindless>(VertexBuffers), false));
-			BindlessShaderBindingArray[4].Add(jShaderBinding::CreateBindless(0, (uint32)MaterialBuffers.size(), EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_RAYTRACING,
-				ResourceInlineAllactor.Alloc<jUniformBufferResourceBindless>(MaterialBuffers)));
-			BindlessShaderBindingArray[5].Add(jShaderBinding::CreateBindless(0, (uint32)LightBuffers.size(), EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::ALL_RAYTRACING,
-				ResourceInlineAllactor.Alloc<jUniformBufferResourceBindless>(LightBuffers)));
-			BindlessShaderBindingArray[6].Add(jShaderBinding::CreateBindless(0, (uint32)Textures.size(), EShaderBindingType::TEXTURE_SRV, EShaderAccessStageFlag::ALL_RAYTRACING,
-				ResourceInlineAllactor.Alloc<jTextureResourceBindless>(Textures)));
 		}
 
-		std::shared_ptr<jShaderBindingInstance> GlobalShaderBindingInstanceBindless[_countof(BindlessShaderBindingArray)];
-		for (int32 i = 0; i < _countof(BindlessShaderBindingArray); ++i)
-		{
-			GlobalShaderBindingInstanceBindless[i] = g_rhi->CreateShaderBindingInstance(BindlessShaderBindingArray[i], jShaderBindingInstanceType::SingleFrame);
-		}
+        jPathTracingBindlessParameters BindlessParameters;
+        BindlessParameters.VertexIndexOffsetArray.Buffers = VertexAndInexOffsetBuffers;
+        BindlessParameters.IndexBindlessArray.Buffers = IndexBuffers;
+        BindlessParameters.RenderObjParamArray.Buffers = TestUniformBuffers;
+        BindlessParameters.VerticesBindlessArray.Buffers = VertexBuffers;
+        BindlessParameters.MaterialBindlessArray.Buffers = MaterialBuffers;
+        BindlessParameters.LightBindlessArray.Buffers = LightBuffers;
+        BindlessParameters.TextureBindlessArray.Textures = Textures;
+        std::vector<std::shared_ptr<jShaderBindingInstance>> BindlessShaderBindingInstances =
+            jShaderBindlessSet::CreateShaderBindingInstances(BindlessParameters, EShaderAccessStageFlag::ALL_RAYTRACING, jShaderBindingInstanceType::SingleFrame);
 
-		for (int32 i = 0; i < _countof(BindlessShaderBindingArray); ++i)
+		for (const auto& BindlessShaderBindingInstance : BindlessShaderBindingInstances)
 		{
-			GlobalShaderBindingLayoutArray.Add(GlobalShaderBindingInstanceBindless[i]->ShaderBindingsLayouts);
+			GlobalShaderBindingLayoutArray.Add(BindlessShaderBindingInstance->ShaderBindingsLayouts);
 		}
 
 		// Create RaytracingPipelineState
@@ -337,9 +462,9 @@ void jRenderer_PathTracing::PathTracing()
 		// Binding RaytracingShader resources
 		jShaderBindingInstanceArray ShaderBindingInstanceArray;
 		ShaderBindingInstanceArray.Add(GlobalShaderBindingInstance.get());
-		for (int32 i = 0; i < _countof(GlobalShaderBindingInstanceBindless); ++i)
+		for (const auto& BindlessShaderBindingInstance : BindlessShaderBindingInstances)
 		{
-			ShaderBindingInstanceArray.Add(GlobalShaderBindingInstanceBindless[i].get());
+			ShaderBindingInstanceArray.Add(BindlessShaderBindingInstance.get());
 		}
 
 		jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
@@ -389,8 +514,7 @@ void jRenderer_PathTracing::PathTracing()
 					, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
 					, 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
 
-				InOutShaderBindingArray.Add(jShaderBinding::Create(InOutShaderBindingArray.NumOfData, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
-					, InOutResourceInlineAllactor.Alloc<jTextureResource>(InTexture, SamplerState)));
+				jRHIUtil::BuildSingleTextureFragmentBindings(InTexture, SamplerState, InOutShaderBindingArray, InOutResourceInlineAllactor);
 			}
 			, [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
 				{
@@ -398,6 +522,7 @@ void jRenderer_PathTracing::PathTracing()
 					shaderInfo.SetName(jNameStatic("SimpleTonemap"));
 					shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/SimpleTonemap_ps.hlsl"));
 					shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
+					jRHIUtil::AppendSingleTextureFragmentShaderInfo(shaderInfo);
 					return g_rhi->CreateShader(shaderInfo);
 				});
 	}

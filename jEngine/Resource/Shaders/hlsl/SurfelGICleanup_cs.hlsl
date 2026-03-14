@@ -15,74 +15,6 @@
 #define SURFEL_GI_GUIDE_LOBE_COUNT (SURFEL_GI_GUIDE_DIM * SURFEL_GI_GUIDE_DIM)
 #define SURFEL_GI_GUIDE_TOTAL_FLOATS (SURFEL_GI_GUIDE_LOBE_COUNT + SURFEL_GI_GUIDE_DIM)
 
-struct CommonComputeUniformBuffer
-{
-    float4x4 InvP;
-    float4x4 V;
-    float4x4 InvV;
-    float2 ScreenSize;
-    float NormalThreshold;
-    float DepthEdgeScale;
-    float NormalEdgeScale;
-    int PreferCellCenterForFirstPlacement;
-    float MinRadius;
-    float MaxDistance;
-    int FrameNumber;
-    int TileSize;
-    int MaxSurfels;
-    int SurfelPageSize;
-    int SurfelPageTableCapacity;
-    int SpawnBudget;
-    int TTLInFrames;
-    float GridCellSize;
-    float4 CascadeCellScaleFromPrevPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeStartDistancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRadiusScalePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    int OutOfViewKeepFrames;
-    float RadiusScale;
-    float FaceMarginRadiusScale;
-    float4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 SurfelsPerCellPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeCellBasePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeCellCountPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeDeltaCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeDeltaCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeDeltaCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClearAllPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-};
-
-struct SurfelData
-{
-    float4 PositionRadius;
-    float4 NormalSeenFrame;
-    float4 AlbedoWeight;
-    float4 Extra;
-};
-
-struct SurfelIrradianceData
-{
-    float4 IrradianceAndCount;
-    float4 MSMEData0;
-    float4 MSMEData1;
-};
-
-cbuffer ComputeCommon : register(b3, space0)
-{
-    CommonComputeUniformBuffer ComputeCommon;
-}
-
-RWStructuredBuffer<SurfelData> SurfelPool : register(u0, space0);
-RWStructuredBuffer<SurfelIrradianceData> SurfelIrradianceBuffer : register(u1, space0);
-RWStructuredBuffer<float> SurfelGuidingBuffer : register(u2, space0);
-
 uint HashU32(uint x)
 {
     x ^= x >> 16;
@@ -160,7 +92,7 @@ uint GetConsumedAge(float lastSeenFrame)
     return (uint)(rawAge * SURFEL_GI_AGE_CONSUME_SCALE);
 }
 
-void MarkDormantSurfel(inout SurfelData s, int3 cellCoord, uint cascadeIndex)
+void MarkDormantSurfel(inout jSurfelGPU s, int3 cellCoord, uint cascadeIndex)
 {
     s.Extra.x = 5.0;
     s.Extra.y = 0.0;
@@ -168,7 +100,7 @@ void MarkDormantSurfel(inout SurfelData s, int3 cellCoord, uint cascadeIndex)
     s.Extra.w = (float)cascadeIndex;
 }
 
-void ResetSurfelHard(inout SurfelData s)
+void ResetSurfelHard(inout jSurfelGPU s)
 {
     s.PositionRadius = float4(0.0, 0.0, 0.0, 0.0);
     s.NormalSeenFrame = float4(0.0, 0.0, 0.0, 0.0);
@@ -193,7 +125,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     if (surfelIndex >= maxSurfels)
         return;
 
-    SurfelData s = SurfelPool[surfelIndex];
+    jSurfelGPU s = SurfelPool[surfelIndex];
     const uint ttl = max((uint)ComputeCommon.TTLInFrames, 1u);
     const uint outOfViewKeepFrames = max((uint)ComputeCommon.OutOfViewKeepFrames, 1u);
     const float cascade0CellSize = max(ComputeCommon.GridCellSize, 0.1);
@@ -217,7 +149,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
             ResetSurfelHard(s);
             SurfelPool[surfelIndex] = s;
 
-            SurfelIrradianceData ir;
+            jSurfelIrradianceGPU ir;
             ir.IrradianceAndCount = float4(0.0, 0.0, 0.0, 0.0);
             ir.MSMEData0 = float4(0.0, 0.0, 0.0, 0.0);
             ir.MSMEData1 = float4(0.0, 0.0, 0.0, 0.0);
@@ -248,7 +180,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         MarkDormantSurfel(s, cellCoord, surfelCascade);
         SurfelPool[surfelIndex] = s;
 
-        SurfelIrradianceData ir;
+        jSurfelIrradianceGPU ir;
         ir.IrradianceAndCount = float4(0.0, 0.0, 0.0, 0.0);
         ir.MSMEData0 = float4(0.0, 0.0, 0.0, 0.0);
         ir.MSMEData1 = float4(0.0, 0.0, 0.0, 0.0);

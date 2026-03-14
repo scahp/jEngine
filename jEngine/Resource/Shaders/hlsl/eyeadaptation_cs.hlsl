@@ -2,27 +2,7 @@
 
 #define TILE_SIZE 8
 
-struct jEyeAdaptationUniformBuffer
-{
-    float2 ViewportMin;
-    float2 ViewportMax;
-    float MinLuminanceAverage;
-    float MaxLuminanceAverage;
-    float DeltaFrametime;
-    float AdaptationSpeed;
-    float ExposureCompensation;
-};
-
-Texture2D SceneColor : register(t0);
-Texture2D EyeAdaptationTexture : register(t1);
-RWTexture2D<float4> RWEyeAdaptationTexture : register(u2);
-
 groupshared float2 SubRectTotalValueWeight[TILE_SIZE * TILE_SIZE];
-
-cbuffer EyeAdaptation : register(b3)
-{
-    jEyeAdaptationUniformBuffer EyeAdaptation;
-}
 
 float2 ComputeWeightedSubRegion(uint2 InSubRectMin, uint2 InSubRectMax, float2 InViewportMin, float2 InViewportMax)
 {

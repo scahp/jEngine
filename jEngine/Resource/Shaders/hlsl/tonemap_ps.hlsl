@@ -4,13 +4,6 @@ struct VSOutput
     float2 TexCoord : TEXCOORD0;
 };
 
-Texture2D BloomTexture : register(t0, space0);
-SamplerState BloomTextureSampler : register(s0, space0);
-Texture2D Texture : register(t1, space0);
-SamplerState TextureSampler : register(s1, space0);
-Texture2D EyeAdaptationTexture : register(t2, space0);
-SamplerState EyeAdaptationTextureSampler : register(s2, space0);
-
 // http://filmicworlds.com/blog/filmic-tonemapping-with-piecewise-power-curves/		// wait for implementation
 // Applies the filmic curve from John Hable's presentation
 float3 FilmicToneMapALU(float3 linearColor)

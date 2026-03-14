@@ -9,6 +9,18 @@
 #define USE_BINDLESS_RESOURCE 0
 #endif
 
+#if USE_BINDLESS_RESOURCE
+TextureCube<float4> IrradianceMapArray[] : register(t0, space1);
+TextureCube<float4> PrefilteredEnvMapArray[] : register(t0, space2);
+StructuredBuffer<uint2> VertexIndexOffsetArray[] : register(t0, space3);
+Buffer<uint> IndexBindlessArray[] : register(t0, space4);
+StructuredBuffer<RenderObjectUniformBuffer> RenderObjParamArray[] : register(t0, space5);
+ByteAddressBuffer VerticesBindlessArray[] : register(t0, space6);
+Texture2D AlbedoTextureArray[] : register(t0, space7);
+Texture2D NormalTextureArray[] : register(t0, space8);
+Texture2D RMTextureArray[] : register(t0, space9);
+#endif
+
 #define MAX_RECURSION_DEPTH 4
 
 struct SceneConstantBuffer
@@ -31,18 +43,6 @@ RWTexture2D<float4> RenderTarget : register(u1, space0);
 ConstantBuffer<SceneConstantBuffer> g_sceneCB : register(b2, space0);
 SamplerState AlbedoTextureSampler : register(s3, space0);
 SamplerState PBRSamplerState : register(s4, space0);
-
-#if USE_BINDLESS_RESOURCE
-TextureCube<float4> IrradianceMapArray[] : register(t0, space1);
-TextureCube<float4> PrefilteredEnvMapArray[] : register(t0, space2);
-StructuredBuffer<uint2> VertexIndexOffsetArray[] : register(t0, space3);
-Buffer<uint> IndexBindlessArray[] : register(t0, space4);
-StructuredBuffer<RenderObjectUniformBuffer> RenderObjParamArray[] : register(t0, space5);
-ByteAddressBuffer VerticesBindlessArray[] : register(t0, space6);
-Texture2D AlbedoTextureArray[] : register(t0, space7);
-Texture2D NormalTextureArray[] : register(t0, space8);
-Texture2D RMTextureArray[] : register(t0, space9);
-#endif // USE_BINDLESS_RESOURCE
 
 jVertex GetVertex(in ByteAddressBuffer buffer, uint index)
 {

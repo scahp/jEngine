@@ -1,18 +1,6 @@
 #include "common.hlsl"
 #include "Sphericalmap.hlsl"
 
-// IrradianceMap Size
-struct RTSizeUniformBuffer
-{
-    int width;
-    int height;
-};
-
-TextureCube<float4> TexHDR : register(t0);
-SamplerState TexHDRSamplerState : register(s0);
-RWTexture2DArray<float4> IrradianceMap : register(u1);
-cbuffer RTSizeParam : register(b2) { RTSizeUniformBuffer RTSizeParam; }
-
 float3 GenerateIrradiance(float3 InNormal)
 {
     float3 up = normalize(float3(0.0, 1.0, 0.0));
@@ -38,7 +26,7 @@ float3 GenerateIrradiance(float3 InNormal)
                 tangentSample.z * InNormal;
 
             sampleVec = normalize(sampleVec);
-            float3 curRGB = TexHDR.SampleLevel(TexHDRSamplerState, sampleVec, 0).xyz;
+            float3 curRGB = TexHDR.SampleLevel(TexHDRSampler, sampleVec, 0).xyz;
 
             irradiance += curRGB * cos(theta) * sin(theta);
             nrSamples++;

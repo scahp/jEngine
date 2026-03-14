@@ -4,61 +4,6 @@
 // This shader is the bridge between surfel-space lighting and pixel-space shading.
 // Earlier passes store irradiance on surfels; this pass asks which surfels should influence
 // the current screen pixel and combines their irradiance into a screen-space texture.
-struct ResolveUniformBuffer
-{
-    float4x4 InvP;
-    float4x4 InvV;
-    float2 ScreenSize;
-    float GridCellSize;
-    float4 CascadeCellScaleFromPrevPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 SurfelsPerCellPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeCellBasePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    int MaxSurfels;
-    int SurfelPageSize;
-    int SurfelPageTableCapacity;
-    int NeighborCellRadius;
-    float ResolveSoftness;
-    float ResolveIrradianceWarmupUpdates;
-    float2 Padding0;
-};
-
-struct SurfelData
-{
-    float4 PositionRadius;
-    float4 NormalSeenFrame;
-    float4 AlbedoWeight;
-    float4 Extra;
-};
-
-struct SurfelIrradianceData
-{
-    float4 IrradianceAndCount;
-    float4 MSMEData0;
-    float4 MSMEData1;
-};
-
-RWTexture2D<float4> Result : register(u0, space0);
-Texture2D DepthTexture : register(t1, space0);
-SamplerState DepthTextureSampler : register(s1, space0);
-Texture2D GBufferNormalTexture : register(t2, space0);
-SamplerState GBufferNormalSampler : register(s2, space0);
-StructuredBuffer<SurfelData> SurfelPool : register(t3, space0);
-StructuredBuffer<uint> SurfelCellPageTable : register(t4, space0);
-StructuredBuffer<SurfelIrradianceData> SurfelIrradianceBuffer : register(t5, space0);
-
-cbuffer ResolveCommon : register(b6, space0)
-{
-    ResolveUniformBuffer ResolveCommon;
-}
 
 uint GetDesiredSlotsPerCell(uint cascadeIndex)
 {
@@ -88,7 +33,7 @@ uint GetCascadePartitionCapacity(uint maxSurfels, uint cascadeIndex)
     return max(1u, base + ((c < rem) ? 1u : 0u));
 }
 
-float ComputeSurfelWeight(float3 pixelWorldPos, float3 pixelWorldNormal, SurfelData surfel, SurfelIrradianceData irradiance)
+float ComputeSurfelWeight(float3 pixelWorldPos, float3 pixelWorldNormal, jSurfelGPU surfel, jSurfelIrradianceGPU irradiance)
 {
     // Resolve is intentionally conservative: a surfel should only influence pixels that look like
     // they lie on the same local surface patch. We therefore combine:
@@ -134,7 +79,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
     const float3 viewPos = CalcViewPositionFromDepth(DepthTexture, DepthTextureSampler, uv, ResolveCommon.InvP);
     const float3 worldPos = mul(ResolveCommon.InvV, float4(viewPos, 1.0)).xyz;
-    float3 worldNormal = GBufferNormalTexture.SampleLevel(GBufferNormalSampler, uv, 0).xyz * 2.0 - 1.0;
+    float3 worldNormal = GBufferNormalTexture.SampleLevel(GBufferNormalTextureSampler, uv, 0).xyz * 2.0 - 1.0;
     const float normalLenSq = dot(worldNormal, worldNormal);
     if (normalLenSq <= 1e-6)
     {
@@ -192,7 +137,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                     [loop] for (uint slot = 0u; slot < slotsPerCell; ++slot)
                     {
                         const uint surfelIndex = baseIndex + slot;
-                        const SurfelData surfel = SurfelPool[surfelIndex];
+                        const jSurfelGPU surfel = SurfelPool[surfelIndex];
                         if (surfel.Extra.y < 0.5)
                             continue;
                         if ((uint)round(surfel.Extra.w) != cascadeIndex)
@@ -203,7 +148,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                         if (any(surfelCellCoord != queryCellCoord))
                             continue;
 
-                        const SurfelIrradianceData irradiance = SurfelIrradianceBuffer[surfelIndex];
+                        const jSurfelIrradianceGPU irradiance = SurfelIrradianceBuffer[surfelIndex];
                         // IrradianceAndCount.xyz stores the MSME long-term mean. That is the stable
                         // lighting value meant for downstream shading.
                         const float irradianceWarmupUpdates = max(ResolveCommon.ResolveIrradianceWarmupUpdates, 0.0);

@@ -4,18 +4,6 @@ struct VSOutput
     float4 TexCoord[8] : TEXCOORD0;
 };
 
-struct BloomUniformBuffer
-{
-    float4 BufferSizeAndInvSize;
-    float4 TintA;
-    float4 TintB;
-    float BloomIntensity;
-};
-
-cbuffer BloomParam : register(b0, space0) { BloomUniformBuffer BloomParam; }
-Texture2D Texture : register(t1, space0);
-SamplerState TextureSampler : register(s1, space0);
-
 // bloom up with gaussian blur from UE5
 float4 main(VSOutput input) : SV_TARGET
 {

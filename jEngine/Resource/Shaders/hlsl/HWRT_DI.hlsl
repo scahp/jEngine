@@ -3,35 +3,6 @@
 #include "lightutil.hlsl"
 #include "SurfelGIClipmapLookup.hlsl"
 
-struct SceneConstantBuffer
-{
-    float4x4 projectionToWorld;
-    float3 cameraPosition;
-    float normalBias;
-    uint numLights;
-    uint debugViewMode;
-    uint forceMipLevel0;
-    uint renderWidth;
-    float debugLineWidth;
-    float debugUVScale;
-    float debugPrimitiveIDScale;
-    float shadowRayStartOffset;
-    uint renderHeight;
-    float padding0;
-    float padding1;
-    float padding2;
-};
-
-struct MaterialInstanceUniform
-{
-    uint materialFlags;
-    uint albedoSamplerIndex;
-    uint normalSamplerIndex;
-    uint rmSamplerIndex;
-    float alphaCutoff;
-    float3 padding0;
-};
-
 static const uint HWRTDI_MaterialFlag_HasAlbedoTexture = 1u << 0;
 static const uint HWRTDI_MaterialFlag_HasNormalTexture = 1u << 1;
 static const uint HWRTDI_MaterialFlag_HasRMTexture = 1u << 2;
@@ -43,36 +14,8 @@ static const uint HWRTDI_RAY_MASK_SCENE = 0x01u;
 
 bool HasMaterialFlag(in MaterialInstanceUniform MaterialInstance, in uint Flag)
 {
-    return (MaterialInstance.materialFlags & Flag) != 0;
+    return (MaterialInstance.MaterialFlags & Flag) != 0;
 }
-
-RaytracingAccelerationStructure Scene : register(t0, space0);
-RWTexture2D<float4> RenderTarget : register(u1, space0);
-ConstantBuffer<SceneConstantBuffer> g_sceneCB : register(b2, space0);
-SamplerState DefaultSamplerState : register(s3, space0);
-TextureCube<float4> EnvTexture : register(t4, space0);
-
-StructuredBuffer<uint2> VertexIndexOffsetArray[] : register(t0, space1);
-Buffer<uint> IndexBindlessArray[] : register(t0, space2);
-StructuredBuffer<RenderObjectUniformBuffer> RenderObjParamArray[] : register(t0, space3);
-ByteAddressBuffer VerticesBindlessArray[] : register(t0, space4);
-ConstantBuffer<MaterialInstanceUniform> MaterialInstanceArray[] : register(b0, space5);
-Texture2D AlbedoTextureArray[] : register(t0, space6);
-Texture2D NormalTextureArray[] : register(t0, space7);
-Texture2D RMTextureArray[] : register(t0, space8);
-SamplerState AlbedoSamplerArray[] : register(s0, space9);
-SamplerState NormalSamplerArray[] : register(s0, space10);
-SamplerState RMSamplerArray[] : register(s0, space11);
-
-struct HWRTDILightData
-{
-    float4 ColorAndType;               // rgb: color, w: ELightType (1: directional, 2: point, 3: spot)
-    float4 PositionAndMaxDistance;     // xyz: position, w: max distance
-    float4 DirectionAndPenumbra;       // xyz: direction, w: penumbra radian
-    float4 UmbraAndPadding;            // x: umbra radian
-};
-
-StructuredBuffer<HWRTDILightData> LightBuffer : register(t5, space0);
 
 static const uint HWRTDI_LightType_Directional = 1u;
 static const uint HWRTDI_LightType_Point = 2u;
@@ -109,14 +52,14 @@ struct SurfaceData
 
 float3 HashPrimitiveColor(in uint PrimitiveIdx)
 {
-    const float Seed = (float)(PrimitiveIdx + 1u) * g_sceneCB.debugPrimitiveIDScale;
+    const float Seed = (float)(PrimitiveIdx + 1u) * g_sceneCB.DebugPrimitiveIDScale;
     const float3 Color = frac(float3(0.1031, 0.11369, 0.13787) * Seed);
     return 0.2 + 0.8 * Color;
 }
 
 float3 EvaluateDebugViewColor(in SurfaceData Surface, in MyAttributes Attr)
 {
-    const uint Mode = g_sceneCB.debugViewMode;
+    const uint Mode = g_sceneCB.DebugViewMode;
     const float B1 = saturate(Attr.barycentrics.x);
     const float B2 = saturate(Attr.barycentrics.y);
     const float B0 = saturate(1.0 - B1 - B2);
@@ -124,7 +67,7 @@ float3 EvaluateDebugViewColor(in SurfaceData Surface, in MyAttributes Attr)
     if (Mode == 1u)
     {
         const float EdgeDist = min(B0, min(B1, B2));
-        const float LineWidth = max(g_sceneCB.debugLineWidth, 1e-5);
+        const float LineWidth = max(g_sceneCB.DebugLineWidth, 1e-5);
         const float EdgeMask = 1.0 - smoothstep(0.0, LineWidth, EdgeDist);
         return lerp(float3(0.02, 0.02, 0.02), float3(1.0, 1.0, 1.0), EdgeMask);
     }
@@ -134,14 +77,14 @@ float3 EvaluateDebugViewColor(in SurfaceData Surface, in MyAttributes Attr)
     }
     if (Mode == 3u)
     {
-        const float2 GridUV = Surface.UV * max(g_sceneCB.debugUVScale, 1.0);
+        const float2 GridUV = Surface.UV * max(g_sceneCB.DebugUVScale, 1.0);
         const float2 Cell = floor(GridUV);
         const float Checker = fmod(Cell.x + Cell.y, 2.0);
         const float3 BaseColor = lerp(float3(0.08, 0.08, 0.08), float3(0.85, 0.85, 0.85), Checker);
 
         const float2 LocalUV = frac(GridUV);
         const float GridEdgeDist = min(min(LocalUV.x, 1.0 - LocalUV.x), min(LocalUV.y, 1.0 - LocalUV.y));
-        const float GridLineWidth = max(g_sceneCB.debugLineWidth * 2.0, 0.001);
+        const float GridLineWidth = max(g_sceneCB.DebugLineWidth * 2.0, 0.001);
         const float GridLine = 1.0 - smoothstep(0.0, GridLineWidth, GridEdgeDist);
         return lerp(BaseColor, float3(1.0, 0.2, 0.2), GridLine);
     }
@@ -272,8 +215,8 @@ float ComputeApproxTextureMipLevel(
     const float TexelCount = max((float)Width * (float)Height, 1.0);
     const float TexelWorldArea = WorldArea / max(UVArea * TexelCount, 1e-8);
 
-    const float DistanceToCamera = max(length(WorldPos - g_sceneCB.cameraPosition), 1e-3);
-    const float PixelWorldRadius = DistanceToCamera / max((float)g_sceneCB.renderHeight, 1.0);
+    const float DistanceToCamera = max(length(WorldPos - g_sceneCB.CameraPosition), 1e-3);
+    const float PixelWorldRadius = DistanceToCamera / max((float)g_sceneCB.RenderHeight, 1.0);
     const float PixelWorldArea = PixelWorldRadius * PixelWorldRadius;
     const float FootprintTexels = PixelWorldArea / max(TexelWorldArea, 1e-8);
 
@@ -313,7 +256,7 @@ float4 SampleAlbedoTexture(in uint InstanceIdx, in MaterialInstanceUniform Mater
     if (!HasMaterialFlag(MaterialInstance, HWRTDI_MaterialFlag_HasAlbedoTexture))
         return float4(1.0, 1.0, 1.0, 1.0);
 
-    float4 AlbedoSample = AlbedoTextureArray[InstanceIdx].SampleLevel(AlbedoSamplerArray[MaterialInstance.albedoSamplerIndex], UV, MipLevel);
+    float4 AlbedoSample = AlbedoTextureArray[InstanceIdx].SampleLevel(AlbedoSamplerArray[MaterialInstance.AlbedoSamplerIndex], UV, MipLevel);
     if (HasMaterialFlag(MaterialInstance, HWRTDI_MaterialFlag_UseSRGBAlbedoTexture))
     {
         AlbedoSample.rgb = pow(AlbedoSample.rgb, 2.2);
@@ -372,7 +315,7 @@ float3 GetShadingNormal(
     WorldTangent = normalize(WorldTangent - WorldNormal * dot(WorldNormal, WorldTangent));
     float3 WorldBitangent = normalize(cross(WorldNormal, WorldTangent)) * Handedness;
 
-    float3 TangentSpaceNormal = NormalTextureArray[InstanceIdx].SampleLevel(NormalSamplerArray[MaterialInstance.normalSamplerIndex], UV, MipLevel).xyz;
+    float3 TangentSpaceNormal = NormalTextureArray[InstanceIdx].SampleLevel(NormalSamplerArray[MaterialInstance.NormalSamplerIndex], UV, MipLevel).xyz;
     TangentSpaceNormal.y = 1.0 - TangentSpaceNormal.y;
     TangentSpaceNormal = TangentSpaceNormal * 2.0 - 1.0;
 
@@ -402,7 +345,7 @@ SurfaceData GetSurfaceDataInternal(in uint InstanceIdx, in uint PrimitiveIdx, in
     Surface.WorldPos = WorldPos;
     Surface.PrimitiveIdx = PrimitiveIdx;
     Surface.UV = HitAttribute(Vertex0.TexCoord, Vertex1.TexCoord, Vertex2.TexCoord, Attr);
-    Surface.MaterialFlags = MaterialInstance.materialFlags;
+    Surface.MaterialFlags = MaterialInstance.MaterialFlags;
     Surface.GeometricWorldNormal = ComputeFaceWorldNormal(Vertex0, Vertex1, Vertex2, RenderObjParam);
     Surface.AlbedoTextureSample = float3(1.0, 1.0, 1.0);
     Surface.NormalTextureSample = float3(0.5, 0.5, 1.0);
@@ -412,7 +355,7 @@ SurfaceData GetSurfaceDataInternal(in uint InstanceIdx, in uint PrimitiveIdx, in
     Surface.RMMipLevel = 0.0;
     Surface.UVStretchMetric = ComputeUVStretchMetric(Vertex0, Vertex1, Vertex2, RenderObjParam);
 
-    const bool ForceMipLevel0 = (g_sceneCB.forceMipLevel0 != 0u);
+    const bool ForceMipLevel0 = (g_sceneCB.ForceMipLevel0 != 0u);
     float AlbedoMipLevel = 0.0;
     if (HasMaterialFlag(MaterialInstance, HWRTDI_MaterialFlag_HasAlbedoTexture))
     {
@@ -439,7 +382,7 @@ SurfaceData GetSurfaceDataInternal(in uint InstanceIdx, in uint PrimitiveIdx, in
     Surface.NormalMipLevel = NormalMipLevel;
     if (HasMaterialFlag(MaterialInstance, HWRTDI_MaterialFlag_HasNormalTexture))
     {
-        Surface.NormalTextureSample = NormalTextureArray[InstanceIdx].SampleLevel(NormalSamplerArray[MaterialInstance.normalSamplerIndex], Surface.UV, NormalMipLevel).xyz;
+        Surface.NormalTextureSample = NormalTextureArray[InstanceIdx].SampleLevel(NormalSamplerArray[MaterialInstance.NormalSamplerIndex], Surface.UV, NormalMipLevel).xyz;
     }
     Surface.WorldNormal = GetShadingNormal(InstanceIdx, MaterialInstance, Surface.UV, Vertex0, Vertex1, Vertex2, Attr, RenderObjParam, NormalMipLevel);
     Surface.Metallic = RenderObjParam.Metallic;
@@ -453,7 +396,7 @@ SurfaceData GetSurfaceDataInternal(in uint InstanceIdx, in uint PrimitiveIdx, in
             RMMipLevel = 0.0;
         }
         Surface.RMMipLevel = RMMipLevel;
-        const float4 RMSample = RMTextureArray[InstanceIdx].SampleLevel(RMSamplerArray[MaterialInstance.rmSamplerIndex], Surface.UV, RMMipLevel);
+        const float4 RMSample = RMTextureArray[InstanceIdx].SampleLevel(RMSamplerArray[MaterialInstance.RMSamplerIndex], Surface.UV, RMMipLevel);
         Surface.Roughness = RMSample.y;
         Surface.Metallic = RMSample.z;
         Surface.RMTextureSample = RMSample.rgb;
@@ -484,7 +427,7 @@ bool IsRayHitRejectedByMaterial(in uint InstanceIdx, in uint PrimitiveIdx, in fl
         const MyAttributes Attr = MakeAttributesFromBarycentrics(Barycentrics);
         const float2 UV = HitAttribute(Vertex0.TexCoord, Vertex1.TexCoord, Vertex2.TexCoord, Attr);
         const float Alpha = SampleAlbedoTexture(InstanceIdx, MaterialInstance, UV, 0.0).a;
-        if (Alpha < saturate(MaterialInstance.alphaCutoff))
+        if (Alpha < saturate(MaterialInstance.AlphaCutoff))
         {
             return true;
         }
@@ -504,7 +447,7 @@ bool RequiresShadowMaterialRejectTest(in uint InstanceIdx)
 
 bool TraceShadowRay(in float3 Origin, in float3 Direction, in float TMax)
 {
-    const float RayStartOffset = max(g_sceneCB.shadowRayStartOffset, 0.0);
+    const float RayStartOffset = max(g_sceneCB.ShadowRayStartOffset, 0.0);
     const float TMin = max(RayStartOffset, 1e-5);
 
     RayDesc Ray;
@@ -538,7 +481,7 @@ bool TraceShadowRay(in float3 Origin, in float3 Direction, in float TMax)
 float3 EvaluateUnifiedLights(in SurfaceData Surface, in float3 ViewDir)
 {
     float3 Result = 0.0;
-    const uint NumLights = g_sceneCB.numLights;
+    const uint NumLights = g_sceneCB.NumLights;
     for (uint i = 0; i < NumLights; ++i)
     {
         const HWRTDILightData Light = LightBuffer[i];
@@ -552,7 +495,7 @@ float3 EvaluateUnifiedLights(in SurfaceData Surface, in float3 ViewDir)
             if (NdotL <= 0.0)
                 continue;
 
-            const float3 ShadowOrigin = Surface.WorldPos + Surface.WorldNormal * g_sceneCB.normalBias;
+            const float3 ShadowOrigin = Surface.WorldPos + Surface.WorldNormal * g_sceneCB.NormalBias;
             if (!TraceShadowRay(ShadowOrigin, L, 100000.0))
                 continue;
 
@@ -571,8 +514,8 @@ float3 EvaluateUnifiedLights(in SurfaceData Surface, in float3 ViewDir)
             if (NdotL <= 0.0)
                 continue;
 
-            const float3 ShadowOrigin = Surface.WorldPos + Surface.WorldNormal * g_sceneCB.normalBias;
-            if (!TraceShadowRay(ShadowOrigin, L, DistanceToLight - g_sceneCB.normalBias))
+            const float3 ShadowOrigin = Surface.WorldPos + Surface.WorldNormal * g_sceneCB.NormalBias;
+            if (!TraceShadowRay(ShadowOrigin, L, DistanceToLight - g_sceneCB.NormalBias))
                 continue;
 
             const float Attenuation = DistanceAttenuation2(DistanceToLight * DistanceToLight, 1.0 / MaxDistance);
@@ -599,8 +542,8 @@ float3 EvaluateUnifiedLights(in SurfaceData Surface, in float3 ViewDir)
             if (Attenuation <= 0.0)
                 continue;
 
-            const float3 ShadowOrigin = Surface.WorldPos + Surface.WorldNormal * g_sceneCB.normalBias;
-            if (!TraceShadowRay(ShadowOrigin, L, DistanceToLight - g_sceneCB.normalBias))
+            const float3 ShadowOrigin = Surface.WorldPos + Surface.WorldNormal * g_sceneCB.NormalBias;
+            if (!TraceShadowRay(ShadowOrigin, L, DistanceToLight - g_sceneCB.NormalBias))
                 continue;
 
             Result += PBR(L, Surface.WorldNormal, ViewDir, Surface.Albedo, LightColor, DistanceToLight, Surface.Metallic, Surface.Roughness) * Attenuation;
@@ -614,16 +557,16 @@ void GenerateCameraRay(in uint2 Index, in uint2 RenderDimensions, out float3 Ori
     float2 ScreenPos = ((float2)Index + 0.5f) / (float2)RenderDimensions * 2.0 - 1.0;
     ScreenPos.y = -ScreenPos.y;
 
-    float4 World = mul(g_sceneCB.projectionToWorld, float4(ScreenPos, 0.0, 1.0));
+    float4 World = mul(g_sceneCB.ProjectionToWorld, float4(ScreenPos, 0.0, 1.0));
     World.xyz /= World.w;
 
-    Origin = g_sceneCB.cameraPosition;
+    Origin = g_sceneCB.CameraPosition;
     Direction = normalize(World.xyz - Origin);
 }
 
 float3 EvaluateSurfaceRadianceFromViewPosition(in SurfaceData Surface, in MyAttributes Attr, in float3 ViewPosition)
 {
-    if (g_sceneCB.debugViewMode != 0u)
+    if (g_sceneCB.DebugViewMode != 0u)
     {
         return EvaluateDebugViewColor(Surface, Attr);
     }
@@ -637,19 +580,19 @@ float3 EvaluateSurfaceRadianceFromViewPosition(in SurfaceData Surface, in MyAttr
 
 float3 EvaluateSurfaceRadiance(in SurfaceData Surface, in MyAttributes Attr)
 {
-    return EvaluateSurfaceRadianceFromViewPosition(Surface, Attr, g_sceneCB.cameraPosition);
+    return EvaluateSurfaceRadianceFromViewPosition(Surface, Attr, g_sceneCB.CameraPosition);
 }
 
 [numthreads(8, 8, 1)]
 void InlineRayQueryCS(uint3 DispatchThreadID : SV_DispatchThreadID)
 {
     const uint2 Pixel = DispatchThreadID.xy;
-    if (Pixel.x >= g_sceneCB.renderWidth || Pixel.y >= g_sceneCB.renderHeight)
+    if (Pixel.x >= g_sceneCB.RenderWidth || Pixel.y >= g_sceneCB.RenderHeight)
         return;
 
     float3 Origin;
     float3 Direction;
-    GenerateCameraRay(Pixel, uint2(g_sceneCB.renderWidth, g_sceneCB.renderHeight), Origin, Direction);
+    GenerateCameraRay(Pixel, uint2(g_sceneCB.RenderWidth, g_sceneCB.RenderHeight), Origin, Direction);
 
     RayDesc Ray;
     Ray.Origin = Origin;
@@ -749,20 +692,7 @@ void ShadowMissShader(inout RayPayload Payload)
     Payload.Visibility = 1;
 }
 
-struct SurfelGIData
-{
-    float4 PositionRadius;
-    float4 NormalSeenFrame;
-    float4 AlbedoWeight;
-    float4 Extra;
-};
-
-struct SurfelGIIrradianceData
-{
-    float4 IrradianceAndCount;
-    float4 MSMEData0;
-    float4 MSMEData1;
-};
+#if defined(USE_SURFEL_GI) && USE_SURFEL_GI
 
 #define SURFEL_GI_GUIDE_DIM 4
 #define SURFEL_GI_GUIDE_LOBE_COUNT (SURFEL_GI_GUIDE_DIM * SURFEL_GI_GUIDE_DIM)
@@ -770,55 +700,6 @@ struct SurfelGIIrradianceData
 #define SURFEL_GI_GUIDE_LEARNING_RATE 0.02
 #define SURFEL_GI_GUIDE_MAX_BLEND 0.9
 #define SURFEL_GI_HOVER_DEBUG_MAX_RAYS 16
-
-struct SurfelGIActiveCounter
-{
-    uint Count;
-    uint3 Padding;
-};
-
-struct SurfelGIGatherUniformBuffer
-{
-    uint MaxSurfels;
-    uint RayCount;
-    uint BootstrapRayCount;
-    float MaxRayDistance;
-    float RadianceScale;
-    float NormalBias;
-    float HistoryBlend;
-    uint UseGuiding;
-    int FrameNumber;
-    uint SurfelPageSize;
-    float GridCellSize;
-    float Padding0;
-    float4 CascadeCellScaleFromPrevPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeStartDistancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeOriginCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeRingOffsetZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-    float4 CascadeCellBasePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-};
-
-struct SurfelGIHoverSelection
-{
-    uint SurfelIndex;
-    uint Valid;
-    uint MousePixelX;
-    uint MousePixelY;
-};
-
-struct SurfelGIHoverRayDebug
-{
-    float4 OriginAndCount;
-    float4 RayDirAndType[SURFEL_GI_HOVER_DEBUG_MAX_RAYS];
-    float4 RayColor[SURFEL_GI_HOVER_DEBUG_MAX_RAYS];
-};
 
 float3 GetHoverRayDebugColorFromRadiance(float3 radiance)
 {
@@ -828,15 +709,6 @@ float3 GetHoverRayDebugColorFromRadiance(float3 radiance)
         return float3(0.0, 0.0, 0.0);
     return saturate(c / maxChannel);
 }
-
-StructuredBuffer<uint> SurfelGIActiveSurfelIndexBuffer : register(t0, space12);
-StructuredBuffer<SurfelGIActiveCounter> SurfelGIActiveSurfelCounterBuffer : register(t1, space12);
-StructuredBuffer<SurfelGIData> SurfelGIPool : register(t2, space12);
-RWStructuredBuffer<SurfelGIIrradianceData> SurfelGIIrradianceBuffer : register(u3, space12);
-RWStructuredBuffer<float> SurfelGIGuidingBuffer : register(u4, space12);
-ConstantBuffer<SurfelGIGatherUniformBuffer> g_surfelGatherCB : register(b5, space12);
-StructuredBuffer<SurfelGIHoverSelection> SurfelGIHoverSelectionBuffer : register(t6, space12);
-RWStructuredBuffer<SurfelGIHoverRayDebug> SurfelGIHoverRayDebugBuffer : register(u7, space12);
 
 uint InitSurfelGatherSeed(uint SurfelIndex, uint FrameNumber)
 {
@@ -850,7 +722,7 @@ float3 EvaluateSurfelGatherMissRadiance(in float3 WorldDir)
     return 0.0;
 }
 
-float ComputeHitSurfelWeight(float3 SurfaceWorldPos, float3 SurfaceWorldNormal, SurfelGIData Surfel, SurfelGIIrradianceData Irradiance)
+float ComputeHitSurfelWeight(float3 SurfaceWorldPos, float3 SurfaceWorldNormal, jSurfelGPU Surfel, jSurfelIrradianceGPU Irradiance)
 {
     const float3 SurfelNormal = normalize(Surfel.NormalSeenFrame.xyz);
     const float SurfelRadius = max(Surfel.PositionRadius.w, 0.001);
@@ -901,7 +773,7 @@ bool TrySampleSurfelIrradianceAtCascade(float3 SurfaceWorldPos, float3 SurfaceWo
         if (CandidateSurfelIndex >= max(g_surfelGatherCB.MaxSurfels, 1u))
             break;
 
-        const SurfelGIData CandidateSurfel = SurfelGIPool[CandidateSurfelIndex];
+        const jSurfelGPU CandidateSurfel = SurfelGIPool[CandidateSurfelIndex];
         if (CandidateSurfel.Extra.y < 0.5)
             continue;
         if ((uint)round(CandidateSurfel.Extra.w) != CascadeIndex)
@@ -911,7 +783,7 @@ bool TrySampleSurfelIrradianceAtCascade(float3 SurfaceWorldPos, float3 SurfaceWo
         if (any(CandidateCellCoord != CellCoord))
             continue;
 
-        const SurfelGIIrradianceData CandidateIrradiance = SurfelGIIrradianceBuffer[CandidateSurfelIndex];
+        const jSurfelIrradianceGPU CandidateIrradiance = SurfelGIIrradianceBuffer[CandidateSurfelIndex];
         if (CandidateIrradiance.IrradianceAndCount.w <= 0.01)
             continue;
 
@@ -935,7 +807,7 @@ bool TrySampleSurfelIrradianceAtCascade(float3 SurfaceWorldPos, float3 SurfaceWo
 
 float3 EvaluateHitSurfelIndirectRadiance(in SurfaceData Surface)
 {
-    const float CameraDistance = length(Surface.WorldPos - g_sceneCB.cameraPosition);
+    const float CameraDistance = length(Surface.WorldPos - g_sceneCB.CameraPosition);
     const uint ExpectedCascade = SurfelGIGetCascadeIndexByDistance(g_surfelGatherCB.CascadeStartDistancePacked, CameraDistance);
 
     float3 SampledIrradiance = 0.0;
@@ -1176,7 +1048,7 @@ void SurfelGIGatherIrradianceHWRT_CS(uint3 DispatchThreadID : SV_DispatchThreadI
     if (SurfelIndex >= max(g_surfelGatherCB.MaxSurfels, 1u))
         return;
 
-    const SurfelGIData Surfel = SurfelGIPool[SurfelIndex];
+    const jSurfelGPU Surfel = SurfelGIPool[SurfelIndex];
     float3 ReceiverNormal = Surfel.NormalSeenFrame.xyz;
     const float ReceiverNormalLenSq = dot(ReceiverNormal, ReceiverNormal);
     if (ReceiverNormalLenSq <= 1e-6)
@@ -1188,12 +1060,12 @@ void SurfelGIGatherIrradianceHWRT_CS(uint3 DispatchThreadID : SV_DispatchThreadI
     const float TMin = max(OriginBias * 0.25, 0.001);
     const float TMax = max(g_surfelGatherCB.MaxRayDistance, TMin + 0.001);
     const float3 RayOrigin = ReceiverWorldPos + ReceiverNormal * OriginBias;
-    const SurfelGIHoverSelection HoverSelection = SurfelGIHoverSelectionBuffer[0];
+    const jSurfelGIHoverSelectionGPU HoverSelection = SurfelGIHoverSelectionBuffer[0];
     const bool CaptureHoverRays = (HoverSelection.Valid != 0u) && (HoverSelection.SurfelIndex == SurfelIndex);
 
     // Temporal state from previous frames. PrevCount is used both as confidence and as a guide
     // ramp so newly created surfels start in a conservative mode before guiding/history mature.
-    const SurfelGIIrradianceData Prev = SurfelGIIrradianceBuffer[SurfelIndex];
+    const jSurfelIrradianceGPU Prev = SurfelGIIrradianceBuffer[SurfelIndex];
     const float PrevCount = max(Prev.IrradianceAndCount.w, 0.0);
     const uint BaseRayCount = max(g_surfelGatherCB.RayCount, 1u);
     const uint BootstrapRayCount = max(g_surfelGatherCB.BootstrapRayCount, 1u);
@@ -1204,7 +1076,7 @@ void SurfelGIGatherIrradianceHWRT_CS(uint3 DispatchThreadID : SV_DispatchThreadI
 
     uint Seed = InitSurfelGatherSeed(SurfelIndex, (uint)max(g_surfelGatherCB.FrameNumber, 0));
     float3 AccumulatedIrradiance = 0.0;
-    SurfelGIHoverRayDebug HoverRayDebug = (SurfelGIHoverRayDebug)0;
+    jSurfelGIHoverRayDebugGPU HoverRayDebug = (jSurfelGIHoverRayDebugGPU)0;
     if (CaptureHoverRays)
     {
         HoverRayDebug.OriginAndCount = float4(ReceiverWorldPos, 0.0);
@@ -1327,7 +1199,7 @@ void SurfelGIGatherIrradianceHWRT_CS(uint3 DispatchThreadID : SV_DispatchThreadI
         State = RunMSME(CurrentIrradiance, State, ShortWindowBlend);
     }
 
-    SurfelGIIrradianceData OutData;
+    jSurfelIrradianceGPU OutData;
     // Count is deliberately capped. We only need a rough confidence estimate, not an ever-growing
     // exact sample count that would eventually become numerically meaningless.
     OutData.IrradianceAndCount = float4(State.Mean, min(PrevCount + 1.0, 200.0));
@@ -1335,3 +1207,5 @@ void SurfelGIGatherIrradianceHWRT_CS(uint3 DispatchThreadID : SV_DispatchThreadI
     OutData.MSMEData1 = float4(State.Variance, State.Inconsistency);
     SurfelGIIrradianceBuffer[SurfelIndex] = OutData;
 }
+
+#endif

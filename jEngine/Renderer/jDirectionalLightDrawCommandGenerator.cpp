@@ -3,6 +3,7 @@
 #include "jPrimitiveUtil.h"
 #include "jOptions.h"
 #include "Scene/jRenderObject.h"
+#include "Shader/jLightingShaderParameters.h"
 #include "jSceneRenderTargets.h"
 
 jObject* jDirectionalLightDrawCommandGenerator::GlobalFullscreenPrimitive = nullptr;
@@ -40,11 +41,7 @@ void jDirectionalLightDrawCommandGenerator::Initialize(int32 InRTWidth, int32 In
         , jViewport(0.0f, 0.0f, (float)InRTWidth, (float)InRTHeight), jScissor(0, 0, InRTWidth, InRTHeight), gOptions.UseVRS);
 
     {
-        jShaderInfo shaderInfo;
-        shaderInfo.SetName(jNameStatic("DirectionalLightShaderVS"));
-        shaderInfo.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/fullscreenquad_vs.hlsl"));
-        shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
-        Shader.VertexShader = g_rhi->CreateShader(shaderInfo);
+        Shader.VertexShader = jShaderFullscreenQuadVertexShader::CreateShader(jShaderFullscreenQuadVertexShader::ShaderPermutation());
     }
 }
 
@@ -60,21 +57,18 @@ void jDirectionalLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* Ou
     jShaderBindingInstanceArray CopyShaderBindingInstances = ShaderBindingInstances;
     CopyShaderBindingInstances.Add(InLightView.ShaderBindingInstance.get());
 
-    // temp
-    jShaderBindingArray ShaderBindingArray;
-    jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
     const jSamplerStateInfo* ShadowSamplerStateInfo = TSamplerStateInfo<ETextureFilter::NEAREST_MIPMAP_LINEAR, ETextureFilter::NEAREST_MIPMAP_LINEAR
         , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
         , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
 
-    ShaderBindingArray.Add(jShaderBinding::Create(jShaderBinding::APPEND_LAST, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
-        , ResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::IrradianceMap2, ShadowSamplerStateInfo)));
-
-    ShaderBindingArray.Add(jShaderBinding::Create(jShaderBinding::APPEND_LAST, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
-        , ResourceInlineAllactor.Alloc<jTextureResource>(jSceneRenderTarget::FilteredEnvMap2, ShadowSamplerStateInfo)));
-    temp = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
+    jDirectionalLightIBLShaderParameters Parameters;
+    Parameters.IrradianceMap = { jSceneRenderTarget::IrradianceMap2, ShadowSamplerStateInfo };
+    Parameters.PrefilteredEnvMap = { jSceneRenderTarget::FilteredEnvMap2, ShadowSamplerStateInfo };
+    temp = jShaderParameterSet::CreateShaderBindingInstance(Parameters, EShaderAccessStageFlag::FRAGMENT, jShaderBindingInstanceType::SingleFrame);
     CopyShaderBindingInstances.Add(temp.get());
-    //
+
+    SceneTextureShaderBindingInstance = InRenderFrameContextPtr->SceneRenderTargetPtr->PrepareGBufferShaderBindingInstance(gOptions.UseSubpass);
+    CopyShaderBindingInstances.Add(SceneTextureShaderBindingInstance.get());
 
     check(OutDestDrawCommand);
     new (OutDestDrawCommand) jDrawCommand(InRenderFrameContextPtr, &InLightView, GlobalFullscreenPrimitive->RenderObjects[0], InRenderPass
