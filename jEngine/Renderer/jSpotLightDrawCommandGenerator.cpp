@@ -12,8 +12,8 @@
 
 jObject* jSpotLightDrawCommandGenerator::SpotLightCone = nullptr;
 
-jSpotLightDrawCommandGenerator::jSpotLightDrawCommandGenerator(const jShaderBindingInstanceArray& InShaderBindingInstances)
-    : ShaderBindingInstances(InShaderBindingInstances)
+jSpotLightDrawCommandGenerator::jSpotLightDrawCommandGenerator(const jShaderBindingInstanceGroup& InShaderBindingGroup)
+    : ShaderBindingGroup(InShaderBindingGroup)
 {
 }
 
@@ -77,8 +77,8 @@ void jSpotLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* OutDestDr
     ShaderPermutation.SetIndex<jShaderSpotLightPixelShader::USE_PBR>(ENABLE_PBR);
     Shader.PixelShader = jShaderSpotLightPixelShader::CreateShader(ShaderPermutation);
 
-    jShaderBindingInstanceArray CopyShaderBindingInstances = ShaderBindingInstances;
-    CopyShaderBindingInstances.Add(InLightView.ShaderBindingInstance.get());
+    jShaderBindingInstanceGroup LightShaderBindingGroup = ShaderBindingGroup;
+    LightShaderBindingGroup.Add(InLightView.ShaderBindingInstance);
 
     //////////////////////////////////////////////////////////////////////////
     UniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
@@ -90,15 +90,14 @@ void jSpotLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* OutDestDr
     jLightVolumeVertexShaderParameters Parameters;
     Parameters.PushConsts.Buffer = UniformBuffer;
     ShaderBindingInstance = jShaderParameterSet::CreateShaderBindingInstance(Parameters, EShaderAccessStageFlag::VERTEX, jShaderBindingInstanceType::SingleFrame);
-    CopyShaderBindingInstances.Add(ShaderBindingInstance.get());
+    LightShaderBindingGroup.Add(ShaderBindingInstance);
     //////////////////////////////////////////////////////////////////////////
 
     SceneTextureShaderBindingInstance = InRenderFrameContextPtr->SceneRenderTargetPtr->PrepareGBufferShaderBindingInstance(gOptions.UseSubpass);
-    CopyShaderBindingInstances.Add(SceneTextureShaderBindingInstance.get());
+    LightShaderBindingGroup.Add(SceneTextureShaderBindingInstance);
 
     check(OutDestDrawCommand);
     new (OutDestDrawCommand) jDrawCommand(InRenderFrameContextPtr, &InLightView, SpotLightCone->RenderObjects[0], InRenderPass
-        , Shader, &PipelineStateFixedInfo, SpotLightCone->RenderObjects[0]->MaterialPtr.get(), CopyShaderBindingInstances, PushConstant, nullptr, InSubpassIndex);
-    OutDestDrawCommand->Test = true;
+        , Shader, &PipelineStateFixedInfo, SpotLightCone->RenderObjects[0]->MaterialPtr.get(), LightShaderBindingGroup, PushConstant, nullptr, InSubpassIndex, EDrawCommandBindingMode::Manual);
     OutDestDrawCommand->PrepareToDraw(false);
 }

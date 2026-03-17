@@ -24,7 +24,7 @@ public:
         Matrix MVP;
     };
 
-    jPointLightDrawCommandGenerator(const jShaderBindingInstanceArray& InShaderBindingInstances);
+    jPointLightDrawCommandGenerator(const jShaderBindingInstanceGroup& InShaderBindingGroup);
 
     virtual void Initialize(int32 InRTWidth, int32 InRTHeight) override;
     virtual void GenerateDrawCommand(jDrawCommand* OutDestDrawCommand, const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr
@@ -39,5 +39,5 @@ public:
     std::shared_ptr<IUniformBufferBlock> UniformBuffer;
     std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance;
     std::shared_ptr<jShaderBindingInstance> SceneTextureShaderBindingInstance;
-    const jShaderBindingInstanceArray& ShaderBindingInstances;
+    jShaderBindingInstanceGroup ShaderBindingGroup;
 };

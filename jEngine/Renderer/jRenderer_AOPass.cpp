@@ -432,28 +432,12 @@ void DispatchShaderParameterComputePass(const std::shared_ptr<jRenderFrameContex
     jShaderParameterSet::AppendToShaderInfo<TShaderParameters>(ShaderInfo, 0);
     jShader* Shader = g_rhi->CreateShader(ShaderInfo);
 
-    jShaderBindingLayoutArray ShaderBindingLayoutArray;
-    ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
-
-    jPipelineStateInfo* ComputePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingLayoutArray, {});
+    jShaderBindingInstanceGroup ShaderBindingGroup;
+    ShaderBindingGroup.Add(CurrentBindingInstance);
+    jPipelineStateInfo* ComputePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingGroup.GetLayoutArray(), {});
     ComputePipelineStateInfo->Bind(InRenderFrameContextPtr);
 
-    jShaderBindingInstanceArray ShaderBindingInstanceArray;
-    ShaderBindingInstanceArray.Add(CurrentBindingInstance.get());
-
-    jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
-    for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
-    {
-        ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
-        const std::vector<uint32>* DynamicOffsets = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
-        if (DynamicOffsets && DynamicOffsets->size())
-        {
-            ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)DynamicOffsets->data(), (int32)DynamicOffsets->size());
-        }
-    }
-    ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
-
-    g_rhi->BindComputeShaderBindingInstances(InRenderFrameContextPtr->GetActiveCommandBuffer(), ComputePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
+    g_rhi->BindComputeShaderBindingInstances(InRenderFrameContextPtr->GetActiveCommandBuffer(), ComputePipelineStateInfo, ShaderBindingGroup.GetCombiner(), 0);
     g_rhi->DispatchCompute(InRenderFrameContextPtr, NumGroupsX, NumGroupsY, NumGroupsZ);
 }
 
@@ -467,28 +451,12 @@ void DispatchShaderParameterComputePass(const std::shared_ptr<jRenderFrameContex
 
     jShader* Shader = TShaderClass::CreateShader(InPermutation);
 
-    jShaderBindingLayoutArray ShaderBindingLayoutArray;
-    ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
-
-    jPipelineStateInfo* ComputePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingLayoutArray, {});
+    jShaderBindingInstanceGroup ShaderBindingGroup;
+    ShaderBindingGroup.Add(CurrentBindingInstance);
+    jPipelineStateInfo* ComputePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingGroup.GetLayoutArray(), {});
     ComputePipelineStateInfo->Bind(InRenderFrameContextPtr);
 
-    jShaderBindingInstanceArray ShaderBindingInstanceArray;
-    ShaderBindingInstanceArray.Add(CurrentBindingInstance.get());
-
-    jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
-    for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
-    {
-        ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
-        const std::vector<uint32>* DynamicOffsets = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
-        if (DynamicOffsets && DynamicOffsets->size())
-        {
-            ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)DynamicOffsets->data(), (int32)DynamicOffsets->size());
-        }
-    }
-    ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
-
-    g_rhi->BindComputeShaderBindingInstances(InRenderFrameContextPtr->GetActiveCommandBuffer(), ComputePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
+    g_rhi->BindComputeShaderBindingInstances(InRenderFrameContextPtr->GetActiveCommandBuffer(), ComputePipelineStateInfo, ShaderBindingGroup.GetCombiner(), 0);
     g_rhi->DispatchCompute(InRenderFrameContextPtr, NumGroupsX, NumGroupsY, NumGroupsZ);
 }
 
@@ -1074,13 +1042,10 @@ std::shared_ptr<jTexture> jRenderer::RTAO()
 				jShaderBindlessSet::CreateShaderBindingInstances(BindlessParameters, EShaderAccessStageFlag::ALL_RAYTRACING, jShaderBindingInstanceType::SingleFrame);
 #endif // TURN_ON_BINDLESS
 
-			jShaderBindingLayoutArray GlobalShaderBindingLayoutArray;
-			GlobalShaderBindingLayoutArray.Add(GlobalShaderBindingInstance->ShaderBindingsLayouts);
+			jShaderBindingInstanceGroup ShaderBindingGroup;
+			ShaderBindingGroup.Add(GlobalShaderBindingInstance);
 #if TURN_ON_BINDLESS
-			for (const auto& BindlessShaderBindingInstance : BindlessShaderBindingInstances)
-			{
-				GlobalShaderBindingLayoutArray.Add(BindlessShaderBindingInstance->ShaderBindingsLayouts);
-			}
+			ShaderBindingGroup.Add(BindlessShaderBindingInstances);
 #endif // TURN_ON_BINDLESS
 
 			// Create RaytracingShaders
@@ -1115,30 +1080,10 @@ std::shared_ptr<jTexture> jRenderer::RTAO()
 			RaytracingPipelineData.MaxPayloadSize = 4 * sizeof(float);		                    // float shadow
 			RaytracingPipelineData.MaxTraceRecursionDepth = 1;
 			auto RaytracingPipelineState = g_rhi->CreateRaytracingPipelineStateInfo(RaytracingShaders, RaytracingPipelineData
-				, GlobalShaderBindingLayoutArray, nullptr);
+				, ShaderBindingGroup.GetLayoutArray(), nullptr);
 
 			// Binding RaytracingShader resources
-			jShaderBindingInstanceArray ShaderBindingInstanceArray;
-			ShaderBindingInstanceArray.Add(GlobalShaderBindingInstance.get());
-#if TURN_ON_BINDLESS
-			for (const auto& BindlessShaderBindingInstance : BindlessShaderBindingInstances)
-			{
-				ShaderBindingInstanceArray.Add(BindlessShaderBindingInstance.get());
-			}
-#endif // TURN_ON_BINDLESS
-
-			jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
-			for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
-			{
-				ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
-				const std::vector<uint32>* pDynamicOffsetTest = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
-				if (pDynamicOffsetTest && pDynamicOffsetTest->size())
-				{
-					ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)pDynamicOffsetTest->data(), (int32)pDynamicOffsetTest->size());
-				}
-			}
-			ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
-			g_rhi->BindRaytracingShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), RaytracingPipelineState, ShaderBindingInstanceCombiner, 0);
+			g_rhi->BindRaytracingShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), RaytracingPipelineState, ShaderBindingGroup.GetCombiner(), 0);
 
 			// Binding Raytracing Pipeline State
 			RaytracingPipelineState->Bind(RenderFrameContextPtr);

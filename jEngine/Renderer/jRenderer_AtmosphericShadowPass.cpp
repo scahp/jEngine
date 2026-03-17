@@ -163,30 +163,13 @@ void jRenderer::AtmosphericShadow()
 
         jShader* Shader = jShaderAtmosphericShadowingComputeShader::CreateShader(jShaderAtmosphericShadowingComputeShader::ShaderPermutation());
 
-        jShaderBindingLayoutArray ShaderBindingLayoutArray;
-        ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
-
-        jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingLayoutArray, {});
+        jShaderBindingInstanceGroup ShaderBindingGroup;
+        ShaderBindingGroup.Add(CurrentBindingInstance);
+        jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingGroup.GetLayoutArray(), {});
 
         computePipelineStateInfo->Bind(RenderFrameContextPtr);
 
-        jShaderBindingInstanceArray ShaderBindingInstanceArray;
-        ShaderBindingInstanceArray.Add(CurrentBindingInstance.get());
-
-        jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
-        for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
-        {
-            // Add ShaderBindingInstanceCombiner data : DescriptorSets, DynamicOffsets
-            ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
-            const std::vector<uint32>* pDynamicOffsetTest = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
-            if (pDynamicOffsetTest && pDynamicOffsetTest->size())
-            {
-                ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)pDynamicOffsetTest->data(), (int32)pDynamicOffsetTest->size());
-            }
-        }
-        ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
-
-        g_rhi->BindComputeShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), computePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
+        g_rhi->BindComputeShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), computePipelineStateInfo, ShaderBindingGroup.GetCombiner(), 0);
 
         int32 X = (Width / 8) + ((Width % 8) ? 1 : 0);
         int32 Y = (Height / 8) + ((Height % 8) ? 1 : 0);
@@ -273,8 +256,8 @@ void jRenderer::AtmosphericShadow()
             Parameters, EShaderAccessStageFlag::FRAGMENT, jShaderBindingInstanceType::SingleFrame);
 
         RenderFrameContextPtr->GetActiveCommandBuffer()->GetBarrierBatcher()->Flush(RenderFrameContextPtr->GetActiveCommandBuffer());
-        jShaderBindingInstanceArray ShaderBindingInstanceArray;
-        ShaderBindingInstanceArray.Add(ShaderBindingInstance.get());
+        jShaderBindingInstanceGroup ShaderBindingGroup;
+        ShaderBindingGroup.Add(ShaderBindingInstance);
 
         jGraphicsPipelineShader Shader;
         {
@@ -285,8 +268,7 @@ void jRenderer::AtmosphericShadow()
         if (!jSceneRenderTarget::GlobalFullscreenPrimitive)
             jSceneRenderTarget::GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
         jDrawCommand DrawCommand(RenderFrameContextPtr, jSceneRenderTarget::GlobalFullscreenPrimitive->RenderObjects[0], RenderPass
-            , Shader, &PostProcessPassPipelineStateFixed, jSceneRenderTarget::GlobalFullscreenPrimitive->RenderObjects[0]->MaterialPtr.get(), ShaderBindingInstanceArray, nullptr);
-        DrawCommand.Test = true;
+            , Shader, &PostProcessPassPipelineStateFixed, jSceneRenderTarget::GlobalFullscreenPrimitive->RenderObjects[0]->MaterialPtr.get(), ShaderBindingGroup, nullptr, nullptr, 0, EDrawCommandBindingMode::Manual);
         DrawCommand.PrepareToDraw(false);
 
         if (RenderPass && RenderPass->BeginRenderPass(RenderFrameContextPtr->GetActiveCommandBuffer()))

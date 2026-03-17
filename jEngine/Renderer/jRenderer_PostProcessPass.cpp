@@ -243,9 +243,9 @@ void jRenderer::PostProcess()
 			// Create RenderPass
 			jRenderPass* RenderPass = g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { RTWidth, RTHeight });
 
-			jShaderBindingInstanceArray ShaderBindingInstanceArray;
 			auto ShaderBindingInstance = jShaderParameterSet::CreateShaderBindingInstance(InParameters, EShaderAccessStageFlag::ALL_GRAPHICS, jShaderBindingInstanceType::SingleFrame);
-			ShaderBindingInstanceArray.Add(ShaderBindingInstance.get());
+			jShaderBindingInstanceGroup ShaderBindingGroup;
+			ShaderBindingGroup.Add(ShaderBindingInstance);
 
 			jGraphicsPipelineShader Shader;
 			{
@@ -254,8 +254,7 @@ void jRenderer::PostProcess()
 			}
 
 			jDrawCommand DrawCommand(RenderFrameContextPtr, jSceneRenderTarget::GlobalFullscreenPrimitive->RenderObjects[0], RenderPass
-				, Shader, &PostProcessPassPipelineStateFixed, jSceneRenderTarget::GlobalFullscreenPrimitive->RenderObjects[0]->MaterialPtr.get(), ShaderBindingInstanceArray, nullptr);
-			DrawCommand.Test = true;
+				, Shader, &PostProcessPassPipelineStateFixed, jSceneRenderTarget::GlobalFullscreenPrimitive->RenderObjects[0]->MaterialPtr.get(), ShaderBindingGroup, nullptr, nullptr, 0, EDrawCommandBindingMode::Manual);
 			DrawCommand.PrepareToDraw(false);
 
 			if (RenderPass && RenderPass->BeginRenderPass(RenderFrameContextPtr->GetActiveCommandBuffer()))
@@ -272,28 +271,12 @@ void jRenderer::PostProcess()
 
 			auto CurrentBindingInstance = jShaderParameterSet::CreateShaderBindingInstance(InParameters, EShaderAccessStageFlag::COMPUTE, jShaderBindingInstanceType::SingleFrame);
 
-			jShaderBindingLayoutArray ShaderBindingLayoutArray;
-			ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
-
-			jPipelineStateInfo* ComputePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(InComputeShader, ShaderBindingLayoutArray, {});
+			jShaderBindingInstanceGroup ShaderBindingGroup;
+			ShaderBindingGroup.Add(CurrentBindingInstance);
+			jPipelineStateInfo* ComputePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(InComputeShader, ShaderBindingGroup.GetLayoutArray(), {});
 			ComputePipelineStateInfo->Bind(RenderFrameContextPtr);
 
-			jShaderBindingInstanceArray ShaderBindingInstanceArray;
-			ShaderBindingInstanceArray.Add(CurrentBindingInstance.get());
-
-			jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
-			for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
-			{
-				ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
-				const std::vector<uint32>* DynamicOffsets = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
-				if (DynamicOffsets && DynamicOffsets->size())
-				{
-					ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)DynamicOffsets->data(), (int32)DynamicOffsets->size());
-				}
-			}
-			ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
-
-			g_rhi->BindComputeShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), ComputePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
+			g_rhi->BindComputeShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), ComputePipelineStateInfo, ShaderBindingGroup.GetCombiner(), 0);
 			g_rhi->DispatchCompute(RenderFrameContextPtr, NumGroupsX, NumGroupsY, NumGroupsZ);
 		};
 

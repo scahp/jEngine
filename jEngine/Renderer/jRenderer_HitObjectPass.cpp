@@ -185,7 +185,7 @@ void jRenderer::HitObjectPass()
 		for (auto iter : jObject::GetStaticRenderObject())
 		{
 			new (&HitObjectDrawCommands[i]) jDrawCommand(RenderFrameContextPtr, &View, iter, HitObjectRenderPass
-				, HitObjectShader, &HitObjectPipelineStateFixed, nullptr, {}, nullptr);
+				, HitObjectShader, &HitObjectPipelineStateFixed, nullptr, jShaderBindingInstanceArray(), nullptr);
 			HitObjectDrawCommands[i].PrepareToDraw(false);
 			++i;
 		}
@@ -194,7 +194,7 @@ void jRenderer::HitObjectPass()
 			for (auto* renderObject : debugObject->RenderObjects)
 			{
 				new (&HitObjectDrawCommands[i]) jDrawCommand(RenderFrameContextPtr, &View, renderObject, HitObjectRenderPass
-					, HitObjectShader, &HitObjectPipelineStateFixed, nullptr, {}, nullptr);
+					, HitObjectShader, &HitObjectPipelineStateFixed, nullptr, jShaderBindingInstanceArray(), nullptr);
 				HitObjectDrawCommands[i].PrepareToDraw(false);
 				++i;
 			}

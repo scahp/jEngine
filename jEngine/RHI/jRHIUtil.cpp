@@ -72,28 +72,12 @@ void DispatchShaderParameterComputePass(const std::shared_ptr<jRenderFrameContex
     jShaderParameterSet::AppendToShaderInfo<TShaderParameters>(ShaderInfo, 0);
     jShader* Shader = g_rhi->CreateShader(ShaderInfo);
 
-    jShaderBindingLayoutArray ShaderBindingLayoutArray;
-    ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
-
-    jPipelineStateInfo* ComputePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingLayoutArray, {});
+    jShaderBindingInstanceGroup ShaderBindingGroup;
+    ShaderBindingGroup.Add(CurrentBindingInstance);
+    jPipelineStateInfo* ComputePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingGroup.GetLayoutArray(), {});
     ComputePipelineStateInfo->Bind(InRenderFrameContextPtr);
 
-    jShaderBindingInstanceArray ShaderBindingInstanceArray;
-    ShaderBindingInstanceArray.Add(CurrentBindingInstance.get());
-
-    jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
-    for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
-    {
-        ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
-        const std::vector<uint32>* DynamicOffsets = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
-        if (DynamicOffsets && DynamicOffsets->size())
-        {
-            ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)DynamicOffsets->data(), (int32)DynamicOffsets->size());
-        }
-    }
-    ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
-
-    g_rhi->BindComputeShaderBindingInstances(InRenderFrameContextPtr->GetActiveCommandBuffer(), ComputePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
+    g_rhi->BindComputeShaderBindingInstances(InRenderFrameContextPtr->GetActiveCommandBuffer(), ComputePipelineStateInfo, ShaderBindingGroup.GetCombiner(), 0);
     g_rhi->DispatchCompute(InRenderFrameContextPtr, NumGroupsX, NumGroupsY, NumGroupsZ);
 }
 }
@@ -409,31 +393,14 @@ void DispatchCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameCo
 
 	CurrentBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
 
-	jShaderBindingLayoutArray ShaderBindingLayoutArray;
-	ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
-
 	jShader* Shader = InFuncCreateShaders(InRenderFrameContextPtr);
-	jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingLayoutArray, {});
-
+	jShaderBindingInstanceGroup ShaderBindingGroup;
+	ShaderBindingGroup.Add(CurrentBindingInstance);
+	jPipelineStateInfo* computePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingGroup.GetLayoutArray(), {});
+ 
 	computePipelineStateInfo->Bind(InRenderFrameContextPtr);
 
-	jShaderBindingInstanceArray ShaderBindingInstanceArray;
-	ShaderBindingInstanceArray.Add(CurrentBindingInstance.get());
-
-	jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
-	for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
-	{
-		// Add ShaderBindingInstanceCombiner data : DescriptorSets, DynamicOffsets
-		ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
-		const std::vector<uint32>* pDynamicOffsetTest = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
-		if (pDynamicOffsetTest && pDynamicOffsetTest->size())
-		{
-			ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)pDynamicOffsetTest->data(), (int32)pDynamicOffsetTest->size());
-		}
-	}
-	ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
-
-	g_rhi->BindComputeShaderBindingInstances(InRenderFrameContextPtr->GetActiveCommandBuffer(), computePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
+	g_rhi->BindComputeShaderBindingInstances(InRenderFrameContextPtr->GetActiveCommandBuffer(), computePipelineStateInfo, ShaderBindingGroup.GetCombiner(), 0);
 
 	const int32 X = (Width / 8) + ((Width % 8) ? 1 : 0);
 	const int32 Y = (Height / 8) + ((Height % 8) ? 1 : 0);
@@ -488,29 +455,25 @@ void DrawQuad(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPt
 
 	auto RenderPass = g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { Width, Height });
 
-	std::shared_ptr<jShaderBindingInstance> CurrentBindingInstance = nullptr;
-	int32 BindingPoint = 0;
 	jShaderBindingArray ShaderBindingArray;
 	jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
 
 	InFuncBindingShaderResources(InRenderFrameContextPtr, ShaderBindingArray, ResourceInlineAllactor);
 
 	std::shared_ptr<jShaderBindingInstance> ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::SingleFrame);
-	jShaderBindingInstanceArray ShaderBindingInstanceArray;
-	ShaderBindingInstanceArray.Add(ShaderBindingInstance.get());
+	jShaderBindingInstanceGroup ShaderBindingGroup;
+	ShaderBindingGroup.Add(ShaderBindingInstance);
 
 	jGraphicsPipelineShader Shader;
 	{
 		Shader.VertexShader = jShaderFullscreenQuadVertexShader::CreateShader(jShaderFullscreenQuadVertexShader::ShaderPermutation());
-
 		Shader.PixelShader = InFuncCreateShaders(InRenderFrameContextPtr);
 	}
 
 	if (!jSceneRenderTarget::GlobalFullscreenPrimitive)
 		jSceneRenderTarget::GlobalFullscreenPrimitive = jPrimitiveUtil::CreateFullscreenQuad(nullptr);
 	jDrawCommand DrawCommand(InRenderFrameContextPtr, jSceneRenderTarget::GlobalFullscreenPrimitive->RenderObjects[0], RenderPass
-		, Shader, &PostProcessPassPipelineStateFixed, jSceneRenderTarget::GlobalFullscreenPrimitive->RenderObjects[0]->MaterialPtr.get(), ShaderBindingInstanceArray, nullptr);
-	DrawCommand.Test = true;
+		, Shader, &PostProcessPassPipelineStateFixed, jSceneRenderTarget::GlobalFullscreenPrimitive->RenderObjects[0]->MaterialPtr.get(), ShaderBindingGroup, nullptr, nullptr, 0, EDrawCommandBindingMode::Manual);
 	DrawCommand.PrepareToDraw(false);
 	if (RenderPass && RenderPass->BeginRenderPass(InRenderFrameContextPtr->GetActiveCommandBuffer()))
 	{

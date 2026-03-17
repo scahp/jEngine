@@ -11,9 +11,20 @@
 
 jDrawCommand::jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const jView* InView
     , jRenderObject* InRenderObject, jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed, jMaterial* InMaterial
-    , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, const jVertexBuffer* InOverrideInstanceData, int32 InSubpassIndex)
+    , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, const jVertexBuffer* InOverrideInstanceData, int32 InSubpassIndex, EDrawCommandBindingMode InBindingMode)
     : RenderFrameContextPtr(InRenderFrameContextPtr), View(InView), RenderObject(InRenderObject), RenderPass(InRenderPass), Shader(InShader), PipelineStateFixed(InPipelineStateFixed)
-    , Material(InMaterial), PushConstant(InPushConstant), ShaderBindingInstanceArray(InShaderBindingInstanceArray), OverrideInstanceData(InOverrideInstanceData), SubpassIndex(InSubpassIndex)
+    , Material(InMaterial), PushConstant(InPushConstant), OverrideInstanceData(InOverrideInstanceData), SubpassIndex(InSubpassIndex), BindingMode(InBindingMode)
+{
+    check(RenderObject);
+    IsViewLight = false;
+    ShaderBindingGroup.Add(InShaderBindingInstanceArray);
+}
+
+jDrawCommand::jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const jView* InView
+    , jRenderObject* InRenderObject, jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed, jMaterial* InMaterial
+    , const jShaderBindingInstanceGroup& InShaderBindingInstanceGroup, const jPushConstant* InPushConstant, const jVertexBuffer* InOverrideInstanceData, int32 InSubpassIndex, EDrawCommandBindingMode InBindingMode)
+    : ShaderBindingGroup(InShaderBindingInstanceGroup), RenderFrameContextPtr(InRenderFrameContextPtr), View(InView), RenderObject(InRenderObject), RenderPass(InRenderPass), Shader(InShader)
+    , PipelineStateFixed(InPipelineStateFixed), Material(InMaterial), PushConstant(InPushConstant), OverrideInstanceData(InOverrideInstanceData), SubpassIndex(InSubpassIndex), BindingMode(InBindingMode)
 {
     check(RenderObject);
     IsViewLight = false;
@@ -21,9 +32,20 @@ jDrawCommand::jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderF
 
 jDrawCommand::jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const jViewLight* InViewLight
     , jRenderObject* InRenderObject, jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed, jMaterial* InMaterial
-    , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, const jVertexBuffer* InOverrideInstanceData, int32 InSubpassIndex)
+    , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, const jVertexBuffer* InOverrideInstanceData, int32 InSubpassIndex, EDrawCommandBindingMode InBindingMode)
     : RenderFrameContextPtr(InRenderFrameContextPtr), ViewLight(InViewLight), RenderObject(InRenderObject), RenderPass(InRenderPass), Shader(InShader), PipelineStateFixed(InPipelineStateFixed)
-    , Material(InMaterial), PushConstant(InPushConstant), ShaderBindingInstanceArray(InShaderBindingInstanceArray), OverrideInstanceData(InOverrideInstanceData), SubpassIndex(InSubpassIndex)
+    , Material(InMaterial), PushConstant(InPushConstant), OverrideInstanceData(InOverrideInstanceData), SubpassIndex(InSubpassIndex), BindingMode(InBindingMode)
+{
+    check(RenderObject);
+    IsViewLight = true;
+    ShaderBindingGroup.Add(InShaderBindingInstanceArray);
+}
+
+jDrawCommand::jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const jViewLight* InViewLight
+    , jRenderObject* InRenderObject, jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed, jMaterial* InMaterial
+    , const jShaderBindingInstanceGroup& InShaderBindingInstanceGroup, const jPushConstant* InPushConstant, const jVertexBuffer* InOverrideInstanceData, int32 InSubpassIndex, EDrawCommandBindingMode InBindingMode)
+    : ShaderBindingGroup(InShaderBindingInstanceGroup), RenderFrameContextPtr(InRenderFrameContextPtr), ViewLight(InViewLight), RenderObject(InRenderObject), RenderPass(InRenderPass), Shader(InShader)
+    , PipelineStateFixed(InPipelineStateFixed), Material(InMaterial), PushConstant(InPushConstant), OverrideInstanceData(InOverrideInstanceData), SubpassIndex(InSubpassIndex), BindingMode(InBindingMode)
 {
     check(RenderObject);
     IsViewLight = true;
@@ -31,53 +53,51 @@ jDrawCommand::jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderF
 
 jDrawCommand::jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr
     , jRenderObject* InRenderObject, jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed, jMaterial* InMaterial
-    , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, const jVertexBuffer* InOverrideInstanceData, int32 InSubpassIndex)
+    , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, const jVertexBuffer* InOverrideInstanceData, int32 InSubpassIndex, EDrawCommandBindingMode InBindingMode)
     : RenderFrameContextPtr(InRenderFrameContextPtr), RenderObject(InRenderObject), RenderPass(InRenderPass), Shader(InShader), PipelineStateFixed(InPipelineStateFixed), Material(InMaterial)
-    , PushConstant(InPushConstant), ShaderBindingInstanceArray(InShaderBindingInstanceArray), OverrideInstanceData(InOverrideInstanceData), SubpassIndex(InSubpassIndex)
+    , PushConstant(InPushConstant), OverrideInstanceData(InOverrideInstanceData), SubpassIndex(InSubpassIndex), BindingMode(InBindingMode)
+{
+    check(RenderObject);
+    ShaderBindingGroup.Add(InShaderBindingInstanceArray);
+}
+
+jDrawCommand::jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr
+    , jRenderObject* InRenderObject, jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed, jMaterial* InMaterial
+    , const jShaderBindingInstanceGroup& InShaderBindingInstanceGroup, const jPushConstant* InPushConstant, const jVertexBuffer* InOverrideInstanceData, int32 InSubpassIndex, EDrawCommandBindingMode InBindingMode)
+    : ShaderBindingGroup(InShaderBindingInstanceGroup), RenderFrameContextPtr(InRenderFrameContextPtr), RenderObject(InRenderObject), RenderPass(InRenderPass), Shader(InShader)
+    , PipelineStateFixed(InPipelineStateFixed), Material(InMaterial), PushConstant(InPushConstant), OverrideInstanceData(InOverrideInstanceData), SubpassIndex(InSubpassIndex), BindingMode(InBindingMode)
 {
     check(RenderObject);
 }
 
+void jDrawCommand::AppendStandardBindings()
+{
+    if (IsViewLight)
+    {
+        ShaderBindingGroup.Add(ViewLight->ShaderBindingInstance);
+    }
+    else if (View)
+    {
+        jShaderBindingInstanceArray ShaderBindingInstanceArray;
+        View->GetShaderBindingInstance(ShaderBindingInstanceArray, RenderFrameContextPtr->UseForwardRenderer);
+        ShaderBindingGroup.Add(ShaderBindingInstanceArray);
+    }
+
+    OneRenderObjectUniformBuffer = RenderObject->CreateShaderBindingInstance();
+    ShaderBindingGroup.Add(OneRenderObjectUniformBuffer);
+
+    if (Material)
+    {
+        ShaderBindingGroup.Add(Material->CreateShaderBindingInstance());
+    }
+}
+
 void jDrawCommand::PrepareToDraw(bool InIsPositionOnly)
 {
-    if (!Test)
+    if (BindingMode == EDrawCommandBindingMode::Standard)
     {
-        // GetShaderBindings
-        if (IsViewLight)
-        {
-            ShaderBindingInstanceArray.Add(ViewLight->ShaderBindingInstance.get());
-        }
-        else if (View)
-        {
-            View->GetShaderBindingInstance(ShaderBindingInstanceArray, RenderFrameContextPtr->UseForwardRenderer);
-        }
-    
-        // GetShaderBindings
-        OneRenderObjectUniformBuffer = RenderObject->CreateShaderBindingInstance();
-        ShaderBindingInstanceArray.Add(OneRenderObjectUniformBuffer.get());
-
-        if (Material)
-        {
-            ShaderBindingInstanceArray.Add(Material->CreateShaderBindingInstance().get());
-        }
+        AppendStandardBindings();
     }
-
-    // Gather ShaderBindings
-    jShaderBindingLayoutArray ShaderBindingLayoutArray;
-    for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
-    {
-        // Add DescriptorSetLayout data
-        ShaderBindingLayoutArray.Add(ShaderBindingInstanceArray[i]->ShaderBindingsLayouts);
-
-        // Add ShaderBindingInstanceCombiner data : DescriptorSets, DynamicOffsets
-        ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
-        const std::vector<uint32>* pDynamicOffsetTest = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
-        if (pDynamicOffsetTest && pDynamicOffsetTest->size())
-        {
-            ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)pDynamicOffsetTest->data(), (int32)pDynamicOffsetTest->size());
-        }
-    }
-    ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
 
     const auto& RenderObjectGeoDataPtr = RenderObject->GeometryDataPtr;
 
@@ -94,7 +114,7 @@ void jDrawCommand::PrepareToDraw(bool InIsPositionOnly)
 
     // Create Pipeline
     CurrentPipelineStateInfo = (jPipelineStateInfo*)g_rhi->CreatePipelineStateInfo(PipelineStateFixed, Shader
-        , VertexBufferArray, RenderPass, ShaderBindingLayoutArray, PushConstant, SubpassIndex);
+        , VertexBufferArray, RenderPass, ShaderBindingGroup.GetLayoutArray(), PushConstant, SubpassIndex);
 
     IsPositionOnly = InIsPositionOnly;
 }
@@ -103,7 +123,7 @@ void jDrawCommand::Draw() const
 {
     check(RenderFrameContextPtr);
 
-    g_rhi->BindGraphicsShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), CurrentPipelineStateInfo, ShaderBindingInstanceCombiner, 0);
+    g_rhi->BindGraphicsShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), CurrentPipelineStateInfo, ShaderBindingGroup.GetCombiner(), 0);
 
     // Bind the image that contains the shading rate patterns
 #if USE_VARIABLE_SHADING_RATE_TIER2

@@ -82,28 +82,12 @@ void DispatchShaderParameterComputePass(const std::shared_ptr<jRenderFrameContex
     jShaderParameterSet::AppendToShaderInfo<TShaderParameters>(ShaderInfo, 0);
     jShader* Shader = g_rhi->CreateShader(ShaderInfo);
 
-    jShaderBindingLayoutArray ShaderBindingLayoutArray;
-    ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
-
-    jPipelineStateInfo* ComputePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingLayoutArray, {});
+    jShaderBindingInstanceGroup ShaderBindingGroup;
+    ShaderBindingGroup.Add(CurrentBindingInstance);
+    jPipelineStateInfo* ComputePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingGroup.GetLayoutArray(), {});
     ComputePipelineStateInfo->Bind(InRenderFrameContextPtr);
 
-    jShaderBindingInstanceArray ShaderBindingInstanceArray;
-    ShaderBindingInstanceArray.Add(CurrentBindingInstance.get());
-
-    jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
-    for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
-    {
-        ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
-        const std::vector<uint32>* DynamicOffsets = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
-        if (DynamicOffsets && DynamicOffsets->size())
-        {
-            ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)DynamicOffsets->data(), (int32)DynamicOffsets->size());
-        }
-    }
-    ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
-
-    g_rhi->BindComputeShaderBindingInstances(InRenderFrameContextPtr->GetActiveCommandBuffer(), ComputePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
+    g_rhi->BindComputeShaderBindingInstances(InRenderFrameContextPtr->GetActiveCommandBuffer(), ComputePipelineStateInfo, ShaderBindingGroup.GetCombiner(), 0);
     g_rhi->DispatchCompute(InRenderFrameContextPtr, NumGroupsX, NumGroupsY, NumGroupsZ);
 }
 }
@@ -234,7 +218,7 @@ void IRenderer::DebugPasses()
 		for (int32 i = 0; i < (int32)DebugObjects.size(); ++i)
 		{
 			new (&DebugDrawCommand[i]) jDrawCommand(RenderFrameContextPtr, &View, DebugObjects[i]->RenderObjects[0], DebugRenderPass
-				, DebugObjectShader, &DebugPassPipelineStateFixed, DebugObjects[i]->RenderObjects[0]->MaterialPtr.get(), {}, nullptr);
+				, DebugObjectShader, &DebugPassPipelineStateFixed, DebugObjects[i]->RenderObjects[0]->MaterialPtr.get(), jShaderBindingInstanceArray(), nullptr);
 			DebugDrawCommand[i].PrepareToDraw(false);
 		}
 
@@ -451,7 +435,7 @@ void jRenderer::SetupShadowPass()
                 const jVertexBuffer* OverrideInstanceData = (ShouldUseOnePassPointLightShadow ? jRHI::CubeMapInstanceDataForSixFace.get() : nullptr);
 
                 new (&ShadowPasses.DrawCommands[InIndex]) jDrawCommand(RenderFrameContextPtr, &ShadowPasses.ViewLight, InRenderObject, ShadowPasses.ShadowMapRenderPass
-                    , (InRenderObject->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, Material, {}, nullptr, OverrideInstanceData);
+                    , (InRenderObject->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, Material, jShaderBindingInstanceArray(), nullptr, OverrideInstanceData);
                 ShadowPasses.DrawCommands[InIndex].PrepareToDraw(true);
             });
 #else
@@ -469,7 +453,7 @@ void jRenderer::SetupShadowPass()
                 const jVertexBuffer* OverrideInstanceData = (ShouldUseOnePassPointLightShadow ? jRHI::CubeMapInstanceDataForSixFace.get() : nullptr);
 
                 new (&ShadowPasses.DrawCommands[i]) jDrawCommand(RenderFrameContextPtr, &ShadowPasses.ViewLight, iter, ShadowPasses.ShadowMapRenderPass
-                    , (iter->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, Material, {}, nullptr, OverrideInstanceData);
+                    , (iter->HasInstancing() ? ShadowInstancingShader : ShadowShader), &ShadpwPipelineStateFixed, Material, jShaderBindingInstanceArray(), nullptr, OverrideInstanceData);
                 ShadowPasses.DrawCommands[i].PrepareToDraw(true);
                 ++i;
             }
@@ -733,7 +717,7 @@ void jRenderer::SetupBasePass()
             }
 
             new (&BasePasses[InIndex]) jDrawCommand(RenderFrameContextPtr, &View, InRenderObject, BaseRenderPass
-                , GetOrCreateShaderFunc(InRenderObject, Material), &BasePassPipelineStateFixed, Material, {}, SimplePushConstant);
+                , GetOrCreateShaderFunc(InRenderObject, Material), &BasePassPipelineStateFixed, Material, jShaderBindingInstanceArray(), SimplePushConstant);
             BasePasses[InIndex].PrepareToDraw(false);
         });
 #else
@@ -757,7 +741,7 @@ void jRenderer::SetupBasePass()
         //Material = GDefaultMaterial.get();
 
         new (&BasePasses[i]) jDrawCommand(RenderFrameContextPtr, &View, iter, BaseRenderPass
-            , GetOrCreateShaderFunc(iter, Material), &BasePassPipelineStateFixed, Material, {}, SimplePushConstant);
+            , GetOrCreateShaderFunc(iter, Material), &BasePassPipelineStateFixed, Material, jShaderBindingInstanceArray(), SimplePushConstant);
         BasePasses[i].PrepareToDraw(false);
         ++i;
     }
@@ -924,8 +908,8 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
 
     //////////////////////////////////////////////////////////////////////////
     // GBuffer Input attachment 추가
-    jShaderBindingInstanceArray DefaultLightPassShaderBindingInstances;
-    DefaultLightPassShaderBindingInstances.Add(View.ViewUniformBufferShaderBindingInstance.get());
+    jShaderBindingInstanceGroup DefaultLightPassShaderBindingGroup;
+    DefaultLightPassShaderBindingGroup.Add(View.ViewUniformBufferShaderBindingInstance);
     //////////////////////////////////////////////////////////////////////////
 
     std::vector<jDrawCommand> LightPasses;
@@ -946,13 +930,13 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
         switch (viewLight.Light->Type)
         {
         case ELightType::DIRECTIONAL:
-            generator = std::make_unique<jDirectionalLightDrawCommandGenerator>(DefaultLightPassShaderBindingInstances);
+            generator = std::make_unique<jDirectionalLightDrawCommandGenerator>(DefaultLightPassShaderBindingGroup);
             break;
         case ELightType::POINT:
-            generator = std::make_unique<jPointLightDrawCommandGenerator>(DefaultLightPassShaderBindingInstances);
+            generator = std::make_unique<jPointLightDrawCommandGenerator>(DefaultLightPassShaderBindingGroup);
             break;
         case ELightType::SPOT:
-            generator = std::make_unique<jSpotLightDrawCommandGenerator>(DefaultLightPassShaderBindingInstances);
+            generator = std::make_unique<jSpotLightDrawCommandGenerator>(DefaultLightPassShaderBindingGroup);
             break;
         default:
             continue;

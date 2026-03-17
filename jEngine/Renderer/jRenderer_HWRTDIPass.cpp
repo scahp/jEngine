@@ -676,31 +676,9 @@ namespace
         std::vector<std::shared_ptr<jShaderBindingInstance>> BindlessShaderBindingInstances =
             jShaderBindlessSet::CreateShaderBindingInstances(BindlessParameters, BindingShaderStageFlag, jShaderBindingInstanceType::SingleFrame);
 
-        jShaderBindingLayoutArray GlobalShaderBindingLayoutArray;
-        GlobalShaderBindingLayoutArray.Add(GlobalShaderBindingInstance->ShaderBindingsLayouts);
-        for (const auto& BindlessShaderBindingInstance : BindlessShaderBindingInstances)
-        {
-            GlobalShaderBindingLayoutArray.Add(BindlessShaderBindingInstance->ShaderBindingsLayouts);
-        }
-
-        jShaderBindingInstanceArray ShaderBindingInstanceArray;
-        ShaderBindingInstanceArray.Add(GlobalShaderBindingInstance.get());
-        for (const auto& BindlessShaderBindingInstance : BindlessShaderBindingInstances)
-        {
-            ShaderBindingInstanceArray.Add(BindlessShaderBindingInstance.get());
-        }
-
-        jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
-        for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
-        {
-            ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
-            const std::vector<uint32>* DynamicOffsets = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
-            if (DynamicOffsets && DynamicOffsets->size())
-            {
-                ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)DynamicOffsets->data(), (int32)DynamicOffsets->size());
-            }
-        }
-        ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
+        jShaderBindingInstanceGroup ShaderBindingGroup;
+        ShaderBindingGroup.Add(GlobalShaderBindingInstance);
+        ShaderBindingGroup.Add(BindlessShaderBindingInstances);
 
         g_rhi->TransitionLayout(CmdBuffer, PackedLightBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
         g_rhi->TransitionLayout(CmdBuffer, HWRTDIOutput, EResourceLayout::UAV);
@@ -711,9 +689,9 @@ namespace
             InlinePermutation.SetIndex<jShaderHWRTDIInlineRayQueryComputeShader::USE_SURFEL_GI>(0);
             InlinePermutation.SetIndex<jShaderHWRTDIInlineRayQueryComputeShader::USE_BINDLESS_RESOURCE>(1);
             jShader* InlineComputeShader = jShaderHWRTDIInlineRayQueryComputeShader::CreateShader(InlinePermutation);
-            jPipelineStateInfo* InlineComputePipelineState = g_rhi->CreateComputePipelineStateInfo(InlineComputeShader, GlobalShaderBindingLayoutArray, nullptr);
+            jPipelineStateInfo* InlineComputePipelineState = g_rhi->CreateComputePipelineStateInfo(InlineComputeShader, ShaderBindingGroup.GetLayoutArray(), nullptr);
             InlineComputePipelineState->Bind(InRenderer->RenderFrameContextPtr);
-            g_rhi->BindComputeShaderBindingInstances(CmdBuffer, InlineComputePipelineState, ShaderBindingInstanceCombiner, 0);
+            g_rhi->BindComputeShaderBindingInstances(CmdBuffer, InlineComputePipelineState, ShaderBindingGroup.GetCombiner(), 0);
 
             const uint32 GroupX = ((uint32)SCR_WIDTH + 7u) / 8u;
             const uint32 GroupY = ((uint32)SCR_HEIGHT + 7u) / 8u;
@@ -728,9 +706,9 @@ namespace
             RaytracingPipelineData.MaxAttributeSize = 2 * sizeof(float);
             RaytracingPipelineData.MaxPayloadSize = sizeof(Vector4);
             RaytracingPipelineData.MaxTraceRecursionDepth = 2;
-            auto RaytracingPipelineState = g_rhi->CreateRaytracingPipelineStateInfo(RaytracingShaders, RaytracingPipelineData, GlobalShaderBindingLayoutArray, nullptr);
+            auto RaytracingPipelineState = g_rhi->CreateRaytracingPipelineStateInfo(RaytracingShaders, RaytracingPipelineData, ShaderBindingGroup.GetLayoutArray(), nullptr);
 
-            g_rhi->BindRaytracingShaderBindingInstances(CmdBuffer, RaytracingPipelineState, ShaderBindingInstanceCombiner, 0);
+            g_rhi->BindRaytracingShaderBindingInstances(CmdBuffer, RaytracingPipelineState, ShaderBindingGroup.GetCombiner(), 0);
             RaytracingPipelineState->Bind(InRenderer->RenderFrameContextPtr);
 
             jRaytracingDispatchData TracingData;

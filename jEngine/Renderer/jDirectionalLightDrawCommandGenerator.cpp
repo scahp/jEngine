@@ -8,8 +8,8 @@
 
 jObject* jDirectionalLightDrawCommandGenerator::GlobalFullscreenPrimitive = nullptr;
 
-jDirectionalLightDrawCommandGenerator::jDirectionalLightDrawCommandGenerator(const jShaderBindingInstanceArray& InShaderBindingInstances)
-    : ShaderBindingInstances(InShaderBindingInstances)
+jDirectionalLightDrawCommandGenerator::jDirectionalLightDrawCommandGenerator(const jShaderBindingInstanceGroup& InShaderBindingGroup)
+    : ShaderBindingGroup(InShaderBindingGroup)
 {
 }
 
@@ -54,8 +54,8 @@ void jDirectionalLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* Ou
     ShaderPermutation.SetIndex<jShaderDirectionalLightPixelShader::USE_PBR>(ENABLE_PBR);
     Shader.PixelShader = jShaderDirectionalLightPixelShader::CreateShader(ShaderPermutation);
 
-    jShaderBindingInstanceArray CopyShaderBindingInstances = ShaderBindingInstances;
-    CopyShaderBindingInstances.Add(InLightView.ShaderBindingInstance.get());
+    jShaderBindingInstanceGroup LightShaderBindingGroup = ShaderBindingGroup;
+    LightShaderBindingGroup.Add(InLightView.ShaderBindingInstance);
 
     const jSamplerStateInfo* ShadowSamplerStateInfo = TSamplerStateInfo<ETextureFilter::NEAREST_MIPMAP_LINEAR, ETextureFilter::NEAREST_MIPMAP_LINEAR
         , ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER
@@ -65,14 +65,13 @@ void jDirectionalLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* Ou
     Parameters.IrradianceMap = { jSceneRenderTarget::IrradianceMap2, ShadowSamplerStateInfo };
     Parameters.PrefilteredEnvMap = { jSceneRenderTarget::FilteredEnvMap2, ShadowSamplerStateInfo };
     temp = jShaderParameterSet::CreateShaderBindingInstance(Parameters, EShaderAccessStageFlag::FRAGMENT, jShaderBindingInstanceType::SingleFrame);
-    CopyShaderBindingInstances.Add(temp.get());
+    LightShaderBindingGroup.Add(temp);
 
     SceneTextureShaderBindingInstance = InRenderFrameContextPtr->SceneRenderTargetPtr->PrepareGBufferShaderBindingInstance(gOptions.UseSubpass);
-    CopyShaderBindingInstances.Add(SceneTextureShaderBindingInstance.get());
+    LightShaderBindingGroup.Add(SceneTextureShaderBindingInstance);
 
     check(OutDestDrawCommand);
     new (OutDestDrawCommand) jDrawCommand(InRenderFrameContextPtr, &InLightView, GlobalFullscreenPrimitive->RenderObjects[0], InRenderPass
-        , Shader, &PipelineStateFixedInfo, GlobalFullscreenPrimitive->RenderObjects[0]->MaterialPtr.get(), CopyShaderBindingInstances, {}, nullptr, InSubpassIndex);
-    OutDestDrawCommand->Test = true;
+        , Shader, &PipelineStateFixedInfo, GlobalFullscreenPrimitive->RenderObjects[0]->MaterialPtr.get(), LightShaderBindingGroup, nullptr, nullptr, InSubpassIndex, EDrawCommandBindingMode::Manual);
     OutDestDrawCommand->PrepareToDraw(false);
 }

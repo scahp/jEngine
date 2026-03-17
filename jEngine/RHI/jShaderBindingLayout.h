@@ -358,6 +358,128 @@ private:
 // todo : MemStack for jShaderBindingInstanceArray to allocate fast memory
 using jShaderBindingInstanceArray = jResourceContainer<const jShaderBindingInstance*>;
 using jShaderBindingInstancePtrArray = std::vector<std::shared_ptr<jShaderBindingInstance>>;
+struct jShaderBindingInstanceCombiner
+{
+    const jShaderBindingInstanceArray* ShaderBindingInstanceArray = nullptr;
+
+    jResourceContainer<void*> DescriptorSetHandles;
+    jResourceContainer<uint32> DynamicOffsets;
+};
+
+class jShaderBindingInstanceGroup
+{
+public:
+    jShaderBindingInstanceGroup()
+    {
+        Reset();
+    }
+
+    jShaderBindingInstanceGroup(const jShaderBindingInstanceGroup& InOther)
+        : ShaderBindingInstanceArray(InOther.ShaderBindingInstanceArray)
+        , ShaderBindingLayoutArray(InOther.ShaderBindingLayoutArray)
+        , ShaderBindingInstanceCombinerData(InOther.ShaderBindingInstanceCombinerData)
+    {
+        ShaderBindingInstanceCombinerData.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
+    }
+
+    jShaderBindingInstanceGroup(jShaderBindingInstanceGroup&& InOther) noexcept
+        : ShaderBindingInstanceArray(InOther.ShaderBindingInstanceArray)
+        , ShaderBindingLayoutArray(InOther.ShaderBindingLayoutArray)
+        , ShaderBindingInstanceCombinerData(InOther.ShaderBindingInstanceCombinerData)
+    {
+        ShaderBindingInstanceCombinerData.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
+    }
+
+    jShaderBindingInstanceGroup& operator=(const jShaderBindingInstanceGroup& InOther)
+    {
+        if (this != &InOther)
+        {
+            ShaderBindingInstanceArray = InOther.ShaderBindingInstanceArray;
+            ShaderBindingLayoutArray = InOther.ShaderBindingLayoutArray;
+            ShaderBindingInstanceCombinerData = InOther.ShaderBindingInstanceCombinerData;
+            ShaderBindingInstanceCombinerData.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
+        }
+        return *this;
+    }
+
+    jShaderBindingInstanceGroup& operator=(jShaderBindingInstanceGroup&& InOther) noexcept
+    {
+        if (this != &InOther)
+        {
+            ShaderBindingInstanceArray = InOther.ShaderBindingInstanceArray;
+            ShaderBindingLayoutArray = InOther.ShaderBindingLayoutArray;
+            ShaderBindingInstanceCombinerData = InOther.ShaderBindingInstanceCombinerData;
+            ShaderBindingInstanceCombinerData.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
+        }
+        return *this;
+    }
+
+    void Reset()
+    {
+        ShaderBindingInstanceArray.Reset();
+        ShaderBindingLayoutArray.Reset();
+        ShaderBindingInstanceCombinerData = {};
+        ShaderBindingInstanceCombinerData.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
+    }
+
+    void Add(const jShaderBindingInstance* InShaderBindingInstance)
+    {
+        check(InShaderBindingInstance);
+
+        ShaderBindingInstanceArray.Add(InShaderBindingInstance);
+        ShaderBindingLayoutArray.Add(InShaderBindingInstance->ShaderBindingsLayouts);
+        ShaderBindingInstanceCombinerData.DescriptorSetHandles.Add(InShaderBindingInstance->GetHandle());
+
+        if (const std::vector<uint32>* DynamicOffsets = InShaderBindingInstance->GetDynamicOffsets())
+        {
+            if (!DynamicOffsets->empty())
+            {
+                ShaderBindingInstanceCombinerData.DynamicOffsets.Add((void*)DynamicOffsets->data(), (int32)DynamicOffsets->size());
+            }
+        }
+    }
+
+    void Add(const std::shared_ptr<jShaderBindingInstance>& InShaderBindingInstance)
+    {
+        Add(InShaderBindingInstance.get());
+    }
+
+    void Add(const jShaderBindingInstanceArray& InShaderBindingInstances)
+    {
+        for (int32 i = 0; i < InShaderBindingInstances.NumOfData; ++i)
+        {
+            Add(InShaderBindingInstances[i]);
+        }
+    }
+
+    void Add(const jShaderBindingInstancePtrArray& InShaderBindingInstances)
+    {
+        for (const auto& ShaderBindingInstance : InShaderBindingInstances)
+        {
+            Add(ShaderBindingInstance);
+        }
+    }
+
+    const jShaderBindingInstanceArray& GetInstanceArray() const
+    {
+        return ShaderBindingInstanceArray;
+    }
+
+    const jResourceContainer<const jShaderBindingLayout*>& GetLayoutArray() const
+    {
+        return ShaderBindingLayoutArray;
+    }
+
+    const jShaderBindingInstanceCombiner& GetCombiner() const
+    {
+        return ShaderBindingInstanceCombinerData;
+    }
+
+private:
+    jShaderBindingInstanceArray ShaderBindingInstanceArray;
+    jResourceContainer<const jShaderBindingLayout*> ShaderBindingLayoutArray;
+    jShaderBindingInstanceCombiner ShaderBindingInstanceCombinerData;
+};
 
 struct jShaderBindingLayout
 {

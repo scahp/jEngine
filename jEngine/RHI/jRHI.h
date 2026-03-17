@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "Math\Matrix.h"
 #include "Core\jName.h"
 #include "Math\Vector.h"
@@ -221,7 +221,7 @@ class jLight;
 class jDirectionalLight;
 struct jShaderBindingInstance;
 
-// View 에서 사용할 라이트 정보
+// View ?먯꽌 ?ъ슜???쇱씠???뺣낫
 class jViewLight
 {
 public:
@@ -252,15 +252,6 @@ public:
 	std::shared_ptr<jShaderBindingInstance> ViewUniformBufferShaderBindingInstance;
 };
 
-// BindGraphicsShaderBindingInstances 에서 바인딩 할 ShaderBindingInstance 배열을 얻어오는데 사용하는 구조체
-struct jShaderBindingInstanceCombiner
-{
-	const jShaderBindingInstanceArray* ShaderBindingInstanceArray = nullptr;
-
-    jResourceContainer<void*> DescriptorSetHandles;
-    jResourceContainer<uint32> DynamicOffsets;
-};
-
 struct jImageSubResourceData
 {
     int32 Format = 0;
@@ -286,7 +277,7 @@ struct jTextureCopyRegion
     int32 Height = 0;
     uint32 MipLevel = 0;
     uint32 ArraySlice = 0;
-    uint32 DestRowPitchOverride = 0;    // 0이면 API 기본 규칙 사용 (DX12: 256 align)
+    uint32 DestRowPitchOverride = 0;    // 0?대㈃ API 湲곕낯 洹쒖튃 ?ъ슜 (DX12: 256 align)
 };
 
 struct jRaytracingDispatchData
@@ -712,7 +703,7 @@ struct TRasterizationStateInfo
         initializer.RasterizerDiscardEnable = TRasterizerDiscardEnable;
 
 		initializer.SampleCount = TSampleCount;
-		initializer.SampleShadingEnable = TSampleShadingEnable;		// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
+		initializer.SampleShadingEnable = TSampleShadingEnable;		// Sample shading 耳? (?띿뒪爾??대????덈뒗 aliasing ???꾪솕 ?댁쨲)
 		initializer.MinSampleShading = TMinSampleShading;
 		initializer.AlphaToCoverageEnable = TAlphaToCoverageEnable;
 		initializer.AlphaToOneEnable = TAlphaToOneEnable;
@@ -735,7 +726,7 @@ struct TRasterizationStateInfo
 //
 //        jMultisampleStateInfo initializer;
 //        initializer.SampleCount = InSampleCount;
-//        initializer.SampleShadingEnable = TSampleShadingEnable;		// Sample shading 켬	 (텍스쳐 내부에 있는 aliasing 도 완화 해줌)
+//        initializer.SampleShadingEnable = TSampleShadingEnable;		// Sample shading 耳? (?띿뒪爾??대????덈뒗 aliasing ???꾪솕 ?댁쨲)
 //        initializer.MinSampleShading = TMinSampleShading;
 //        initializer.AlphaToCoverageEnable = TAlphaToCoverageEnable;
 //        initializer.AlphaToOneEnable = TAlphaToOneEnable;
@@ -834,3 +825,4 @@ public:
 #define DEBUG_EVENT_NAME(Name, Line) Name##Line
 #define DEBUG_EVENT(RenderFrameContextPtr, Name) jGPUDebugEvent DEBUG_EVENT_NAME(DebugEvent_, __LINE__)(RenderFrameContextPtr->GetActiveCommandBuffer(), Name);
 #define DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, Name, ColorVec4) jGPUDebugEvent DEBUG_EVENT_NAME(DebugEvent_, __LINE__)(RenderFrameContextPtr->GetActiveCommandBuffer(), Name, ColorVec4);
+

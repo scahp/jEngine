@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include "RHI/jShaderBindingLayout.h"
+
 class jRenderObject;
 class jView;
 class jViewLight;
@@ -10,6 +12,12 @@ struct jPipelineStateFixedInfo;
 struct jShaderBindingInstance;
 class jMaterial;
 
+enum class EDrawCommandBindingMode : uint8
+{
+    Standard = 0,
+    Manual
+};
+
 class jDrawCommand
 {
 public:
@@ -17,21 +25,32 @@ public:
     jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const jView* InView, jRenderObject* InRenderObject
         , jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed, jMaterial* InMaterial
         , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, const jVertexBuffer* InOverrideInstanceData = nullptr
-        , int32 InSubpassIndex = 0);
+        , int32 InSubpassIndex = 0, EDrawCommandBindingMode InBindingMode = EDrawCommandBindingMode::Standard);
+    jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const jView* InView, jRenderObject* InRenderObject
+        , jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed, jMaterial* InMaterial
+        , const jShaderBindingInstanceGroup& InShaderBindingInstanceGroup, const jPushConstant* InPushConstant, const jVertexBuffer* InOverrideInstanceData = nullptr
+        , int32 InSubpassIndex = 0, EDrawCommandBindingMode InBindingMode = EDrawCommandBindingMode::Standard);
     jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const jViewLight* InViewLight, jRenderObject* InRenderObject
         , jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed, jMaterial* InMaterial
         , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, const jVertexBuffer* InOverrideInstanceData = nullptr
-        , int32 InSubpassIndex = 0);
+        , int32 InSubpassIndex = 0, EDrawCommandBindingMode InBindingMode = EDrawCommandBindingMode::Standard);
+    jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const jViewLight* InViewLight, jRenderObject* InRenderObject
+        , jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed, jMaterial* InMaterial
+        , const jShaderBindingInstanceGroup& InShaderBindingInstanceGroup, const jPushConstant* InPushConstant, const jVertexBuffer* InOverrideInstanceData = nullptr
+        , int32 InSubpassIndex = 0, EDrawCommandBindingMode InBindingMode = EDrawCommandBindingMode::Standard);
     jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jRenderObject* InRenderObject
         , jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed, jMaterial* InMaterial
         , const jShaderBindingInstanceArray& InShaderBindingInstanceArray, const jPushConstant* InPushConstant, const jVertexBuffer* InOverrideInstanceData = nullptr
-        , int32 InSubpassIndex = 0);
+        , int32 InSubpassIndex = 0, EDrawCommandBindingMode InBindingMode = EDrawCommandBindingMode::Standard);
+    jDrawCommand(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jRenderObject* InRenderObject
+        , jRenderPass* InRenderPass, jGraphicsPipelineShader InShader, jPipelineStateFixedInfo* InPipelineStateFixed, jMaterial* InMaterial
+        , const jShaderBindingInstanceGroup& InShaderBindingInstanceGroup, const jPushConstant* InPushConstant, const jVertexBuffer* InOverrideInstanceData = nullptr
+        , int32 InSubpassIndex = 0, EDrawCommandBindingMode InBindingMode = EDrawCommandBindingMode::Standard);
 
     void PrepareToDraw(bool bPositionOnly);
     void Draw() const;
 
-    jShaderBindingInstanceArray ShaderBindingInstanceArray;
-    jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
+    jShaderBindingInstanceGroup ShaderBindingGroup;
 
     bool IsViewLight = false;
     union
@@ -50,9 +69,12 @@ public:
     std::shared_ptr<jRenderFrameContext> RenderFrameContextPtr;
     bool IsPositionOnly = false;
     int32 SubpassIndex = 0;
-    bool Test = false;
+    EDrawCommandBindingMode BindingMode = EDrawCommandBindingMode::Standard;
 
     std::shared_ptr<jShaderBindingInstance> OneRenderObjectUniformBuffer;
+
+private:
+    void AppendStandardBindings();
 };
 
 // jDrawCommand generator

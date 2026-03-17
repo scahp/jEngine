@@ -76,28 +76,12 @@ void DispatchShaderParameterComputePass(const std::shared_ptr<jRenderFrameContex
     jShaderParameterSet::AppendToShaderInfo<TShaderParameters>(ShaderInfo, 0);
     jShader* Shader = g_rhi->CreateShader(ShaderInfo);
 
-    jShaderBindingLayoutArray ShaderBindingLayoutArray;
-    ShaderBindingLayoutArray.Add(CurrentBindingInstance->ShaderBindingsLayouts);
-
-    jPipelineStateInfo* ComputePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingLayoutArray, {});
+    jShaderBindingInstanceGroup ShaderBindingGroup;
+    ShaderBindingGroup.Add(CurrentBindingInstance);
+    jPipelineStateInfo* ComputePipelineStateInfo = g_rhi->CreateComputePipelineStateInfo(Shader, ShaderBindingGroup.GetLayoutArray(), {});
     ComputePipelineStateInfo->Bind(InRenderFrameContextPtr);
 
-    jShaderBindingInstanceArray ShaderBindingInstanceArray;
-    ShaderBindingInstanceArray.Add(CurrentBindingInstance.get());
-
-    jShaderBindingInstanceCombiner ShaderBindingInstanceCombiner;
-    for (int32 i = 0; i < ShaderBindingInstanceArray.NumOfData; ++i)
-    {
-        ShaderBindingInstanceCombiner.DescriptorSetHandles.Add(ShaderBindingInstanceArray[i]->GetHandle());
-        const std::vector<uint32>* DynamicOffsets = ShaderBindingInstanceArray[i]->GetDynamicOffsets();
-        if (DynamicOffsets && DynamicOffsets->size())
-        {
-            ShaderBindingInstanceCombiner.DynamicOffsets.Add((void*)DynamicOffsets->data(), (int32)DynamicOffsets->size());
-        }
-    }
-    ShaderBindingInstanceCombiner.ShaderBindingInstanceArray = &ShaderBindingInstanceArray;
-
-    g_rhi->BindComputeShaderBindingInstances(InRenderFrameContextPtr->GetActiveCommandBuffer(), ComputePipelineStateInfo, ShaderBindingInstanceCombiner, 0);
+    g_rhi->BindComputeShaderBindingInstances(InRenderFrameContextPtr->GetActiveCommandBuffer(), ComputePipelineStateInfo, ShaderBindingGroup.GetCombiner(), 0);
     g_rhi->DispatchCompute(InRenderFrameContextPtr, NumGroupsX, NumGroupsY, NumGroupsZ);
 }
 
@@ -1092,45 +1076,20 @@ bool DispatchSurfelGIHWRTDIGather(
     auto SurfelGatherBindingInstance = jShaderParameterSet::CreateShaderBindingInstance(
         SurfelGatherParameters, EShaderAccessStageFlag::COMPUTE, jShaderBindingInstanceType::SingleFrame);
 
-    jShaderBindingLayoutArray LayoutArray;
-    LayoutArray.Add(GlobalShaderBindingInstance->ShaderBindingsLayouts);
-    LayoutArray.Add(SurfelGatherBindingInstance->ShaderBindingsLayouts);
-    for (const auto& BindlessShaderBindingInstance : BindlessShaderBindingInstances)
-    {
-        LayoutArray.Add(BindlessShaderBindingInstance->ShaderBindingsLayouts);
-    }
+    jShaderBindingInstanceGroup ShaderBindingGroup;
+    ShaderBindingGroup.Add(GlobalShaderBindingInstance);
+    ShaderBindingGroup.Add(SurfelGatherBindingInstance);
+    ShaderBindingGroup.Add(BindlessShaderBindingInstances);
 
     jShaderSurfelGIGatherIrradianceHWRTCS::ShaderPermutation GatherPermutation;
     GatherPermutation.SetIndex<jShaderSurfelGIGatherIrradianceHWRTCS::USE_SURFEL_GI>(1);
     GatherPermutation.SetIndex<jShaderSurfelGIGatherIrradianceHWRTCS::USE_BINDLESS_RESOURCE>(1);
     jShader* IrradianceGatherShader = jShaderSurfelGIGatherIrradianceHWRTCS::CreateShader(GatherPermutation);
-    jPipelineStateInfo* IrradianceGatherPSO = g_rhi->CreateComputePipelineStateInfo(IrradianceGatherShader, LayoutArray, {});
+    jPipelineStateInfo* IrradianceGatherPSO = g_rhi->CreateComputePipelineStateInfo(IrradianceGatherShader, ShaderBindingGroup.GetLayoutArray(), {});
     IrradianceGatherPSO->Bind(InRenderFrameContextPtr);
 
-    jShaderBindingInstanceArray InstanceArray;
-    InstanceArray.Add(GlobalShaderBindingInstance.get());
-    InstanceArray.Add(SurfelGatherBindingInstance.get());
-    for (const auto& BindlessShaderBindingInstance : BindlessShaderBindingInstances)
-    {
-        InstanceArray.Add(BindlessShaderBindingInstance.get());
-    }
-
-    jShaderBindingInstanceCombiner ShaderBindingCombiner;
-    ShaderBindingCombiner.ShaderBindingInstanceArray = &InstanceArray;
-    for (int32 i = 0; i < InstanceArray.NumOfData; ++i)
-    {
-        ShaderBindingCombiner.DescriptorSetHandles.Add(InstanceArray[i]->GetHandle());
-        if (const std::vector<uint32>* DynamicOffsets = InstanceArray[i]->GetDynamicOffsets())
-        {
-            if (!DynamicOffsets->empty())
-            {
-                ShaderBindingCombiner.DynamicOffsets.Add((void*)DynamicOffsets->data(), (int32)DynamicOffsets->size());
-            }
-        }
-    }
-
     g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), PackedLightBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
-    g_rhi->BindComputeShaderBindingInstances(InRenderFrameContextPtr->GetActiveCommandBuffer(), IrradianceGatherPSO, ShaderBindingCombiner, 0);
+    g_rhi->BindComputeShaderBindingInstances(InRenderFrameContextPtr->GetActiveCommandBuffer(), IrradianceGatherPSO, ShaderBindingGroup.GetCombiner(), 0);
     const jName RHIName = g_rhi->GetRHIName();
     const bool SupportsComputeIndirectDispatch = (RHIName == jNameStatic("Vulkan")) || (RHIName == jNameStatic("DirectX12"));
     if (SupportsComputeIndirectDispatch)

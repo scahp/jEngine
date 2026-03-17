@@ -18,7 +18,7 @@ class jDirectionalLightDrawCommandGenerator : public jDrawCommandGenerator
 public:
     static jObject* GlobalFullscreenPrimitive;
 
-    jDirectionalLightDrawCommandGenerator(const jShaderBindingInstanceArray& InShaderBindingInstances);
+    jDirectionalLightDrawCommandGenerator(const jShaderBindingInstanceGroup& InShaderBindingGroup);
 
     virtual void Initialize(int32 InRTWidth, int32 InRTHeight) override;
     virtual void GenerateDrawCommand(jDrawCommand* OutDestDrawCommand, const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr
@@ -30,7 +30,7 @@ public:
     jPipelineStateFixedInfo PipelineStateFixedInfo;
 
     jGraphicsPipelineShader Shader;
-    const jShaderBindingInstanceArray& ShaderBindingInstances;
+    jShaderBindingInstanceGroup ShaderBindingGroup;
 
     std::shared_ptr<jShaderBindingInstance> temp;
     std::shared_ptr<jShaderBindingInstance> SceneTextureShaderBindingInstance;
