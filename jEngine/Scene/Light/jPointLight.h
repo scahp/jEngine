@@ -49,8 +49,37 @@ public:
     virtual jCamera* GetLightCamra(int index = 0) const;
     virtual const Matrix* GetLightWorldMatrix() const override;
     virtual const std::shared_ptr<jShaderBindingInstance>& PrepareShaderBindingInstance(jTexture* InShadowMap) override;
+    virtual bool SupportsPosition() const override { return true; }
+    virtual Vector GetPosition() const override { return LightData.Position; }
 
     FORCEINLINE const jPointLightUniformBufferData& GetLightData() const { return LightData; }
+
+    virtual void SetPosition(const Vector& InPosition) override
+    {
+        if (LightData.Position != InPosition)
+        {
+            LightData.Position = InPosition;
+            IsNeedToUpdateShaderBindingInstance = true;
+        }
+    }
+
+    void SetColor(const Vector& InColor)
+    {
+        if (LightData.Color != InColor)
+        {
+            LightData.Color = InColor;
+            IsNeedToUpdateShaderBindingInstance = true;
+        }
+    }
+
+    void SetMaxDistance(float InMaxDistance)
+    {
+        if (LightData.MaxDistance != InMaxDistance)
+        {
+            LightData.MaxDistance = InMaxDistance;
+            IsNeedToUpdateShaderBindingInstance = true;
+        }
+    }
 
     jCamera* Camera[6] = {0,};
     Matrix LightWorldMatrix;
@@ -59,7 +88,7 @@ public:
 
     std::shared_ptr<jShaderBindingInstance> ShaderBindingInstanceOnlyLightData;
     std::shared_ptr<jShaderBindingInstance> ShaderBindingInstanceWithShadowMap;
-    bool IsNeedToUpdateShaderBindingInstance = true;                // 위치가 달라지는 경우도 업데이트 되도록... 업데이트 규칙을 좀 만들어야 함
+    bool IsNeedToUpdateShaderBindingInstance = true;                // 위치 변경 시에도 shader binding instance를 갱신한다.
     jTexture* LastUsedShadowMap = nullptr;
 
 private:

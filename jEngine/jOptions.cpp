@@ -174,8 +174,8 @@ jOptions::jOptions()
     RayPerPixel = 1;
 
     // Path Tracing
-    MaxRecursionDepthForPathTracing = 1;
-    RayPerPixelForPathTracing = 1;
+    MaxRecursionDepthForPathTracing = 6;
+    RayPerPixelForPathTracing = 5;
 
 	// Raytracing
 	UseRaytracing = true;

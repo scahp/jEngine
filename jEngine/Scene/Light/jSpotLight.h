@@ -54,8 +54,21 @@ public:
     virtual const Matrix* GetLightWorldMatrix() const override;
     virtual const std::shared_ptr<jShaderBindingInstance>& PrepareShaderBindingInstance(jTexture* InShadowMap) override;
     virtual bool IsUseRevereZPerspective() const { return true; }
+    virtual bool SupportsPosition() const override { return true; }
+    virtual bool SupportsDirection() const override { return true; }
+    virtual Vector GetPosition() const override { return LightData.Position; }
+    virtual Vector GetDirection() const override { return LightData.Direction; }
 
     FORCEINLINE const jSpotLightUniformBufferData& GetLightData() const { return LightData; }
+
+    virtual void SetPosition(const Vector& InPosition) override
+    {
+        if (LightData.Position != InPosition)
+        {
+            LightData.Position = InPosition;
+            IsNeedToUpdateShaderBindingInstance = true;
+        }
+    }
 
     jCamera* Camera = nullptr;
     Matrix LightWorldMatrix;
@@ -63,12 +76,44 @@ public:
     std::shared_ptr<IUniformBufferBlock> LightDataUniformBlockPtr;
     std::shared_ptr<jShaderBindingInstance> ShaderBindingInstanceOnlyLightData;
     std::shared_ptr<jShaderBindingInstance> ShaderBindingInstanceWithShadowMap;
-    bool IsNeedToUpdateShaderBindingInstance = true;                // 위치가 달라지는 경우도 업데이트 되도록... 업데이트 규칙을 좀 만들어야 함
+    bool IsNeedToUpdateShaderBindingInstance = true;                // 위치 변경 시에도 shader binding instance를 갱신한다.
 
-    void SetDirection(const Vector& InDirection)
+    virtual void SetDirection(const Vector& InDirection) override
     {
-        LightData.Direction = InDirection;
-        IsNeedToUpdateShaderBindingInstance = true;
+        if (LightData.Direction != InDirection)
+        {
+            LightData.Direction = InDirection;
+            IsNeedToUpdateShaderBindingInstance = true;
+        }
+    }
+
+    void SetColor(const Vector& InColor)
+    {
+        if (LightData.Color != InColor)
+        {
+            LightData.Color = InColor;
+            IsNeedToUpdateShaderBindingInstance = true;
+        }
+    }
+
+    void SetMaxDistance(float InMaxDistance)
+    {
+        if (LightData.MaxDistance != InMaxDistance)
+        {
+            LightData.MaxDistance = InMaxDistance;
+            SM_FarDist = InMaxDistance;
+            IsNeedToUpdateShaderBindingInstance = true;
+        }
+    }
+
+    void SetConeAngles(float InPenumbraRadian, float InUmbraRadian)
+    {
+        if (LightData.PenumbraRadian != InPenumbraRadian || LightData.UmbraRadian != InUmbraRadian)
+        {
+            LightData.PenumbraRadian = InPenumbraRadian;
+            LightData.UmbraRadian = InUmbraRadian;
+            IsNeedToUpdateShaderBindingInstance = true;
+        }
     }
 
 private:

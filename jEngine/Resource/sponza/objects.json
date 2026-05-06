@@ -1,0 +1,52 @@
+{
+  "camera": {
+    "position": [1124.351929, 31.903732, 18.57412],
+    "target": [1123.424909, 32.168008, 18.308052],
+    "up": [0.0, 1.0, 0.0],
+    "fovDegree": 45.0,
+    "near": 10.0,
+    "far": 5000.0
+  },
+  "lights": [
+    {
+      "type": "directional",
+      "direction": [0.049, -0.953, -0.263],
+      "color": [2.22, 1.77, 0.84]
+    },
+    {
+      "type": "point",
+      "position": [10.0, 100.0, 10.0],
+      "color": [20000.0, 15000.0, 15000.0],
+      "maxDistance": 1500.0
+    },
+    {
+      "type": "spot",
+      "position": [0.0, 60.0, 5.0],
+      "direction": [0.680414, -0.680414, 0.272166],
+      "color": [0.0, 20000.0, 0.0],
+      "maxDistance": 2000.0,
+      "penumbraRadian": 0.35,
+      "umbraRadian": 1.0,
+      "logic": {
+        "name": "rotate_axis",
+        "params": {
+          "target": "direction",
+          "axis": [0.0, 1.0, 0.0],
+          "speed": 1.0,
+          "normalize": true
+        }
+      }
+    }
+  ],
+  "objects": [
+    {
+      "type": "sphere",
+      "position": [65.0, 35.0, 10.0],
+      "radius": 1.0,
+      "slices": 60,
+      "stacks": 30,
+      "scale": [30.0, 30.0, 30.0],
+      "color": [1.0, 1.0, 1.0, 1.0]
+    }
+  ]
+}

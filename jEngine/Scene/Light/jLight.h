@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "Math/Vector.h"
 #include "Scene/jCamera.h"
+#include <functional>
 
 enum class ELightType
 {
@@ -74,7 +75,7 @@ namespace jLightUtil
 
 	//	jCamera* ShadowMapCamera = nullptr;
 
-	//	// todo 정리 필요
+	//	// todo: shadow map related data layout cleanup
 	//	Matrix CascadeLightVP[NUM_CASCADES];
 	//	float CascadeEndsW[NUM_CASCADES] = { 0, };
 	//};
@@ -83,7 +84,7 @@ namespace jLightUtil
 	//static jShadowMapData* CreateCascadeShadowMap(const Vector& direction, const Vector& pos);
 }
 
-using PRE_UPDATE_LAMBDA = void (*)(class jLight*, float);
+using PRE_UPDATE_LAMBDA = std::function<void(class jLight*, float)>;
 
 class jLight
 {
@@ -125,6 +126,12 @@ public:
 	virtual const jCamera* GetLightCamra(int32 index = 0) const { return nullptr; }
 	virtual const jTexture* GetShadowMap(int32 index = 0) const { return nullptr; };
 	virtual bool IsUseRevereZPerspective() const { return false; }
+	virtual bool SupportsPosition() const { return false; }
+	virtual bool SupportsDirection() const { return false; }
+	virtual Vector GetPosition() const { return Vector::ZeroVector; }
+	virtual Vector GetDirection() const { return Vector(0.0f, -1.0f, 0.0f); }
+	virtual void SetPosition(const Vector& InPosition) {}
+	virtual void SetDirection(const Vector& InDirection) {}
 	
 	// Light world matrix by using light's Position and MaxDistance
 	virtual const Matrix* GetLightWorldMatrix() const { return nullptr; }

@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 #include "jRenderer.h"
 #include "ImGui/jImGui.h"
 #include "Profiler/jPerformanceProfile.h"
@@ -270,6 +270,12 @@ void IRenderer::UIPass()
 		ImGui::Begin(szTitle);
         static bool bSelectHWRTTabByDefault = false;
         static bool bSelectSurfelGITabByDefault = true;
+        static bool bSelectPathTracingTabByDefault = false;
+        static bool bWasUsingPathTracingRenderer = false;
+        const bool bIsUsingPathTracingRenderer = (g_Engine && g_Engine->Game.IsUsingPathTracingRenderer());
+        if (bIsUsingPathTracingRenderer && !bWasUsingPathTracingRenderer)
+            bSelectPathTracingTabByDefault = true;
+        bWasUsingPathTracingRenderer = bIsUsingPathTracingRenderer;
 			
 		if (ImGui::BeginTabBar("RHI"))
 		{
@@ -1057,40 +1063,135 @@ void IRenderer::UIPass()
 			}
 
 #if USE_PATH_TRACING
-			{
-				ImGui::SetNextWindowPos(ImVec2(400.0f, 27.0f), ImGuiCond_FirstUseEver);
-				ImGui::SetNextWindowSize(ImVec2(200.0f, 80.0f), ImGuiCond_FirstUseEver);
-				if (ImGui::Begin("PathTracing Options", 0, ImGuiWindowFlags_AlwaysAutoResize))
-				{
-					if (ImGui::BeginCombo("PathTracingScene", gSelectedScene, ImGuiComboFlags_None))
-					{
-						for (int32 i = 0; i < (int32)gPathTracingScenesNameOnly.size(); ++i)
-						{
-							const bool is_selected = (gSelectedScene == gPathTracingScenesNameOnly[i].c_str());
-							if (ImGui::Selectable(gPathTracingScenesNameOnly[i].c_str(), is_selected))
-							{
-								gSelectedScene = gPathTracingScenesNameOnly[i].c_str();
-								gSelectedSceneIndex = i;
-							}
-							if (is_selected)
-								ImGui::SetItemDefaultFocus();
-						}
-						ImGui::EndCombo();
-					}
-
-					ImGui::SliderInt("MaxRecursionDepth", &gOptions.MaxRecursionDepthForPathTracing, 1, 100);
-					ImGui::SliderInt("RayPerPixel", &gOptions.RayPerPixelForPathTracing, 1, 100);
-
-					ImGui::End();
-				}
-			}
+            const ImGuiTabItemFlags PathTracingTabFlags = bSelectPathTracingTabByDefault ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
+            if (ImGui::BeginTabItem("PathTracing Options", nullptr, PathTracingTabFlags))
+            {
+                bSelectPathTracingTabByDefault = false;
+                ImGui::SliderInt("MaxRecursionDepth", &gOptions.MaxRecursionDepthForPathTracing, 1, 100);
+                ImGui::SliderInt("RayPerPixel", &gOptions.RayPerPixelForPathTracing, 1, 100);
+                ImGui::EndTabItem();
+            }
 #endif // USE_PATH_TRACING
+
 			ImGui::EndTabBar();
 		}
 		ImGui::End();
+
+		{
+			auto& game = g_Engine->Game;
+			const auto& loadableScenes = game.GetLoadablePathTracingScenes();
+			const int32 activeSceneIndex = game.GetActivePathTracingSceneIndex();
+			char sceneBrowserTitle[256] = { 0, };
+			const char* activeSceneName = game.GetActivePathTracingSceneName();
+			if (activeSceneName && strcmp(activeSceneName, "None") != 0)
+				sprintf_s(sceneBrowserTitle, sizeof(sceneBrowserTitle), "Scene Browser - %s###SceneBrowserWindow", activeSceneName);
+			else
+				sprintf_s(sceneBrowserTitle, sizeof(sceneBrowserTitle), "Scene Browser###SceneBrowserWindow");
+
+			ImGui::SetNextWindowPos(ImVec2(400.0f, 27.0f), ImGuiCond_FirstUseEver);
+			ImGui::SetNextWindowSize(ImVec2(430.0f, 340.0f), ImGuiCond_FirstUseEver);
+			ImGui::SetNextWindowCollapsed(true, ImGuiCond_FirstUseEver);
+			if (ImGui::Begin(sceneBrowserTitle, 0, ImGuiWindowFlags_AlwaysAutoResize))
+			{
+				ImGui::TextColored(ImVec4(1.0f, 0.9f, 0.2f, 1.0f), "Active Scene : %s", game.GetActivePathTracingSceneName());
+				ImGui::Text("Active Renderer : %s", game.GetActiveSceneRenderPipelineName());
+				ImGui::Text("Active Loader : %s", game.GetActivePathTracingSceneLoaderName());
+				ImGui::Text("Selected Scene : %s", game.GetSelectedPathTracingSceneName());
+				ImGui::Separator();
+
+				ImGui::Text("Loadable Scenes");
+				if (ImGui::BeginListBox("##LoadableScenes", ImVec2(380.0f, 180.0f)))
+				{
+					for (int32 i = 0; i < (int32)loadableScenes.size(); ++i)
+					{
+						const bool isActiveScene = (activeSceneIndex == i);
+						std::string label = loadableScenes[i].DisplayName;
+						label += " [";
+						label += game.GetSceneRenderPipelineName(i);
+						label += "]";
+						if (isActiveScene)
+							label += " [Active]";
+
+						if (isActiveScene)
+							ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.9f, 0.2f, 1.0f));
+
+						const bool isSelected = (game.GetSelectedPathTracingSceneIndex() == i);
+						if (ImGui::Selectable(label.c_str(), isSelected))
+						{
+							game.SetSelectedPathTracingSceneIndex(i);
+						}
+						if (isSelected)
+							ImGui::SetItemDefaultFocus();
+
+						if (isActiveScene)
+							ImGui::PopStyleColor();
+					}
+					ImGui::EndListBox();
+				}
+
+				const int32 selectedSceneIndex = game.GetSelectedPathTracingSceneIndex();
+				if (selectedSceneIndex >= 0 && selectedSceneIndex < (int32)loadableScenes.size())
+				{
+					const char* recommendedLoaderName = game.GetSceneRecommendedLoaderName(selectedSceneIndex);
+					const auto selectedLoader = game.GetSelectedPathTracingSceneLoader();
+					std::string recommendedOptionLabel = std::string("Recommended (") + recommendedLoaderName + ")";
+					const char* selectedLoaderPreview = nullptr;
+					switch (selectedLoader)
+					{
+					case jGame::ESceneLoader::Recommended:
+						selectedLoaderPreview = recommendedOptionLabel.c_str();
+						break;
+					case jGame::ESceneLoader::Model:
+						selectedLoaderPreview = "Model";
+						break;
+					case jGame::ESceneLoader::PathTracing:
+						selectedLoaderPreview = "PathTracing";
+						break;
+					default:
+						selectedLoaderPreview = "Unknown";
+						break;
+					}
+
+					ImGui::Text("Recommended Loader : %s", recommendedLoaderName);
+					if (ImGui::BeginCombo("Scene Loader", selectedLoaderPreview))
+					{
+						const bool isRecommendedSelected = (selectedLoader == jGame::ESceneLoader::Recommended);
+						if (ImGui::Selectable(recommendedOptionLabel.c_str(), isRecommendedSelected))
+							game.SetSelectedPathTracingSceneLoader(jGame::ESceneLoader::Recommended);
+						if (isRecommendedSelected)
+							ImGui::SetItemDefaultFocus();
+
+						const bool isModelSelected = (selectedLoader == jGame::ESceneLoader::Model);
+						if (ImGui::Selectable("Model", isModelSelected))
+							game.SetSelectedPathTracingSceneLoader(jGame::ESceneLoader::Model);
+						if (isModelSelected)
+							ImGui::SetItemDefaultFocus();
+
+						const bool isPathTracingSelected = (selectedLoader == jGame::ESceneLoader::PathTracing);
+						if (ImGui::Selectable("PathTracing", isPathTracingSelected))
+							game.SetSelectedPathTracingSceneLoader(jGame::ESceneLoader::PathTracing);
+						if (isPathTracingSelected)
+							ImGui::SetItemDefaultFocus();
+
+						ImGui::EndCombo();
+					}
+				}
+
+				ImGui::BeginDisabled(!game.CanLoadSelectedPathTracingScene());
+				if (ImGui::Button("Load Scene"))
+					game.RequestLoadSelectedPathTracingScene();
+				ImGui::EndDisabled();
+			}
+			ImGui::End();
+		}
 
 		// Console overlay (rendered on top of everything)
 		jConsole::Get().Render();
 	});
 	g_ImGUI->Draw(RenderFrameContextPtr);
 }
+
+
+
+
+

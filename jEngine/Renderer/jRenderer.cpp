@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 #include "FileLoader/jImageFileLoader.h"
 #include "Material/jMaterial.h"
 #include "Profiler/jPerformanceProfile.h"
@@ -279,7 +279,7 @@ void jRenderer::Setup()
     FrameIndex = g_rhi->GetCurrentFrameIndex();
     View.ShadowCasterLights.reserve(View.Lights.size());
 
-    // View 별로 저장 할 수 있어야 함
+    // Build per-light view data
     for (int32 i = 0; i < View.Lights.size(); ++i)
     {
         jViewLight& ViewLight = View.Lights[i];
@@ -334,6 +334,8 @@ void jRenderer::SetupShadowPass()
         jViewLight& ViewLight = View.ShadowCasterLights[i];
         if (!ViewLight.Light->IsShadowCaster)
             continue;
+        if (!ViewLight.ShadowMapPtr)
+            continue;
 
         ShadowDrawInfo.push_back(jShadowDrawInfo());
         jShadowDrawInfo& ShadowPasses = ShadowDrawInfo[ShadowDrawInfo.size() - 1];
@@ -379,7 +381,7 @@ void jRenderer::SetupShadowPass()
             ShadowPasses.ShadowMapRenderPass = g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { RTWidth, RTHeight });
         }
 
-        // Shadow 기준 View 를 생성, 현재 Light 가 가진 Shadow Camera 와 ViewLight를 설정해줌
+        // Shadow 패스에서 사용할 ViewLight를 보관한다. 이후 Light와 Shadow Camera 정보를 재사용한다.
         ShadowPasses.ViewLight = ViewLight;
 
         jGraphicsPipelineShader ShadowShader;
@@ -907,13 +909,15 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
     }
 
     //////////////////////////////////////////////////////////////////////////
-    // GBuffer Input attachment 추가
+    // GBuffer input attachment 바인딩
     jShaderBindingInstanceGroup DefaultLightPassShaderBindingGroup;
     DefaultLightPassShaderBindingGroup.Add(View.ViewUniformBufferShaderBindingInstance);
     //////////////////////////////////////////////////////////////////////////
 
     std::vector<jDrawCommand> LightPasses;
-    LightPasses.resize(View.Lights.size());
+    LightPasses.reserve(View.Lights.size());
+    std::vector<const jViewLight*> DrawableLights;
+    DrawableLights.reserve(View.Lights.size());
 
     const int32 RTWidth = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->Info.Width;
     const int32 RTHeight = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->Info.Height;
@@ -946,6 +950,8 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
         {
             generator->Initialize(RTWidth, RTHeight);
             LightDrawCommandGenerators.push_back(std::move(generator));
+            LightPasses.push_back(jDrawCommand());
+            DrawableLights.push_back(&viewLight);
         }
     }
 
@@ -1003,11 +1009,11 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
             InRenderPass->BeginRenderPass(RenderFrameContextPtr->GetActiveCommandBuffer());
         }
 
-        check(View.Lights.size() == LightPasses.size());
+        check(DrawableLights.size() == LightPasses.size());
         check(LightDrawCommandGenerators.size() == LightPasses.size());
         for (int32 i = 0; i < (int32)LightPasses.size(); ++i)
         {
-            LightDrawCommandGenerators[i]->GenerateDrawCommand(&LightPasses[i], RenderFrameContextPtr, &View, View.Lights[i], InRenderPass, SubpassIndex);
+            LightDrawCommandGenerators[i]->GenerateDrawCommand(&LightPasses[i], RenderFrameContextPtr, &View, *DrawableLights[i], InRenderPass, SubpassIndex);
         }
 
         for (int32 i = 0; i < (int32)LightPasses.size(); ++i)
@@ -1223,3 +1229,5 @@ void jRenderer::Render()
     DebugPasses();
     UIPass();
 }
+
+

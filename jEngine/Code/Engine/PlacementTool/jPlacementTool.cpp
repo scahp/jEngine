@@ -78,6 +78,21 @@ namespace
 		if (!IsIndexSelected(indices, index))
 			indices.push_back(index);
 	}
+
+	inline EPlacementLightType ToPlacementLightType(ELightType lightType)
+	{
+		switch (lightType)
+		{
+		case ELightType::POINT:
+			return EPlacementLightType::POINT;
+		case ELightType::SPOT:
+			return EPlacementLightType::SPOT;
+		case ELightType::DIRECTIONAL:
+			return EPlacementLightType::DIRECTIONAL;
+		default:
+			return EPlacementLightType::NONE;
+		}
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -1411,6 +1426,44 @@ void jPlacementTool::UnregisterStaticObject(jObject* obj)
 
 	auto it = std::find_if(PlacedObjects.begin(), PlacedObjects.end(),
 		[obj](const PlacedObjectInfo& info) { return info.Object == obj; });
+
+	if (it != PlacedObjects.end())
+	{
+		int32 index = static_cast<int32>(std::distance(PlacedObjects.begin(), it));
+		if (index == SelectedPlacedObjectIndex)
+			SelectedPlacedObjectIndex = -1;
+		else if (index < SelectedPlacedObjectIndex)
+			SelectedPlacedObjectIndex--;
+
+		PlacedObjects.erase(it);
+	}
+}
+
+void jPlacementTool::RegisterLight(jLight* light)
+{
+	if (!light)
+		return;
+
+	if (std::find_if(PlacedObjects.begin(), PlacedObjects.end(),
+		[light](const PlacedObjectInfo& info) { return info.LightPtr == light; }) != PlacedObjects.end())
+	{
+		return;
+	}
+
+	PlacedObjectInfo info;
+	info.Type = EPlacedObjectType::LIGHT;
+	info.LightType = ToPlacementLightType(light->GetLightType());
+	info.LightPtr = light;
+	PlacedObjects.push_back(info);
+}
+
+void jPlacementTool::UnregisterLight(jLight* light)
+{
+	if (!light)
+		return;
+
+	auto it = std::find_if(PlacedObjects.begin(), PlacedObjects.end(),
+		[light](const PlacedObjectInfo& info) { return info.LightPtr == light; });
 
 	if (it != PlacedObjects.end())
 	{

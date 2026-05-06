@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 #include "jGame.h"
 #include "Math/Vector.h"
 #include "Scene/jCamera.h"
@@ -6,6 +6,7 @@
 #include "Scene/Light/jDirectionalLight.h"
 #include "Scene/Light/jPointLight.h"
 #include "Scene/Light/jSpotLight.h"
+#include "Scene/Light/jLightLogic.h"
 #include "Scene/jRenderObject.h"
 #include "Profiler/jPerformanceProfile.h"
 #include "Renderer/jRenderer.h"
@@ -14,7 +15,7 @@
 #include "FileLoader/jModelLoader.h"
 #include "Scene/jMeshObject.h"
 #include "FileLoader/jImageFileLoader.h"
-#include "Renderer/jSceneRenderTargets.h"    // 임시
+#include "Renderer/jSceneRenderTargets.h"    // temp
 #include "dxcapi.h"
 #include "RHI/jRaytracingScene.h"
 #include "Renderer/jDirectionalLightDrawCommandGenerator.h"
@@ -27,13 +28,577 @@
 #include "PathTracingDataLoader/GLTFLoader.h"
 #include "Renderer/jRenderer_PathTracing.h"
 #include "FileLoader/jFile.h"
+#include "PathTracingDataLoader/json.hpp"
+#include <algorithm>
+#include <cctype>
+#include <filesystem>
+#include <fstream>
+#include <iomanip>
+#include <sstream>
 
 #ifdef ENABLE_EDITOR_FEATURES
 #include "Code/Engine/jEditor.h"
 #endif
 
 jRHI* g_rhi = nullptr;
-jObject* jGame::Sphere = nullptr;
+namespace
+{
+	const char* GetSceneRenderPipelineNameInternal(jGame::ESceneRenderPipeline InRenderPipeline)
+	{
+		switch (InRenderPipeline)
+		{
+		case jGame::ESceneRenderPipeline::Forward: return "Forward";
+		case jGame::ESceneRenderPipeline::PathTracing: return "PathTracing";
+		case jGame::ESceneRenderPipeline::Deferred:
+		default:
+			return "Deferred";
+		}
+	}
+
+	const char* GetSceneLoaderNameInternal(jGame::ESceneLoader InLoader)
+	{
+		switch (InLoader)
+		{
+		case jGame::ESceneLoader::Recommended: return "Recommended";
+		case jGame::ESceneLoader::Model: return "Model";
+		case jGame::ESceneLoader::PathTracing: return "PathTracing";
+		default: return "Unknown";
+		}
+	}
+
+	jGame::ESceneRenderPipeline GetDefaultSceneRenderPipeline(const std::filesystem::path& InPath)
+	{
+		std::string extension = InPath.extension().generic_string();
+		std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+		if (extension == ".scene")
+			return jGame::ESceneRenderPipeline::PathTracing;
+		return jGame::ESceneRenderPipeline::Deferred;
+	}
+
+	jGame::ESceneLoader GetRecommendedSceneLoader(const std::filesystem::path& InPath)
+	{
+		std::string extension = InPath.extension().generic_string();
+		std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+		if (extension == ".scene")
+			return jGame::ESceneLoader::PathTracing;
+		return jGame::ESceneLoader::Model;
+	}
+
+	bool TryParseSceneRenderPipeline(const std::string& InValue, jGame::ESceneRenderPipeline& OutRenderPipeline)
+	{
+		std::string normalized = InValue;
+		normalized.erase(std::remove_if(normalized.begin(), normalized.end(), [](unsigned char ch) { return std::isspace(ch) != 0; }), normalized.end());
+		std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+		if (normalized == "forward")
+		{
+			OutRenderPipeline = jGame::ESceneRenderPipeline::Forward;
+			return true;
+		}
+		if (normalized == "pathtracing" || normalized == "path_tracing")
+		{
+			OutRenderPipeline = jGame::ESceneRenderPipeline::PathTracing;
+			return true;
+		}
+		if (normalized == "deferred")
+		{
+			OutRenderPipeline = jGame::ESceneRenderPipeline::Deferred;
+			return true;
+		}
+		return false;
+	}
+
+	bool TryParseSceneLoader(const std::string& InValue, jGame::ESceneLoader& OutLoader)
+	{
+		std::string normalized = InValue;
+		normalized.erase(std::remove_if(normalized.begin(), normalized.end(), [](unsigned char ch) { return std::isspace(ch) != 0; }), normalized.end());
+		std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+		if (normalized == "recommended" || normalized == "default" || normalized == "auto")
+		{
+			OutLoader = jGame::ESceneLoader::Recommended;
+			return true;
+		}
+		if (normalized == "model")
+		{
+			OutLoader = jGame::ESceneLoader::Model;
+			return true;
+		}
+		if (normalized == "pathtracing" || normalized == "path_tracing")
+		{
+			OutLoader = jGame::ESceneLoader::PathTracing;
+			return true;
+		}
+		return false;
+	}
+
+	jGame::ESceneLoader ResolveSceneLoader(const jGame::jLoadableSceneDesc& InSceneDesc)
+	{
+		return (InSceneDesc.SelectedLoader == jGame::ESceneLoader::Recommended)
+			? InSceneDesc.RecommendedLoader
+			: InSceneDesc.SelectedLoader;
+	}
+
+	std::string TrimString(const std::string& InValue)
+	{
+		size_t begin = 0;
+		while (begin < InValue.size() && std::isspace(static_cast<unsigned char>(InValue[begin])) != 0)
+			++begin;
+
+		size_t end = InValue.size();
+		while (end > begin && std::isspace(static_cast<unsigned char>(InValue[end - 1])) != 0)
+			--end;
+
+		return InValue.substr(begin, end - begin);
+	}
+
+	std::string ToLowerString(const std::string& InValue)
+	{
+		std::string result = InValue;
+		std::transform(result.begin(), result.end(), result.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+		return result;
+	}
+
+	std::string UnquoteString(const std::string& InValue)
+	{
+		if (InValue.size() >= 2 && InValue.front() == '"' && InValue.back() == '"')
+			return InValue.substr(1, InValue.size() - 2);
+		return InValue;
+	}
+
+	bool TryGetIniSectionName(const std::string& InLine, std::string& OutSectionName)
+	{
+		const std::string trimmedLine = TrimString(InLine);
+		if (trimmedLine.size() >= 2 && trimmedLine.front() == '[' && trimmedLine.back() == ']')
+		{
+			OutSectionName = ToLowerString(TrimString(trimmedLine.substr(1, trimmedLine.size() - 2)));
+			return true;
+		}
+		return false;
+	}
+
+	bool IsLoadablePathTracingSceneFile(const std::filesystem::path& InPath)
+	{
+		std::string extension = InPath.extension().generic_string();
+		std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+		return (extension == ".scene" || extension == ".gltf" || extension == ".glb");
+	}
+
+	std::string MakeSceneId(const std::filesystem::path& InRootPath, const std::filesystem::path& InFilePath)
+	{
+		std::error_code errorCode;
+		const auto relativePath = std::filesystem::relative(InFilePath, InRootPath, errorCode);
+		return (errorCode ? InFilePath.lexically_normal() : relativePath.lexically_normal()).generic_string();
+	}
+
+	std::filesystem::path GetSceneObjectConfigPath(const std::filesystem::path& InScenePath)
+	{
+		return InScenePath.parent_path() / "objects.json";
+	}
+
+	struct jSceneCameraPlacement
+	{
+		bool IsValid = false;
+		Vector Position = Vector::ZeroVector;
+		Vector Target = Vector::ZeroVector;
+		Vector Up = Vector(0.0f, 1.0f, 0.0f);
+		float FovRad = DegreeToRadian(45.0f);
+		float Near = 10.0f;
+		float Far = 5000.0f;
+	};
+
+	struct jSceneDirectionalLightPlacement
+	{
+		bool IsValid = false;
+		Vector Direction = Vector(0.0f, -1.0f, 0.0f);
+		Vector Color = Vector(1.0f);
+	};
+
+	struct jScenePointLightPlacement
+	{
+		bool IsValid = false;
+		Vector Position = Vector::ZeroVector;
+		Vector Color = Vector(1.0f);
+		float MaxDistance = 150.0f;
+	};
+
+	struct jSceneSpotLightPlacement
+	{
+		bool IsValid = false;
+		Vector Position = Vector::ZeroVector;
+		Vector Direction = Vector(0.0f, -1.0f, 0.0f);
+		Vector Color = Vector(1.0f);
+		float MaxDistance = 200.0f;
+		float PenumbraRadian = 0.35f;
+		float UmbraRadian = 0.5f;
+	};
+
+	struct jScenePlacementPreset
+	{
+		enum class EObjectType
+		{
+			Sphere = 0,
+			Quad,
+			Triangle,
+			Cube,
+			Capsule,
+			Cone,
+			Cylinder,
+		};
+
+		struct jObjectPlacement
+		{
+			bool IsValid = false;
+			EObjectType Type = EObjectType::Sphere;
+			Vector Position = Vector::ZeroVector;
+			Vector Size = Vector::OneVector;
+			Vector Scale = Vector::OneVector;
+			Vector4 Color = Vector4::OneVector;
+			float Radius = 1.0f;
+			float Height = 1.0f;
+			int32 Slices = 20;
+			int32 Stacks = 20;
+		};
+
+		struct jLightPlacement
+		{
+			bool IsValid = false;
+			ELightType Type = ELightType::POINT;
+			Vector Position = Vector::ZeroVector;
+			Vector Direction = Vector(0.0f, -1.0f, 0.0f);
+			Vector Color = Vector(1.0f);
+			float MaxDistance = 150.0f;
+			float PenumbraRadian = 0.35f;
+			float UmbraRadian = 0.5f;
+			std::string LogicName;
+			nlohmann::json LogicParams = nlohmann::json::object();
+		};
+
+		bool IsValid = false;
+		jSceneCameraPlacement Camera;
+		jSceneDirectionalLightPlacement DirectionalLight;
+		jScenePointLightPlacement PointLight;
+		jSceneSpotLightPlacement SpotLight;
+		std::vector<jObjectPlacement> Objects;
+		std::vector<jLightPlacement> Lights;
+	};
+
+	bool TryParseSceneObjectType(const std::string& InValue, jScenePlacementPreset::EObjectType& OutType)
+	{
+		std::string normalized = InValue;
+		std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+		if (normalized == "sphere")
+		{
+			OutType = jScenePlacementPreset::EObjectType::Sphere;
+			return true;
+		}
+		if (normalized == "quad")
+		{
+			OutType = jScenePlacementPreset::EObjectType::Quad;
+			return true;
+		}
+		if (normalized == "triangle")
+		{
+			OutType = jScenePlacementPreset::EObjectType::Triangle;
+			return true;
+		}
+		if (normalized == "cube")
+		{
+			OutType = jScenePlacementPreset::EObjectType::Cube;
+			return true;
+		}
+		if (normalized == "capsule")
+		{
+			OutType = jScenePlacementPreset::EObjectType::Capsule;
+			return true;
+		}
+		if (normalized == "cone")
+		{
+			OutType = jScenePlacementPreset::EObjectType::Cone;
+			return true;
+		}
+		if (normalized == "cylinder")
+		{
+			OutType = jScenePlacementPreset::EObjectType::Cylinder;
+			return true;
+		}
+		return false;
+	}
+
+	bool TryParseSceneLightType(const std::string& InValue, ELightType& OutType)
+	{
+		std::string normalized = InValue;
+		std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+		if (normalized == "directional")
+		{
+			OutType = ELightType::DIRECTIONAL;
+			return true;
+		}
+		if (normalized == "point")
+		{
+			OutType = ELightType::POINT;
+			return true;
+		}
+		if (normalized == "spot")
+		{
+			OutType = ELightType::SPOT;
+			return true;
+		}
+		return false;
+	}
+
+	bool TryReadVector3(const nlohmann::json& InValue, Vector& OutValue)
+	{
+		if (!InValue.is_array() || InValue.size() != 3)
+			return false;
+
+		if (!InValue[0].is_number() || !InValue[1].is_number() || !InValue[2].is_number())
+			return false;
+
+		OutValue = Vector(InValue[0].get<float>(), InValue[1].get<float>(), InValue[2].get<float>());
+		return true;
+	}
+
+	bool TryReadVector4(const nlohmann::json& InValue, Vector4& OutValue)
+	{
+		if (!InValue.is_array() || InValue.size() != 4)
+			return false;
+
+		if (!InValue[0].is_number() || !InValue[1].is_number() || !InValue[2].is_number() || !InValue[3].is_number())
+			return false;
+
+		OutValue = Vector4(InValue[0].get<float>(), InValue[1].get<float>(), InValue[2].get<float>(), InValue[3].get<float>());
+		return true;
+	}
+
+	bool TryParseSceneCameraPlacement(const nlohmann::json& InValue, jSceneCameraPlacement& OutPlacement)
+	{
+		if (!InValue.is_object())
+			return false;
+
+		if (!TryReadVector3(InValue.value("position", nlohmann::json::array()), OutPlacement.Position)
+			|| !TryReadVector3(InValue.value("target", nlohmann::json::array()), OutPlacement.Target))
+		{
+			return false;
+		}
+
+		if (!TryReadVector3(InValue.value("up", nlohmann::json::array({ 0.0f, 1.0f, 0.0f })), OutPlacement.Up))
+			return false;
+
+		if (InValue.contains("fovDegree"))
+			OutPlacement.FovRad = DegreeToRadian(InValue.value("fovDegree", 45.0f));
+		else
+			OutPlacement.FovRad = InValue.value("fovRad", DegreeToRadian(45.0f));
+		OutPlacement.Near = InValue.value("near", 10.0f);
+		OutPlacement.Far = InValue.value("far", 5000.0f);
+		OutPlacement.IsValid = true;
+		return true;
+	}
+
+	bool TryParseSceneObjectPlacement(const nlohmann::json& InValue, jScenePlacementPreset::jObjectPlacement& OutPlacement)
+	{
+		if (!InValue.is_object())
+			return false;
+
+		const auto typeIter = InValue.find("type");
+		if (typeIter == InValue.end() || !typeIter->is_string())
+			return false;
+
+		if (!TryParseSceneObjectType(typeIter->get<std::string>(), OutPlacement.Type))
+			return false;
+
+		switch (OutPlacement.Type)
+		{
+		case jScenePlacementPreset::EObjectType::Sphere:
+		{
+			if (!TryReadVector3(InValue.value("position", nlohmann::json::array()), OutPlacement.Position)
+				|| !TryReadVector3(InValue.value("scale", nlohmann::json::array({ 1.0f, 1.0f, 1.0f })), OutPlacement.Scale)
+				|| !TryReadVector4(InValue.value("color", nlohmann::json::array({ 1.0f, 1.0f, 1.0f, 1.0f })), OutPlacement.Color))
+			{
+				return false;
+			}
+			OutPlacement.Radius = InValue.value("radius", 1.0f);
+			OutPlacement.Slices = Max(3, InValue.value("slices", 20));
+			OutPlacement.Stacks = Max(2, InValue.value("stacks", 20));
+			break;
+		}
+		case jScenePlacementPreset::EObjectType::Quad:
+		case jScenePlacementPreset::EObjectType::Triangle:
+		case jScenePlacementPreset::EObjectType::Cube:
+		{
+			if (!TryReadVector3(InValue.value("position", nlohmann::json::array()), OutPlacement.Position)
+				|| !TryReadVector3(InValue.value("size", nlohmann::json::array()), OutPlacement.Size)
+				|| !TryReadVector3(InValue.value("scale", nlohmann::json::array({ 1.0f, 1.0f, 1.0f })), OutPlacement.Scale)
+				|| !TryReadVector4(InValue.value("color", nlohmann::json::array({ 1.0f, 1.0f, 1.0f, 1.0f })), OutPlacement.Color))
+			{
+				return false;
+			}
+			break;
+		}
+		case jScenePlacementPreset::EObjectType::Capsule:
+		case jScenePlacementPreset::EObjectType::Cone:
+		case jScenePlacementPreset::EObjectType::Cylinder:
+		{
+			if (!TryReadVector3(InValue.value("position", nlohmann::json::array()), OutPlacement.Position)
+				|| !TryReadVector3(InValue.value("scale", nlohmann::json::array({ 1.0f, 1.0f, 1.0f })), OutPlacement.Scale)
+				|| !TryReadVector4(InValue.value("color", nlohmann::json::array({ 1.0f, 1.0f, 1.0f, 1.0f })), OutPlacement.Color))
+			{
+				return false;
+			}
+			OutPlacement.Height = InValue.value("height", 1.0f);
+			OutPlacement.Radius = InValue.value("radius", 1.0f);
+			OutPlacement.Slices = Max(3, InValue.value("slices", 20));
+			break;
+		}
+		default:
+			return false;
+		}
+
+		OutPlacement.IsValid = true;
+		return true;
+	}
+
+	bool TryParseSceneLightPlacement(const nlohmann::json& InValue, jScenePlacementPreset::jLightPlacement& OutPlacement)
+	{
+		if (!InValue.is_object())
+			return false;
+
+		const auto typeIter = InValue.find("type");
+		if (typeIter == InValue.end() || !typeIter->is_string())
+			return false;
+
+		if (!TryParseSceneLightType(typeIter->get<std::string>(), OutPlacement.Type))
+			return false;
+
+		if (!TryReadVector3(InValue.value("color", nlohmann::json::array({ 1.0f, 1.0f, 1.0f })), OutPlacement.Color))
+			return false;
+
+		switch (OutPlacement.Type)
+		{
+		case ELightType::DIRECTIONAL:
+			if (!TryReadVector3(InValue.value("direction", nlohmann::json::array()), OutPlacement.Direction))
+				return false;
+			break;
+		case ELightType::POINT:
+			if (!TryReadVector3(InValue.value("position", nlohmann::json::array()), OutPlacement.Position))
+				return false;
+			OutPlacement.MaxDistance = InValue.value("maxDistance", 150.0f);
+			break;
+		case ELightType::SPOT:
+			if (!TryReadVector3(InValue.value("position", nlohmann::json::array()), OutPlacement.Position)
+				|| !TryReadVector3(InValue.value("direction", nlohmann::json::array()), OutPlacement.Direction))
+			{
+				return false;
+			}
+			OutPlacement.MaxDistance = InValue.value("maxDistance", 200.0f);
+			OutPlacement.PenumbraRadian = InValue.value("penumbraRadian", InValue.value("penumbra", 0.35f));
+			OutPlacement.UmbraRadian = InValue.value("umbraRadian", InValue.value("umbra", 0.5f));
+			break;
+		default:
+			return false;
+		}
+
+		const auto logicIter = InValue.find("logic");
+		if (logicIter != InValue.end() && logicIter->is_object())
+		{
+			const auto nameIter = logicIter->find("name");
+			if (nameIter != logicIter->end() && nameIter->is_string())
+			{
+				OutPlacement.LogicName = nameIter->get<std::string>();
+				const auto paramsIter = logicIter->find("params");
+				if (paramsIter != logicIter->end() && paramsIter->is_object())
+					OutPlacement.LogicParams = *paramsIter;
+			}
+		}
+
+		OutPlacement.IsValid = true;
+		return true;
+	}
+
+	void ApplySceneObjectConfig(const std::filesystem::path& InScenePath, jGame::jLoadableSceneDesc* InOutSceneDesc = nullptr, jScenePlacementPreset* InOutPreset = nullptr)
+	{
+		const std::filesystem::path objectConfigPath = GetSceneObjectConfigPath(InScenePath);
+		if (!std::filesystem::exists(objectConfigPath))
+			return;
+
+		std::ifstream objectConfigFile(objectConfigPath);
+		if (!objectConfigFile.is_open())
+			return;
+
+		std::stringstream buffer;
+		buffer << objectConfigFile.rdbuf();
+		const nlohmann::json objectConfigJson = nlohmann::json::parse(buffer.str(), nullptr, false);
+		if (objectConfigJson.is_discarded() || !objectConfigJson.is_object())
+			return;
+
+		if (InOutSceneDesc)
+		{
+			const auto rendererIter = objectConfigJson.find("renderer");
+			if (rendererIter != objectConfigJson.end() && rendererIter->is_string())
+			{
+				jGame::ESceneRenderPipeline renderPipeline = InOutSceneDesc->RenderPipeline;
+				if (TryParseSceneRenderPipeline(rendererIter->get<std::string>(), renderPipeline))
+					InOutSceneDesc->RenderPipeline = renderPipeline;
+			}
+
+			const auto loaderIter = objectConfigJson.find("loader");
+			if (loaderIter != objectConfigJson.end() && loaderIter->is_string())
+			{
+				jGame::ESceneLoader loader = InOutSceneDesc->RecommendedLoader;
+				if (TryParseSceneLoader(loaderIter->get<std::string>(), loader) && loader != jGame::ESceneLoader::Recommended)
+					InOutSceneDesc->RecommendedLoader = loader;
+			}
+		}
+
+		if (InOutPreset)
+		{
+			const auto cameraIter = objectConfigJson.find("camera");
+			if (cameraIter != objectConfigJson.end())
+			{
+				jSceneCameraPlacement cameraPlacement;
+				if (TryParseSceneCameraPlacement(*cameraIter, cameraPlacement))
+				{
+					InOutPreset->Camera = cameraPlacement;
+					InOutPreset->IsValid = true;
+				}
+			}
+
+			const auto objectsIter = objectConfigJson.find("objects");
+			if (objectsIter != objectConfigJson.end() && objectsIter->is_array())
+			{
+				for (const auto& objectJson : *objectsIter)
+				{
+					jScenePlacementPreset::jObjectPlacement objectPlacement;
+					if (TryParseSceneObjectPlacement(objectJson, objectPlacement))
+					{
+						InOutPreset->Objects.push_back(objectPlacement);
+						InOutPreset->IsValid = true;
+					}
+				}
+			}
+
+			const auto lightsIter = objectConfigJson.find("lights");
+			if (lightsIter != objectConfigJson.end() && lightsIter->is_array())
+			{
+				for (const auto& lightJson : *lightsIter)
+				{
+					jScenePlacementPreset::jLightPlacement lightPlacement;
+					if (TryParseSceneLightPlacement(lightJson, lightPlacement))
+					{
+						InOutPreset->Lights.push_back(lightPlacement);
+						InOutPreset->IsValid = true;
+					}
+				}
+			}
+		}
+	}
+
+	jScenePlacementPreset GetScenePlacementPreset(const jGame::jLoadableSceneDesc& InSceneDesc)
+	{
+		jScenePlacementPreset preset;
+		ApplySceneObjectConfig(std::filesystem::path(InSceneDesc.FilePath), nullptr, &preset);
+
+		return preset;
+	}
+}
 
 jGame::jGame()
 {
@@ -41,6 +606,659 @@ jGame::jGame()
 
 jGame::~jGame()
 {
+}
+
+const std::vector<jGame::jLoadableSceneDesc>& jGame::GetLoadablePathTracingScenes() const
+{
+	return PathTracingSceneBrowser.Scenes;
+}
+
+int32 jGame::GetSelectedPathTracingSceneIndex() const
+{
+	return PathTracingSceneBrowser.SelectedIndex;
+}
+
+int32 jGame::GetActivePathTracingSceneIndex() const
+{
+	return PathTracingSceneBrowser.ActiveIndex;
+}
+
+const char* jGame::GetSelectedPathTracingSceneName() const
+{
+	const int32 selectedIndex = PathTracingSceneBrowser.SelectedIndex;
+	if (selectedIndex >= 0 && selectedIndex < (int32)PathTracingSceneBrowser.Scenes.size())
+		return PathTracingSceneBrowser.Scenes[selectedIndex].DisplayName.c_str();
+
+	return "None";
+}
+
+const char* jGame::GetActivePathTracingSceneName() const
+{
+	const int32 activeIndex = PathTracingSceneBrowser.ActiveIndex;
+	if (activeIndex >= 0 && activeIndex < (int32)PathTracingSceneBrowser.Scenes.size())
+		return PathTracingSceneBrowser.Scenes[activeIndex].DisplayName.c_str();
+
+	return "None";
+}
+
+const char* jGame::GetSceneRenderPipelineName(int32 InIndex) const
+{
+	if (InIndex < 0 || InIndex >= (int32)PathTracingSceneBrowser.Scenes.size())
+		return "Unknown";
+
+	return GetSceneRenderPipelineNameInternal(PathTracingSceneBrowser.Scenes[InIndex].RenderPipeline);
+}
+
+const char* jGame::GetActiveSceneRenderPipelineName() const
+{
+	return GetSceneRenderPipelineNameInternal(PathTracingSceneBrowser.ActiveRenderPipeline);
+}
+
+const char* jGame::GetSceneRecommendedLoaderName(int32 InIndex) const
+{
+	if (InIndex < 0 || InIndex >= (int32)PathTracingSceneBrowser.Scenes.size())
+		return "Unknown";
+
+	return GetSceneLoaderNameInternal(PathTracingSceneBrowser.Scenes[InIndex].RecommendedLoader);
+}
+
+const char* jGame::GetSelectedPathTracingSceneLoaderName() const
+{
+	const int32 selectedIndex = PathTracingSceneBrowser.SelectedIndex;
+	if (selectedIndex < 0 || selectedIndex >= (int32)PathTracingSceneBrowser.Scenes.size())
+		return "None";
+
+	return GetSceneLoaderNameInternal(PathTracingSceneBrowser.Scenes[selectedIndex].SelectedLoader);
+}
+
+const char* jGame::GetActivePathTracingSceneLoaderName() const
+{
+	return GetSceneLoaderNameInternal(PathTracingSceneBrowser.ActiveLoader);
+}
+
+jGame::ESceneLoader jGame::GetSelectedPathTracingSceneLoader() const
+{
+	const int32 selectedIndex = PathTracingSceneBrowser.SelectedIndex;
+	if (selectedIndex < 0 || selectedIndex >= (int32)PathTracingSceneBrowser.Scenes.size())
+		return ESceneLoader::Recommended;
+
+	return PathTracingSceneBrowser.Scenes[selectedIndex].SelectedLoader;
+}
+
+bool jGame::IsUsingPathTracingRenderer() const
+{
+	return PathTracingSceneBrowser.ActiveRenderPipeline == ESceneRenderPipeline::PathTracing;
+}
+
+void jGame::SetSelectedPathTracingSceneIndex(int32 InIndex)
+{
+	if (InIndex >= 0 && InIndex < (int32)PathTracingSceneBrowser.Scenes.size())
+		PathTracingSceneBrowser.SelectedIndex = InIndex;
+}
+
+void jGame::SetSelectedPathTracingSceneLoader(ESceneLoader InLoader)
+{
+	const int32 selectedIndex = PathTracingSceneBrowser.SelectedIndex;
+	if (selectedIndex >= 0 && selectedIndex < (int32)PathTracingSceneBrowser.Scenes.size())
+		PathTracingSceneBrowser.Scenes[selectedIndex].SelectedLoader = InLoader;
+}
+
+void jGame::RequestLoadSelectedPathTracingScene()
+{
+	if (CanLoadSelectedPathTracingScene())
+		PathTracingSceneBrowser.PendingLoadIndex = PathTracingSceneBrowser.SelectedIndex;
+}
+
+bool jGame::CanLoadSelectedPathTracingScene() const
+{
+	const int32 selectedIndex = PathTracingSceneBrowser.SelectedIndex;
+	return (selectedIndex >= 0
+		&& selectedIndex < (int32)PathTracingSceneBrowser.Scenes.size()
+		&& (selectedIndex != PathTracingSceneBrowser.ActiveIndex
+			|| ResolveSceneLoader(PathTracingSceneBrowser.Scenes[selectedIndex]) != PathTracingSceneBrowser.ActiveLoader));
+}
+
+void jGame::InitializePathTracingSceneBrowser()
+{
+	if (PathTracingSceneBrowser.Initialized)
+		return;
+
+	PathTracingSceneBrowser.Initialized = true;
+	RefreshPathTracingSceneCatalog();
+	LoadPathTracingSceneBrowserSettings();
+
+	if (!PathTracingSceneBrowser.LastLoadedSceneId.empty())
+	{
+		const int32 cachedSceneIndex = FindPathTracingSceneIndexById(PathTracingSceneBrowser.LastLoadedSceneId);
+		if (cachedSceneIndex >= 0 && cachedSceneIndex < (int32)PathTracingSceneBrowser.Scenes.size())
+		{
+			PathTracingSceneBrowser.Scenes[cachedSceneIndex].SelectedLoader = PathTracingSceneBrowser.LastLoadedLoader;
+			PathTracingSceneBrowser.SelectedIndex = cachedSceneIndex;
+			PathTracingSceneBrowser.PendingLoadIndex = cachedSceneIndex;
+		}
+	}
+}
+
+void jGame::RefreshPathTracingSceneCatalog()
+{
+	std::string previousSelectedSceneId;
+	std::string previousActiveSceneId;
+	std::string previousPendingSceneId;
+	std::unordered_map<std::string, ESceneLoader> previousSelectedLoaders;
+
+	if (PathTracingSceneBrowser.SelectedIndex >= 0 && PathTracingSceneBrowser.SelectedIndex < (int32)PathTracingSceneBrowser.Scenes.size())
+		previousSelectedSceneId = PathTracingSceneBrowser.Scenes[PathTracingSceneBrowser.SelectedIndex].SceneId;
+	if (PathTracingSceneBrowser.ActiveIndex >= 0 && PathTracingSceneBrowser.ActiveIndex < (int32)PathTracingSceneBrowser.Scenes.size())
+		previousActiveSceneId = PathTracingSceneBrowser.Scenes[PathTracingSceneBrowser.ActiveIndex].SceneId;
+	if (PathTracingSceneBrowser.PendingLoadIndex >= 0 && PathTracingSceneBrowser.PendingLoadIndex < (int32)PathTracingSceneBrowser.Scenes.size())
+		previousPendingSceneId = PathTracingSceneBrowser.Scenes[PathTracingSceneBrowser.PendingLoadIndex].SceneId;
+
+	for (const auto& sceneDesc : PathTracingSceneBrowser.Scenes)
+	{
+		previousSelectedLoaders[sceneDesc.SceneId] = sceneDesc.SelectedLoader;
+	}
+
+	PathTracingSceneBrowser.Scenes.clear();
+
+	const std::filesystem::path rootPath(PathTracingSceneBrowser.RootFolder);
+	if (std::filesystem::exists(rootPath))
+	{
+		for (const auto& entry : std::filesystem::recursive_directory_iterator(rootPath))
+		{
+			if (!entry.is_regular_file() || !IsLoadablePathTracingSceneFile(entry.path()))
+				continue;
+
+			jLoadableSceneDesc sceneDesc;
+			sceneDesc.SceneId = MakeSceneId(rootPath, entry.path());
+			sceneDesc.FilePath = entry.path().generic_string();
+			sceneDesc.DisplayName = sceneDesc.SceneId;
+			sceneDesc.Extension = entry.path().extension().generic_string();
+			sceneDesc.RenderPipeline = GetDefaultSceneRenderPipeline(entry.path());
+			sceneDesc.RecommendedLoader = GetRecommendedSceneLoader(entry.path());
+			sceneDesc.SelectedLoader = ESceneLoader::Recommended;
+			ApplySceneObjectConfig(entry.path(), &sceneDesc, nullptr);
+			const auto previousLoaderIter = previousSelectedLoaders.find(sceneDesc.SceneId);
+			if (previousLoaderIter != previousSelectedLoaders.end())
+				sceneDesc.SelectedLoader = previousLoaderIter->second;
+			PathTracingSceneBrowser.Scenes.push_back(std::move(sceneDesc));
+		}
+	}
+
+	std::sort(PathTracingSceneBrowser.Scenes.begin(), PathTracingSceneBrowser.Scenes.end(),
+		[](const jLoadableSceneDesc& lhs, const jLoadableSceneDesc& rhs)
+		{
+			return lhs.SceneId < rhs.SceneId;
+		});
+
+	const auto findSceneIndexById = [this](const std::string& InSceneId) -> int32
+	{
+		if (InSceneId.empty())
+			return -1;
+
+		for (int32 i = 0; i < (int32)PathTracingSceneBrowser.Scenes.size(); ++i)
+		{
+			if (PathTracingSceneBrowser.Scenes[i].SceneId == InSceneId)
+				return i;
+		}
+		return -1;
+	};
+
+	PathTracingSceneBrowser.SelectedIndex = findSceneIndexById(previousSelectedSceneId);
+	PathTracingSceneBrowser.ActiveIndex = findSceneIndexById(previousActiveSceneId);
+	PathTracingSceneBrowser.PendingLoadIndex = findSceneIndexById(previousPendingSceneId);
+	if (PathTracingSceneBrowser.ActiveIndex >= 0)
+	{
+		PathTracingSceneBrowser.ActiveRenderPipeline = PathTracingSceneBrowser.Scenes[PathTracingSceneBrowser.ActiveIndex].RenderPipeline;
+		PathTracingSceneBrowser.ActiveLoader = ResolveSceneLoader(PathTracingSceneBrowser.Scenes[PathTracingSceneBrowser.ActiveIndex]);
+	}
+	else
+	{
+		PathTracingSceneBrowser.ActiveLoader = ESceneLoader::Model;
+	}
+
+	if (PathTracingSceneBrowser.SelectedIndex < 0 && !PathTracingSceneBrowser.Scenes.empty())
+		PathTracingSceneBrowser.SelectedIndex = 0;
+}
+
+void jGame::LoadPathTracingSceneBrowserSettings()
+{
+	PathTracingSceneBrowser.LastLoadedSceneId.clear();
+	PathTracingSceneBrowser.LastLoadedLoader = ESceneLoader::Model;
+
+	std::ifstream inputFile(PathTracingSceneBrowser.SettingsFile);
+	if (!inputFile.is_open())
+		return;
+
+	bool isSceneBrowserSection = false;
+	std::string line;
+	while (std::getline(inputFile, line))
+	{
+		const std::string trimmedLine = TrimString(line);
+		if (trimmedLine.empty() || trimmedLine[0] == ';' || trimmedLine[0] == '#')
+			continue;
+
+		std::string sectionName;
+		if (TryGetIniSectionName(trimmedLine, sectionName))
+		{
+			isSceneBrowserSection = (sectionName == "scenebrowser");
+			continue;
+		}
+
+		if (!isSceneBrowserSection)
+			continue;
+
+		const size_t separatorPos = trimmedLine.find('=');
+		if (separatorPos == std::string::npos)
+			continue;
+
+		const std::string key = ToLowerString(TrimString(trimmedLine.substr(0, separatorPos)));
+		const std::string value = UnquoteString(TrimString(trimmedLine.substr(separatorPos + 1)));
+		if (key == "lastloadedsceneid")
+		{
+			PathTracingSceneBrowser.LastLoadedSceneId = value;
+		}
+		else if (key == "lastloadedloader")
+		{
+			ESceneLoader loader = PathTracingSceneBrowser.LastLoadedLoader;
+			if (TryParseSceneLoader(value, loader))
+				PathTracingSceneBrowser.LastLoadedLoader = loader;
+		}
+	}
+}
+
+void jGame::SavePathTracingSceneBrowserSettings() const
+{
+	std::vector<std::string> preservedLines;
+	std::ifstream inputFile(PathTracingSceneBrowser.SettingsFile);
+	if (inputFile.is_open())
+	{
+		bool isFilteredSection = false;
+		std::string line;
+		while (std::getline(inputFile, line))
+		{
+			std::string sectionName;
+			if (TryGetIniSectionName(line, sectionName))
+			{
+				if (sectionName == "scenebrowser" || sectionName == "scenestartpoints")
+				{
+					isFilteredSection = true;
+					continue;
+				}
+				isFilteredSection = false;
+			}
+
+			if (!isFilteredSection)
+				preservedLines.push_back(line);
+		}
+	}
+
+	const std::filesystem::path settingsPath(PathTracingSceneBrowser.SettingsFile);
+	if (settingsPath.has_parent_path())
+		std::filesystem::create_directories(settingsPath.parent_path());
+
+	std::ofstream outputFile(PathTracingSceneBrowser.SettingsFile, std::ios::trunc);
+	if (!outputFile.is_open())
+		return;
+
+	for (const std::string& line : preservedLines)
+		outputFile << line << '\n';
+
+	if (!preservedLines.empty() && !preservedLines.back().empty())
+		outputFile << '\n';
+
+	outputFile << "[SceneBrowser]\n";
+	outputFile << "LastLoadedSceneId=" << std::quoted(PathTracingSceneBrowser.LastLoadedSceneId) << '\n';
+	outputFile << "LastLoadedLoader=" << GetSceneLoaderNameInternal(PathTracingSceneBrowser.LastLoadedLoader) << '\n';
+}
+
+void jGame::ClearSceneBrowserLoadedObjects()
+{
+	for (jObject* object : SceneBrowserLoadedObjects)
+	{
+		if (!object)
+			continue;
+
+		jObject::RemoveObject(object);
+		delete object;
+	}
+	SceneBrowserLoadedObjects.clear();
+}
+
+void jGame::ClearSceneBrowserLoadedLights()
+{
+	for (jLight* light : SceneBrowserLoadedLights)
+	{
+		if (!light)
+			continue;
+
+#ifdef ENABLE_EDITOR_FEATURES
+		if (g_Editor)
+			g_Editor->Placement.UnregisterLight(light);
+#endif
+
+		jLight::RemoveLights(light);
+		delete light;
+	}
+	SceneBrowserLoadedLights.clear();
+}
+
+int32 jGame::FindPathTracingSceneIndexById(const std::string& InSceneId) const
+{
+	if (InSceneId.empty())
+		return -1;
+
+	for (int32 i = 0; i < (int32)PathTracingSceneBrowser.Scenes.size(); ++i)
+	{
+		if (PathTracingSceneBrowser.Scenes[i].SceneId == InSceneId)
+			return i;
+	}
+
+	return -1;
+}
+
+void jGame::ApplyScenePlacementPreset(int32 InIndex)
+{
+	if (InIndex < 0 || InIndex >= (int32)PathTracingSceneBrowser.Scenes.size())
+		return;
+
+	const jScenePlacementPreset preset = GetScenePlacementPreset(PathTracingSceneBrowser.Scenes[InIndex]);
+	if (!preset.IsValid)
+		return;
+
+	if (preset.Camera.IsValid && MainCamera)
+	{
+		const float distance = (preset.Camera.Target - preset.Camera.Position).Length();
+		const Vector cameraUpPoint = preset.Camera.Position + preset.Camera.Up;
+		jCamera::SetCamera(MainCamera
+			, preset.Camera.Position
+			, preset.Camera.Target
+			, cameraUpPoint
+			, preset.Camera.FovRad
+			, preset.Camera.Near
+			, preset.Camera.Far
+			, (float)MainCamera->Width
+			, (float)MainCamera->Height
+			, MainCamera->IsPerspectiveProjection
+			, (distance > 0.0f) ? distance : MainCamera->Distance);
+		MainCamera->UpdateCamera();
+		gOptions.CameraPos = MainCamera->Pos;
+	}
+
+	for (jLight* light : jLight::GetLights())
+	{
+		if (!light)
+			continue;
+
+		switch (light->GetLightType())
+		{
+		case ELightType::DIRECTIONAL:
+		{
+			if (!preset.DirectionalLight.IsValid)
+				break;
+
+			auto* directionalLight = static_cast<jDirectionalLight*>(light);
+			directionalLight->SetDirection(preset.DirectionalLight.Direction);
+			directionalLight->SetColor(preset.DirectionalLight.Color);
+			break;
+		}
+		case ELightType::POINT:
+		{
+			if (!preset.PointLight.IsValid)
+				break;
+
+			auto* pointLight = static_cast<jPointLight*>(light);
+			pointLight->SetPosition(preset.PointLight.Position);
+			pointLight->SetColor(preset.PointLight.Color);
+			pointLight->SetMaxDistance(preset.PointLight.MaxDistance);
+			break;
+		}
+		case ELightType::SPOT:
+		{
+			if (!preset.SpotLight.IsValid)
+				break;
+
+			auto* spotLight = static_cast<jSpotLight*>(light);
+			spotLight->SetPosition(preset.SpotLight.Position);
+			spotLight->SetDirection(preset.SpotLight.Direction);
+			spotLight->SetColor(preset.SpotLight.Color);
+			spotLight->SetMaxDistance(preset.SpotLight.MaxDistance);
+			spotLight->SetConeAngles(preset.SpotLight.PenumbraRadian, preset.SpotLight.UmbraRadian);
+			break;
+		}
+		default:
+			break;
+		}
+	}
+
+	std::vector<jLight*> assignedLights;
+	assignedLights.reserve(preset.Lights.size());
+	for (const auto& lightPlacement : preset.Lights)
+	{
+		if (!lightPlacement.IsValid)
+			continue;
+
+		jLight* selectedLight = nullptr;
+		for (jLight* light : jLight::GetLights())
+		{
+			if (!light || light->GetLightType() != lightPlacement.Type)
+				continue;
+			if (std::find(assignedLights.begin(), assignedLights.end(), light) != assignedLights.end())
+				continue;
+
+			selectedLight = light;
+			break;
+		}
+
+		if (!selectedLight)
+		{
+			switch (lightPlacement.Type)
+			{
+			case ELightType::DIRECTIONAL:
+				selectedLight = jLight::CreateDirectionalLight(lightPlacement.Direction, lightPlacement.Color, Vector(1.0f), Vector(1.0f), 64.0f);
+				break;
+			case ELightType::POINT:
+				selectedLight = jLight::CreatePointLight(lightPlacement.Position, lightPlacement.Color, lightPlacement.MaxDistance, Vector(1.0f), Vector(1.0f), 64.0f);
+				break;
+			case ELightType::SPOT:
+				selectedLight = jLight::CreateSpotLight(lightPlacement.Position, lightPlacement.Direction, lightPlacement.Color
+					, lightPlacement.MaxDistance, lightPlacement.PenumbraRadian, lightPlacement.UmbraRadian, Vector(1.0f), Vector(1.0f), 64.0f);
+				break;
+			default:
+				break;
+			}
+
+			if (selectedLight)
+			{
+				jLight::AddLights(selectedLight);
+				SceneBrowserLoadedLights.push_back(selectedLight);
+#ifdef ENABLE_EDITOR_FEATURES
+				if (g_Editor)
+					g_Editor->Placement.RegisterLight(selectedLight);
+#endif
+			}
+		}
+
+		if (!selectedLight)
+			continue;
+
+		assignedLights.push_back(selectedLight);
+
+		if (selectedLight->SupportsPosition())
+			selectedLight->SetPosition(lightPlacement.Position);
+		if (selectedLight->SupportsDirection())
+			selectedLight->SetDirection(lightPlacement.Direction);
+
+		switch (lightPlacement.Type)
+		{
+		case ELightType::DIRECTIONAL:
+		{
+			auto* directionalLight = static_cast<jDirectionalLight*>(selectedLight);
+			directionalLight->SetColor(lightPlacement.Color);
+			break;
+		}
+		case ELightType::POINT:
+		{
+			auto* pointLight = static_cast<jPointLight*>(selectedLight);
+			pointLight->SetColor(lightPlacement.Color);
+			pointLight->SetMaxDistance(lightPlacement.MaxDistance);
+			break;
+		}
+		case ELightType::SPOT:
+		{
+			auto* spotLight = static_cast<jSpotLight*>(selectedLight);
+			spotLight->SetColor(lightPlacement.Color);
+			spotLight->SetMaxDistance(lightPlacement.MaxDistance);
+			spotLight->SetConeAngles(lightPlacement.PenumbraRadian, lightPlacement.UmbraRadian);
+			break;
+		}
+		default:
+			break;
+		}
+
+		if (!lightPlacement.LogicName.empty())
+		{
+			const std::string logicName = lightPlacement.LogicName;
+			const nlohmann::json logicParams = lightPlacement.LogicParams;
+			selectedLight->PreUpdateLambda = [logicName, logicParams](jLight* InLight, float InDeltaTime)
+			{
+				jLightLogicContext context;
+				context.DeltaTime = InDeltaTime;
+				context.Params = &logicParams;
+				jLightLogicRegistry::Get().Execute(logicName, InLight, context);
+			};
+		}
+		else
+		{
+			selectedLight->PreUpdateLambda = nullptr;
+		}
+	}
+
+	for (const auto& objectPlacement : preset.Objects)
+	{
+		if (!objectPlacement.IsValid)
+			continue;
+
+		jObject* spawnedObject = nullptr;
+		switch (objectPlacement.Type)
+		{
+		case jScenePlacementPreset::EObjectType::Sphere:
+			spawnedObject = jPrimitiveUtil::CreateSphere(objectPlacement.Position, objectPlacement.Radius
+				, (uint32)objectPlacement.Slices, (uint32)objectPlacement.Stacks, objectPlacement.Scale, objectPlacement.Color);
+			break;
+		case jScenePlacementPreset::EObjectType::Quad:
+			spawnedObject = jPrimitiveUtil::CreateQuad(objectPlacement.Position, objectPlacement.Size, objectPlacement.Scale, objectPlacement.Color);
+			break;
+		case jScenePlacementPreset::EObjectType::Triangle:
+			spawnedObject = jPrimitiveUtil::CreateTriangle(objectPlacement.Position, objectPlacement.Size, objectPlacement.Scale, objectPlacement.Color);
+			break;
+		case jScenePlacementPreset::EObjectType::Cube:
+			spawnedObject = jPrimitiveUtil::CreateCube(objectPlacement.Position, objectPlacement.Size, objectPlacement.Scale, objectPlacement.Color);
+			break;
+		case jScenePlacementPreset::EObjectType::Capsule:
+			spawnedObject = jPrimitiveUtil::CreateCapsule(objectPlacement.Position, objectPlacement.Height, objectPlacement.Radius
+				, objectPlacement.Slices, objectPlacement.Scale, objectPlacement.Color);
+			break;
+		case jScenePlacementPreset::EObjectType::Cone:
+			spawnedObject = jPrimitiveUtil::CreateCone(objectPlacement.Position, objectPlacement.Height, objectPlacement.Radius
+				, objectPlacement.Slices, objectPlacement.Scale, objectPlacement.Color);
+			break;
+		case jScenePlacementPreset::EObjectType::Cylinder:
+			spawnedObject = jPrimitiveUtil::CreateCylinder(objectPlacement.Position, objectPlacement.Height, objectPlacement.Radius
+				, objectPlacement.Slices, objectPlacement.Scale, objectPlacement.Color);
+			break;
+		default:
+			break;
+		}
+
+		if (!spawnedObject)
+			continue;
+
+		jObject::AddObject(spawnedObject);
+		SceneBrowserLoadedObjects.push_back(spawnedObject);
+	}
+}
+
+void jGame::LoadPathTracingSceneByIndex(int32 InIndex, bool InRebuildRaytracingScene)
+{
+	if (InIndex < 0 || InIndex >= (int32)PathTracingSceneBrowser.Scenes.size())
+		return;
+
+	const jLoadableSceneDesc& sceneDesc = PathTracingSceneBrowser.Scenes[InIndex];
+	PathTracingSceneBrowser.PendingLoadIndex = -1;
+
+	if (gPathTracingScene)
+	{
+		g_rhi->Flush();
+		gPathTracingScene->ClearSceneFor_jEngine(this);
+		delete gPathTracingScene;
+		gPathTracingScene = nullptr;
+	}
+	ClearSceneBrowserLoadedLights();
+	ClearSceneBrowserLoadedObjects();
+
+	const ESceneLoader resolvedLoader = ResolveSceneLoader(sceneDesc);
+	const bool usePathTracingSceneLoader = (resolvedLoader == ESceneLoader::PathTracing);
+	if (usePathTracingSceneLoader)
+	{
+		gPathTracingScene = jPathTracingLoadData::LoadPathTracingData(sceneDesc.FilePath);
+		check(gPathTracingScene);
+		if (!gPathTracingScene)
+			return;
+		gPathTracingScene->CreateSceneFor_jEngine(this);
+	}
+	else
+	{
+		const std::filesystem::path scenePath(sceneDesc.FilePath);
+		const std::string materialRootDir = scenePath.has_parent_path() ? scenePath.parent_path().generic_string() : std::string();
+		jMeshObject* loadedScene = jModelLoader::GetInstance().LoadFromFile(sceneDesc.FilePath.c_str()
+			, materialRootDir.empty() ? nullptr : materialRootDir.c_str());
+		check(loadedScene);
+		if (!loadedScene)
+			return;
+
+		jObject::AddObject(loadedScene);
+		SceneBrowserLoadedObjects.push_back(loadedScene);
+	}
+
+	PathTracingSceneBrowser.ActiveIndex = InIndex;
+	PathTracingSceneBrowser.SelectedIndex = InIndex;
+	PathTracingSceneBrowser.ActiveRenderPipeline = sceneDesc.RenderPipeline;
+	PathTracingSceneBrowser.ActiveLoader = resolvedLoader;
+	PathTracingSceneBrowser.LastLoadedSceneId = sceneDesc.SceneId;
+	PathTracingSceneBrowser.LastLoadedLoader = resolvedLoader;
+	SavePathTracingSceneBrowserSettings();
+
+	switch (PathTracingSceneBrowser.ActiveRenderPipeline)
+	{
+	case ESceneRenderPipeline::Forward:
+		gOptions.UseDeferredRenderer = false;
+		break;
+	case ESceneRenderPipeline::Deferred:
+		gOptions.UseDeferredRenderer = true;
+		break;
+	case ESceneRenderPipeline::PathTracing:
+	default:
+		break;
+	}
+
+	ApplyScenePlacementPreset(InIndex);
+
+	if (InRebuildRaytracingScene && GSupportRaytracing && g_rhi && g_rhi->RaytracingScene)
+	{
+		g_rhi->RaytracingScene->Clear();
+
+		jRatracingInitializer Initializer;
+		Initializer.CommandBuffer = g_rhi->BeginSingleTimeCommands();
+		Initializer.RenderObjects = jObject::GetStaticRenderObject();
+		g_rhi->RaytracingScene->CreateOrUpdateBLAS(Initializer);
+		g_rhi->EndSingleTimeCommands(Initializer.CommandBuffer);
+		g_rhi->Finish(); // todo : Instead of this, it needs UAV barrier here
+
+		Initializer.CommandBuffer = g_rhi->BeginSingleTimeCommands();
+		g_rhi->RaytracingScene->CreateOrUpdateTLAS(Initializer);
+		g_rhi->EndSingleTimeCommands(Initializer.CommandBuffer);
+		g_rhi->Finish(); // todo : Instead of this, it needs UAV barrier here
+	}
 }
 
 void jGame::ProcessInput(float deltaTime)
@@ -131,275 +1349,13 @@ static jConsoleVariableInt* cvar_SurfelGIInlineRayCount = new jConsoleVariableIn
 		jConsole::Get().Log("Test console variables registered.");
 	}
 
-#if ENABLE_PBR
-	// PBR will use light color as a flux,
-	float LightColorScale = 20000.0f;
-#else
-	float LightColorScale = 1.0f;
-#endif
-
-#if USE_SPONZA
 	// Create main camera
-    const Vector mainCameraPos(1124.351929f, 31.903732f, 18.574120f);
-    const Vector mainCameraTarget(Vector(1124.351929f, 31.903732f, 18.574120f) + Vector(-0.927020f, 0.264276f, -0.266068f));
-    MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 5000.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, true);
-    jCamera::AddCamera(0, MainCamera);
-
-	jDirectionalLight* DirectionalLight = nullptr;
-	jPointLight* PointLight = nullptr;
-	jSpotLight* SpotLight = nullptr;
-	#if !USE_PATH_TRACING		// todo : this hard code should be removed.
-    // Create lights
-	{
-		Vector lightColor = gOptions.DirectionalLightColor * gOptions.DirectionalLightIntensity;
-		DirectionalLight = jLight::CreateDirectionalLight(gOptions.DefaultSunDir
-			, Vector4(lightColor.x, lightColor.y, lightColor.z, 1.0f), Vector(1.0f), Vector(1.0f), 64);
-
-		PointLight = jLight::CreatePointLight(Vector(10.0f, 100.0f, 10.0f), Vector4(1.0f, 0.75f, 0.75f, 1.0f) * LightColorScale, 1500.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
-		SpotLight = jLight::CreateSpotLight(Vector(0.0f, 60.0f, 5.0f), Vector(1.0f, -1.0f, 0.4f).GetNormalize(), Vector4(0.0f, 1.0f, 0.0f, 1.0f) * LightColorScale, 2000.0f, 0.35f, 1.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
-        if (SpotLight)
-        {
-			SpotLight->PreUpdateLambda = [](jLight* light, float InDeltaTime)
-            {
-                auto SpotLight = (jSpotLight*)(light);
-                check(SpotLight);
-                SpotLight->SetDirection(Matrix::MakeRotateY(1.0f * InDeltaTime).TransformDirection(SpotLight->GetLightData().Direction));
-            };
-        }
-	}
-	#endif // !USE_PATH_TRACING
-#else
-	// Create main camera
-	//const Vector mainCameraPos(-111.6f, 17.49f, 3.11f);
-	//const Vector mainCameraTarget(282.378632f, 17.6663227f, -1.00448179f);
     const Vector mainCameraPos(172.66f, 160.0f, -180.63f);
     const Vector mainCameraTarget(0.0f, 0.0f, 0.0f);
     MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 1500.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, true);
     jCamera::AddCamera(0, MainCamera);
-
-    // Create lights
-    Vector lightColor = gOptions.DirectionalLightColor * gOptions.DirectionalLightIntensity;
-    DirectionalLight = jLight::CreateDirectionalLight(gOptions.DefaultSunDir
-        , Vector4(lightColor.x, lightColor.y, lightColor.z, 1.0f), Vector(1.0f), Vector(1.0f), 64);
-    //CascadeDirectionalLight = jLight::CreateCascadeDirectionalLight(AppSettings.DirecionalLightDirection
-    //	, Vector4(0.6f), Vector(1.0f), Vector(1.0f), 64);
-    //AmbientLight = jLight::CreateAmbientLight(Vector(0.2f, 0.5f, 1.0f), Vector(0.05f));		// sky light color
-    PointLight = jLight::CreatePointLight(Vector(10.0f, 100.0f, 10.0f), Vector4(1.0f, 0.75f, 0.75f, 1.0f) * LightColorScale, 150.0f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
-    SpotLight = jLight::CreateSpotLight(Vector(0.0f, 80.0f, 5.0f), Vector(1.0f, -1.0f, 0.4f).GetNormalize(), Vector4(0.2f, 1.0f, 0.2f, 1.0f) * LightColorScale, 200.0f, 0.35f, 0.5f, Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), 64.0f);
-#endif
-
-	if (DirectionalLight)
-		jLight::AddLights(DirectionalLight);
-	if (PointLight)
-		jLight::AddLights(PointLight);
-	if (SpotLight)
-		jLight::AddLights(SpotLight);
-
-	//PointLight->IsShadowCaster = false;
-	//SpotLight->IsShadowCaster = false;
-
-    //auto cube = jPrimitiveUtil::CreateCube(Vector(0.0f, 60.0f, 5.0f), Vector::OneVector, Vector::OneVector * 10.f, Vector4(0.7f, 0.7f, 0.7f, 1.0f));
-    //jObject::AddObject(cube);
-    //SpawnedObjects.push_back(cube);
-
-	// Create light info for debugging light infomation
-    if (DirectionalLight)
-    {
-        DirectionalLightInfo = jPrimitiveUtil::CreateDirectionalLightDebug(Vector(250, 400, 0) * 0.5f, Vector::OneVector * 10.0f, 10.0f, MainCamera, DirectionalLight, "Image/sun.png");
-        // jObject::AddDebugObject(DirectionalLightInfo);
-		jObject::AddDebugObject(DirectionalLightInfo->BillboardObject);
-		// jObject::AddDebugObject(DirectionalLightInfo->ArrowSegementObject);
-
-#ifdef ENABLE_EDITOR_FEATURES
-		// Add to Placement Tool
-		if (g_Editor)
-		{
-			PlacedObjectInfo info;
-			info.Object = DirectionalLightInfo->BillboardObject;
-			info.Type = EPlacedObjectType::LIGHT;
-			info.LightType = EPlacementLightType::DIRECTIONAL;
-			info.LightPtr = DirectionalLight;
-			g_Editor->Placement.PlacedObjects.push_back(info);
-		}
-#endif
-    }
-
-    if (PointLight)
-    {
-        PointLightInfo = jPrimitiveUtil::CreatePointLightDebug(Vector(10.0f), MainCamera, PointLight, "Image/bulb.png");
-        jObject::AddDebugObject(PointLightInfo->BillboardObject);
-
-#ifdef ENABLE_EDITOR_FEATURES
-		// Add to Placement Tool
-		if (g_Editor)
-		{
-			PlacedObjectInfo info;
-			info.Object = PointLightInfo->BillboardObject;
-			info.Type = EPlacedObjectType::LIGHT;
-			info.LightType = EPlacementLightType::POINT;
-			info.LightPtr = PointLight;
-			g_Editor->Placement.PlacedObjects.push_back(info);
-		}
-#endif
-    }
-
-    if (SpotLight)
-    {
-        SpotLightInfo = jPrimitiveUtil::CreateSpotLightDebug(Vector(10.0f), MainCamera, SpotLight, "Image/spot.png");
-        jObject::AddDebugObject(SpotLightInfo->BillboardObject);
-
-#ifdef ENABLE_EDITOR_FEATURES
-		// Add to Placement Tool
-		if (g_Editor)
-		{
-			PlacedObjectInfo info;
-			info.Object = SpotLightInfo->BillboardObject;
-			info.Type = EPlacedObjectType::LIGHT;
-			info.LightType = EPlacementLightType::SPOT;
-			info.LightPtr = SpotLight;
-			g_Editor->Placement.PlacedObjects.push_back(info);
-		}
-#endif
-    }
-
-	//// Main camera is linked with lights which will be used.
-	//if (DirectionalLight)
-	//	MainCamera->AddLight(DirectionalLight);
-	//if (PointLight)
-	//	MainCamera->AddLight(PointLight);
-	//if (SpotLight)
-	//	MainCamera->AddLight(SpotLight);
-	//MainCamera->AddLight(AmbientLight);
-
-	//// Create UI primitive to visualize shadowmap for debugging
-	//DirectionalLightShadowMapUIDebug = jPrimitiveUtil::CreateUIQuad({ 0.0f, 0.0f }, { 150, 150 }, DirectionalLight->GetShadowMap());
-	//if (DirectionalLightShadowMapUIDebug)
-	//	jObject::AddUIDebugObject(DirectionalLightShadowMapUIDebug);
-
-	// Select spawning object type
-#if !USE_SPONZA
-	SpawnObjects(ESpawnedType::TestPrimitive);
-#endif
-	//SpawnObjects(ESpawnedType::InstancingPrimitive);
-	//SpawnObjects(ESpawnedType::IndirectDrawPrimitive);
-
-	//ResourceLoadCompleteEvent = std::async(std::launch::async, [&]()
-	//{
-#if USE_SPONZA
-	#if !USE_PATH_TRACING		// todo : this hard code should be removed.
-	{
-#if USE_SPONZA_PBR		
-        Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza_pbr/sponza.glb", "Resource/sponza_pbr");
-#else
-        Sponza = jModelLoader::GetInstance().LoadFromFile("Resource/sponza/sponza.dae", "Resource/");
-#endif
-        jObject::AddObject(Sponza);
-        SpawnedObjects.push_back(Sponza);
-
-        for (int32 i = 0; i < 1; ++i)
-        {
-            Sphere = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f + i * 100), 1.0, 60, 30, Vector(30.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
-            jObject::AddObject(Sphere);
-            SpawnedObjects.push_back(Sphere);
-        }
-	}
-	#endif // !USE_PATH_TRACING
-
-		//auto random_double = []() -> float
-		//{
-		//	// Returns a random real in [0,1).
-		//	return rand() / (RAND_MAX + 1.0f);
-		//};
-
-		//int32 cnt = 0;
-
-		//srand(123);
-
-  //      // Plane
-  //      {
-  //          auto NewPrimitive = jPrimitiveUtil::CreateQuad(Vector(0.0f, -1.0f, 0.0f), Vector(1.0f), Vector(200.0f), Vector4::ColorWhite);
-  //          jObject::AddObject(NewPrimitive);
-  //          SpawnedObjects.push_back(NewPrimitive);
-  //      }
-
-		//// Small Sphere
-		//const float radius = 0.3f;
-  //      int32 w = 11, h = 11;
-  //      int32 totalCount = (w * 2 * h * 2) + 3 + 1;     // small balls, big balls, plane
-		//for (int32 i = -w; i < w; ++i)
-		//{
-		//	for (int32 j = -h; j < h; ++j, ++cnt)
-		//	{
-		//		float r = radius;
-		//		auto t = Vector(
-		//			(float)(i * radius * 5.0f) + (radius * 4.0f * random_double())
-		//			, -0.7f
-		//			, (float)(j * radius * 5.0f) + (radius * 4.0f * random_double()));
-
-		//		auto NewPrimitive = jPrimitiveUtil::CreateSphere(t, 1.0, 38, 16, Vector(r), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
-  //              jObject::AddObject(NewPrimitive);
-  //              SpawnedObjects.push_back(NewPrimitive);
-		//	}
-		//}
-
-		//// Big Sphere
-  //      for (int32 i = 0; i < 3; ++i)
-  //      {
-  //          auto s = XMMatrixScaling(1.0f, 1.0f, 1.0f);
-  //          auto t = Vector(0.0f + i * 2, 0.0f, 0.0f + i * 2);
-  //          
-		//	auto NewPrimitive = jPrimitiveUtil::CreateSphere(t, 1.0, 38, 16, Vector(1.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
-		//	jObject::AddObject(NewPrimitive);
-		//	SpawnedObjects.push_back(NewPrimitive);
-  //      }
-
-        //auto sphere2 = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f + 130.0f), 1.0, 150, Vector(30.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
-        //jObject::AddObject(sphere2);
-        //SpawnedObjects.push_back(sphere2);
-        //if (sphere2->RenderObjects[0])
-        //{
-        //    auto MaterialSphere = std::make_shared<jMaterial>();
-        //    MaterialSphere->bUseSphericalMap = true;
-        //    jName FilePath = jName("Image/grace_probe.hdr");
-        //    MaterialSphere->TexData[(int32)jMaterial::EMaterialTextureType::Albedo].FilePath = FilePath;
-        //    MaterialSphere->TexData[(int32)jMaterial::EMaterialTextureType::Albedo].Texture
-        //        = jImageFileLoader::GetInstance().LoadTextureFromFile(FilePath, false, true).lock().get();
-        //    sphere2->RenderObjects[0]->MaterialPtr = MaterialSphere;
-        //}
-
-#endif
-		//{
-		//	jScopedLock s(&AsyncLoadLock);
-		//	CompletedAsyncLoadObjects.push_back(Sponza);
-		//}
-	//});
 	
-#if USE_PATH_TRACING
-    static bool initialized = false;
-    if (!initialized)
-    {
-        initialized = true;
-
-		jFile::SearchFilesRecursive(gPathTracingScenes, "Resource/PathTracing", { ".scene" });
-        gPathTracingScenesNameOnly.resize(gPathTracingScenes.size());
-        for (int32 i = 0; i < gPathTracingScenes.size(); ++i)
-        {
-            gPathTracingScenesNameOnly[i] = jFile::ExtractFileName(gPathTracingScenes[i]);
-        }
-
-        if (gPathTracingScenesNameOnly.size() > 0)
-            gSelectedScene = gPathTracingScenesNameOnly[0].c_str();
-
-		gSelectedSceneIndex = 3;
-		gSelectedScene = gPathTracingScenesNameOnly[gSelectedSceneIndex].c_str();
-    }
-
-	if (!gPathTracingScene)
-	{
-		gPathTracingScene = jPathTracingLoadData::LoadPathTracingData(gPathTracingScenes[gSelectedSceneIndex]);
-		gPathTracingScene->CreateSceneFor_jEngine(this);
-	}
-#endif // USE_PATH_TRACING
+	InitializePathTracingSceneBrowser();
 
 	g_rhi->Finish(); // todo : Instead of this, it needs UAV barrier here
 	if (GSupportRaytracing)
@@ -430,82 +1386,15 @@ static jConsoleVariableInt* cvar_SurfelGIInlineRayCount = new jConsoleVariableIn
 	}
 }
 
-void jGame::SpawnObjects(ESpawnedType spawnType)
-{
-	if (spawnType != SpawnedType)
-	{
-		SpawnedType = spawnType;
-		switch (SpawnedType)
-		{
-		case ESpawnedType::TestPrimitive:
-			SpawnTestPrimitives();
-			break;
-		case ESpawnedType::CubePrimitive:
-			SapwnCubePrimitives();
-			break;
-		case ESpawnedType::InstancingPrimitive:
-			SpawnInstancingPrimitives();
-			break;
-		case ESpawnedType::IndirectDrawPrimitive:
-			SpawnIndirectDrawPrimitives();
-			break;
-		}
-	}
-}
-
-void jGame::RemoveSpawnedObjects()
-{
-	for (auto& iter : SpawnedObjects)
-	{
-		JASSERT(iter);
-		jObject::RemoveObject(iter);
-		delete iter;
-	}
-	SpawnedObjects.clear();
-}
-
 void jGame::Update(float deltaTime)
 {
 	SCOPE_DEBUG_EVENT(g_rhi, "Game::Update");
 
-#if USE_PATH_TRACING
-	static int32 LastSelectedIndex = gSelectedSceneIndex;
-	if (gSelectedSceneIndex != LastSelectedIndex)
+	if (PathTracingSceneBrowser.PendingLoadIndex >= 0
+		&& PathTracingSceneBrowser.PendingLoadIndex != PathTracingSceneBrowser.ActiveIndex)
 	{
-		g_rhi->Flush();
-
-		gPathTracingScene->ClearSceneFor_jEngine(this);
-        gPathTracingScene = jPathTracingLoadData::LoadPathTracingData(gPathTracingScenes[gSelectedSceneIndex].c_str());
-        gPathTracingScene->CreateSceneFor_jEngine(this);
-
-		g_rhi->RaytracingScene->Clear();
-
-        jRatracingInitializer Initializer;
-        Initializer.CommandBuffer = g_rhi->BeginSingleTimeCommands();
-        Initializer.RenderObjects = jObject::GetStaticRenderObject();
-        g_rhi->RaytracingScene->CreateOrUpdateBLAS(Initializer);
-        g_rhi->EndSingleTimeCommands(Initializer.CommandBuffer);
-        g_rhi->Finish(); // todo : Instead of this, it needs UAV barrier here
-
-        Initializer.CommandBuffer = g_rhi->BeginSingleTimeCommands();
-        g_rhi->RaytracingScene->CreateOrUpdateTLAS(Initializer);
-        g_rhi->EndSingleTimeCommands(Initializer.CommandBuffer);
-        g_rhi->Finish(); // todo : Instead of this, it needs UAV barrier here
-
-		LastSelectedIndex = gSelectedSceneIndex;
+		LoadPathTracingSceneByIndex(PathTracingSceneBrowser.PendingLoadIndex, true);
 	}
-#endif // USE_PATH_TRACING
-
-	//if (CompletedAsyncLoadObjects.size() > 0)
-	//{
- //       jScopedLock s(&AsyncLoadLock);
-	//	for (auto iter : CompletedAsyncLoadObjects)
-	//	{
- //           jObject::AddObject(iter);
- //           SpawnedObjects.push_back(iter);
-	//	}
-	//	CompletedAsyncLoadObjects.clear();
-	//}
 
 	// Update application property by using UI Pannel.
 	// UpdateAppSetting();
@@ -597,8 +1486,16 @@ void jGame::Draw()
 		View.PrepareViewUniformBufferShaderBindingInstance();
 
 #if USE_PATH_TRACING
-        jRenderer_PathTracing renderer(renderFrameContext, View);
-        renderer.Render();
+		if (IsUsingPathTracingRenderer())
+		{
+			jRenderer_PathTracing renderer(renderFrameContext, View);
+			renderer.Render();
+		}
+		else
+		{
+			jRenderer renderer(renderFrameContext, View);
+			renderer.Render();
+		}
 #else
         jRenderer renderer(renderFrameContext, View);
         renderer.Render();
@@ -692,7 +1589,6 @@ void jGame::Release()
 	delete jSceneRenderTarget::GlobalFullscreenPrimitive;
 	jSceneRenderTarget::GlobalFullscreenPrimitive = nullptr;
 
-	SpawnedObjects.clear();
 	for(auto it : jObject::s_StaticObjects)
 	{
 		delete it;
@@ -701,132 +1597,15 @@ void jGame::Release()
 	{
 		delete it;
 	}
+
+	delete gPathTracingScene;
+	gPathTracingScene = nullptr;
 	
 	delete MainCamera;
     MainCamera = nullptr;
 
-    DirectionalLightInfo = nullptr;
-    PointLightInfo = nullptr;
-    SpotLightInfo = nullptr;
-	DirectionalLightShadowMapUIDebug = nullptr;
-
     ReleaseSurfelGIResources();
     jSceneRenderTarget::ReleasePersistentResources();
-}
-
-void jGame::SpawnTestPrimitives()
-{
-	RemoveSpawnedObjects();
-
-	auto quad = jPrimitiveUtil::CreateQuad(Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), Vector(1000.0f, 1000.0f, 1000.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
-	quad->SetPlane(jPlane(Vector(0.0, 1.0, 0.0), -0.1f));
-	quad->SkipUpdateShadowVolume = true;
-	jObject::AddObject(quad);
-	SpawnedObjects.push_back(quad);
-
-	auto gizmo = jPrimitiveUtil::CreateGizmo(Vector::ZeroVector, Vector::ZeroVector, Vector::OneVector);
-	gizmo->SkipShadowMapGen = true;
-	jObject::AddObject(gizmo);
-	SpawnedObjects.push_back(gizmo);
-
-	auto triangle = jPrimitiveUtil::CreateTriangle(Vector(60.0, 100.0, 20.0), Vector::OneVector, Vector(40.0, 40.0, 40.0), Vector4(0.5f, 0.1f, 1.0f, 1.0f));
-	triangle->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
-	{
-		thisObject->RenderObjects[0]->SetRot(thisObject->RenderObjects[0]->GetRot() + Vector(5.0f, 0.0f, 0.0f) * deltaTime);
-	};
-	jObject::AddObject(triangle);
-	SpawnedObjects.push_back(triangle);
-
-	auto cube = jPrimitiveUtil::CreateCube(Vector(-60.0f, 55.0f, -20.0f), Vector::OneVector, Vector(50.0f, 50.0f, 50.0f), Vector4(0.7f, 0.7f, 0.7f, 1.0f));
-	cube->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
-	{
-		thisObject->RenderObjects[0]->SetRot(thisObject->RenderObjects[0]->GetRot() + Vector(0.0f, 0.0f, 0.5f) * deltaTime);
-	};
-	jObject::AddObject(cube);
-	SpawnedObjects.push_back(cube);
-
-	auto cube2 = jPrimitiveUtil::CreateCube(Vector(-65.0f, 35.0f, 10.0f), Vector::OneVector, Vector(50.0f, 50.0f, 50.0f), Vector4(0.7f, 0.7f, 0.7f, 1.0f));
-	jObject::AddObject(cube2);
-	SpawnedObjects.push_back(cube2);
-
-	auto capsule = jPrimitiveUtil::CreateCapsule(Vector(30.0f, 30.0f, -80.0f), 40.0f, 10.0f, 20, Vector(1.0f), Vector4(1.0f, 1.0f, 0.0f, 1.0f));
-	capsule->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
-	{
-		thisObject->RenderObjects[0]->SetRot(thisObject->RenderObjects[0]->GetRot() + Vector(-1.0f, 0.0f, 0.0f) * deltaTime);
-	};
-	jObject::AddObject(capsule);
-	SpawnedObjects.push_back(capsule);
-
-	auto cone = jPrimitiveUtil::CreateCone(Vector(0.0f, 50.0f, 60.0f), 40.0f, 20.0f, 15, Vector::OneVector, Vector4(1.0f, 1.0f, 0.0f, 1.0f));
-	cone->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
-	{
-		thisObject->RenderObjects[0]->SetRot(thisObject->RenderObjects[0]->GetRot() + Vector(0.0f, 3.0f, 0.0f) * deltaTime);
-	};
-	jObject::AddObject(cone);
-	SpawnedObjects.push_back(cone);
-
-	auto cylinder = jPrimitiveUtil::CreateCylinder(Vector(-30.0f, 60.0f, -60.0f), 20.0f, 10.0f, 20, Vector::OneVector, Vector4(0.0f, 0.0f, 1.0f, 1.0f));
-	cylinder->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
-	{
-		thisObject->RenderObjects[0]->SetRot(thisObject->RenderObjects[0]->GetRot() + Vector(5.0f, 0.0f, 0.0f) * deltaTime);
-	};
-	jObject::AddObject(cylinder);
-	SpawnedObjects.push_back(cylinder);
-
-	auto quad2 = jPrimitiveUtil::CreateQuad(Vector(-20.0f, 80.0f, 40.0f), Vector::OneVector, Vector(20.0f, 20.0f, 20.0f), Vector4(0.0f, 0.0f, 1.0f, 1.0f));
-	quad2->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
-	{
-		thisObject->RenderObjects[0]->SetRot(thisObject->RenderObjects[0]->GetRot() + Vector(0.0f, 0.0f, 8.0f) * deltaTime);
-	};
-	jObject::AddObject(quad2);
-	SpawnedObjects.push_back(quad2);
-
-	auto sphere = jPrimitiveUtil::CreateSphere(Vector(65.0f, 35.0f, 10.0f), 1.0, 150, 75, Vector(30.0f), Vector4(0.8f, 0.0f, 0.0f, 1.0f));
-	sphere->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
-	{
-        float RotationSpeed = 100.0f;
-        thisObject->RenderObjects[0]->SetRot(thisObject->RenderObjects[0]->GetRot() + Vector(0.0f, 0.0f, DegreeToRadian(180.0f)) * RotationSpeed * deltaTime);
-	};
-	jObject::AddObject(sphere);
-	SpawnedObjects.push_back(sphere);
-
-	auto sphere2 = jPrimitiveUtil::CreateSphere(Vector(150.0f, 5.0f, 0.0f), 1.0, 150, 75, Vector(10.0f), Vector4(0.8f, 0.4f, 0.6f, 1.0f));
-	sphere2->PostUpdateFunc = [](jObject* thisObject, float deltaTime)
-	{
-		const float startY = 5.0f;
-		const float endY = 100;
-		const float speed = 150.0f * deltaTime;
-		static bool dir = true;
-		auto Pos = thisObject->RenderObjects[0]->GetPos();
-		Pos.y += dir ? speed : -speed;
-		if (Pos.y < startY || Pos.y > endY)
-		{
-			dir = !dir;
-			Pos.y += dir ? speed : -speed;
-		}
-		thisObject->RenderObjects[0]->SetPos(Pos);
-	};
-	jObject::AddObject(sphere2);
-	SpawnedObjects.push_back(sphere2);
-
-	auto billboard = jPrimitiveUtil::CreateBillobardQuad(Vector(0.0f, 60.0f, 80.0f), Vector::OneVector, Vector(20.0f, 20.0f, 20.0f), Vector4(1.0f, 0.0f, 1.0f, 1.0f), MainCamera);
-	jObject::AddObject(billboard);
-	SpawnedObjects.push_back(billboard);
-
-	//const float Size = 20.0f;
-
-	//for (int32 i = 0; i < 10; ++i)
-	//{
-	//	for (int32 j = 0; j < 10; ++j)
-	//	{
-	//		for (int32 k = 0; k < 5; ++k)
-	//		{
-	//			auto cube = jPrimitiveUtil::CreateCube(Vector(i * 25.0f, k * 25.0f, j * 25.0f), Vector::OneVector, Vector(Size), Vector4(0.7f, 0.7f, 0.7f, 1.0f));
-	//			jObject::AddObject(cube);
-	//			SpawnedObjects.push_back(cube);
-	//		}
-	//	}
-	//}
 }
 
 void jGame::SpawnGraphTestFunc()
@@ -877,156 +1656,6 @@ void jGame::SpawnGraphTestFunc()
 	jObject::AddUIDebugObject(graphObj2);
 }
 
-void jGame::SapwnCubePrimitives()
-{
-	RemoveSpawnedObjects();
 
-	for (int i = 0; i < 20; ++i)
-	{
-		float height = 5.0f * i;
-		auto cube = jPrimitiveUtil::CreateCube(Vector(-500.0f + i * 50.0f, height / 2.0f, 20.0f), Vector::OneVector, Vector(10.0f, height, 20.0f), Vector4(0.7f, 0.7f, 0.7f, 1.0f));
-		jObject::AddObject(cube);
-		SpawnedObjects.push_back(cube);
-		cube = jPrimitiveUtil::CreateCube(Vector(-500.0f + i * 50.0f, height / 2.0f, 20.0f + i * 20.0f), Vector::OneVector, Vector(10.0f, height, 10.0f), Vector4(0.7f, 0.7f, 0.7f, 1.0f));
-		jObject::AddObject(cube);
-		SpawnedObjects.push_back(cube);
-		cube = jPrimitiveUtil::CreateCube(Vector(-500.0f + i * 50.0f, height / 2.0f, 20.0f - i * 20.0f), Vector::OneVector, Vector(20.0f, height, 10.0f), Vector4(0.7f, 0.7f, 0.7f, 1.0f));
-		jObject::AddObject(cube);
-		SpawnedObjects.push_back(cube);
-	}
 
-	auto quad = jPrimitiveUtil::CreateQuad(Vector(1.0f, 1.0f, 1.0f), Vector(1.0f), Vector(1000.0f, 1000.0f, 1000.0f), Vector4(1.0f, 1.0f, 1.0f, 1.0f));
-	quad->SetPlane(jPlane(Vector(0.0, 1.0, 0.0), -0.1f));
-	jObject::AddObject(quad);
-	SpawnedObjects.push_back(quad);
-}
 
-void jGame::SpawnInstancingPrimitives()
-{
-    struct jInstanceData
-    {
-        Vector4 Color;
-        Vector W;
-    };
-    jInstanceData instanceData[100];
-
-    const float colorStep = 1.0f / (float)sqrt(_countof(instanceData));
-    Vector4 curStep = Vector4(colorStep, colorStep, colorStep, 1.0f);
-
-    for (int32 i = 0; i < _countof(instanceData); ++i)
-    {
-        float x = (float)(i / 10);
-        float y = (float)(i % 10);
-        instanceData[i].W = Vector(y * 10.0f, x * 10.0f, 0.0f);
-        instanceData[i].Color = curStep;
-        if (i < _countof(instanceData) / 3)
-            curStep.x += colorStep;
-        else if (i < _countof(instanceData) / 2)
-            curStep.y += colorStep;
-        else if (i < _countof(instanceData))
-            curStep.z += colorStep;
-    }
-
-    {
-        auto obj = jPrimitiveUtil::CreateTriangle(Vector(0.0f, 0.0f, 0.0f), Vector::OneVector * 8.0f, Vector::OneVector, Vector4(1.0f, 0.0f, 0.0f, 1.0f));
-
-        auto streamParam = std::make_shared<jStreamParam<jInstanceData>>();
-        streamParam->BufferType = EBufferType::STATIC;
-        streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(Vector4)});
-        streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(Vector)});
-        streamParam->Stride = sizeof(jInstanceData);
-        streamParam->Name = jName("InstanceData");
-        streamParam->Data.resize(100);
-        memcpy(&streamParam->Data[0], instanceData, sizeof(instanceData));
-
-		auto& GeometryDataPtr = obj->RenderObjects[0]->GeometryDataPtr;
-
-        GeometryDataPtr->VertexStream_InstanceDataPtr = std::make_shared<jVertexStreamData>();
-        GeometryDataPtr->VertexStream_InstanceDataPtr->ElementCount = _countof(instanceData);
-        GeometryDataPtr->VertexStream_InstanceDataPtr->StartLocation = (int32)GeometryDataPtr->VertexStreamPtr->GetEndLocation();
-        GeometryDataPtr->VertexStream_InstanceDataPtr->BindingIndex = (int32)GeometryDataPtr->VertexStreamPtr->Params.size();
-        GeometryDataPtr->VertexStream_InstanceDataPtr->VertexInputRate = EVertexInputRate::INSTANCE;
-        GeometryDataPtr->VertexStream_InstanceDataPtr->Params.push_back(streamParam);
-        GeometryDataPtr->VertexBuffer_InstanceDataPtr = g_rhi->CreateVertexBuffer(GeometryDataPtr->VertexStream_InstanceDataPtr);
-
-        jObject::AddObject(obj);
-        SpawnedObjects.push_back(obj);
-    }
-}
-
-void jGame::SpawnIndirectDrawPrimitives()
-{
-    struct jInstanceData
-    {
-        Vector4 Color;
-        Vector W;
-    };
-    jInstanceData instanceData[100];
-
-    const float colorStep = 1.0f / (float)sqrt(_countof(instanceData));
-    Vector4 curStep = Vector4(colorStep, colorStep, colorStep, 1.0f);
-
-    for (int32 i = 0; i < _countof(instanceData); ++i)
-    {
-        float x = (float)(i / 10);
-        float y = (float)(i % 10);
-        instanceData[i].W = Vector(y * 10.0f, x * 10.0f, 0.0f);
-        instanceData[i].Color = curStep;
-        if (i < _countof(instanceData) / 3)
-            curStep.x += colorStep;
-        else if (i < _countof(instanceData) / 2)
-            curStep.y += colorStep;
-        else if (i < _countof(instanceData))
-            curStep.z += colorStep;
-    }
-
-    {
-        auto obj = jPrimitiveUtil::CreateTriangle(Vector(0.0f, 0.0f, 0.0f), Vector::OneVector * 8.0f, Vector::OneVector, Vector4(1.0f, 0.0f, 0.0f, 1.0f));
-
-        auto streamParam = std::make_shared<jStreamParam<jInstanceData>>();
-        streamParam->BufferType = EBufferType::STATIC;
-        streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(Vector4)});
-        streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(Vector)});
-        streamParam->Stride = sizeof(jInstanceData);
-        streamParam->Name = jName("InstanceData");
-        streamParam->Data.resize(100);
-        memcpy(&streamParam->Data[0], instanceData, sizeof(instanceData));
-
-		auto& GeometryDataPtr = obj->RenderObjects[0]->GeometryDataPtr;
-        GeometryDataPtr->VertexStream_InstanceDataPtr = std::make_shared<jVertexStreamData>();
-        GeometryDataPtr->VertexStream_InstanceDataPtr->ElementCount = _countof(instanceData);
-        GeometryDataPtr->VertexStream_InstanceDataPtr->StartLocation = (int32)GeometryDataPtr->VertexStreamPtr->GetEndLocation();
-        GeometryDataPtr->VertexStream_InstanceDataPtr->BindingIndex = (int32)GeometryDataPtr->VertexStreamPtr->Params.size();
-        GeometryDataPtr->VertexStream_InstanceDataPtr->VertexInputRate = EVertexInputRate::INSTANCE;
-        GeometryDataPtr->VertexStream_InstanceDataPtr->Params.push_back(streamParam);
-        GeometryDataPtr->VertexBuffer_InstanceDataPtr = g_rhi->CreateVertexBuffer(GeometryDataPtr->VertexStream_InstanceDataPtr);
-
-        // Create indirect draw buffer
-        {
-            check(GeometryDataPtr->VertexStream_InstanceDataPtr);
-
-            std::vector<VkDrawIndirectCommand> indrectCommands;
-
-            const int32 instanceCount = GeometryDataPtr->VertexStream_InstanceDataPtr->ElementCount;
-            const int32 vertexCount = GeometryDataPtr->VertexStreamPtr->ElementCount;
-            for (int32 i = 0; i < instanceCount; ++i)
-            {
-                VkDrawIndirectCommand command;
-                command.vertexCount = vertexCount;
-                command.instanceCount = 1;
-                command.firstVertex = 0;
-                command.firstInstance = i;
-                indrectCommands.emplace_back(command);
-            }
-
-            const size_t bufferSize = indrectCommands.size() * sizeof(VkDrawIndirectCommand);
-
-			check(!GeometryDataPtr->IndirectCommandBufferPtr);
-			GeometryDataPtr->IndirectCommandBufferPtr = g_rhi->CreateStructuredBuffer(bufferSize, 0, sizeof(VkDrawIndirectCommand), EBufferCreateFlag::IndirectCommand, EResourceLayout::TRANSFER_DST
-				, indrectCommands.data(), bufferSize, jName(TEXT("IndirectBuffer")));
-        }
-
-        jObject::AddObject(obj);
-        SpawnedObjects.push_back(obj);
-    }
-}

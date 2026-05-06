@@ -58,11 +58,13 @@ public:
 
     virtual const jCamera* GetLightCamra(int32 index = 0) const override;
     virtual const std::shared_ptr<jShaderBindingInstance>& PrepareShaderBindingInstance(jTexture* InShadowMap) override;
+    virtual bool SupportsDirection() const override { return true; }
+    virtual Vector GetDirection() const override { return LightData.Direction; }
 
     FORCEINLINE const jDirectionalLightUniformBufferData& GetLightData() const { return LightData; }
     FORCEINLINE jDirectionalLightUniformBufferData& GetLightData() { return LightData; }
 
-    void SetDirection(const Vector& InDirection);
+    virtual void SetDirection(const Vector& InDirection) override;
     void SetColor(const Vector& InColor);
     void SetIntensity(float InIntensity);
 

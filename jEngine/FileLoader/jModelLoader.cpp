@@ -11,6 +11,7 @@
 #include "Math/Vector.h"
 #include "Scene/jRenderObject.h"
 #include "jImageFileLoader.h"
+#include <filesystem>
 
 #if defined _DEBUG
 #pragma comment(lib, "assimp-vc143-mtd.lib")
@@ -215,38 +216,37 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
                 curTexData.MaxAnisotropy = (Anisotropy > 1.0f) ? (float)Anisotropy : 1.0f;
             }
 
-			std::string FilePath;
-			if (materialRootDir)
-				FilePath = materialRootDir;
-
-			if (FilePath.length() > 0 && str.length > 0)
-			{
-				const char last = FilePath[FilePath.length() - 1];
-				const char first = str.data[0];
-				const bool lastHasNoSlash = (last != '/' && last != '\\');
-				const bool firstHasNoSlash = (first != '/' && first != '\\');
-				if (lastHasNoSlash && firstHasNoSlash)
-					FilePath += "\\";
-			}
-			FilePath += str.C_Str();
-
-			jName FilePathName = jName(FilePath);
 			curTexData.Name = jName(str.C_Str());
-			curTexData.FilePath = FilePathName;
 
-            if (FilePath.length())
-            {
-				Materials.push_back(newMeshMaterial);
-				jTask T;
-				T.pHashFunc = [&FilePathName]()
+			const std::string texturePath = str.C_Str();
+			const bool isEmbeddedTexture = (!texturePath.empty() && texturePath[0] == '*');
+			const bool isDataUri = (texturePath.rfind("data:", 0) == 0);
+			if (!isEmbeddedTexture && !isDataUri && !texturePath.empty())
+			{
+				std::filesystem::path resolvedPath(texturePath);
+				if (!resolvedPath.is_absolute() && materialRootDir)
+					resolvedPath = std::filesystem::path(materialRootDir) / resolvedPath;
+
+				resolvedPath = resolvedPath.lexically_normal();
+				std::error_code errorCode;
+				if (std::filesystem::exists(resolvedPath, errorCode) && !errorCode)
 				{
-					return (size_t)FilePathName.GetNameHash();
-				};
-				T.pFunc = [FilePath]() {
-					jImageFileLoader::GetInstance().LoadImageDataFromFile(jName(FilePath));
-				};
-				ThreadPool.Enqueue(T);
-            }
+					const std::string filePath = resolvedPath.generic_string();
+					jName FilePathName = jName(filePath);
+					curTexData.FilePath = FilePathName;
+
+					Materials.push_back(newMeshMaterial);
+					jTask T;
+					T.pHashFunc = [&FilePathName]()
+					{
+						return (size_t)FilePathName.GetNameHash();
+					};
+					T.pFunc = [filePath]() {
+						jImageFileLoader::GetInstance().LoadImageDataFromFile(jName(filePath));
+					};
+					ThreadPool.Enqueue(T);
+				}
+			}
 		}
 
 		ai_real Opacity = 1.0f;
@@ -364,7 +364,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 
 	const int32 elementCount = static_cast<int32>(meshData->Vertices.size());
 
-    // PositionOnly VertexStream 추가
+    // Position-only vertex stream 생성
     std::vector<jPositionOnlyVertex> verticesPositionOnly(meshData->Vertices.size());
     for (int32 i = 0; i < (int32)meshData->Vertices.size(); ++i)
     {
@@ -386,7 +386,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
         positionOnlyVertexStreamData->ElementCount = NumOfVertices;
     }
 
-	// Base VertexStream 추가
+	// Base vertex stream 생성
 	auto vertexStreamData = std::make_shared<jVertexStreamData>();
 	{
 		auto streamParam = std::make_shared<jStreamParam<jBaseVertex>>();
@@ -472,18 +472,21 @@ jThreadPool::jThreadPool(size_t num_threads) : IsStop(false)
 	{
         WorkerThreads.emplace_back([this] 
 		{
+			const HRESULT comInitResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+			const bool shouldUninitializeCOM = SUCCEEDED(comInitResult);
+
             while (true) 
 			{
 				jTask task;
                 {
                     std::unique_lock<std::mutex> lock(QueueLock);
 
-                    // 대기 중인 파일이 없고, 스레드 풀이 종료되지 않았다면 대기
+                    // 작업이 없고 스레드 풀 종료 요청도 없다면 대기
                     ConditionVariable.wait(lock, [this] { return IsStop || !TaskQueue.empty(); });
 
                     if (IsStop && TaskQueue.empty()) 
 					{
-                        return;
+                        break;
 
                     }
 
@@ -500,6 +503,9 @@ jThreadPool::jThreadPool(size_t num_threads) : IsStop(false)
 					--RemainTask;
 				}
             }
+
+			if (shouldUninitializeCOM)
+				CoUninitialize();
         });
 
     }
@@ -524,11 +530,11 @@ void jThreadPool::Enqueue(const jTask& file_path)
 {
     std::unique_lock<std::mutex> lock(QueueLock);
 
-    // 중복 확인
+    // 중복 작업인지 확인
     auto hash = file_path.GetHash();
     if (ProcessingTaskHashes.find(hash) == ProcessingTaskHashes.end())
 	{
-        // 중복되지 않은 경우에만 파일 큐에 추가
+        // 중복이 아닐 때만 작업 큐에 추가
         TaskQueue.push(file_path);
         RemainTask++;
 		ProcessingTaskHashes.insert(hash);

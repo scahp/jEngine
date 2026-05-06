@@ -81,6 +81,8 @@ public:
 	// Register a static object (called from jObject::AddObject)
 	void RegisterStaticObject(jObject* obj);
 	void UnregisterStaticObject(jObject* obj);
+	void RegisterLight(jLight* light);
+	void UnregisterLight(jLight* light);
 
 	// Pick request state (set by mouse click, consumed by renderer)
 	bool bPickRequested = false;

@@ -27,6 +27,7 @@
 
 
 #include "pch.h"
+#include <filesystem>
 #include <map>
 #include <cstdint>
 #include "GLTFLoader.h"
@@ -226,20 +227,45 @@ namespace GLSLPT
         }
     }
 
-    void LoadTextures(jPathTracingLoadData* scene, tinygltf::Model& gltfModel)
+    bool LoadTextures(const std::string& sceneFilename, jPathTracingLoadData* scene, tinygltf::Model& gltfModel)
     {
+        const std::filesystem::path sceneDirectory = std::filesystem::path(sceneFilename).parent_path();
+
         for (size_t i = 0; i < gltfModel.textures.size(); ++i)
         {
             tinygltf::Texture& gltfTex = gltfModel.textures[i];
-            tinygltf::Image& image = gltfModel.images[gltfTex.source];
-            std::string texName = gltfTex.name;
-            if (strcmp(gltfTex.name.c_str(), "") == 0)
-                texName = image.uri;
+            if (gltfTex.source < 0 || gltfTex.source >= (int32)gltfModel.images.size())
+            {
+                printf("glTF texture %zu has an invalid image source index.\n", i);
+                return false;
+            }
 
-            jTexture* texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(texName.c_str())).lock().get();
-            check(texture);
+            tinygltf::Image& image = gltfModel.images[gltfTex.source];
+            std::string textureFilename = image.uri;
+            if (textureFilename.empty())
+                textureFilename = image.name;
+
+            if (textureFilename.empty())
+            {
+                printf("glTF texture %zu does not provide a loadable uri.\n", i);
+                return false;
+            }
+
+            std::filesystem::path texturePath(textureFilename);
+            if (texturePath.is_relative())
+                texturePath = sceneDirectory / texturePath;
+
+            const std::string resolvedTexturePath = texturePath.lexically_normal().string();
+            jTexture* texture = jImageFileLoader::GetInstance().LoadTextureFromFile(jName(resolvedTexturePath.c_str())).lock().get();
+            if (!texture)
+            {
+                printf("Failed to load glTF texture %s referenced by %s\n", resolvedTexturePath.c_str(), sceneFilename.c_str());
+                return false;
+            }
             scene->textures.push_back(texture);
         }
+
+        return true;
     }
 
     void LoadMaterials(jPathTracingLoadData* scene, tinygltf::Model& gltfModel)
@@ -420,7 +446,8 @@ namespace GLSLPT
         std::map<int, std::vector<Primitive>> meshPrimMap;
         LoadMeshes(scene, gltfModel, meshPrimMap);
         LoadMaterials(scene, gltfModel);
-        LoadTextures(scene, gltfModel);
+        if (!LoadTextures(filename, scene, gltfModel))
+            return false;
         LoadInstances(scene, gltfModel, xform, meshPrimMap);
 
         return true;

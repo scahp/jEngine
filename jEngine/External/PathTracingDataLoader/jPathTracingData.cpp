@@ -283,12 +283,14 @@ void jPathTracingLoadData::ClearSceneFor_jEngine(class jGame* InGame)
     for (jObject* obj : SpawnObjects)
     {
         jObject::RemoveObject(obj);
+		delete obj;
     }
     SpawnObjects.clear();
 
 	for (jLight* light : SpawnLights)
 	{
 		jLight::RemoveLights(light);
+		delete light;
 	}
     SpawnLights.clear();
 }
@@ -453,3 +455,4 @@ void jPathTracingLoadData::AddEnvMap(const std::string& filename)
     //envMapModified = true;
     //dirty = true;
 }
+
