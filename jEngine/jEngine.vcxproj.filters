@@ -1185,6 +1185,30 @@
     <None Include="Resource\Shaders\hlsl\SurfelGIVisibleCellCollect_cs.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
+    <None Include="Resource\Shaders\hlsl\ApplySurfelGI_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\SurfelGIBuildInlineRayDispatchArgs_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\SurfelGIClearClipmapCells_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\SurfelGIClearInlineRayDispatch_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\SurfelGIClipmapLookup.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\SurfelGICompactActiveInlineRayIndices_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\SurfelGIResolve_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
+    <None Include="Resource\Shaders\hlsl\SurfelGISelectHoveredSurfel_cs.hlsl">
+      <Filter>Resource\Shaders\hlsl</Filter>
+    </None>
     <None Include="Resource\Shaders\hlsl\SurfelGIRefreshVisibleCellSurfels_cs.hlsl">
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
