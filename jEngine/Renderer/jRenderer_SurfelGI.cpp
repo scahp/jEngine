@@ -1016,8 +1016,8 @@ bool DispatchSurfelGIHWRTDIGather(
     SceneCB.CameraPosition = InMainCamera->Pos;
     SceneCB.NormalBias = (gOptions.HWRTNormalBias > 0.0f) ? gOptions.HWRTNormalBias : 0.0f;
     SceneCB.ShadowRayStartOffset = (gOptions.HWRTShadowRayStartOffset > 0.0f) ? gOptions.HWRTShadowRayStartOffset : 0.0f;
-    SceneCB.RenderWidth = (uint32)SCR_WIDTH;
-    SceneCB.RenderHeight = (uint32)SCR_HEIGHT;
+    SceneCB.RenderWidth = (uint32)InRenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->Info.Width;
+    SceneCB.RenderHeight = (uint32)InRenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->Info.Height;
     SceneCB.DebugViewMode = 0u;
     SceneCB.DebugLineWidth = Max(gOptions.HWRTDebugLineWidth, 0.0005f);
     SceneCB.DebugUVScale = Max(gOptions.HWRTDebugUVScale, 1.0f);
@@ -1133,7 +1133,6 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
     const int64 MinRequiredForTargetSlots64 = (int64)TotalCellCount * (int64)Max(1, GSurfelPageSize);
     const int32 MinRequiredForTargetSlots = (int32)Min<int64>(MinRequiredForTargetSlots64, (int64)SURFEL_GI_MAX_SURFELS_HARD_CAP);
     const int32 MaxSurfels = Max(RequestedMaxSurfels, MinRequiredForTargetSlots);
-    gOptions.SurfelGIMaxSurfels = MaxSurfels;
     const int32 MaxSlotsPerCellByBudget = Max(1, MaxSurfels / Max(1, TotalCellCount));
     GSurfelPageSize = Clamp(GSurfelPageSize, 1, MaxSlotsPerCellByBudget);
     bool RecreatedPrimaryStorage = false;
@@ -1497,6 +1496,8 @@ void jRenderer::SurfelGIPass()
     auto MainCamera = jCamera::GetMainCamera();
     if (!MainCamera)
         return;
+    const int32 Width = RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->Info.Width;
+    const int32 Height = RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->Info.Height;
 
     jSurfelGIUniformBuffer UniformData;
     float CascadeStartDistanceSanitized[SURFEL_GI_CASCADE_COUNT] = {};
@@ -1516,7 +1517,7 @@ void jRenderer::SurfelGIPass()
     UniformData.InvP = MainCamera->Projection.GetInverse();
     UniformData.V = MainCamera->View;
     UniformData.InvV = MainCamera->View.GetInverse();
-    UniformData.ScreenSize = Vector2((float)SCR_WIDTH, (float)SCR_HEIGHT);
+    UniformData.ScreenSize = Vector2((float)Width, (float)Height);
     UniformData.NormalThreshold = gOptions.SurfelGINormalThreshold;
     UniformData.DepthEdgeScale = 0.75f;
     UniformData.NormalEdgeScale = 1.25f;
@@ -1697,8 +1698,6 @@ void jRenderer::SurfelGIPass()
         , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
         , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
 
-    const int32 Width = RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->Info.Width;
-    const int32 Height = RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->Info.Height;
     const int32 GroupX = (Width + 7) / 8;
     const int32 GroupY = (Height + 7) / 8;
 
@@ -2009,7 +2008,7 @@ void jRenderer::SurfelGIPass()
             jSurfelGIHoverSelectUniformBuffer HoverSelectUniformData;
             HoverSelectUniformData.InvP = MainCamera->Projection.GetInverse();
             HoverSelectUniformData.InvV = MainCamera->View.GetInverse();
-            HoverSelectUniformData.ScreenSize = Vector2((float)SCR_WIDTH, (float)SCR_HEIGHT);
+            HoverSelectUniformData.ScreenSize = Vector2((float)Width, (float)Height);
             HoverSelectUniformData.GridCellSize = Max(0.1f, gOptions.SurfelGIWorldGridCellSize);
             auto SetPackedHoverSelectValue = [](Vector4* packedArray, int32 cascade, float value)
             {
@@ -2054,8 +2053,8 @@ void jRenderer::SurfelGIPass()
             HoverSelectUniformData.SurfelPageSize = Max(1, GSurfelPageSize);
             HoverSelectUniformData.SurfelPageTableCapacity = Max(1, GSurfelCellPageTableCapacity);
             HoverSelectUniformData.NeighborCellRadius = Clamp(gOptions.SurfelGIVisualizeNeighborCellRadius, 0, 3);
-            HoverSelectUniformData.MousePixelX = HasMouseInClient ? Clamp(PickMouseX, 0, Max(0, SCR_WIDTH - 1)) : -1;
-            HoverSelectUniformData.MousePixelY = HasMouseInClient ? Clamp(PickMouseY, 0, Max(0, SCR_HEIGHT - 1)) : -1;
+            HoverSelectUniformData.MousePixelX = HasMouseInClient ? Clamp(PickMouseX, 0, Max(0, Width - 1)) : -1;
+            HoverSelectUniformData.MousePixelY = HasMouseInClient ? Clamp(PickMouseY, 0, Max(0, Height - 1)) : -1;
             HoverSelectUniformData.MouseValid = HasMouseInClient ? 1 : 0;
 
             auto HoverSelectUniformBuffer = std::shared_ptr<IUniformBufferBlock>(
@@ -2167,7 +2166,7 @@ void jRenderer::SurfelGIPass()
         VisualizeUniformData.InvP = MainCamera->Projection.GetInverse();
         VisualizeUniformData.InvV = MainCamera->View.GetInverse();
         VisualizeUniformData.ViewProj = MainCamera->ViewProjection;
-        VisualizeUniformData.ScreenSize = Vector2((float)SCR_WIDTH, (float)SCR_HEIGHT);
+        VisualizeUniformData.ScreenSize = Vector2((float)Width, (float)Height);
         VisualizeUniformData.BlendAlpha = Clamp(gOptions.SurfelGIVisualizeBlendAlpha, 0.0f, 1.0f);
         VisualizeUniformData.GridCellSize = Max(0.1f, gOptions.SurfelGIWorldGridCellSize);
         for (int32 pack = 0; pack < SURFEL_GI_CASCADE_PACKED_COUNT; ++pack)
@@ -2282,8 +2281,10 @@ void jRenderer::SurfelGIPass()
             DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "SurfelGI BlendToScene", Vector4(0.8f, 0.45f, 0.2f, 1.0f));
             SCOPE_GPU_PROFILE(RenderFrameContextPtr, SurfelGI_BlendToScene);
 
+            const int32 ColorWidth = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->Info.Width;
+            const int32 ColorHeight = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->Info.Height;
             auto TempColorRT = jRenderTargetPool::GetRenderTargetForOneFrame(RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->Info);
-            jRHIUtil::DrawQuad(RenderFrameContextPtr, TempColorRT, { 0, 0, SCR_WIDTH, SCR_HEIGHT },
+            jRHIUtil::DrawQuad(RenderFrameContextPtr, TempColorRT, { 0, 0, ColorWidth, ColorHeight },
                 [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
                 {
                     jTexture* InTexture = InRenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture();
@@ -2308,8 +2309,8 @@ void jRenderer::SurfelGIPass()
 
             jApplySurfelGIVisualizeUniformBuffer ApplyUniformData;
             ApplyUniformData.BlendAlpha = Clamp(gOptions.SurfelGIVisualizeBlendAlpha, 0.0f, 1.0f);
-            ApplyUniformData.SceneWidth = SCR_WIDTH;
-            ApplyUniformData.SceneHeight = SCR_HEIGHT;
+            ApplyUniformData.SceneWidth = ColorWidth;
+            ApplyUniformData.SceneHeight = ColorHeight;
             ApplyUniformData.Padding0 = 0;
 
             auto ApplyUniformBuffer = g_rhi->CreateUniformBufferBlock(jNameStatic("ApplySurfelGIVisualizeUniformBuffer"), jLifeTimeType::OneFrame, sizeof(ApplyUniformData));
@@ -2325,8 +2326,8 @@ void jRenderer::SurfelGIPass()
             Parameters.SurfelVisualizeInput = { jSceneRenderTarget::SurfelGI_Debug_RT->GetTexture(), nullptr };
             Parameters.ApplyCommon.Buffer = std::shared_ptr<IUniformBufferBlock>(ApplyUniformBuffer);
 
-            const uint32 NumGroupsX = SCR_WIDTH / 8 + ((SCR_WIDTH % 8) ? 1 : 0);
-            const uint32 NumGroupsY = SCR_HEIGHT / 8 + ((SCR_HEIGHT % 8) ? 1 : 0);
+            const uint32 NumGroupsX = ColorWidth / 8 + ((ColorWidth % 8) ? 1 : 0);
+            const uint32 NumGroupsY = ColorHeight / 8 + ((ColorHeight % 8) ? 1 : 0);
             DispatchShaderParameterComputePass(RenderFrameContextPtr
                 , jNameStatic("ApplySurfelGIVisualize_CS")
                 , jNameStatic("Resource/Shaders/hlsl/ApplySurfelGIVisualize_cs.hlsl")
@@ -2357,15 +2358,20 @@ void jRenderer::SurfelGIResolvePass()
         return;
     if (!RenderFrameContextPtr || !RenderFrameContextPtr->SceneRenderTargetPtr)
         return;
+    auto MainCamera = jCamera::GetMainCamera();
+    if (!MainCamera)
+        return;
+    const int32 Width = RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->Info.Width;
+    const int32 Height = RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->Info.Height;
 
     auto ResolveRT = jRenderTargetPool::GetRenderTargetForOneFrame({
         .Type = ETextureType::TEXTURE_2D,
         .Format = ETextureFormat::R11G11B10F,
-        .Width = SCR_WIDTH,
-        .Height = SCR_HEIGHT,
+        .Width = Width,
+        .Height = Height,
         .LayerCount = 1,
         .IsGenerateMipmap = false,
-        .SampleCount = g_rhi->GetSelectedMSAASamples(),
+        .SampleCount = EMSAASamples::COUNT_1,
         .RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
         .TextureCreateFlag = ETextureCreateFlag::UAV,
         .ResourceName = jNameStatic("SurfelGI_Resolve_RT")
@@ -2373,9 +2379,9 @@ void jRenderer::SurfelGIResolvePass()
     jSceneRenderTarget::SurfelGI_Resolve_RT = ResolveRT;
 
     jSurfelGIResolveUniformBuffer ResolveUniformData;
-    ResolveUniformData.InvP = jCamera::GetMainCamera()->Projection.GetInverse();
-    ResolveUniformData.InvV = jCamera::GetMainCamera()->View.GetInverse();
-    ResolveUniformData.ScreenSize = Vector2((float)SCR_WIDTH, (float)SCR_HEIGHT);
+    ResolveUniformData.InvP = MainCamera->Projection.GetInverse();
+    ResolveUniformData.InvV = MainCamera->View.GetInverse();
+    ResolveUniformData.ScreenSize = Vector2((float)Width, (float)Height);
     ResolveUniformData.GridCellSize = Max(0.1f, gOptions.SurfelGIWorldGridCellSize);
     for (int32 pack = 0; pack < SURFEL_GI_CASCADE_PACKED_COUNT; ++pack)
     {
@@ -2434,6 +2440,7 @@ void jRenderer::SurfelGIResolvePass()
 
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::NORMAL)->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), ResolveRT->GetTexture(), EResourceLayout::UAV);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelPoolBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelCellPageTableBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelIrradianceBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
@@ -2473,8 +2480,10 @@ void jRenderer::ApplySurfelGI()
     if (!RenderFrameContextPtr || !RenderFrameContextPtr->SceneRenderTargetPtr)
         return;
 
+    const int32 ColorWidth = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->Info.Width;
+    const int32 ColorHeight = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->Info.Height;
     auto TempColorRT = jRenderTargetPool::GetRenderTargetForOneFrame(RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->Info);
-    jRHIUtil::DrawQuad(RenderFrameContextPtr, TempColorRT, { 0, 0, SCR_WIDTH, SCR_HEIGHT },
+    jRHIUtil::DrawQuad(RenderFrameContextPtr, TempColorRT, { 0, 0, ColorWidth, ColorHeight },
         [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
         {
             jTexture* InTexture = InRenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture();
@@ -2498,8 +2507,8 @@ void jRenderer::ApplySurfelGI()
 
     jApplySurfelGIUniformBuffer ApplyUniformData;
     ApplyUniformData.SurfelGIIntensity = Max(0.0f, gOptions.SurfelGIIntensity);
-    ApplyUniformData.SceneWidth = SCR_WIDTH;
-    ApplyUniformData.SceneHeight = SCR_HEIGHT;
+    ApplyUniformData.SceneWidth = ColorWidth;
+    ApplyUniformData.SceneHeight = ColorHeight;
 
     auto ApplyUniformBuffer = g_rhi->CreateUniformBufferBlock(jNameStatic("ApplySurfelGIUniformBuffer"), jLifeTimeType::OneFrame, sizeof(ApplyUniformData));
     ApplyUniformBuffer->UpdateBufferData(&ApplyUniformData, sizeof(ApplyUniformData));
@@ -2522,8 +2531,8 @@ void jRenderer::ApplySurfelGI()
     Parameters.AlbedoTexture = { RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::ALBEDO)->GetTexture(), SamplerState };
     Parameters.ApplySurfelGIUniformBuffer.Buffer = std::shared_ptr<IUniformBufferBlock>(ApplyUniformBuffer);
 
-    const uint32 NumGroupsX = SCR_WIDTH / 8 + ((SCR_WIDTH % 8) ? 1 : 0);
-    const uint32 NumGroupsY = SCR_HEIGHT / 8 + ((SCR_HEIGHT % 8) ? 1 : 0);
+    const uint32 NumGroupsX = ColorWidth / 8 + ((ColorWidth % 8) ? 1 : 0);
+    const uint32 NumGroupsY = ColorHeight / 8 + ((ColorHeight % 8) ? 1 : 0);
     DispatchShaderParameterComputePass(RenderFrameContextPtr
         , jNameStatic("ApplySurfelGI_CS")
         , jNameStatic("Resource/Shaders/hlsl/ApplySurfelGI_cs.hlsl")
