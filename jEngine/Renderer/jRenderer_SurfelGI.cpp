@@ -134,10 +134,6 @@ END_SHADER_STRUCT()
 
 BEGIN_SHADER_STRUCT(jSurfelCandidateGPU)
     SHADER_STRUCT_MEMBER(jSurfelGPU, Surfel)
-    SHADER_STRUCT_MEMBER(int32, CellX)
-    SHADER_STRUCT_MEMBER(int32, CellY)
-    SHADER_STRUCT_MEMBER(int32, CellZ)
-    SHADER_STRUCT_MEMBER(int32, Cascade)
     SHADER_STRUCT_MEMBER(uint32, Priority)
     SHADER_STRUCT_MEMBER(uint32, Padding0)
     SHADER_STRUCT_MEMBER(uint32, Padding1)
@@ -157,11 +153,7 @@ END_SHADER_STRUCT()
 
 BEGIN_SHADER_STRUCT(jSurfelGIStatsGPU)
     SHADER_STRUCT_MEMBER(uint32, ActiveCount)
-    SHADER_STRUCT_MEMBER(uint32, DormantCount)
     SHADER_STRUCT_MEMBER(uint32, MismatchCount)
-    SHADER_STRUCT_MEMBER(uint32, TTLRetireCount)
-    SHADER_STRUCT_MEMBER(uint32, PageGCCount)
-    SHADER_STRUCT_MEMBER(uint32, PageEvictCount)
     SHADER_STRUCT_MEMBER(uint32, ReservoirOverflowCount)
     SHADER_STRUCT_MEMBER(uint32, ReservoirRejectedCount)
 END_SHADER_STRUCT()
@@ -304,10 +296,6 @@ namespace
     struct alignas(16) jSurfelGILegacyCandidateGPU
     {
         jSurfelGPU Surfel;
-        int32 CellX = 0;
-        int32 CellY = 0;
-        int32 CellZ = 0;
-        int32 Cascade = 0;
         uint32 Priority = 0;
         uint32 Padding0 = 0;
         uint32 Padding1 = 0;
@@ -365,7 +353,6 @@ namespace
     static_assert(sizeof(jSurfelCandidateGPU) == sizeof(jSurfelGILegacyCandidateGPU), "jSurfelCandidateGPU size mismatch");
     static_assert(alignof(jSurfelCandidateGPU) == alignof(jSurfelGILegacyCandidateGPU), "jSurfelCandidateGPU alignment mismatch");
     static_assert(offsetof(jSurfelCandidateGPU, Surfel) == offsetof(jSurfelGILegacyCandidateGPU, Surfel), "jSurfelCandidateGPU Surfel offset mismatch");
-    static_assert(offsetof(jSurfelCandidateGPU, CellX) == offsetof(jSurfelGILegacyCandidateGPU, CellX), "jSurfelCandidateGPU CellX offset mismatch");
     static_assert(offsetof(jSurfelCandidateGPU, Priority) == offsetof(jSurfelGILegacyCandidateGPU, Priority), "jSurfelCandidateGPU Priority offset mismatch");
 
     static_assert(sizeof(jSurfelGIUniformBuffer) == sizeof(jSurfelGILegacyUniformBuffer), "jSurfelGIUniformBuffer size mismatch");
@@ -412,8 +399,6 @@ END_SHADER_PARAMETER_SET()
 BEGIN_SHADER_STRUCT(jSurfelGIHoverSelectionGPU)
     SHADER_STRUCT_MEMBER(uint32, SurfelIndex)
     SHADER_STRUCT_MEMBER(uint32, Valid)
-    SHADER_STRUCT_MEMBER(uint32, MousePixelX)
-    SHADER_STRUCT_MEMBER(uint32, MousePixelY)
 END_SHADER_STRUCT()
 
 BEGIN_SHADER_STRUCT(jSurfelGIHoverRayDebugGPU)

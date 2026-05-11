@@ -475,10 +475,6 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     c.Surfel.NormalSeenFrame = float4(worldNormal, (float)ComputeCommon.FrameNumber);
     c.Surfel.AlbedoWeight = float4(albedo, 1.0);
     c.Surfel.Extra = float4(0.0, 1.0, 0.0, (float)cascadeIndex);
-    c.CellX = cellCoord.x;
-    c.CellY = cellCoord.y;
-    c.CellZ = cellCoord.z;
-    c.Cascade = (int)cascadeIndex;
     c.Priority = priority;
     c.Padding0 = 0u;
     c.Padding1 = 0u;

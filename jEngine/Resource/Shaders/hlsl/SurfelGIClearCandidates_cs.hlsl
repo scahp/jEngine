@@ -9,10 +9,6 @@ void main(uint3 DTid : SV_DispatchThreadID)
         c.Surfel.NormalSeenFrame = float4(0.0, 0.0, 0.0, 0.0);
         c.Surfel.AlbedoWeight = float4(0.0, 0.0, 0.0, 0.0);
         c.Surfel.Extra = float4(0.0, 0.0, 0.0, 0.0);
-        c.CellX = 0;
-        c.CellY = 0;
-        c.CellZ = 0;
-        c.Cascade = 0;
         c.Priority = 0u;
         c.Padding0 = 0u;
         c.Padding1 = 0u;

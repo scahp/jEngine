@@ -141,8 +141,6 @@ void main(uint3 DispatchThreadID : SV_DispatchThreadID)
     jSurfelGIHoverRayDebugGPU HoverRayDebug = (jSurfelGIHoverRayDebugGPU)0;
     Result.SurfelIndex = 0xffffffffu;
     Result.Valid = 0u;
-    Result.MousePixelX = (HoverSelectCommon.MousePixelX >= 0) ? (uint)HoverSelectCommon.MousePixelX : 0u;
-    Result.MousePixelY = (HoverSelectCommon.MousePixelY >= 0) ? (uint)HoverSelectCommon.MousePixelY : 0u;
     HoverRayDebugBuffer[0] = HoverRayDebug;
 
     if (HoverSelectCommon.MouseValid == 0)
