@@ -1,6 +1,5 @@
 [numthreads(1, 1, 1)]
-void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
+void main()
 {
-    (void)GlobalInvocationID;
-    VisibleCellCounterBuffer[0].Count = 0u;
+    VisibleCellCounterBuffer[0] = 0u;
 }

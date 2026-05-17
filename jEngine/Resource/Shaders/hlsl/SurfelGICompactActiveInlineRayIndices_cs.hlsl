@@ -10,6 +10,6 @@ void main(uint3 DTid : SV_DispatchThreadID)
         return;
 
     uint outIndex = 0u;
-    InterlockedAdd(ActiveCounterBuffer[0].Count, 1u, outIndex);
+    InterlockedAdd(ActiveCounterBuffer[0], 1u, outIndex);
     ActiveIndexBuffer[outIndex] = surfelIndex;
 }

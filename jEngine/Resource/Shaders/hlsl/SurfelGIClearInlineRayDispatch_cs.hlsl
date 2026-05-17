@@ -2,7 +2,7 @@
 void main(uint3 DTid : SV_DispatchThreadID)
 {
     (void)DTid;
-    ActiveCounterBuffer[0].Count = 0u;
+    ActiveCounterBuffer[0] = 0u;
 
     jSurfelInlineRayDispatchArgsGPU args;
     args.GroupCountX = 1u;

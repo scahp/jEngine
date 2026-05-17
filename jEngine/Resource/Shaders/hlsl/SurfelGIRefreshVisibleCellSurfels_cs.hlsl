@@ -257,7 +257,7 @@ float GetCascadeScale(uint cascadeIndex)
 void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {
     const uint worklistIndex = GlobalInvocationID.x;
-    const uint workCount = VisibleCellCounterBuffer[0].Count;
+    const uint workCount = VisibleCellCounterBuffer[0];
     if (worklistIndex >= workCount)
         return;
 

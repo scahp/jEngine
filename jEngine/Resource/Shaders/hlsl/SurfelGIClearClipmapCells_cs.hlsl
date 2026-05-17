@@ -122,8 +122,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
     const int3 dim = GetCascadeDim(cascadeIndex);
     const uint dimX = (uint)max(dim.x, 1);
     const uint dimY = (uint)max(dim.y, 1);
-    const uint dimZ = (uint)max(dim.z, 1);
-    const uint cascadeCellCount = dimX * dimY * dimZ;
+    const uint cascadeCellCount = GetCascadeCellCount(cascadeIndex);
     if (localLinear >= cascadeCellCount)
         return;
 
@@ -157,18 +156,8 @@ void main(uint3 DTid : SV_DispatchThreadID)
         if (surfelIndex >= maxSurfels)
             break;
 
-        jSurfelGPU s;
-        s.PositionRadius = float4(0.0, 0.0, 0.0, 0.0);
-        s.NormalSeenFrame = float4(0.0, 0.0, 0.0, 0.0);
-        s.AlbedoWeight = float4(0.0, 0.0, 0.0, 0.0);
-        s.Extra = float4(0.0, 0.0, 0.0, 0.0);
-        SurfelPool[surfelIndex] = s;
-
-        jSurfelIrradianceGPU ir;
-        ir.IrradianceAndCount = float4(0.0, 0.0, 0.0, 0.0);
-        ir.MSMEData0 = float4(0.0, 0.0, 0.0, 0.0);
-        ir.MSMEData1 = float4(0.0, 0.0, 0.0, 0.0);
-        SurfelIrradianceBuffer[surfelIndex] = ir;
+        SurfelPool[surfelIndex] = (jSurfelGPU)0;
+        SurfelIrradianceBuffer[surfelIndex] = (jSurfelIrradianceGPU)0;
         const uint guidingBaseIndex = surfelIndex * SURFEL_GI_GUIDE_TOTAL_FLOATS;
         [unroll] for (uint guideIndex = 0u; guideIndex < SURFEL_GI_GUIDE_TOTAL_FLOATS; ++guideIndex)
         {

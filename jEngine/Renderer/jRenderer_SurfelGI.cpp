@@ -18,7 +18,6 @@
 #include "RHI/jRaytracingScene.h"
 #include "Shader/jShaderParameterSet.h"
 #include <cmath>
-#include <limits>
 #include <array>
 #include <unordered_map>
 #include <cstddef>
@@ -144,13 +143,6 @@ BEGIN_SHADER_STRUCT(jVisibleCellGPU)
     SHADER_STRUCT_MEMBER(Vector4i, CellCascade)
 END_SHADER_STRUCT()
 
-BEGIN_SHADER_STRUCT(jVisibleCellCounterGPU)
-    SHADER_STRUCT_MEMBER(uint32, Count)
-    SHADER_STRUCT_MEMBER(uint32, Padding0)
-    SHADER_STRUCT_MEMBER(uint32, Padding1)
-    SHADER_STRUCT_MEMBER(uint32, Padding2)
-END_SHADER_STRUCT()
-
 BEGIN_SHADER_STRUCT(jSurfelGIStatsGPU)
     SHADER_STRUCT_MEMBER(uint32, ActiveCount)
     SHADER_STRUCT_MEMBER(uint32, MismatchCount)
@@ -159,7 +151,7 @@ BEGIN_SHADER_STRUCT(jSurfelGIStatsGPU)
 END_SHADER_STRUCT()
 
 BEGIN_SHADER_PARAMETER_SET(jSurfelGIClearVisibleCellCounterCSParameters)
-    SHADER_RW_STRUCTURED_BUFFER(jVisibleCellCounterGPU, VisibleCellCounterBuffer)
+    SHADER_RW_STRUCTURED_BUFFER(uint32, VisibleCellCounterBuffer)
 END_SHADER_PARAMETER_SET()
 
 BEGIN_SHADER_PARAMETER_SET(jSurfelGIClearStatsCSParameters)
@@ -236,12 +228,12 @@ BEGIN_SHADER_PARAMETER_SET(jSurfelGIVisibleCellCollectCSParameters)
     SHADER_TEXTURE2D(DepthTexture)
     SHADER_UNIFORM_BUFFER(jSurfelGIUniformBuffer, ComputeCommon)
     SHADER_RW_STRUCTURED_BUFFER(jVisibleCellGPU, VisibleCellWorklist)
-    SHADER_RW_STRUCTURED_BUFFER(jVisibleCellCounterGPU, VisibleCellCounterBuffer)
+    SHADER_RW_STRUCTURED_BUFFER(uint32, VisibleCellCounterBuffer)
 END_SHADER_PARAMETER_SET()
 
 BEGIN_SHADER_PARAMETER_SET(jSurfelGIRefreshVisibleCellSurfelsCSParameters)
     SHADER_STRUCTURED_BUFFER(jVisibleCellGPU, VisibleCellWorklist)
-    SHADER_STRUCTURED_BUFFER(jVisibleCellCounterGPU, VisibleCellCounterBuffer)
+    SHADER_STRUCTURED_BUFFER(uint32, VisibleCellCounterBuffer)
     SHADER_UNIFORM_BUFFER(jSurfelGIUniformBuffer, ComputeCommon)
     SHADER_RW_STRUCTURED_BUFFER(jSurfelGPU, SurfelPool)
     SHADER_STRUCTURED_BUFFER(uint32, SurfelCellPageTable)
@@ -365,13 +357,6 @@ namespace
     static_assert(offsetof(jSurfelGIUniformBuffer, CascadeClearAllPacked) == offsetof(jSurfelGILegacyUniformBuffer, CascadeClearAllPacked), "jSurfelGIUniformBuffer CascadeClearAllPacked offset mismatch");
 }
 
-BEGIN_SHADER_STRUCT(jSurfelActiveCounterGPU)
-    SHADER_STRUCT_MEMBER(uint32, Count)
-    SHADER_STRUCT_MEMBER(uint32, Padding0)
-    SHADER_STRUCT_MEMBER(uint32, Padding1)
-    SHADER_STRUCT_MEMBER(uint32, Padding2)
-END_SHADER_STRUCT()
-
 BEGIN_SHADER_STRUCT(jSurfelInlineRayDispatchArgsGPU)
     SHADER_STRUCT_MEMBER(uint32, GroupCountX)
     SHADER_STRUCT_MEMBER(uint32, GroupCountY)
@@ -380,19 +365,19 @@ BEGIN_SHADER_STRUCT(jSurfelInlineRayDispatchArgsGPU)
 END_SHADER_STRUCT()
 
 BEGIN_SHADER_PARAMETER_SET(jSurfelGIClearInlineRayDispatchCSParameters)
-    SHADER_RW_STRUCTURED_BUFFER(jSurfelActiveCounterGPU, ActiveCounterBuffer)
+    SHADER_RW_STRUCTURED_BUFFER(uint32, ActiveCounterBuffer)
     SHADER_RW_STRUCTURED_BUFFER(jSurfelInlineRayDispatchArgsGPU, DispatchArgsBuffer)
 END_SHADER_PARAMETER_SET()
 
 BEGIN_SHADER_PARAMETER_SET(jSurfelGIBuildInlineRayDispatchArgsCSParameters)
-    SHADER_STRUCTURED_BUFFER(jSurfelActiveCounterGPU, ActiveCounterBuffer)
+    SHADER_STRUCTURED_BUFFER(uint32, ActiveCounterBuffer)
     SHADER_RW_STRUCTURED_BUFFER(jSurfelInlineRayDispatchArgsGPU, DispatchArgsBuffer)
 END_SHADER_PARAMETER_SET()
 
 BEGIN_SHADER_PARAMETER_SET(jSurfelGICompactActiveInlineRayIndicesCSParameters)
     SHADER_STRUCTURED_BUFFER(jSurfelGPU, SurfelPool)
     SHADER_RW_STRUCTURED_BUFFER(uint32, ActiveIndexBuffer)
-    SHADER_RW_STRUCTURED_BUFFER(jSurfelActiveCounterGPU, ActiveCounterBuffer)
+    SHADER_RW_STRUCTURED_BUFFER(uint32, ActiveCounterBuffer)
     SHADER_UNIFORM_BUFFER(jSurfelGIActiveCompactUniformBuffer, ActiveCompactUniformBuffer)
 END_SHADER_PARAMETER_SET()
 
@@ -614,7 +599,7 @@ END_SHADER_PARAMETER_SET()
 
 BEGIN_SHADER_PARAMETER_SET(jSurfelGIHWRTDIGatherParameters)
     SHADER_STRUCTURED_BUFFER(uint32, SurfelGIActiveSurfelIndexBuffer)
-    SHADER_STRUCTURED_BUFFER(jSurfelActiveCounterGPU, SurfelGIActiveSurfelCounterBuffer)
+    SHADER_STRUCTURED_BUFFER(uint32, SurfelGIActiveSurfelCounterBuffer)
     SHADER_STRUCTURED_BUFFER(jSurfelGPU, SurfelGIPool)
     SHADER_RW_STRUCTURED_BUFFER(jSurfelIrradianceGPU, SurfelGIIrradianceBuffer)
     SHADER_RW_STRUCTURED_BUFFER(float, SurfelGIGuidingBuffer)
@@ -991,7 +976,7 @@ bool DispatchSurfelGIHWRTDIGather(
         PackedLights.push_back(jHWRTDIPackedLight());
     }
     const uint32 PackedLightCount = (uint32)PackedLights.size();
-    const uint64 PackedLightBufferSize = (uint64)sizeof(jHWRTDIPackedLight) * (uint64)PackedLightCount;
+    const size_t PackedLightBufferSize = sizeof(jHWRTDIPackedLight) * PackedLightCount;
     PackedLightBuffer = g_rhi->CreateStructuredBuffer(PackedLightBufferSize, 0, sizeof(jHWRTDIPackedLight), EBufferCreateFlag::UAV
         , EResourceLayout::GENERAL, PackedLights.data(), PackedLightBufferSize, jNameStatic("SurfelGI_HWRTDI_PackedLightBuffer"));
     check(PackedLightBuffer);
@@ -1099,29 +1084,28 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
     }
     GSurfelPageSize = Max(1, MaxSurfelSlotsPerCell);
 
-    uint64 TotalCellCount64 = 0;
-    int64 RunningCellBase = 0;
+    int32 TotalCellCount = 0;
+    int32 RunningCellBase = 0;
     for (int32 cascade = 0; cascade < SURFEL_GI_CASCADE_COUNT; ++cascade)
     {
         const int32 DimX = Clamp(gOptions.SurfelGIClipmapGridDimX[cascade], 4, 512);
         const int32 DimY = Clamp(gOptions.SurfelGIClipmapGridDimY[cascade], 4, 512);
         const int32 DimZ = Clamp(gOptions.SurfelGIClipmapGridDimZ[cascade], 4, 512);
-        const uint64 CascadeCellCount64 = (uint64)DimX * (uint64)DimY * (uint64)DimZ;
-        const int32 CascadeCellCount = (int32)Min<uint64>(CascadeCellCount64, (uint64)std::numeric_limits<int32>::max());
-        GSurfelCascadeCellBase[cascade] = (int32)Min<int64>(RunningCellBase, (int64)std::numeric_limits<int32>::max());
+        const int32 CascadeCellCount = DimX * DimY * DimZ;
+        GSurfelCascadeCellBase[cascade] = RunningCellBase;
         GSurfelCascadeCellCount[cascade] = Max(1, CascadeCellCount);
-        RunningCellBase = Min<int64>(RunningCellBase + (int64)GSurfelCascadeCellCount[cascade], (int64)std::numeric_limits<int32>::max());
-        TotalCellCount64 += CascadeCellCount64;
+        RunningCellBase += GSurfelCascadeCellCount[cascade];
+        TotalCellCount += CascadeCellCount;
     }
-    const int32 TotalCellCount = Max(1, (int32)Min<uint64>(TotalCellCount64, (uint64)std::numeric_limits<int32>::max()));
+    TotalCellCount = Max(1, TotalCellCount);
     const int32 RequestedMaxSurfels = Clamp(Max(1024, gOptions.SurfelGIMaxSurfels), 1024, SURFEL_GI_MAX_SURFELS_HARD_CAP);
-    const int64 MinRequiredForTargetSlots64 = (int64)TotalCellCount * (int64)Max(1, GSurfelPageSize);
-    const int32 MinRequiredForTargetSlots = (int32)Min<int64>(MinRequiredForTargetSlots64, (int64)SURFEL_GI_MAX_SURFELS_HARD_CAP);
+    const int32 MinRequiredForTargetSlots = Min(TotalCellCount * Max(1, GSurfelPageSize), SURFEL_GI_MAX_SURFELS_HARD_CAP);
     const int32 MaxSurfels = Max(RequestedMaxSurfels, MinRequiredForTargetSlots);
     const int32 MaxSlotsPerCellByBudget = Max(1, MaxSurfels / Max(1, TotalCellCount));
     GSurfelPageSize = Clamp(GSurfelPageSize, 1, MaxSlotsPerCellByBudget);
     bool RecreatedPrimaryStorage = false;
 
+    // Surfel pool and associated buffers. The pool is a big structured buffer of jSurfelGPU, which is the GPU-friendly representation of surfels.
     if (!GSurfelPoolBuffer || GSurfelPoolMaxCount != MaxSurfels)
     {
         GSurfelPoolMaxCount = MaxSurfels;
@@ -1129,17 +1113,19 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
         InitialPool.resize(MaxSurfels);
 
         GSurfelPoolBuffer = g_rhi->CreateStructuredBuffer(
-            sizeof(jSurfelGPU) * (uint64)MaxSurfels,
+            sizeof(jSurfelGPU) * MaxSurfels,
             0,
             sizeof(jSurfelGPU),
             EBufferCreateFlag::UAV,
             EResourceLayout::UAV,
             InitialPool.data(),
-            sizeof(jSurfelGPU) * (uint64)MaxSurfels,
+            sizeof(jSurfelGPU) * MaxSurfels,
             jNameStatic("SurfelGI_Pool"));
         RecreatedPrimaryStorage = true;
     }
 
+    // The irradiance buffer is a structured buffer of jSurfelIrradianceGPU, which holds the current lighting state of each surfel.
+    // This is read and updated by the inline ray tracing pass, and read by the shading pass.
     if (!GSurfelIrradianceBuffer || GSurfelIrradianceCapacity != MaxSurfels)
     {
         GSurfelIrradianceCapacity = MaxSurfels;
@@ -1147,21 +1133,23 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
         InitialIrradiance.resize(MaxSurfels);
 
         GSurfelIrradianceBuffer = g_rhi->CreateStructuredBuffer(
-            sizeof(jSurfelIrradianceGPU) * (uint64)MaxSurfels,
+            sizeof(jSurfelIrradianceGPU) * MaxSurfels,
             0,
             sizeof(jSurfelIrradianceGPU),
             EBufferCreateFlag::UAV,
             EResourceLayout::UAV,
             InitialIrradiance.data(),
-            sizeof(jSurfelIrradianceGPU) * (uint64)MaxSurfels,
+            sizeof(jSurfelIrradianceGPU) * MaxSurfels,
             jNameStatic("SurfelGI_Irradiance"));
         RecreatedPrimaryStorage = true;
     }
 
+    // The guiding buffer is a flat float buffer storing one compact guiding distribution per surfel.
+    // It is updated by the inline ray gather pass and read by later gathers to bias ray generation toward useful directions.
     if (!GSurfelGuidingBuffer || GSurfelGuidingCapacity != MaxSurfels)
     {
         GSurfelGuidingCapacity = MaxSurfels;
-        const uint64 GuidingFloatCount = (uint64)MaxSurfels * (uint64)SURFEL_GI_GUIDE_TOTAL_FLOATS;
+        const int32 GuidingFloatCount = MaxSurfels * SURFEL_GI_GUIDE_TOTAL_FLOATS;
 
         GSurfelGuidingBuffer = g_rhi->CreateStructuredBuffer(
             sizeof(float) * GuidingFloatCount,
@@ -1175,6 +1163,8 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
         RecreatedPrimaryStorage = true;
     }
 
+    // The active index buffer is a structured buffer of uint32, which holds the indices of currently active surfels in the pool.
+    // The active-compaction pass writes this buffer, and the inline ray gather pass reads it.
     if (!GSurfelGIActiveIndexBuffer || GSurfelGIActiveIndexCapacity != MaxSurfels)
     {
         GSurfelGIActiveIndexCapacity = MaxSurfels;
@@ -1182,30 +1172,34 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
         InitialActiveIndices.resize((size_t)MaxSurfels, 0u);
 
         GSurfelGIActiveIndexBuffer = g_rhi->CreateStructuredBuffer(
-            sizeof(uint32) * (uint64)MaxSurfels,
+            sizeof(uint32) * MaxSurfels,
             0,
             sizeof(uint32),
             EBufferCreateFlag::UAV,
             EResourceLayout::UAV,
             InitialActiveIndices.data(),
-            sizeof(uint32) * (uint64)MaxSurfels,
+            sizeof(uint32) * MaxSurfels,
             jNameStatic("SurfelGI_ActiveIndex"));
     }
 
+    // The active counter buffer is a structured buffer of uint32, which holds the count of currently active surfels.
+    // This is used for indirect dispatch and to avoid dispatching more threads than necessary.
     if (!GSurfelGIActiveCounterBuffer)
     {
-        jSurfelActiveCounterGPU InitialActiveCounter = {};
+        uint32 InitialActiveCounter = 0;
         GSurfelGIActiveCounterBuffer = g_rhi->CreateStructuredBuffer(
-            sizeof(jSurfelActiveCounterGPU),
+            sizeof(uint32),
             0,
-            sizeof(jSurfelActiveCounterGPU),
+            sizeof(uint32),
             EBufferCreateFlag::UAV,
             EResourceLayout::UAV,
             &InitialActiveCounter,
-            sizeof(jSurfelActiveCounterGPU),
+            sizeof(uint32),
             jNameStatic("SurfelGI_ActiveCounter"));
     }
 
+    // The inline ray dispatch args buffer is a structured buffer of jSurfelInlineRayDispatchArgsGPU
+    // , which holds the arguments for indirect dispatch of the inline ray tracing pass.
     if (!GSurfelGIInlineRayDispatchArgsBuffer)
     {
         jSurfelInlineRayDispatchArgsGPU InitialDispatchArgs = {};
@@ -1220,6 +1214,8 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
             jNameStatic("SurfelGI_InlineRayDispatchArgs"));
     }
 
+    // The hover selection buffer is a structured buffer of jSurfelGIHoverSelectionGPU
+    // , which holds the result of the hover-ray intersection for debugging purposes.
     if (!GSurfelGIHoverSelectionBuffer)
     {
         jSurfelGIHoverSelectionGPU InitialSelection = {};
@@ -1234,6 +1230,8 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
             jNameStatic("SurfelGI_HoverSelection"));
     }
 
+    // The hover ray debug buffer is a structured buffer of jSurfelGIHoverRayDebugGPU
+    // , which holds the rays and intersection results for the hover-ray debug visualization.
     if (!GSurfelGIHoverRayDebugBuffer)
     {
         jSurfelGIHoverRayDebugGPU InitialHoverDebug = {};
@@ -1248,6 +1246,7 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
             jNameStatic("SurfelGI_HoverRayDebug"));
     }
 
+    // The cell page table buffer is a structured buffer of uint32, which holds the mapping from cell indices to surfel pool pages.
     if (!GSurfelCellPageTableBuffer || GSurfelCellPageTableCapacity != TotalCellCount)
     {
         GSurfelCellPageTableCapacity = TotalCellCount;
@@ -1255,17 +1254,18 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
         InitialEntries.resize((size_t)TotalCellCount, 0u);
 
         GSurfelCellPageTableBuffer = g_rhi->CreateStructuredBuffer(
-            sizeof(uint32) * (uint64)TotalCellCount,
+            sizeof(uint32) * TotalCellCount,
             0,
             sizeof(uint32),
             EBufferCreateFlag::UAV,
             EResourceLayout::UAV,
             InitialEntries.data(),
-            sizeof(uint32) * (uint64)TotalCellCount,
+            sizeof(uint32) * TotalCellCount,
             jNameStatic("SurfelGI_CellPageTable"));
         RecreatedPrimaryStorage = true;
     }
 
+    // The debug render targets for surfel GI. These are used to visualize the surfel distribution and other intermediate data for debugging purposes.
     const int32 Width = InRenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->Info.Width;
     const int32 Height = InRenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->Info.Height;
     if (!jSceneRenderTarget::SurfelGI_Debug_RT
@@ -1287,6 +1287,8 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
         jSceneRenderTarget::SurfelGI_Debug_RT = g_rhi->CreateRenderTarget(Info);
     }
 
+    // The attempt render target is a debug mask written by GatherCandidates to show pixels that attempted surfel spawning.
+    // It is sampled only by the SurfelGI visualization pass when spawn-attempt debug is enabled.
     if (!jSceneRenderTarget::SurfelGI_Attempt_RT
         || jSceneRenderTarget::SurfelGI_Attempt_RT->Info.Width != Width
         || jSceneRenderTarget::SurfelGI_Attempt_RT->Info.Height != Height)
@@ -1306,6 +1308,8 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
         jSceneRenderTarget::SurfelGI_Attempt_RT = g_rhi->CreateRenderTarget(Info);
     }
 
+    // CandidateBuffer stores surfel placement candidates generated by the GatherCandidates pass.
+    // A later winner-selection pass keeps at most one highest-priority candidate per cell.
     const int32 SampleDispatchWidth = GetSurfelGISampleDispatchDim(Width);
     const int32 SampleDispatchHeight = GetSurfelGISampleDispatchDim(Height);
     const int32 CandidateCapacity = Max(1, SampleDispatchWidth * SampleDispatchHeight);
@@ -1315,57 +1319,64 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
         std::vector<jSurfelCandidateGPU> InitialCandidates;
         InitialCandidates.resize((size_t)CandidateCapacity);
         GSurfelGICandidateBuffer = g_rhi->CreateStructuredBuffer(
-            sizeof(jSurfelCandidateGPU) * (uint64)CandidateCapacity,
+            sizeof(jSurfelCandidateGPU) * CandidateCapacity,
             0,
             sizeof(jSurfelCandidateGPU),
             EBufferCreateFlag::UAV,
             EResourceLayout::UAV,
             InitialCandidates.data(),
-            sizeof(jSurfelCandidateGPU) * (uint64)CandidateCapacity,
+            sizeof(jSurfelCandidateGPU) * CandidateCapacity,
             jNameStatic("SurfelGI_ReservoirCandidates"));
     }
 
+    // The winner buffers store the highest-priority placement candidate per cell.
+    // The lock buffer protects the score/index pair from concurrent shader updates.
     if (!GSurfelGIWinnerScoreBuffer || !GSurfelGIWinnerIndexBuffer || !GSurfelGIWinnerLockBuffer || GSurfelGIWinnerCapacity != TotalCellCount)
     {
         GSurfelGIWinnerCapacity = TotalCellCount;
 
+        // Initialize winner score buffer with 0, so that any candidate with a positive score can become the winner.
         std::vector<uint32> InitialWinnerScore;
         InitialWinnerScore.resize((size_t)TotalCellCount, 0u);
         GSurfelGIWinnerScoreBuffer = g_rhi->CreateStructuredBuffer(
-            sizeof(uint32) * (uint64)TotalCellCount,
+            sizeof(uint32) * TotalCellCount,
             0,
             sizeof(uint32),
             EBufferCreateFlag::UAV,
             EResourceLayout::UAV,
             InitialWinnerScore.data(),
-            sizeof(uint32) * (uint64)TotalCellCount,
+            sizeof(uint32) * TotalCellCount,
             jNameStatic("SurfelGI_ReservoirWinnerScore"));
 
+        // Initialize winner index buffer with 0xffffffff, which is an invalid index indicating no winner yet.
         std::vector<uint32> InitialWinnerIndex;
         InitialWinnerIndex.resize((size_t)TotalCellCount, 0xffffffffu);
         GSurfelGIWinnerIndexBuffer = g_rhi->CreateStructuredBuffer(
-            sizeof(uint32) * (uint64)TotalCellCount,
+            sizeof(uint32) * TotalCellCount,
             0,
             sizeof(uint32),
             EBufferCreateFlag::UAV,
             EResourceLayout::UAV,
             InitialWinnerIndex.data(),
-            sizeof(uint32) * (uint64)TotalCellCount,
+            sizeof(uint32) * TotalCellCount,
             jNameStatic("SurfelGI_ReservoirWinnerIndex"));
 
+        // Initialize winner lock buffer with 0, which means unlocked.
+        // Atomic operations acquire one lock per cell while updating the winner score/index pair.
         std::vector<uint32> InitialWinnerLock;
         InitialWinnerLock.resize((size_t)TotalCellCount, 0u);
         GSurfelGIWinnerLockBuffer = g_rhi->CreateStructuredBuffer(
-            sizeof(uint32) * (uint64)TotalCellCount,
+            sizeof(uint32) * TotalCellCount,
             0,
             sizeof(uint32),
             EBufferCreateFlag::UAV,
             EResourceLayout::UAV,
             InitialWinnerLock.data(),
-            sizeof(uint32) * (uint64)TotalCellCount,
+            sizeof(uint32) * TotalCellCount,
             jNameStatic("SurfelGI_ReservoirWinnerLock"));
     }
 
+    // The stats buffer is used to collect various statistics about the SurfelGI process for debugging and analysis purposes.
     if (!GSurfelGIStatsBuffer)
     {
         jSurfelGIStatsGPU InitialStats = {};
@@ -1380,35 +1391,37 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
             jNameStatic("SurfelGI_ReservoirStats"));
     }
 
-    const int64 MaxVisibleCells64 = (int64)SampleDispatchWidth * (int64)SampleDispatchHeight * (int64)SURFEL_GI_VISIBLE_CELL_WORKLIST_MULTIPLIER;
-    const int32 MaxVisibleCells = Max(1, (int32)Min<int64>(MaxVisibleCells64, (int64)std::numeric_limits<int32>::max()));
+    // The visible cell worklist buffer is used to keep track of which cells are visible and need to be updated each frame.
+    const int32 MaxVisibleCells = Max(1, SampleDispatchWidth * SampleDispatchHeight * SURFEL_GI_VISIBLE_CELL_WORKLIST_MULTIPLIER);
     if (!GVisibleCellWorklistBuffer || GVisibleCellWorklistCapacity != MaxVisibleCells)
     {
         GVisibleCellWorklistCapacity = MaxVisibleCells;
         std::vector<jVisibleCellGPU> InitialWorklist;
         InitialWorklist.resize((size_t)MaxVisibleCells);
         GVisibleCellWorklistBuffer = g_rhi->CreateStructuredBuffer(
-            sizeof(jVisibleCellGPU) * (uint64)MaxVisibleCells,
+            sizeof(jVisibleCellGPU) * MaxVisibleCells,
             0,
             sizeof(jVisibleCellGPU),
             EBufferCreateFlag::UAV,
             EResourceLayout::UAV,
             InitialWorklist.data(),
-            sizeof(jVisibleCellGPU) * (uint64)MaxVisibleCells,
+            sizeof(jVisibleCellGPU) * MaxVisibleCells,
             jNameStatic("SurfelGI_VisibleCellWorklist"));
     }
 
+    // The visible cell counter buffer holds the count of visible cells in the current frame. 
+    // It is used to avoid dispatching more threads than necessary when processing visible cells.
     if (!GVisibleCellCounterBuffer)
     {
-        jVisibleCellCounterGPU CounterInit = {};
+        uint32 CounterInit = 0;
         GVisibleCellCounterBuffer = g_rhi->CreateStructuredBuffer(
-            sizeof(jVisibleCellCounterGPU),
+            sizeof(uint32),
             0,
-            sizeof(jVisibleCellCounterGPU),
+            sizeof(uint32),
             EBufferCreateFlag::UAV,
             EResourceLayout::UAV,
             &CounterInit,
-            sizeof(jVisibleCellCounterGPU),
+            sizeof(uint32),
             jNameStatic("SurfelGI_VisibleCellCounter"));
     }
 
@@ -1422,7 +1435,7 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
     }
 
 }
-}
+} // namespace
 
 void ReleaseSurfelGIResources()
 {
@@ -1568,7 +1581,7 @@ void jRenderer::SurfelGIPass()
     UniformData.RadiusScale = Max(0.05f, gOptions.SurfelGIRadiusScale);
     const bool ForceClearAllThisFrame = GSurfelClipmapForceClearAll;
     bool NeedClipmapCellClear = ForceClearAllThisFrame;
-    int64 RunningCascadeCellBase = 0;
+    int32 RunningCascadeCellBase = 0;
     for (int32 cascade = 0; cascade < SURFEL_GI_CASCADE_COUNT; ++cascade)
     {
         const int32 DimX = Clamp(gOptions.SurfelGIClipmapGridDimX[cascade], 4, 512);
@@ -1576,11 +1589,10 @@ void jRenderer::SurfelGIPass()
         const int32 DimZ = Clamp(gOptions.SurfelGIClipmapGridDimZ[cascade], 4, 512);
         const int32 SurfelPerCell = Clamp(gOptions.SurfelGISurfelsPerCell[cascade], 1, SURFEL_GI_MAX_SLOTS_PER_CELL);
 
-        const uint64 CascadeCellCount64 = (uint64)DimX * (uint64)DimY * (uint64)DimZ;
-        const int32 CascadeCellCount = Max(1, (int32)Min<uint64>(CascadeCellCount64, (uint64)std::numeric_limits<int32>::max()));
-        GSurfelCascadeCellBase[cascade] = (int32)Min<int64>(RunningCascadeCellBase, (int64)std::numeric_limits<int32>::max());
+        const int32 CascadeCellCount = Max(1, DimX * DimY * DimZ);
+        GSurfelCascadeCellBase[cascade] = RunningCascadeCellBase;
         GSurfelCascadeCellCount[cascade] = CascadeCellCount;
-        RunningCascadeCellBase = Min<int64>(RunningCascadeCellBase + (int64)CascadeCellCount, (int64)std::numeric_limits<int32>::max());
+        RunningCascadeCellBase += CascadeCellCount;
 
         const float CellSize = Max(0.1f, UniformData.GridCellSize) * GetCascadeScale(cascade);
         const int32 CameraCellX = (int32)std::floor(MainCamera->Pos.x / Max(CellSize, 0.001f));
@@ -1683,8 +1695,12 @@ void jRenderer::SurfelGIPass()
         , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
         , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
 
-    const int32 GroupX = (Width + 7) / 8;
-    const int32 GroupY = (Height + 7) / 8;
+    const int32 RTSize_GroupX = (Width + 7) / 8;
+    const int32 RTSize_GroupY = (Height + 7) / 8;
+    const int32 TileDispatchWidth = GetSurfelGISampleDispatchDim(Width);
+    const int32 TileDispatchHeight = GetSurfelGISampleDispatchDim(Height);
+    const int32 TileDispatchGroupX = (TileDispatchWidth + 7) / 8;
+    const int32 TileDispatchGroupY = (TileDispatchHeight + 7) / 8;
 
     if (NeedClipmapCellClear)
     {
@@ -1739,7 +1755,7 @@ void jRenderer::SurfelGIPass()
             , jNameStatic("SurfelGIVisibleCellCollect_CS")
             , jNameStatic("Resource/Shaders/hlsl/SurfelGIVisibleCellCollect_cs.hlsl")
             , CollectParameters
-            , GroupX, GroupY, 1);
+            , TileDispatchGroupX, TileDispatchGroupY, 1);
     }
 
     g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), GVisibleCellWorklistBuffer.get());
@@ -1865,7 +1881,7 @@ void jRenderer::SurfelGIPass()
                 , jNameStatic("SurfelGIGatherCandidates_CS")
                 , jNameStatic("Resource/Shaders/hlsl/SurfelGIGatherCandidates_cs.hlsl")
                 , ReservoirGatherParameters
-                , GroupX, GroupY, 1);
+                , RTSize_GroupX, RTSize_GroupY, 1);
         }
 
         g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelGICandidateBuffer.get());

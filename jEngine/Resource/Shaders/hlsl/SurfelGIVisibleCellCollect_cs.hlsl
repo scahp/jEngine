@@ -145,7 +145,7 @@ bool TrySelectCascadeForWorldPos(float3 worldPos, float cameraDistance, out uint
 void EmitVisibleCell(int3 cellCoord, uint cascadeIndex, uint maxVisibleCells)
 {
     uint writeIndex = 0u;
-    InterlockedAdd(VisibleCellCounterBuffer[0].Count, 1u, writeIndex);
+    InterlockedAdd(VisibleCellCounterBuffer[0], 1u, writeIndex);
 
     if (writeIndex < maxVisibleCells)
     {
@@ -158,19 +158,15 @@ void EmitVisibleCell(int3 cellCoord, uint cascadeIndex, uint maxVisibleCells)
 [numthreads(8, 8, 1)]
 void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {
-    const int2 pixel = int2(GlobalInvocationID.xy);
     const int2 screenSize = int2(ComputeCommon.ScreenSize);
-    if (pixel.x >= screenSize.x || pixel.y >= screenSize.y)
-        return;
-
     const int tileSize = max(ComputeCommon.TileSize, 1);
     const int2 dispatchSize = max((screenSize + (tileSize - 1)) / tileSize, int2(1, 1));
-    const int2 tileCoord = pixel / tileSize;
-    const int2 samplePixel = min(tileCoord * tileSize + int2(tileSize / 2, tileSize / 2), screenSize - 1);
-    if (any(pixel != samplePixel))
+    const int2 tileCoord = int2(GlobalInvocationID.xy);
+    if (tileCoord.x >= dispatchSize.x || tileCoord.y >= dispatchSize.y)
         return;
 
-    const float2 uv = (float2(pixel) + 0.5) / float2(screenSize);
+    const int2 samplePixel = min(tileCoord * tileSize + int2(tileSize / 2, tileSize / 2), screenSize - 1);
+    const float2 uv = (float2(samplePixel) + 0.5) / float2(screenSize);
     const float rawDepth = DepthTexture.SampleLevel(DepthTextureSampler, uv, 0).x;
     if (rawDepth <= 0.0)
         return;
@@ -178,6 +174,8 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     const float3 viewPos = CalcViewPositionFromDepth(DepthTexture, DepthTextureSampler, uv, ComputeCommon.InvP);
     const float3 worldPos = mul(ComputeCommon.InvV, float4(viewPos, 1.0)).xyz;
     const float cameraDistance = length(viewPos);
+    
+    // Calculate how many visible cells can be recorded in this pass.
     const uint maxVisibleCells = (uint)max(dispatchSize.x * dispatchSize.y * (int)SURFEL_GI_VISIBLE_CELL_WORKLIST_MULTIPLIER, 1);
     uint primaryCascadeIndex = 0u;
     int3 primaryCellCoord = int3(0, 0, 0);

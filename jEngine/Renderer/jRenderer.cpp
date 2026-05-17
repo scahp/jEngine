@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "FileLoader/jImageFileLoader.h"
 #include "Material/jMaterial.h"
 #include "Profiler/jPerformanceProfile.h"

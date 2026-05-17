@@ -21,12 +21,6 @@ struct SurfelIrradianceData
 #define SURFEL_GI_GUIDE_LEARNING_RATE 0.02
 #define SURFEL_GI_GUIDE_MAX_BLEND 0.9
 
-struct SurfelActiveCounter
-{
-    uint Count;
-    uint3 Padding;
-};
-
 struct SurfelGIInlineRayGatherUniformBuffer
 {
     float4x4 V;
@@ -49,7 +43,7 @@ struct SurfelGIInlineRayGatherUniformBuffer
 
 RaytracingAccelerationStructure Scene : register(t0, space0);
 StructuredBuffer<uint> ActiveSurfelIndexBuffer : register(t1, space0);
-StructuredBuffer<SurfelActiveCounter> ActiveSurfelCounterBuffer : register(t2, space0);
+StructuredBuffer<uint> ActiveSurfelCounterBuffer : register(t2, space0);
 StructuredBuffer<SurfelData> SurfelPool : register(t3, space0);
 Texture2D DepthTexture : register(t4, space0);
 SamplerState DepthTextureSampler : register(s4, space0);
@@ -310,7 +304,7 @@ GuidedSample SampleGuidedDirection(uint surfelIndex, float totalMass, float guid
 void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {
     const uint activeSurfelLinearIndex = GlobalInvocationID.x;
-    const uint activeSurfelCount = ActiveSurfelCounterBuffer[0].Count;
+    const uint activeSurfelCount = ActiveSurfelCounterBuffer[0];
     if (activeSurfelLinearIndex >= activeSurfelCount)
         return;
 

@@ -1040,7 +1040,7 @@ void SurfelGIGatherIrradianceHWRT_CS(uint3 DispatchThreadID : SV_DispatchThreadI
     // ActiveSurfelIndexBuffer is built by earlier passes. Gather only runs for compacted, active
     // surfels so the ray budget is spent on surfels that matter this frame.
     const uint ActiveSurfelLinearIndex = DispatchThreadID.x;
-    const uint ActiveSurfelCount = SurfelGIActiveSurfelCounterBuffer[0].Count;
+    const uint ActiveSurfelCount = SurfelGIActiveSurfelCounterBuffer[0];
     if (ActiveSurfelLinearIndex >= ActiveSurfelCount)
         return;
 
