@@ -3,9 +3,13 @@
 struct SurfelData
 {
     float4 PositionRadius;
-    float4 NormalSeenFrame;
+    float3 Normal;
+    uint LastSeenFrame;
     float4 AlbedoWeight;
-    float4 Extra;
+    int State;
+    uint IsActive;
+    uint OwnerCellHash;
+    uint CascadeIndex;
 };
 
 struct SurfelIrradianceData
@@ -34,7 +38,7 @@ struct SurfelGIInlineRayGatherUniformBuffer
     float HistoryBlend;
     uint UseGuiding;
     float HitDepthThickness;
-    int FrameNumber;
+    uint FrameNumber;
     float Padding0;
     float4 SkyColor;
     float4 SunDirectionAndIntensity;
@@ -314,7 +318,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
     const SurfelData surfel = SurfelPool[surfelIndex];
 
-    float3 normal = surfel.NormalSeenFrame.xyz;
+    float3 normal = surfel.Normal;
     const float normalLenSq = dot(normal, normal);
     if (normalLenSq <= 1e-6)
         return;
@@ -333,7 +337,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     const float guideRamp = saturate(prevCount / 16.0);
     const float guideBlend = (Gather.UseGuiding != 0 && guidingMass > 1e-5) ? min(SURFEL_GI_GUIDE_MAX_BLEND * guideRamp, SURFEL_GI_GUIDE_MAX_BLEND) : 0.0;
 
-    uint seed = InitGatherSeed(surfelIndex, (uint)max(Gather.FrameNumber, 0));
+    uint seed = InitGatherSeed(surfelIndex, Gather.FrameNumber);
     float3 accumulatedIrradiance = 0.0;
 
     [loop] for (uint rayIndex = 0u; rayIndex < rayCount; ++rayIndex)

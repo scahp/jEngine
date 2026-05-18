@@ -117,10 +117,15 @@ constexpr int32 SURFEL_GI_HOVER_DEBUG_MAX_RAYS = 16;
 // The HLSL side reads the same layout directly, so field order matters.
 BEGIN_SHADER_STRUCT(jSurfelGPU)
     SHADER_STRUCT_MEMBER(Vector4, PositionRadius)
-    SHADER_STRUCT_MEMBER(Vector4, NormalSeenFrame)
+    SHADER_STRUCT_MEMBER(Vector, Normal)
+    SHADER_STRUCT_MEMBER(uint32, LastSeenFrame)
     SHADER_STRUCT_MEMBER(Vector4, AlbedoWeight)
-    SHADER_STRUCT_MEMBER(Vector4, Extra)
+    SHADER_STRUCT_MEMBER(int32, State)
+    SHADER_STRUCT_MEMBER(uint32, IsActive)
+    SHADER_STRUCT_MEMBER(uint32, OwnerCellHash)
+    SHADER_STRUCT_MEMBER(uint32, CascadeIndex)
 END_SHADER_STRUCT()
+static_assert(sizeof(jSurfelGPU) == 64, "jSurfelGPU layout must match HLSL SurfelData");
 
 // Temporal lighting state stored per surfel.
 // IrradianceAndCount.xyz is the long-term irradiance used by resolve/apply.
@@ -139,20 +144,12 @@ BEGIN_SHADER_STRUCT(jSurfelCandidateGPU)
     SHADER_STRUCT_MEMBER(uint32, Padding2)
 END_SHADER_STRUCT()
 
-BEGIN_SHADER_STRUCT(jVisibleCellGPU)
-    SHADER_STRUCT_MEMBER(Vector4i, CellCascade)
-END_SHADER_STRUCT()
-
 BEGIN_SHADER_STRUCT(jSurfelGIStatsGPU)
     SHADER_STRUCT_MEMBER(uint32, ActiveCount)
     SHADER_STRUCT_MEMBER(uint32, MismatchCount)
     SHADER_STRUCT_MEMBER(uint32, ReservoirOverflowCount)
     SHADER_STRUCT_MEMBER(uint32, ReservoirRejectedCount)
 END_SHADER_STRUCT()
-
-BEGIN_SHADER_PARAMETER_SET(jSurfelGIClearVisibleCellCounterCSParameters)
-    SHADER_RW_STRUCTURED_BUFFER(uint32, VisibleCellCounterBuffer)
-END_SHADER_PARAMETER_SET()
 
 BEGIN_SHADER_PARAMETER_SET(jSurfelGIClearStatsCSParameters)
     SHADER_RW_STRUCTURED_BUFFER(jSurfelGIStatsGPU, StatsBuffer)
@@ -176,37 +173,43 @@ BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jSurfelGIUniformBuffer)
     SHADER_UNIFORM_BUFFER_MEMBER(int32, PreferCellCenterForFirstPlacement)
     SHADER_UNIFORM_BUFFER_MEMBER(float, MinRadius)
     SHADER_UNIFORM_BUFFER_MEMBER(float, MaxDistance)
-    SHADER_UNIFORM_BUFFER_MEMBER(int32, FrameNumber)
+    SHADER_UNIFORM_BUFFER_MEMBER(uint32, FrameNumber)
     SHADER_UNIFORM_BUFFER_MEMBER(int32, TileSize)
     SHADER_UNIFORM_BUFFER_MEMBER(int32, MaxSurfels)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, CascadePartitionCapacity)
     SHADER_UNIFORM_BUFFER_MEMBER(int32, SurfelPageSize)
     SHADER_UNIFORM_BUFFER_MEMBER(int32, SurfelPageTableCapacity)
     SHADER_UNIFORM_BUFFER_MEMBER(int32, SpawnBudget)
     SHADER_UNIFORM_BUFFER_MEMBER(int32, TTLInFrames)
     SHADER_UNIFORM_BUFFER_MEMBER(float, GridCellSize)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeCellScaleFromPrevPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeStartDistancePacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeRadiusScalePacked, SURFEL_GI_CASCADE_PACKED_COUNT)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeCellScalePacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeStartDistancePacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeRadiusScalePacked)
     SHADER_UNIFORM_BUFFER_MEMBER(int32, OutOfViewKeepFrames)
     SHADER_UNIFORM_BUFFER_MEMBER(float, RadiusScale)
     SHADER_UNIFORM_BUFFER_MEMBER(float, FaceMarginRadiusScale)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeClipmapGridDimXPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeClipmapGridDimYPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeClipmapGridDimZPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, SurfelsPerCellPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeOriginCellXPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeOriginCellYPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeOriginCellZPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeRingOffsetXPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeRingOffsetYPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeRingOffsetZPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeCellBasePacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeCellCountPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeDeltaCellXPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeDeltaCellYPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeDeltaCellZPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeClearAllPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeClipmapGridDimXPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeClipmapGridDimYPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeClipmapGridDimZPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, SurfelsPerCellPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeOriginCellXPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeOriginCellYPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeOriginCellZPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeRingOffsetXPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeRingOffsetYPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeRingOffsetZPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeCellBasePacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeCellCountPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeDeltaCellXPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeDeltaCellYPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeDeltaCellZPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeClearAllPacked)
 END_SHADER_UNIFORM_BUFFER_STRUCT()
+
+BEGIN_SHADER_PARAMETER_SET(jSurfelGIClearVisibleCellCounterCSParameters)
+    SHADER_RW_STRUCTURED_BUFFER(uint32, VisibleCellCounterBuffer)
+    SHADER_UNIFORM_BUFFER(jSurfelGIUniformBuffer, ComputeCommon)
+END_SHADER_PARAMETER_SET()
 
 BEGIN_SHADER_PARAMETER_SET(jSurfelGIClearCandidatesCSParameters)
     SHADER_RW_STRUCTURED_BUFFER(jSurfelCandidateGPU, CandidateBuffer)
@@ -227,12 +230,10 @@ END_SHADER_PARAMETER_SET()
 BEGIN_SHADER_PARAMETER_SET(jSurfelGIVisibleCellCollectCSParameters)
     SHADER_TEXTURE2D(DepthTexture)
     SHADER_UNIFORM_BUFFER(jSurfelGIUniformBuffer, ComputeCommon)
-    SHADER_RW_STRUCTURED_BUFFER(jVisibleCellGPU, VisibleCellWorklist)
     SHADER_RW_STRUCTURED_BUFFER(uint32, VisibleCellCounterBuffer)
 END_SHADER_PARAMETER_SET()
 
 BEGIN_SHADER_PARAMETER_SET(jSurfelGIRefreshVisibleCellSurfelsCSParameters)
-    SHADER_STRUCTURED_BUFFER(jVisibleCellGPU, VisibleCellWorklist)
     SHADER_STRUCTURED_BUFFER(uint32, VisibleCellCounterBuffer)
     SHADER_UNIFORM_BUFFER(jSurfelGIUniformBuffer, ComputeCommon)
     SHADER_RW_STRUCTURED_BUFFER(jSurfelGPU, SurfelPool)
@@ -277,14 +278,6 @@ END_SHADER_PARAMETER_SET()
 
 namespace
 {
-    struct alignas(16) jSurfelGILegacyVisibleCellGPU
-    {
-        int32 CellX = 0;
-        int32 CellY = 0;
-        int32 CellZ = 0;
-        int32 Cascade = 0;
-    };
-
     struct alignas(16) jSurfelGILegacyCandidateGPU
     {
         jSurfelGPU Surfel;
@@ -306,41 +299,38 @@ namespace
         int32 PreferCellCenterForFirstPlacement;
         float MinRadius;
         float MaxDistance;
-        int32 FrameNumber;
+        uint32 FrameNumber;
         int32 TileSize;
         int32 MaxSurfels;
+        int32 CascadePartitionCapacity;
         int32 SurfelPageSize;
         int32 SurfelPageTableCapacity;
         int32 SpawnBudget;
         int32 TTLInFrames;
         float GridCellSize;
-        Vector4 CascadeCellScaleFromPrevPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        Vector4 CascadeStartDistancePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        Vector4 CascadeRadiusScalePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+        Vector4 CascadeCellScalePacked;
+        Vector4 CascadeStartDistancePacked;
+        Vector4 CascadeRadiusScalePacked;
         int32 OutOfViewKeepFrames;
         float RadiusScale;
         float FaceMarginRadiusScale;
-        Vector4 CascadeClipmapGridDimXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        Vector4 CascadeClipmapGridDimYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        Vector4 CascadeClipmapGridDimZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        Vector4 SurfelsPerCellPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        Vector4 CascadeOriginCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        Vector4 CascadeOriginCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        Vector4 CascadeOriginCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        Vector4 CascadeRingOffsetXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        Vector4 CascadeRingOffsetYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        Vector4 CascadeRingOffsetZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        Vector4 CascadeCellBasePacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        Vector4 CascadeCellCountPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        Vector4 CascadeDeltaCellXPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        Vector4 CascadeDeltaCellYPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        Vector4 CascadeDeltaCellZPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
-        Vector4 CascadeClearAllPacked[SURFEL_GI_CASCADE_PACKED_COUNT];
+        Vector4 CascadeClipmapGridDimXPacked;
+        Vector4 CascadeClipmapGridDimYPacked;
+        Vector4 CascadeClipmapGridDimZPacked;
+        Vector4 SurfelsPerCellPacked;
+        Vector4 CascadeOriginCellXPacked;
+        Vector4 CascadeOriginCellYPacked;
+        Vector4 CascadeOriginCellZPacked;
+        Vector4 CascadeRingOffsetXPacked;
+        Vector4 CascadeRingOffsetYPacked;
+        Vector4 CascadeRingOffsetZPacked;
+        Vector4 CascadeCellBasePacked;
+        Vector4 CascadeCellCountPacked;
+        Vector4 CascadeDeltaCellXPacked;
+        Vector4 CascadeDeltaCellYPacked;
+        Vector4 CascadeDeltaCellZPacked;
+        Vector4 CascadeClearAllPacked;
     };
-
-    static_assert(sizeof(jVisibleCellGPU) == sizeof(jSurfelGILegacyVisibleCellGPU), "jVisibleCellGPU size mismatch");
-    static_assert(alignof(jVisibleCellGPU) == alignof(jSurfelGILegacyVisibleCellGPU), "jVisibleCellGPU alignment mismatch");
-    static_assert(offsetof(jVisibleCellGPU, CellCascade) == offsetof(jSurfelGILegacyVisibleCellGPU, CellX), "jVisibleCellGPU field layout mismatch");
 
     static_assert(sizeof(jSurfelCandidateGPU) == sizeof(jSurfelGILegacyCandidateGPU), "jSurfelCandidateGPU size mismatch");
     static_assert(alignof(jSurfelCandidateGPU) == alignof(jSurfelGILegacyCandidateGPU), "jSurfelCandidateGPU alignment mismatch");
@@ -352,7 +342,7 @@ namespace
     static_assert(offsetof(jSurfelGIUniformBuffer, ScreenSize) == offsetof(jSurfelGILegacyUniformBuffer, ScreenSize), "jSurfelGIUniformBuffer ScreenSize offset mismatch");
     static_assert(offsetof(jSurfelGIUniformBuffer, NormalEdgeScale) == offsetof(jSurfelGILegacyUniformBuffer, NormalEdgeScale), "jSurfelGIUniformBuffer NormalEdgeScale offset mismatch");
     static_assert(offsetof(jSurfelGIUniformBuffer, GridCellSize) == offsetof(jSurfelGILegacyUniformBuffer, GridCellSize), "jSurfelGIUniformBuffer GridCellSize offset mismatch");
-    static_assert(offsetof(jSurfelGIUniformBuffer, CascadeCellScaleFromPrevPacked) == offsetof(jSurfelGILegacyUniformBuffer, CascadeCellScaleFromPrevPacked), "jSurfelGIUniformBuffer CascadeCellScaleFromPrevPacked offset mismatch");
+    static_assert(offsetof(jSurfelGIUniformBuffer, CascadeCellScalePacked) == offsetof(jSurfelGILegacyUniformBuffer, CascadeCellScalePacked), "jSurfelGIUniformBuffer CascadeCellScalePacked offset mismatch");
     static_assert(offsetof(jSurfelGIUniformBuffer, CascadeClipmapGridDimXPacked) == offsetof(jSurfelGILegacyUniformBuffer, CascadeClipmapGridDimXPacked), "jSurfelGIUniformBuffer CascadeClipmapGridDimXPacked offset mismatch");
     static_assert(offsetof(jSurfelGIUniformBuffer, CascadeClearAllPacked) == offsetof(jSurfelGILegacyUniformBuffer, CascadeClearAllPacked), "jSurfelGIUniformBuffer CascadeClearAllPacked offset mismatch");
 }
@@ -401,22 +391,22 @@ BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jSurfelGIInlineRayGatherUniformBuffer)
     SHADER_UNIFORM_BUFFER_MEMBER(float, NormalBias)
     SHADER_UNIFORM_BUFFER_MEMBER(float, HistoryBlend)
     SHADER_UNIFORM_BUFFER_MEMBER(uint32, UseGuiding)
-    SHADER_UNIFORM_BUFFER_MEMBER(int32, FrameNumber)
+    SHADER_UNIFORM_BUFFER_MEMBER(uint32, FrameNumber)
     SHADER_UNIFORM_BUFFER_MEMBER(uint32, SurfelPageSize)
     SHADER_UNIFORM_BUFFER_MEMBER(float, GridCellSize)
     SHADER_UNIFORM_BUFFER_MEMBER(float, Padding0)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeCellScaleFromPrevPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeStartDistancePacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeClipmapGridDimXPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeClipmapGridDimYPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeClipmapGridDimZPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeOriginCellXPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeOriginCellYPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeOriginCellZPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeRingOffsetXPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeRingOffsetYPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeRingOffsetZPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeCellBasePacked, SURFEL_GI_CASCADE_PACKED_COUNT)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeCellScalePacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeStartDistancePacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeClipmapGridDimXPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeClipmapGridDimYPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeClipmapGridDimZPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeOriginCellXPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeOriginCellYPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeOriginCellZPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeRingOffsetXPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeRingOffsetYPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeRingOffsetZPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeCellBasePacked)
 END_SHADER_UNIFORM_BUFFER_STRUCT()
 
 BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jSurfelGIVisualizeUniformBuffer)
@@ -426,26 +416,27 @@ BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jSurfelGIVisualizeUniformBuffer)
     SHADER_UNIFORM_BUFFER_MEMBER(Vector2, ScreenSize)
     SHADER_UNIFORM_BUFFER_MEMBER(float, BlendAlpha)
     SHADER_UNIFORM_BUFFER_MEMBER(float, GridCellSize)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeCellScaleFromPrevPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeStartDistancePacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeClipmapGridDimXPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeClipmapGridDimYPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeClipmapGridDimZPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeCellScalePacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeStartDistancePacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeClipmapGridDimXPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeClipmapGridDimYPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeClipmapGridDimZPacked)
     SHADER_UNIFORM_BUFFER_MEMBER(int32, MaxSurfels)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, CascadePartitionCapacity)
     SHADER_UNIFORM_BUFFER_MEMBER(int32, SurfelPageSize)
     SHADER_UNIFORM_BUFFER_MEMBER(int32, SurfelPageTableCapacity)
     SHADER_UNIFORM_BUFFER_MEMBER(int32, NeighborCellRadius)
     SHADER_UNIFORM_BUFFER_MEMBER(int32, BlendWithScene)
     SHADER_UNIFORM_BUFFER_MEMBER(int32, ShowStateDebug)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, SurfelsPerCellPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeOriginCellXPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeOriginCellYPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeOriginCellZPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeRingOffsetXPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeRingOffsetYPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeRingOffsetZPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeCellBasePacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeCellCountPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, SurfelsPerCellPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeOriginCellXPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeOriginCellYPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeOriginCellZPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeRingOffsetXPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeRingOffsetYPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeRingOffsetZPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeCellBasePacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeCellCountPacked)
     SHADER_UNIFORM_BUFFER_MEMBER(int32, ShowCellDebug)
     SHADER_UNIFORM_BUFFER_MEMBER(int32, ShowUnderfilledCellDebug)
     SHADER_UNIFORM_BUFFER_MEMBER(int32, ShowCellGrid)
@@ -478,19 +469,20 @@ BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jSurfelGIResolveUniformBuffer)
     SHADER_UNIFORM_BUFFER_MEMBER(Matrix, InvV)
     SHADER_UNIFORM_BUFFER_MEMBER(Vector2, ScreenSize)
     SHADER_UNIFORM_BUFFER_MEMBER(float, GridCellSize)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeCellScaleFromPrevPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeClipmapGridDimXPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeClipmapGridDimYPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeClipmapGridDimZPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, SurfelsPerCellPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeOriginCellXPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeOriginCellYPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeOriginCellZPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeRingOffsetXPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeRingOffsetYPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeRingOffsetZPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeCellBasePacked, SURFEL_GI_CASCADE_PACKED_COUNT)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeCellScalePacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeClipmapGridDimXPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeClipmapGridDimYPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeClipmapGridDimZPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, SurfelsPerCellPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeOriginCellXPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeOriginCellYPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeOriginCellZPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeRingOffsetXPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeRingOffsetYPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeRingOffsetZPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeCellBasePacked)
     SHADER_UNIFORM_BUFFER_MEMBER(int32, MaxSurfels)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, CascadePartitionCapacity)
     SHADER_UNIFORM_BUFFER_MEMBER(int32, SurfelPageSize)
     SHADER_UNIFORM_BUFFER_MEMBER(int32, SurfelPageTableCapacity)
     SHADER_UNIFORM_BUFFER_MEMBER(int32, NeighborCellRadius)
@@ -515,19 +507,20 @@ BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jSurfelGIHoverSelectUniformBuffer)
     SHADER_UNIFORM_BUFFER_MEMBER(Matrix, InvV)
     SHADER_UNIFORM_BUFFER_MEMBER(Vector2, ScreenSize)
     SHADER_UNIFORM_BUFFER_MEMBER(float, GridCellSize)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeCellScaleFromPrevPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeClipmapGridDimXPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeClipmapGridDimYPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeClipmapGridDimZPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, SurfelsPerCellPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeOriginCellXPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeOriginCellYPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeOriginCellZPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeRingOffsetXPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeRingOffsetYPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeRingOffsetZPacked, SURFEL_GI_CASCADE_PACKED_COUNT)
-    SHADER_UNIFORM_BUFFER_MEMBER_ARRAY(Vector4, CascadeCellBasePacked, SURFEL_GI_CASCADE_PACKED_COUNT)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeCellScalePacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeClipmapGridDimXPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeClipmapGridDimYPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeClipmapGridDimZPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, SurfelsPerCellPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeOriginCellXPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeOriginCellYPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeOriginCellZPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeRingOffsetXPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeRingOffsetYPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeRingOffsetZPacked)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, CascadeCellBasePacked)
     SHADER_UNIFORM_BUFFER_MEMBER(int32, MaxSurfels)
+    SHADER_UNIFORM_BUFFER_MEMBER(int32, CascadePartitionCapacity)
     SHADER_UNIFORM_BUFFER_MEMBER(int32, SurfelPageSize)
     SHADER_UNIFORM_BUFFER_MEMBER(int32, SurfelPageTableCapacity)
     SHADER_UNIFORM_BUFFER_MEMBER(int32, NeighborCellRadius)
@@ -698,9 +691,8 @@ int32 GSurfelIrradianceCapacity = 0;
 std::shared_ptr<jBuffer> GSurfelGuidingBuffer;
 int32 GSurfelGuidingCapacity = 0;
 int32 GSurfelPageSize = 8;
-std::shared_ptr<jBuffer> GVisibleCellWorklistBuffer;
 std::shared_ptr<jBuffer> GVisibleCellCounterBuffer;
-int32 GVisibleCellWorklistCapacity = 0;
+int32 GVisibleCellCounterCapacity = 0;
 std::shared_ptr<jBuffer> GSurfelCellPageTableBuffer;
 int32 GSurfelCellPageTableCapacity = 0;
 std::shared_ptr<jBuffer> GSurfelGICandidateBuffer;
@@ -722,7 +714,32 @@ int32 GSurfelCascadeCellBase[SURFEL_GI_CASCADE_COUNT] = {};
 int32 GSurfelCascadeCellCount[SURFEL_GI_CASCADE_COUNT] = {};
 constexpr int32 SURFEL_GI_MAX_SURFELS_HARD_CAP = 2097152;
 constexpr int32 SURFEL_GI_MAX_SLOTS_PER_CELL = 5;
-constexpr int32 SURFEL_GI_VISIBLE_CELL_WORKLIST_MULTIPLIER = 2;
+
+int32 AlignSurfelGIMaxSurfelsToCascadeCount(int32 InMaxSurfels)
+{
+    constexpr int32 CascadeCount = (SURFEL_GI_CASCADE_COUNT > 0) ? SURFEL_GI_CASCADE_COUNT : 1;
+    const int32 ClampedMaxSurfels = Clamp(InMaxSurfels, CascadeCount, SURFEL_GI_MAX_SURFELS_HARD_CAP);
+    const int32 AlignedUp = ((ClampedMaxSurfels + CascadeCount - 1) / CascadeCount) * CascadeCount;
+    if (AlignedUp <= SURFEL_GI_MAX_SURFELS_HARD_CAP)
+        return AlignedUp;
+
+    return Max(CascadeCount, (SURFEL_GI_MAX_SURFELS_HARD_CAP / CascadeCount) * CascadeCount);
+}
+
+int32 GetSurfelGICascadePartitionCapacity()
+{
+    return Max(1, GSurfelPoolMaxCount / Max(1, SURFEL_GI_CASCADE_COUNT));
+}
+
+float GetSurfelGICascadeCellScale(int32 CascadeIndex)
+{
+    float Scale = 1.0f;
+    for (int32 i = 1; i <= CascadeIndex && i < SURFEL_GI_CASCADE_COUNT; ++i)
+    {
+        Scale *= Max(1.0f, gOptions.SurfelGICascadeCellScaleFromPrev[i]);
+    }
+    return Scale;
+}
 
 int32 GetSurfelGIEffectiveTileSize()
 {
@@ -741,7 +758,7 @@ void ResetSurfelGIRuntimeState()
     GSurfelIrradianceCapacity = 0;
     GSurfelGuidingCapacity = 0;
     GSurfelPageSize = 8;
-    GVisibleCellWorklistCapacity = 0;
+    GVisibleCellCounterCapacity = 0;
     GSurfelCellPageTableCapacity = 0;
     GSurfelGICandidateCapacity = 0;
     GSurfelGIWinnerCapacity = 0;
@@ -1100,7 +1117,7 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
     TotalCellCount = Max(1, TotalCellCount);
     const int32 RequestedMaxSurfels = Clamp(Max(1024, gOptions.SurfelGIMaxSurfels), 1024, SURFEL_GI_MAX_SURFELS_HARD_CAP);
     const int32 MinRequiredForTargetSlots = Min(TotalCellCount * Max(1, GSurfelPageSize), SURFEL_GI_MAX_SURFELS_HARD_CAP);
-    const int32 MaxSurfels = Max(RequestedMaxSurfels, MinRequiredForTargetSlots);
+    const int32 MaxSurfels = AlignSurfelGIMaxSurfelsToCascadeCount(Max(RequestedMaxSurfels, MinRequiredForTargetSlots));
     const int32 MaxSlotsPerCellByBudget = Max(1, MaxSurfels / Max(1, TotalCellCount));
     GSurfelPageSize = Clamp(GSurfelPageSize, 1, MaxSlotsPerCellByBudget);
     bool RecreatedPrimaryStorage = false;
@@ -1391,37 +1408,22 @@ void EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
             jNameStatic("SurfelGI_ReservoirStats"));
     }
 
-    // The visible cell worklist buffer is used to keep track of which cells are visible and need to be updated each frame.
-    const int32 MaxVisibleCells = Max(1, SampleDispatchWidth * SampleDispatchHeight * SURFEL_GI_VISIBLE_CELL_WORKLIST_MULTIPLIER);
-    if (!GVisibleCellWorklistBuffer || GVisibleCellWorklistCapacity != MaxVisibleCells)
+    const int32 VisibleCellCapacity = Max(1, TotalCellCount);
+    // The visible cell counter buffer is indexed by clipmap cell linear index.
+    // Each element records how many sampled screen tiles hit the cell this frame.
+    if (!GVisibleCellCounterBuffer || GVisibleCellCounterCapacity != VisibleCellCapacity)
     {
-        GVisibleCellWorklistCapacity = MaxVisibleCells;
-        std::vector<jVisibleCellGPU> InitialWorklist;
-        InitialWorklist.resize((size_t)MaxVisibleCells);
-        GVisibleCellWorklistBuffer = g_rhi->CreateStructuredBuffer(
-            sizeof(jVisibleCellGPU) * MaxVisibleCells,
-            0,
-            sizeof(jVisibleCellGPU),
-            EBufferCreateFlag::UAV,
-            EResourceLayout::UAV,
-            InitialWorklist.data(),
-            sizeof(jVisibleCellGPU) * MaxVisibleCells,
-            jNameStatic("SurfelGI_VisibleCellWorklist"));
-    }
-
-    // The visible cell counter buffer holds the count of visible cells in the current frame. 
-    // It is used to avoid dispatching more threads than necessary when processing visible cells.
-    if (!GVisibleCellCounterBuffer)
-    {
-        uint32 CounterInit = 0;
+        GVisibleCellCounterCapacity = VisibleCellCapacity;
+        std::vector<uint32> InitialCounters;
+        InitialCounters.resize((size_t)VisibleCellCapacity, 0u);
         GVisibleCellCounterBuffer = g_rhi->CreateStructuredBuffer(
-            sizeof(uint32),
+            sizeof(uint32) * VisibleCellCapacity,
             0,
             sizeof(uint32),
             EBufferCreateFlag::UAV,
             EResourceLayout::UAV,
-            &CounterInit,
-            sizeof(uint32),
+            InitialCounters.data(),
+            sizeof(uint32) * VisibleCellCapacity,
             jNameStatic("SurfelGI_VisibleCellCounter"));
     }
 
@@ -1442,7 +1444,6 @@ void ReleaseSurfelGIResources()
     GSurfelPoolBuffer.reset();
     GSurfelIrradianceBuffer.reset();
     GSurfelGuidingBuffer.reset();
-    GVisibleCellWorklistBuffer.reset();
     GVisibleCellCounterBuffer.reset();
     GSurfelCellPageTableBuffer.reset();
     GSurfelGICandidateBuffer.reset();
@@ -1486,7 +1487,7 @@ void jRenderer::SurfelGIPass()
 
     EnsureSurfelGIResources(RenderFrameContextPtr);
     if (!GSurfelPoolBuffer || !jSceneRenderTarget::SurfelGI_Debug_RT || !jSceneRenderTarget::SurfelGI_Attempt_RT
-        || !GVisibleCellWorklistBuffer || !GVisibleCellCounterBuffer || !GSurfelCellPageTableBuffer
+        || !GVisibleCellCounterBuffer || !GSurfelCellPageTableBuffer
         || !GSurfelGICandidateBuffer || !GSurfelGIWinnerScoreBuffer || !GSurfelGIWinnerIndexBuffer || !GSurfelGIWinnerLockBuffer
         || !GSurfelGIStatsBuffer || !GSurfelIrradianceBuffer || !GSurfelGuidingBuffer
         || !GSurfelGIActiveIndexBuffer || !GSurfelGIActiveCounterBuffer || !GSurfelGIInlineRayDispatchArgsBuffer)
@@ -1522,60 +1523,40 @@ void jRenderer::SurfelGIPass()
     UniformData.PreferCellCenterForFirstPlacement = gOptions.UseSurfelGIPreferCellCenterForFirstPlacement ? 1 : 0;
     UniformData.MinRadius = 15.0f;
     UniformData.MaxDistance = gOptions.SSGIMaxDistance;
-    UniformData.FrameNumber = (int32)g_rhi->GetCurrentFrameNumber();
+    UniformData.FrameNumber = g_rhi->GetCurrentFrameNumber();
     UniformData.TileSize = GetSurfelGIEffectiveTileSize();
     UniformData.MaxSurfels = GSurfelPoolMaxCount;
+    UniformData.CascadePartitionCapacity = GetSurfelGICascadePartitionCapacity();
     UniformData.SurfelPageSize = Max(1, GSurfelPageSize);
     UniformData.SurfelPageTableCapacity = Max(1, GSurfelCellPageTableCapacity);
     UniformData.SpawnBudget = Max(1, gOptions.SurfelGISpawnBudgetPerFrame);
     UniformData.TTLInFrames = Max(1, gOptions.SurfelGITTLInFrames);
     UniformData.GridCellSize = Max(0.1f, gOptions.SurfelGIWorldGridCellSize);
-    for (int32 pack = 0; pack < SURFEL_GI_CASCADE_PACKED_COUNT; ++pack)
-    {
-        UniformData.CascadeCellScaleFromPrevPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        UniformData.CascadeStartDistancePacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        UniformData.CascadeRadiusScalePacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        UniformData.CascadeClipmapGridDimXPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        UniformData.CascadeClipmapGridDimYPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        UniformData.CascadeClipmapGridDimZPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        UniformData.SurfelsPerCellPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        UniformData.CascadeOriginCellXPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        UniformData.CascadeOriginCellYPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        UniformData.CascadeOriginCellZPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        UniformData.CascadeRingOffsetXPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        UniformData.CascadeRingOffsetYPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        UniformData.CascadeRingOffsetZPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        UniformData.CascadeCellBasePacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        UniformData.CascadeCellCountPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        UniformData.CascadeDeltaCellXPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        UniformData.CascadeDeltaCellYPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        UniformData.CascadeDeltaCellZPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        UniformData.CascadeClearAllPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-    }
+    UniformData.CascadeCellScalePacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    UniformData.CascadeStartDistancePacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    UniformData.CascadeRadiusScalePacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    UniformData.CascadeClipmapGridDimXPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    UniformData.CascadeClipmapGridDimYPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    UniformData.CascadeClipmapGridDimZPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    UniformData.SurfelsPerCellPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    UniformData.CascadeOriginCellXPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    UniformData.CascadeOriginCellYPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    UniformData.CascadeOriginCellZPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    UniformData.CascadeRingOffsetXPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    UniformData.CascadeRingOffsetYPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    UniformData.CascadeRingOffsetZPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    UniformData.CascadeCellBasePacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    UniformData.CascadeCellCountPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    UniformData.CascadeDeltaCellXPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    UniformData.CascadeDeltaCellYPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    UniformData.CascadeDeltaCellZPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    UniformData.CascadeClearAllPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
     UniformData.FaceMarginRadiusScale = Clamp(gOptions.SurfelGIFaceMarginRadiusScale, 0.0f, 2.0f);
-    auto SetPackedCascadeValue = [](Vector4* packedArray, int32 cascade, float value)
-    {
-        const int32 packIndex = cascade / 4;
-        const int32 lane = cascade % 4;
-        if (lane == 0) packedArray[packIndex].x = value;
-        else if (lane == 1) packedArray[packIndex].y = value;
-        else if (lane == 2) packedArray[packIndex].z = value;
-        else packedArray[packIndex].w = value;
-    };
-    auto GetCascadeScale = [](int32 cascadeIndex)
-    {
-        float scale = 1.0f;
-        for (int32 i = 1; i <= cascadeIndex && i < SURFEL_GI_CASCADE_COUNT; ++i)
-        {
-            scale *= Max(1.0f, gOptions.SurfelGICascadeCellScaleFromPrev[i]);
-        }
-        return scale;
-    };
     for (int32 cascade = 0; cascade < SURFEL_GI_CASCADE_COUNT; ++cascade)
     {
-        SetPackedCascadeValue(UniformData.CascadeCellScaleFromPrevPacked, cascade, (cascade == 0) ? 1.0f : Max(1.0f, gOptions.SurfelGICascadeCellScaleFromPrev[cascade]));
-        SetPackedCascadeValue(UniformData.CascadeStartDistancePacked, cascade, CascadeStartDistanceSanitized[cascade]);
-        SetPackedCascadeValue(UniformData.CascadeRadiusScalePacked, cascade, (cascade == 0) ? 1.0f : Max(0.05f, gOptions.SurfelGICascadeRadiusScale[cascade]));
+        UniformData.CascadeCellScalePacked.v[cascade] = GetSurfelGICascadeCellScale(cascade);
+        UniformData.CascadeStartDistancePacked.v[cascade] = CascadeStartDistanceSanitized[cascade];
+        UniformData.CascadeRadiusScalePacked.v[cascade] = (cascade == 0) ? 1.0f : Max(0.05f, gOptions.SurfelGICascadeRadiusScale[cascade]);
     }
     UniformData.OutOfViewKeepFrames = Max(1, gOptions.SurfelGIOutOfViewKeepFrames);
     UniformData.RadiusScale = Max(0.05f, gOptions.SurfelGIRadiusScale);
@@ -1594,7 +1575,7 @@ void jRenderer::SurfelGIPass()
         GSurfelCascadeCellCount[cascade] = CascadeCellCount;
         RunningCascadeCellBase += CascadeCellCount;
 
-        const float CellSize = Max(0.1f, UniformData.GridCellSize) * GetCascadeScale(cascade);
+        const float CellSize = Max(0.1f, UniformData.GridCellSize) * GetSurfelGICascadeCellScale(cascade);
         const int32 CameraCellX = (int32)std::floor(MainCamera->Pos.x / Max(CellSize, 0.001f));
         const int32 CameraCellY = (int32)std::floor(MainCamera->Pos.y / Max(CellSize, 0.001f));
         const int32 CameraCellZ = (int32)std::floor(MainCamera->Pos.z / Max(CellSize, 0.001f));
@@ -1647,22 +1628,22 @@ void jRenderer::SurfelGIPass()
         if (CascadeClearAll || DeltaX != 0 || DeltaY != 0 || DeltaZ != 0)
             NeedClipmapCellClear = true;
 
-        SetPackedCascadeValue(UniformData.CascadeClipmapGridDimXPacked, cascade, (float)DimX);
-        SetPackedCascadeValue(UniformData.CascadeClipmapGridDimYPacked, cascade, (float)DimY);
-        SetPackedCascadeValue(UniformData.CascadeClipmapGridDimZPacked, cascade, (float)DimZ);
-        SetPackedCascadeValue(UniformData.SurfelsPerCellPacked, cascade, (float)SurfelPerCell);
-        SetPackedCascadeValue(UniformData.CascadeOriginCellXPacked, cascade, (float)RuntimeState.OriginX);
-        SetPackedCascadeValue(UniformData.CascadeOriginCellYPacked, cascade, (float)RuntimeState.OriginY);
-        SetPackedCascadeValue(UniformData.CascadeOriginCellZPacked, cascade, (float)RuntimeState.OriginZ);
-        SetPackedCascadeValue(UniformData.CascadeRingOffsetXPacked, cascade, (float)RuntimeState.RingOffsetX);
-        SetPackedCascadeValue(UniformData.CascadeRingOffsetYPacked, cascade, (float)RuntimeState.RingOffsetY);
-        SetPackedCascadeValue(UniformData.CascadeRingOffsetZPacked, cascade, (float)RuntimeState.RingOffsetZ);
-        SetPackedCascadeValue(UniformData.CascadeCellBasePacked, cascade, (float)GSurfelCascadeCellBase[cascade]);
-        SetPackedCascadeValue(UniformData.CascadeCellCountPacked, cascade, (float)GSurfelCascadeCellCount[cascade]);
-        SetPackedCascadeValue(UniformData.CascadeDeltaCellXPacked, cascade, (float)DeltaX);
-        SetPackedCascadeValue(UniformData.CascadeDeltaCellYPacked, cascade, (float)DeltaY);
-        SetPackedCascadeValue(UniformData.CascadeDeltaCellZPacked, cascade, (float)DeltaZ);
-        SetPackedCascadeValue(UniformData.CascadeClearAllPacked, cascade, CascadeClearAll ? 1.0f : 0.0f);
+        UniformData.CascadeClipmapGridDimXPacked.v[cascade] = (float)DimX;
+        UniformData.CascadeClipmapGridDimYPacked.v[cascade] = (float)DimY;
+        UniformData.CascadeClipmapGridDimZPacked.v[cascade] = (float)DimZ;
+        UniformData.SurfelsPerCellPacked.v[cascade] = (float)SurfelPerCell;
+        UniformData.CascadeOriginCellXPacked.v[cascade] = (float)RuntimeState.OriginX;
+        UniformData.CascadeOriginCellYPacked.v[cascade] = (float)RuntimeState.OriginY;
+        UniformData.CascadeOriginCellZPacked.v[cascade] = (float)RuntimeState.OriginZ;
+        UniformData.CascadeRingOffsetXPacked.v[cascade] = (float)RuntimeState.RingOffsetX;
+        UniformData.CascadeRingOffsetYPacked.v[cascade] = (float)RuntimeState.RingOffsetY;
+        UniformData.CascadeRingOffsetZPacked.v[cascade] = (float)RuntimeState.RingOffsetZ;
+        UniformData.CascadeCellBasePacked.v[cascade] = (float)GSurfelCascadeCellBase[cascade];
+        UniformData.CascadeCellCountPacked.v[cascade] = (float)GSurfelCascadeCellCount[cascade];
+        UniformData.CascadeDeltaCellXPacked.v[cascade] = (float)DeltaX;
+        UniformData.CascadeDeltaCellYPacked.v[cascade] = (float)DeltaY;
+        UniformData.CascadeDeltaCellZPacked.v[cascade] = (float)DeltaZ;
+        UniformData.CascadeClearAllPacked.v[cascade] = CascadeClearAll ? 1.0f : 0.0f;
     }
     GSurfelClipmapForceClearAll = false;
 
@@ -1674,7 +1655,6 @@ void jRenderer::SurfelGIPass()
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::NORMAL)->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->GetGBuffer(EGBufferType::ALBEDO)->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->LinearDepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
-    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GVisibleCellWorklistBuffer.get(), EResourceLayout::UAV);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GVisibleCellCounterBuffer.get(), EResourceLayout::UAV);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelPoolBuffer.get(), EResourceLayout::UAV);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelIrradianceBuffer.get(), EResourceLayout::UAV);
@@ -1727,8 +1707,11 @@ void jRenderer::SurfelGIPass()
     }
 
     {
+        const int32 ClearVisibleCellCounterGroupX = (Max(1, GVisibleCellCounterCapacity) + 63) / 64;
+
         jSurfelGIClearVisibleCellCounterCSParameters ClearParameters;
         ClearParameters.VisibleCellCounterBuffer.Buffer = GVisibleCellCounterBuffer.get();
+        ClearParameters.ComputeCommon.Buffer = OneFrameUniformBuffer;
 
         DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "SurfelGI Dispatch ClearVisibleCellCounter", Vector4(0.55f, 0.55f, 0.95f, 1.0f));
         SCOPE_GPU_PROFILE(RenderFrameContextPtr, SurfelGI_DispatchClearVisibleCellCounter);
@@ -1736,7 +1719,7 @@ void jRenderer::SurfelGIPass()
             , jNameStatic("SurfelGIClearVisibleCellCounter_CS")
             , jNameStatic("Resource/Shaders/hlsl/SurfelGIClearVisibleCellCounter_cs.hlsl")
             , ClearParameters
-            , 1, 1, 1);
+            , Max(1, ClearVisibleCellCounterGroupX), 1, 1);
     }
 
     g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), GVisibleCellCounterBuffer.get());
@@ -1746,7 +1729,6 @@ void jRenderer::SurfelGIPass()
         CollectParameters.DepthTexture.Texture = RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture();
         CollectParameters.DepthTexture.SamplerState = SamplerState;
         CollectParameters.ComputeCommon.Buffer = OneFrameUniformBuffer;
-        CollectParameters.VisibleCellWorklist.Buffer = GVisibleCellWorklistBuffer.get();
         CollectParameters.VisibleCellCounterBuffer.Buffer = GVisibleCellCounterBuffer.get();
 
         DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "SurfelGI Dispatch CollectVisibleCells", Vector4(0.25f, 0.65f, 0.95f, 1.0f));
@@ -1758,17 +1740,14 @@ void jRenderer::SurfelGIPass()
             , TileDispatchGroupX, TileDispatchGroupY, 1);
     }
 
-    g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), GVisibleCellWorklistBuffer.get());
     g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), GVisibleCellCounterBuffer.get());
-    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GVisibleCellWorklistBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GVisibleCellCounterBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelCellPageTableBuffer.get(), EResourceLayout::SHADER_READ_ONLY);
 
     {
-        const int32 RefreshGroupX = (GVisibleCellWorklistCapacity + 63) / 64;
+        const int32 RefreshGroupX = (GVisibleCellCounterCapacity + 63) / 64;
 
         jSurfelGIRefreshVisibleCellSurfelsCSParameters RefreshParameters;
-        RefreshParameters.VisibleCellWorklist.Buffer = GVisibleCellWorklistBuffer.get();
         RefreshParameters.VisibleCellCounterBuffer.Buffer = GVisibleCellCounterBuffer.get();
         RefreshParameters.ComputeCommon.Buffer = OneFrameUniformBuffer;
         RefreshParameters.SurfelPool.Buffer = GSurfelPoolBuffer.get();
@@ -1784,7 +1763,6 @@ void jRenderer::SurfelGIPass()
     }
 
     g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelPoolBuffer.get());
-    g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GVisibleCellWorklistBuffer.get(), EResourceLayout::UAV);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GVisibleCellCounterBuffer.get(), EResourceLayout::UAV);
     g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelCellPageTableBuffer.get(), EResourceLayout::UAV);
 
@@ -2011,46 +1989,35 @@ void jRenderer::SurfelGIPass()
             HoverSelectUniformData.InvV = MainCamera->View.GetInverse();
             HoverSelectUniformData.ScreenSize = Vector2((float)Width, (float)Height);
             HoverSelectUniformData.GridCellSize = Max(0.1f, gOptions.SurfelGIWorldGridCellSize);
-            auto SetPackedHoverSelectValue = [](Vector4* packedArray, int32 cascade, float value)
-            {
-                const int32 packIndex = cascade / 4;
-                const int32 lane = cascade % 4;
-                if (lane == 0) packedArray[packIndex].x = value;
-                else if (lane == 1) packedArray[packIndex].y = value;
-                else if (lane == 2) packedArray[packIndex].z = value;
-                else packedArray[packIndex].w = value;
-            };
-            for (int32 pack = 0; pack < SURFEL_GI_CASCADE_PACKED_COUNT; ++pack)
-            {
-                HoverSelectUniformData.CascadeCellScaleFromPrevPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-                HoverSelectUniformData.CascadeClipmapGridDimXPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-                HoverSelectUniformData.CascadeClipmapGridDimYPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-                HoverSelectUniformData.CascadeClipmapGridDimZPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-                HoverSelectUniformData.SurfelsPerCellPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-                HoverSelectUniformData.CascadeOriginCellXPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-                HoverSelectUniformData.CascadeOriginCellYPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-                HoverSelectUniformData.CascadeOriginCellZPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-                HoverSelectUniformData.CascadeRingOffsetXPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-                HoverSelectUniformData.CascadeRingOffsetYPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-                HoverSelectUniformData.CascadeRingOffsetZPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-                HoverSelectUniformData.CascadeCellBasePacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            }
+            HoverSelectUniformData.CascadeCellScalePacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+            HoverSelectUniformData.CascadeClipmapGridDimXPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+            HoverSelectUniformData.CascadeClipmapGridDimYPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+            HoverSelectUniformData.CascadeClipmapGridDimZPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+            HoverSelectUniformData.SurfelsPerCellPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+            HoverSelectUniformData.CascadeOriginCellXPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+            HoverSelectUniformData.CascadeOriginCellYPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+            HoverSelectUniformData.CascadeOriginCellZPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+            HoverSelectUniformData.CascadeRingOffsetXPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+            HoverSelectUniformData.CascadeRingOffsetYPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+            HoverSelectUniformData.CascadeRingOffsetZPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+            HoverSelectUniformData.CascadeCellBasePacked = { 0.0f, 0.0f, 0.0f, 0.0f };
             for (int32 cascade = 0; cascade < SURFEL_GI_CASCADE_COUNT; ++cascade)
             {
-                SetPackedHoverSelectValue(HoverSelectUniformData.CascadeCellScaleFromPrevPacked, cascade, (cascade == 0) ? 1.0f : Max(1.0f, gOptions.SurfelGICascadeCellScaleFromPrev[cascade]));
-                SetPackedHoverSelectValue(HoverSelectUniformData.CascadeClipmapGridDimXPacked, cascade, (float)Clamp(gOptions.SurfelGIClipmapGridDimX[cascade], 4, 512));
-                SetPackedHoverSelectValue(HoverSelectUniformData.CascadeClipmapGridDimYPacked, cascade, (float)Clamp(gOptions.SurfelGIClipmapGridDimY[cascade], 4, 512));
-                SetPackedHoverSelectValue(HoverSelectUniformData.CascadeClipmapGridDimZPacked, cascade, (float)Clamp(gOptions.SurfelGIClipmapGridDimZ[cascade], 4, 512));
-                SetPackedHoverSelectValue(HoverSelectUniformData.SurfelsPerCellPacked, cascade, (float)Clamp(gOptions.SurfelGISurfelsPerCell[cascade], 1, SURFEL_GI_MAX_SLOTS_PER_CELL));
-                SetPackedHoverSelectValue(HoverSelectUniformData.CascadeOriginCellXPacked, cascade, (float)GSurfelClipmapRuntimeStates[cascade].OriginX);
-                SetPackedHoverSelectValue(HoverSelectUniformData.CascadeOriginCellYPacked, cascade, (float)GSurfelClipmapRuntimeStates[cascade].OriginY);
-                SetPackedHoverSelectValue(HoverSelectUniformData.CascadeOriginCellZPacked, cascade, (float)GSurfelClipmapRuntimeStates[cascade].OriginZ);
-                SetPackedHoverSelectValue(HoverSelectUniformData.CascadeRingOffsetXPacked, cascade, (float)GSurfelClipmapRuntimeStates[cascade].RingOffsetX);
-                SetPackedHoverSelectValue(HoverSelectUniformData.CascadeRingOffsetYPacked, cascade, (float)GSurfelClipmapRuntimeStates[cascade].RingOffsetY);
-                SetPackedHoverSelectValue(HoverSelectUniformData.CascadeRingOffsetZPacked, cascade, (float)GSurfelClipmapRuntimeStates[cascade].RingOffsetZ);
-                SetPackedHoverSelectValue(HoverSelectUniformData.CascadeCellBasePacked, cascade, (float)GSurfelCascadeCellBase[cascade]);
+                HoverSelectUniformData.CascadeCellScalePacked.v[cascade] = GetSurfelGICascadeCellScale(cascade);
+                HoverSelectUniformData.CascadeClipmapGridDimXPacked.v[cascade] = (float)Clamp(gOptions.SurfelGIClipmapGridDimX[cascade], 4, 512);
+                HoverSelectUniformData.CascadeClipmapGridDimYPacked.v[cascade] = (float)Clamp(gOptions.SurfelGIClipmapGridDimY[cascade], 4, 512);
+                HoverSelectUniformData.CascadeClipmapGridDimZPacked.v[cascade] = (float)Clamp(gOptions.SurfelGIClipmapGridDimZ[cascade], 4, 512);
+                HoverSelectUniformData.SurfelsPerCellPacked.v[cascade] = (float)Clamp(gOptions.SurfelGISurfelsPerCell[cascade], 1, SURFEL_GI_MAX_SLOTS_PER_CELL);
+                HoverSelectUniformData.CascadeOriginCellXPacked.v[cascade] = (float)GSurfelClipmapRuntimeStates[cascade].OriginX;
+                HoverSelectUniformData.CascadeOriginCellYPacked.v[cascade] = (float)GSurfelClipmapRuntimeStates[cascade].OriginY;
+                HoverSelectUniformData.CascadeOriginCellZPacked.v[cascade] = (float)GSurfelClipmapRuntimeStates[cascade].OriginZ;
+                HoverSelectUniformData.CascadeRingOffsetXPacked.v[cascade] = (float)GSurfelClipmapRuntimeStates[cascade].RingOffsetX;
+                HoverSelectUniformData.CascadeRingOffsetYPacked.v[cascade] = (float)GSurfelClipmapRuntimeStates[cascade].RingOffsetY;
+                HoverSelectUniformData.CascadeRingOffsetZPacked.v[cascade] = (float)GSurfelClipmapRuntimeStates[cascade].RingOffsetZ;
+                HoverSelectUniformData.CascadeCellBasePacked.v[cascade] = (float)GSurfelCascadeCellBase[cascade];
             }
             HoverSelectUniformData.MaxSurfels = Max(1, GSurfelPoolMaxCount);
+            HoverSelectUniformData.CascadePartitionCapacity = GetSurfelGICascadePartitionCapacity();
             HoverSelectUniformData.SurfelPageSize = Max(1, GSurfelPageSize);
             HoverSelectUniformData.SurfelPageTableCapacity = Max(1, GSurfelCellPageTableCapacity);
             HoverSelectUniformData.NeighborCellRadius = Clamp(gOptions.SurfelGIVisualizeNeighborCellRadius, 0, 3);
@@ -2104,35 +2071,32 @@ void jRenderer::SurfelGIPass()
         GatherUniformData.FrameNumber = UniformData.FrameNumber;
         GatherUniformData.SurfelPageSize = (uint32)Max(1, GSurfelPageSize);
         GatherUniformData.GridCellSize = Max(0.1f, gOptions.SurfelGIWorldGridCellSize);
-        for (int32 pack = 0; pack < SURFEL_GI_CASCADE_PACKED_COUNT; ++pack)
-        {
-            GatherUniformData.CascadeCellScaleFromPrevPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            GatherUniformData.CascadeStartDistancePacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            GatherUniformData.CascadeClipmapGridDimXPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            GatherUniformData.CascadeClipmapGridDimYPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            GatherUniformData.CascadeClipmapGridDimZPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            GatherUniformData.CascadeOriginCellXPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            GatherUniformData.CascadeOriginCellYPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            GatherUniformData.CascadeOriginCellZPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            GatherUniformData.CascadeRingOffsetXPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            GatherUniformData.CascadeRingOffsetYPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            GatherUniformData.CascadeRingOffsetZPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            GatherUniformData.CascadeCellBasePacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        }
+        GatherUniformData.CascadeCellScalePacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+        GatherUniformData.CascadeStartDistancePacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+        GatherUniformData.CascadeClipmapGridDimXPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+        GatherUniformData.CascadeClipmapGridDimYPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+        GatherUniformData.CascadeClipmapGridDimZPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+        GatherUniformData.CascadeOriginCellXPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+        GatherUniformData.CascadeOriginCellYPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+        GatherUniformData.CascadeOriginCellZPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+        GatherUniformData.CascadeRingOffsetXPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+        GatherUniformData.CascadeRingOffsetYPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+        GatherUniformData.CascadeRingOffsetZPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+        GatherUniformData.CascadeCellBasePacked = { 0.0f, 0.0f, 0.0f, 0.0f };
         for (int32 cascade = 0; cascade < SURFEL_GI_CASCADE_COUNT; ++cascade)
         {
-            SetPackedCascadeValue(GatherUniformData.CascadeCellScaleFromPrevPacked, cascade, (cascade == 0) ? 1.0f : Max(1.0f, gOptions.SurfelGICascadeCellScaleFromPrev[cascade]));
-            SetPackedCascadeValue(GatherUniformData.CascadeStartDistancePacked, cascade, CascadeStartDistanceSanitized[cascade]);
-            SetPackedCascadeValue(GatherUniformData.CascadeClipmapGridDimXPacked, cascade, (float)Clamp(gOptions.SurfelGIClipmapGridDimX[cascade], 4, 512));
-            SetPackedCascadeValue(GatherUniformData.CascadeClipmapGridDimYPacked, cascade, (float)Clamp(gOptions.SurfelGIClipmapGridDimY[cascade], 4, 512));
-            SetPackedCascadeValue(GatherUniformData.CascadeClipmapGridDimZPacked, cascade, (float)Clamp(gOptions.SurfelGIClipmapGridDimZ[cascade], 4, 512));
-            SetPackedCascadeValue(GatherUniformData.CascadeOriginCellXPacked, cascade, (float)GSurfelClipmapRuntimeStates[cascade].OriginX);
-            SetPackedCascadeValue(GatherUniformData.CascadeOriginCellYPacked, cascade, (float)GSurfelClipmapRuntimeStates[cascade].OriginY);
-            SetPackedCascadeValue(GatherUniformData.CascadeOriginCellZPacked, cascade, (float)GSurfelClipmapRuntimeStates[cascade].OriginZ);
-            SetPackedCascadeValue(GatherUniformData.CascadeRingOffsetXPacked, cascade, (float)GSurfelClipmapRuntimeStates[cascade].RingOffsetX);
-            SetPackedCascadeValue(GatherUniformData.CascadeRingOffsetYPacked, cascade, (float)GSurfelClipmapRuntimeStates[cascade].RingOffsetY);
-            SetPackedCascadeValue(GatherUniformData.CascadeRingOffsetZPacked, cascade, (float)GSurfelClipmapRuntimeStates[cascade].RingOffsetZ);
-            SetPackedCascadeValue(GatherUniformData.CascadeCellBasePacked, cascade, (float)GSurfelCascadeCellBase[cascade]);
+            GatherUniformData.CascadeCellScalePacked.v[cascade] = GetSurfelGICascadeCellScale(cascade);
+            GatherUniformData.CascadeStartDistancePacked.v[cascade] = CascadeStartDistanceSanitized[cascade];
+            GatherUniformData.CascadeClipmapGridDimXPacked.v[cascade] = (float)Clamp(gOptions.SurfelGIClipmapGridDimX[cascade], 4, 512);
+            GatherUniformData.CascadeClipmapGridDimYPacked.v[cascade] = (float)Clamp(gOptions.SurfelGIClipmapGridDimY[cascade], 4, 512);
+            GatherUniformData.CascadeClipmapGridDimZPacked.v[cascade] = (float)Clamp(gOptions.SurfelGIClipmapGridDimZ[cascade], 4, 512);
+            GatherUniformData.CascadeOriginCellXPacked.v[cascade] = (float)GSurfelClipmapRuntimeStates[cascade].OriginX;
+            GatherUniformData.CascadeOriginCellYPacked.v[cascade] = (float)GSurfelClipmapRuntimeStates[cascade].OriginY;
+            GatherUniformData.CascadeOriginCellZPacked.v[cascade] = (float)GSurfelClipmapRuntimeStates[cascade].OriginZ;
+            GatherUniformData.CascadeRingOffsetXPacked.v[cascade] = (float)GSurfelClipmapRuntimeStates[cascade].RingOffsetX;
+            GatherUniformData.CascadeRingOffsetYPacked.v[cascade] = (float)GSurfelClipmapRuntimeStates[cascade].RingOffsetY;
+            GatherUniformData.CascadeRingOffsetZPacked.v[cascade] = (float)GSurfelClipmapRuntimeStates[cascade].RingOffsetZ;
+            GatherUniformData.CascadeCellBasePacked.v[cascade] = (float)GSurfelCascadeCellBase[cascade];
         }
 
         auto GatherUniformBuffer = std::shared_ptr<IUniformBufferBlock>(
@@ -2170,49 +2134,38 @@ void jRenderer::SurfelGIPass()
         VisualizeUniformData.ScreenSize = Vector2((float)Width, (float)Height);
         VisualizeUniformData.BlendAlpha = Clamp(gOptions.SurfelGIVisualizeBlendAlpha, 0.0f, 1.0f);
         VisualizeUniformData.GridCellSize = Max(0.1f, gOptions.SurfelGIWorldGridCellSize);
-        for (int32 pack = 0; pack < SURFEL_GI_CASCADE_PACKED_COUNT; ++pack)
-        {
-            VisualizeUniformData.CascadeCellScaleFromPrevPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            VisualizeUniformData.CascadeStartDistancePacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            VisualizeUniformData.CascadeClipmapGridDimXPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            VisualizeUniformData.CascadeClipmapGridDimYPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            VisualizeUniformData.CascadeClipmapGridDimZPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            VisualizeUniformData.SurfelsPerCellPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            VisualizeUniformData.CascadeOriginCellXPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            VisualizeUniformData.CascadeOriginCellYPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            VisualizeUniformData.CascadeOriginCellZPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            VisualizeUniformData.CascadeRingOffsetXPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            VisualizeUniformData.CascadeRingOffsetYPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            VisualizeUniformData.CascadeRingOffsetZPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            VisualizeUniformData.CascadeCellBasePacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            VisualizeUniformData.CascadeCellCountPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        }
-        auto SetPackedVisualizeValue = [](Vector4* packedArray, int32 cascade, float value)
-        {
-            const int32 packIndex = cascade / 4;
-            const int32 lane = cascade % 4;
-            if (lane == 0) packedArray[packIndex].x = value;
-            else if (lane == 1) packedArray[packIndex].y = value;
-            else if (lane == 2) packedArray[packIndex].z = value;
-            else packedArray[packIndex].w = value;
-        };
+        VisualizeUniformData.CascadeCellScalePacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+        VisualizeUniformData.CascadeStartDistancePacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+        VisualizeUniformData.CascadeClipmapGridDimXPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+        VisualizeUniformData.CascadeClipmapGridDimYPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+        VisualizeUniformData.CascadeClipmapGridDimZPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+        VisualizeUniformData.SurfelsPerCellPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+        VisualizeUniformData.CascadeOriginCellXPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+        VisualizeUniformData.CascadeOriginCellYPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+        VisualizeUniformData.CascadeOriginCellZPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+        VisualizeUniformData.CascadeRingOffsetXPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+        VisualizeUniformData.CascadeRingOffsetYPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+        VisualizeUniformData.CascadeRingOffsetZPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+        VisualizeUniformData.CascadeCellBasePacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+        VisualizeUniformData.CascadeCellCountPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
         for (int32 cascade = 0; cascade < SURFEL_GI_CASCADE_COUNT; ++cascade)
         {
-            SetPackedVisualizeValue(VisualizeUniformData.CascadeCellScaleFromPrevPacked, cascade, (cascade == 0) ? 1.0f : Max(1.0f, gOptions.SurfelGICascadeCellScaleFromPrev[cascade]));
-            SetPackedVisualizeValue(VisualizeUniformData.CascadeStartDistancePacked, cascade, CascadeStartDistanceSanitized[cascade]);
-            SetPackedVisualizeValue(VisualizeUniformData.CascadeClipmapGridDimXPacked, cascade, (float)Clamp(gOptions.SurfelGIClipmapGridDimX[cascade], 4, 512));
-            SetPackedVisualizeValue(VisualizeUniformData.CascadeClipmapGridDimYPacked, cascade, (float)Clamp(gOptions.SurfelGIClipmapGridDimY[cascade], 4, 512));
-            SetPackedVisualizeValue(VisualizeUniformData.CascadeClipmapGridDimZPacked, cascade, (float)Clamp(gOptions.SurfelGIClipmapGridDimZ[cascade], 4, 512));
-            SetPackedVisualizeValue(VisualizeUniformData.CascadeOriginCellXPacked, cascade, (float)GSurfelClipmapRuntimeStates[cascade].OriginX);
-            SetPackedVisualizeValue(VisualizeUniformData.CascadeOriginCellYPacked, cascade, (float)GSurfelClipmapRuntimeStates[cascade].OriginY);
-            SetPackedVisualizeValue(VisualizeUniformData.CascadeOriginCellZPacked, cascade, (float)GSurfelClipmapRuntimeStates[cascade].OriginZ);
-            SetPackedVisualizeValue(VisualizeUniformData.CascadeRingOffsetXPacked, cascade, (float)GSurfelClipmapRuntimeStates[cascade].RingOffsetX);
-            SetPackedVisualizeValue(VisualizeUniformData.CascadeRingOffsetYPacked, cascade, (float)GSurfelClipmapRuntimeStates[cascade].RingOffsetY);
-            SetPackedVisualizeValue(VisualizeUniformData.CascadeRingOffsetZPacked, cascade, (float)GSurfelClipmapRuntimeStates[cascade].RingOffsetZ);
-            SetPackedVisualizeValue(VisualizeUniformData.CascadeCellBasePacked, cascade, (float)GSurfelCascadeCellBase[cascade]);
-            SetPackedVisualizeValue(VisualizeUniformData.CascadeCellCountPacked, cascade, (float)GSurfelCascadeCellCount[cascade]);
+            VisualizeUniformData.CascadeCellScalePacked.v[cascade] = GetSurfelGICascadeCellScale(cascade);
+            VisualizeUniformData.CascadeStartDistancePacked.v[cascade] = CascadeStartDistanceSanitized[cascade];
+            VisualizeUniformData.CascadeClipmapGridDimXPacked.v[cascade] = (float)Clamp(gOptions.SurfelGIClipmapGridDimX[cascade], 4, 512);
+            VisualizeUniformData.CascadeClipmapGridDimYPacked.v[cascade] = (float)Clamp(gOptions.SurfelGIClipmapGridDimY[cascade], 4, 512);
+            VisualizeUniformData.CascadeClipmapGridDimZPacked.v[cascade] = (float)Clamp(gOptions.SurfelGIClipmapGridDimZ[cascade], 4, 512);
+            VisualizeUniformData.CascadeOriginCellXPacked.v[cascade] = (float)GSurfelClipmapRuntimeStates[cascade].OriginX;
+            VisualizeUniformData.CascadeOriginCellYPacked.v[cascade] = (float)GSurfelClipmapRuntimeStates[cascade].OriginY;
+            VisualizeUniformData.CascadeOriginCellZPacked.v[cascade] = (float)GSurfelClipmapRuntimeStates[cascade].OriginZ;
+            VisualizeUniformData.CascadeRingOffsetXPacked.v[cascade] = (float)GSurfelClipmapRuntimeStates[cascade].RingOffsetX;
+            VisualizeUniformData.CascadeRingOffsetYPacked.v[cascade] = (float)GSurfelClipmapRuntimeStates[cascade].RingOffsetY;
+            VisualizeUniformData.CascadeRingOffsetZPacked.v[cascade] = (float)GSurfelClipmapRuntimeStates[cascade].RingOffsetZ;
+            VisualizeUniformData.CascadeCellBasePacked.v[cascade] = (float)GSurfelCascadeCellBase[cascade];
+            VisualizeUniformData.CascadeCellCountPacked.v[cascade] = (float)GSurfelCascadeCellCount[cascade];
         }
         VisualizeUniformData.MaxSurfels = GSurfelPoolMaxCount;
+        VisualizeUniformData.CascadePartitionCapacity = GetSurfelGICascadePartitionCapacity();
         VisualizeUniformData.SurfelPageSize = Max(1, GSurfelPageSize);
         VisualizeUniformData.SurfelPageTableCapacity = Max(1, GSurfelCellPageTableCapacity);
         VisualizeUniformData.NeighborCellRadius = Clamp(gOptions.SurfelGIVisualizeNeighborCellRadius, 0, 3);
@@ -2220,7 +2173,7 @@ void jRenderer::SurfelGIPass()
         VisualizeUniformData.ShowStateDebug = gOptions.ShowSurfelGIStateDebug ? 1 : 0;
         for (int32 cascade = 0; cascade < SURFEL_GI_CASCADE_COUNT; ++cascade)
         {
-            SetPackedVisualizeValue(VisualizeUniformData.SurfelsPerCellPacked, cascade, (float)Clamp(gOptions.SurfelGISurfelsPerCell[cascade], 1, SURFEL_GI_MAX_SLOTS_PER_CELL));
+            VisualizeUniformData.SurfelsPerCellPacked.v[cascade] = (float)Clamp(gOptions.SurfelGISurfelsPerCell[cascade], 1, SURFEL_GI_MAX_SLOTS_PER_CELL);
         }
         VisualizeUniformData.ShowCellDebug = gOptions.ShowSurfelGICellDebug ? 1 : 0;
         VisualizeUniformData.ShowUnderfilledCellDebug = gOptions.ShowSurfelGIUnderfilledCellDebug ? 1 : 0;
@@ -2384,46 +2337,35 @@ void jRenderer::SurfelGIResolvePass()
     ResolveUniformData.InvV = MainCamera->View.GetInverse();
     ResolveUniformData.ScreenSize = Vector2((float)Width, (float)Height);
     ResolveUniformData.GridCellSize = Max(0.1f, gOptions.SurfelGIWorldGridCellSize);
-    for (int32 pack = 0; pack < SURFEL_GI_CASCADE_PACKED_COUNT; ++pack)
-    {
-        ResolveUniformData.CascadeCellScaleFromPrevPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        ResolveUniformData.CascadeClipmapGridDimXPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        ResolveUniformData.CascadeClipmapGridDimYPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        ResolveUniformData.CascadeClipmapGridDimZPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        ResolveUniformData.SurfelsPerCellPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        ResolveUniformData.CascadeOriginCellXPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        ResolveUniformData.CascadeOriginCellYPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        ResolveUniformData.CascadeOriginCellZPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        ResolveUniformData.CascadeRingOffsetXPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        ResolveUniformData.CascadeRingOffsetYPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        ResolveUniformData.CascadeRingOffsetZPacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        ResolveUniformData.CascadeCellBasePacked[pack] = { 0.0f, 0.0f, 0.0f, 0.0f };
-    }
-    auto SetPackedResolveValue = [](Vector4* packedArray, int32 cascade, float value)
-    {
-        const int32 packIndex = cascade / 4;
-        const int32 lane = cascade % 4;
-        if (lane == 0) packedArray[packIndex].x = value;
-        else if (lane == 1) packedArray[packIndex].y = value;
-        else if (lane == 2) packedArray[packIndex].z = value;
-        else packedArray[packIndex].w = value;
-    };
+    ResolveUniformData.CascadeCellScalePacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    ResolveUniformData.CascadeClipmapGridDimXPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    ResolveUniformData.CascadeClipmapGridDimYPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    ResolveUniformData.CascadeClipmapGridDimZPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    ResolveUniformData.SurfelsPerCellPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    ResolveUniformData.CascadeOriginCellXPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    ResolveUniformData.CascadeOriginCellYPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    ResolveUniformData.CascadeOriginCellZPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    ResolveUniformData.CascadeRingOffsetXPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    ResolveUniformData.CascadeRingOffsetYPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    ResolveUniformData.CascadeRingOffsetZPacked = { 0.0f, 0.0f, 0.0f, 0.0f };
+    ResolveUniformData.CascadeCellBasePacked = { 0.0f, 0.0f, 0.0f, 0.0f };
     for (int32 cascade = 0; cascade < SURFEL_GI_CASCADE_COUNT; ++cascade)
     {
-        SetPackedResolveValue(ResolveUniformData.CascadeCellScaleFromPrevPacked, cascade, (cascade == 0) ? 1.0f : Max(1.0f, gOptions.SurfelGICascadeCellScaleFromPrev[cascade]));
-        SetPackedResolveValue(ResolveUniformData.CascadeClipmapGridDimXPacked, cascade, (float)Clamp(gOptions.SurfelGIClipmapGridDimX[cascade], 4, 512));
-        SetPackedResolveValue(ResolveUniformData.CascadeClipmapGridDimYPacked, cascade, (float)Clamp(gOptions.SurfelGIClipmapGridDimY[cascade], 4, 512));
-        SetPackedResolveValue(ResolveUniformData.CascadeClipmapGridDimZPacked, cascade, (float)Clamp(gOptions.SurfelGIClipmapGridDimZ[cascade], 4, 512));
-        SetPackedResolveValue(ResolveUniformData.SurfelsPerCellPacked, cascade, (float)Clamp(gOptions.SurfelGISurfelsPerCell[cascade], 1, SURFEL_GI_MAX_SLOTS_PER_CELL));
-        SetPackedResolveValue(ResolveUniformData.CascadeOriginCellXPacked, cascade, (float)GSurfelClipmapRuntimeStates[cascade].OriginX);
-        SetPackedResolveValue(ResolveUniformData.CascadeOriginCellYPacked, cascade, (float)GSurfelClipmapRuntimeStates[cascade].OriginY);
-        SetPackedResolveValue(ResolveUniformData.CascadeOriginCellZPacked, cascade, (float)GSurfelClipmapRuntimeStates[cascade].OriginZ);
-        SetPackedResolveValue(ResolveUniformData.CascadeRingOffsetXPacked, cascade, (float)GSurfelClipmapRuntimeStates[cascade].RingOffsetX);
-        SetPackedResolveValue(ResolveUniformData.CascadeRingOffsetYPacked, cascade, (float)GSurfelClipmapRuntimeStates[cascade].RingOffsetY);
-        SetPackedResolveValue(ResolveUniformData.CascadeRingOffsetZPacked, cascade, (float)GSurfelClipmapRuntimeStates[cascade].RingOffsetZ);
-        SetPackedResolveValue(ResolveUniformData.CascadeCellBasePacked, cascade, (float)GSurfelCascadeCellBase[cascade]);
+        ResolveUniformData.CascadeCellScalePacked.v[cascade] = GetSurfelGICascadeCellScale(cascade);
+        ResolveUniformData.CascadeClipmapGridDimXPacked.v[cascade] = (float)Clamp(gOptions.SurfelGIClipmapGridDimX[cascade], 4, 512);
+        ResolveUniformData.CascadeClipmapGridDimYPacked.v[cascade] = (float)Clamp(gOptions.SurfelGIClipmapGridDimY[cascade], 4, 512);
+        ResolveUniformData.CascadeClipmapGridDimZPacked.v[cascade] = (float)Clamp(gOptions.SurfelGIClipmapGridDimZ[cascade], 4, 512);
+        ResolveUniformData.SurfelsPerCellPacked.v[cascade] = (float)Clamp(gOptions.SurfelGISurfelsPerCell[cascade], 1, SURFEL_GI_MAX_SLOTS_PER_CELL);
+        ResolveUniformData.CascadeOriginCellXPacked.v[cascade] = (float)GSurfelClipmapRuntimeStates[cascade].OriginX;
+        ResolveUniformData.CascadeOriginCellYPacked.v[cascade] = (float)GSurfelClipmapRuntimeStates[cascade].OriginY;
+        ResolveUniformData.CascadeOriginCellZPacked.v[cascade] = (float)GSurfelClipmapRuntimeStates[cascade].OriginZ;
+        ResolveUniformData.CascadeRingOffsetXPacked.v[cascade] = (float)GSurfelClipmapRuntimeStates[cascade].RingOffsetX;
+        ResolveUniformData.CascadeRingOffsetYPacked.v[cascade] = (float)GSurfelClipmapRuntimeStates[cascade].RingOffsetY;
+        ResolveUniformData.CascadeRingOffsetZPacked.v[cascade] = (float)GSurfelClipmapRuntimeStates[cascade].RingOffsetZ;
+        ResolveUniformData.CascadeCellBasePacked.v[cascade] = (float)GSurfelCascadeCellBase[cascade];
     }
     ResolveUniformData.MaxSurfels = Max(1, GSurfelPoolMaxCount);
+    ResolveUniformData.CascadePartitionCapacity = GetSurfelGICascadePartitionCapacity();
     ResolveUniformData.SurfelPageSize = Max(1, GSurfelPageSize);
     ResolveUniformData.SurfelPageTableCapacity = Max(1, GSurfelCellPageTableCapacity);
     ResolveUniformData.NeighborCellRadius = Clamp(gOptions.SurfelGIVisualizeNeighborCellRadius, 0, 3);

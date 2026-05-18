@@ -1,10 +1,9 @@
 #include "common.hlsl"
+#include "SurfelGIClipmapLookup.hlsl"
 
 #ifndef SURFEL_GI_CASCADE_COUNT
     #define SURFEL_GI_CASCADE_COUNT 3
 #endif
-#define SURFEL_GI_CASCADE_PACKED_COUNT ((SURFEL_GI_CASCADE_COUNT + 3) / 4)
-#define SURFEL_GI_ENABLE_OVERFLOW 0
 
 uint HashU32(uint x)
 {
@@ -25,17 +24,9 @@ uint Hash3(int3 v)
     return HashU32(h);
 }
 
-uint GetSlotsPerCell(uint maxSurfels, uint desiredSlotsPerCell)
-{
-    const uint maxSlotsPerCell = min(max((uint)ComputeCommon.SurfelPageSize, 1u), 5u);
-    const uint clampedDesired = clamp(desiredSlotsPerCell, 1u, maxSlotsPerCell);
-    return min(max(1u, maxSurfels), clampedDesired);
-}
-
 uint GetCellCount(uint maxSurfels, uint desiredSlotsPerCell)
 {
-    const uint slotsPerCell = GetSlotsPerCell(maxSurfels, desiredSlotsPerCell);
-    return max(1u, maxSurfels / slotsPerCell);
+    return max(1u, maxSurfels / desiredSlotsPerCell);
 }
 
 int PositiveModulo(int value, int divisor)
@@ -44,32 +35,9 @@ int PositiveModulo(int value, int divisor)
     return (m < 0) ? (m + divisor) : m;
 }
 
-uint GetCascadePartitionOffset(uint maxSurfels, uint cascadeIndex)
+uint GetCascadePartitionCapacity()
 {
-    const uint cascadeCount = (uint)SURFEL_GI_CASCADE_COUNT;
-    const uint c = min(cascadeIndex, cascadeCount);
-    const uint base = maxSurfels / cascadeCount;
-    const uint rem = maxSurfels % cascadeCount;
-    return base * c + min(c, rem);
-}
-
-uint GetCascadePartitionCapacity(uint maxSurfels, uint cascadeIndex)
-{
-    const uint cascadeCount = (uint)SURFEL_GI_CASCADE_COUNT;
-    const uint c = min(cascadeIndex, cascadeCount - 1u);
-    const uint base = maxSurfels / cascadeCount;
-    const uint rem = maxSurfels % cascadeCount;
-    return max(1u, base + ((c < rem) ? 1u : 0u));
-}
-
-uint GetDesiredSlotsPerCell(uint cascadeIndex)
-{
-    const uint c = min(cascadeIndex, (uint)(SURFEL_GI_CASCADE_COUNT - 1));
-    const uint packIndex = c >> 2u;
-    const uint lane = c & 3u;
-    const float4 packed = ComputeCommon.SurfelsPerCellPacked[packIndex];
-    const float value = (lane == 0u) ? packed.x : ((lane == 1u) ? packed.y : ((lane == 2u) ? packed.z : packed.w));
-    return max((uint)round(value), 1u);
+    return max((uint)ComputeCommon.CascadePartitionCapacity, 1u);
 }
 
 uint HashCellWithCascade(int3 cellCoord, uint cascadeIndex)
@@ -81,35 +49,24 @@ uint HashCellWithCascade(int3 cellCoord, uint cascadeIndex)
 
 int3 GetClipmapGridDim(uint cellCount, uint cascadeIndex)
 {
-    const uint c = min(cascadeIndex, (uint)(SURFEL_GI_CASCADE_COUNT - 1));
-    const uint packIndex = c >> 2u;
-    const uint lane = c & 3u;
-    const float4 packedX = ComputeCommon.CascadeClipmapGridDimXPacked[packIndex];
-    const float4 packedY = ComputeCommon.CascadeClipmapGridDimYPacked[packIndex];
-    const float4 packedZ = ComputeCommon.CascadeClipmapGridDimZPacked[packIndex];
-    const float dimXf = (lane == 0u) ? packedX.x : ((lane == 1u) ? packedX.y : ((lane == 2u) ? packedX.z : packedX.w));
-    const float dimYf = (lane == 0u) ? packedY.x : ((lane == 1u) ? packedY.y : ((lane == 2u) ? packedY.z : packedY.w));
-    const float dimZf = (lane == 0u) ? packedZ.x : ((lane == 1u) ? packedZ.y : ((lane == 2u) ? packedZ.z : packedZ.w));
-    uint dimX = max((uint)round(dimXf), 1u);
-    uint dimY = max((uint)round(dimYf), 1u);
-    uint dimZ = max((uint)round(dimZf), 1u);
-    const uint capacity = max(1u, dimX * dimY * dimZ);
+    int dimX = max((int)round(SurfelGIGetPackedFloat(ComputeCommon.CascadeClipmapGridDimXPacked, cascadeIndex)), 1);
+    int dimY = max((int)round(SurfelGIGetPackedFloat(ComputeCommon.CascadeClipmapGridDimYPacked, cascadeIndex)), 1);
+    int dimZ = max((int)round(SurfelGIGetPackedFloat(ComputeCommon.CascadeClipmapGridDimZPacked, cascadeIndex)), 1);
+    const uint capacity = max(1u, (uint)(dimX * dimY * dimZ));
     if (capacity < cellCount)
     {
-        const uint xy = max(1u, dimX * dimY);
-        dimZ = max(dimZ, (cellCount + xy - 1u) / xy);
+        const uint xy = max(1u, (uint)(dimX * dimY));
+        dimZ = max(dimZ, (int)((cellCount + xy - 1u) / xy));
     }
-    return int3((int)dimX, (int)dimY, (int)dimZ);
+    return int3(dimX, dimY, dimZ);
 }
-
-float GetCascadeScale(uint cascadeIndex);
 
 uint GetClipmapLocalLinearIndex(int3 cellCoord, uint maxSurfels, uint desiredSlotsPerCell, uint cascadeIndex)
 {
-    const uint cascadeCapacity = GetCascadePartitionCapacity(maxSurfels, cascadeIndex);
+    const uint cascadeCapacity = GetCascadePartitionCapacity();
     const uint cellCount = GetCellCount(cascadeCapacity, desiredSlotsPerCell);
     const int3 gridDim = GetClipmapGridDim(cellCount, cascadeIndex);
-    const float cellSize = max(ComputeCommon.GridCellSize, 0.1) * GetCascadeScale(cascadeIndex);
+    const float cellSize = max(ComputeCommon.GridCellSize, 0.1) * SurfelGIGetCascadeScale(ComputeCommon.CascadeCellScalePacked, cascadeIndex);
     const float3 cameraWorldPos = mul(ComputeCommon.InvV, float4(0.0, 0.0, 0.0, 1.0)).xyz;
     const int3 cameraCell = int3(floor(cameraWorldPos / cellSize));
     const int3 originCell = cameraCell - (gridDim / 2);
@@ -127,98 +84,29 @@ uint GetPageSize(uint maxSurfels)
     return min(max((uint)ComputeCommon.SurfelPageSize, 1u), maxSurfels);
 }
 
-float GetPackedFloat(float4 packedArray[SURFEL_GI_CASCADE_PACKED_COUNT], uint cascadeIndex)
+bool TryCellLinearToWorldCell(uint cellLinear, out uint outCascadeIndex, out int3 outCellCoord)
 {
-    const uint c = min(cascadeIndex, (uint)(SURFEL_GI_CASCADE_COUNT - 1));
-    const uint packIndex = c >> 2u;
-    const uint lane = c & 3u;
-    const float4 packed = packedArray[packIndex];
-    return (lane == 0u) ? packed.x : ((lane == 1u) ? packed.y : ((lane == 2u) ? packed.z : packed.w));
-}
-
-uint GetPackedUint(float4 packedArray[SURFEL_GI_CASCADE_PACKED_COUNT], uint cascadeIndex)
-{
-    return (uint)round(GetPackedFloat(packedArray, cascadeIndex));
-}
-
-int GetPackedInt(float4 packedArray[SURFEL_GI_CASCADE_PACKED_COUNT], uint cascadeIndex)
-{
-    return (int)round(GetPackedFloat(packedArray, cascadeIndex));
-}
-
-int3 ModWrap3(int3 v, int3 dim)
-{
-    int3 r = v % dim;
-    if (r.x < 0) r.x += dim.x;
-    if (r.y < 0) r.y += dim.y;
-    if (r.z < 0) r.z += dim.z;
-    return r;
-}
-
-int3 GetCascadeDim(uint cascadeIndex)
-{
-    const int dimX = max(GetPackedInt(ComputeCommon.CascadeClipmapGridDimXPacked, cascadeIndex), 1);
-    const int dimY = max(GetPackedInt(ComputeCommon.CascadeClipmapGridDimYPacked, cascadeIndex), 1);
-    const int dimZ = max(GetPackedInt(ComputeCommon.CascadeClipmapGridDimZPacked, cascadeIndex), 1);
-    return int3(dimX, dimY, dimZ);
-}
-
-int3 GetCascadeOriginCell(uint cascadeIndex)
-{
-    return int3(
-        GetPackedInt(ComputeCommon.CascadeOriginCellXPacked, cascadeIndex),
-        GetPackedInt(ComputeCommon.CascadeOriginCellYPacked, cascadeIndex),
-        GetPackedInt(ComputeCommon.CascadeOriginCellZPacked, cascadeIndex));
-}
-
-int3 GetCascadeRingOffset(uint cascadeIndex)
-{
-    return int3(
-        GetPackedInt(ComputeCommon.CascadeRingOffsetXPacked, cascadeIndex),
-        GetPackedInt(ComputeCommon.CascadeRingOffsetYPacked, cascadeIndex),
-        GetPackedInt(ComputeCommon.CascadeRingOffsetZPacked, cascadeIndex));
-}
-
-uint GetCascadeCellBase(uint cascadeIndex)
-{
-    return GetPackedUint(ComputeCommon.CascadeCellBasePacked, cascadeIndex);
-}
-
-bool TryWorldCellToLinear(int3 worldCell, uint cascadeIndex, out uint outCellLinear)
-{
-    const int3 dim = GetCascadeDim(cascadeIndex);
-    const int3 local = worldCell - GetCascadeOriginCell(cascadeIndex);
-    if (any(local < 0) || any(local >= dim))
-        return false;
-
-    const int3 phys = ModWrap3(local + GetCascadeRingOffset(cascadeIndex), dim);
-    const uint localLinear = (uint)(phys.x + dim.x * (phys.y + dim.y * phys.z));
-    outCellLinear = GetCascadeCellBase(cascadeIndex) + localLinear;
-    return true;
-}
-
-bool TryGetCellBaseIndex(int3 cellCoord, uint maxSurfels, uint cascadeIndex, out uint outCellBaseIndex)
-{
-    uint cellLinear = 0u;
-    if (!TryWorldCellToLinear(cellCoord, cascadeIndex, cellLinear))
-        return false;
-    if (cellLinear >= max((uint)ComputeCommon.SurfelPageTableCapacity, 1u))
-        return false;
-
-    const uint pageSize = GetPageSize(maxSurfels);
-    if (cellLinear > ((maxSurfels - 1u) / max(pageSize, 1u)))
-        return false;
-    const uint base = cellLinear * pageSize;
-    if (base >= maxSurfels)
-        return false;
-    outCellBaseIndex = base;
-    return true;
+    return SurfelGITryCellLinearToWorldCell(
+        cellLinear,
+        ComputeCommon.CascadeClipmapGridDimXPacked,
+        ComputeCommon.CascadeClipmapGridDimYPacked,
+        ComputeCommon.CascadeClipmapGridDimZPacked,
+        ComputeCommon.CascadeOriginCellXPacked,
+        ComputeCommon.CascadeOriginCellYPacked,
+        ComputeCommon.CascadeOriginCellZPacked,
+        ComputeCommon.CascadeRingOffsetXPacked,
+        ComputeCommon.CascadeRingOffsetYPacked,
+        ComputeCommon.CascadeRingOffsetZPacked,
+        ComputeCommon.CascadeCellBasePacked,
+        ComputeCommon.CascadeCellCountPacked,
+        outCascadeIndex,
+        outCellCoord);
 }
 
 uint GetCascadeBucketCount(uint maxSurfels, uint cascadeIndex)
 {
-    const uint desiredSlotsPerCell = GetDesiredSlotsPerCell(cascadeIndex);
-    const uint cascadeCapacity = GetCascadePartitionCapacity(maxSurfels, cascadeIndex);
+    const uint desiredSlotsPerCell = SurfelGIGetDesiredSlotsPerCell(ComputeCommon.SurfelsPerCellPacked, cascadeIndex);
+    const uint cascadeCapacity = GetCascadePartitionCapacity();
     return GetCellCount(cascadeCapacity, desiredSlotsPerCell);
 }
 
@@ -234,123 +122,69 @@ uint GetCascadeBucketOffset(uint maxSurfels, uint cascadeIndex)
 
 uint GetCellBucketIndex(int3 cellCoord, uint maxSurfels, uint desiredSlotsPerCell, uint cascadeIndex)
 {
-    const uint localBucketCount = GetCellCount(GetCascadePartitionCapacity(maxSurfels, cascadeIndex), desiredSlotsPerCell);
+    const uint localBucketCount = GetCellCount(GetCascadePartitionCapacity(), desiredSlotsPerCell);
     const uint localLinearIndex = GetClipmapLocalLinearIndex(cellCoord, maxSurfels, desiredSlotsPerCell, cascadeIndex);
     return GetCascadeBucketOffset(maxSurfels, cascadeIndex) + (localLinearIndex % localBucketCount);
-}
-
-float GetCascadeScale(uint cascadeIndex)
-{
-    float scale = 1.0;
-    [loop] for (uint i = 1u; i <= cascadeIndex && i < (uint)SURFEL_GI_CASCADE_COUNT; ++i)
-    {
-        const uint packIndex = i >> 2u;
-        const uint lane = i & 3u;
-        const float4 packed = ComputeCommon.CascadeCellScaleFromPrevPacked[packIndex];
-        const float value = (lane == 0u) ? packed.x : ((lane == 1u) ? packed.y : ((lane == 2u) ? packed.z : packed.w));
-        scale *= max(value, 1.0);
-    }
-    return scale;
 }
 
 [numthreads(64, 1, 1)]
 void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {
-    const uint worklistIndex = GlobalInvocationID.x;
-    const uint workCount = VisibleCellCounterBuffer[0];
-    if (worklistIndex >= workCount)
+    const uint cellLinear = GlobalInvocationID.x;
+    if (cellLinear >= max((uint)ComputeCommon.SurfelPageTableCapacity, 1u))
+        return;
+    if (VisibleCellCounterBuffer[cellLinear] == 0u)
         return;
 
-    const jVisibleCellGPU entry = VisibleCellWorklist[worklistIndex];
-    const int3 cellCoord = entry.CellCascade.xyz;
-    const uint cascadeIndex = (uint)clamp(entry.CellCascade.w, 0, SURFEL_GI_CASCADE_COUNT - 1);
-    const uint maxSurfels = max((uint)ComputeCommon.MaxSurfels, 1u);
-    const uint desiredSlotsPerCell = GetDesiredSlotsPerCell(cascadeIndex);
-    const uint cascadeCapacity = GetCascadePartitionCapacity(maxSurfels, cascadeIndex);
-    const uint slotsPerCell = GetSlotsPerCell(cascadeCapacity, desiredSlotsPerCell);
-    uint cellBaseIndex = 0u;
-    if (!TryGetCellBaseIndex(cellCoord, maxSurfels, cascadeIndex, cellBaseIndex))
+    uint cascadeIndex = 0u;
+    int3 cellCoord = int3(0, 0, 0);
+    if (!TryCellLinearToWorldCell(cellLinear, cascadeIndex, cellCoord))
         return;
-    const float cellSize = max(ComputeCommon.GridCellSize, 0.1) * GetCascadeScale(cascadeIndex);
+
+    const uint maxSurfels = max((uint)ComputeCommon.MaxSurfels, 1u);
+    const uint pageSize = GetPageSize(maxSurfels);
+    if (cellLinear > ((maxSurfels - 1u) / max(pageSize, 1u)))
+        return;
+
+    const uint cellBaseIndex = cellLinear * pageSize;
+    if (cellBaseIndex >= maxSurfels)
+        return;
+
+    const uint desiredSlotsPerCell = min(SurfelGIGetDesiredSlotsPerCell(ComputeCommon.SurfelsPerCellPacked, cascadeIndex), pageSize);
+    const float cellSize = max(ComputeCommon.GridCellSize, 0.1) * SurfelGIGetCascadeScale(ComputeCommon.CascadeCellScalePacked, cascadeIndex);
     const uint cellHash = HashCellWithCascade(cellCoord, cascadeIndex);
 
-    [loop] for (uint slot = 0u; slot < slotsPerCell; ++slot)
+    [loop] for (uint slot = 0u; slot < desiredSlotsPerCell; ++slot)
     {
         const uint surfelIndex = cellBaseIndex + slot;
         jSurfelGPU s = SurfelPool[surfelIndex];
-        if ((uint)round(s.Extra.w) != cascadeIndex)
+        if (s.CascadeIndex != cascadeIndex)
             continue;
 
-        if (s.Extra.y > 0.5)
+        if (s.IsActive != 0u)
         {
             const int3 surfelCellCoord = int3(floor(s.PositionRadius.xyz / cellSize));
             if (any(surfelCellCoord != cellCoord))
                 continue;
 
-            s.NormalSeenFrame.w = (float)ComputeCommon.FrameNumber;
-            s.Extra.y = 1.0;
+            s.LastSeenFrame = ComputeCommon.FrameNumber;
+            s.IsActive = 1u;
             SurfelPool[surfelIndex] = s;
             continue;
         }
 
-        const bool isDormant = (abs(s.Extra.x - 5.0) < 0.5);
+        const bool isDormant = (s.State == SURFEL_GI_SURFEL_STATE_DORMANT);
         if (!isDormant)
             continue;
         const int3 dormantCellCoord = int3(floor(s.PositionRadius.xyz / cellSize));
-        const bool hashMatch = (asuint(s.Extra.z) == cellHash);
+        const bool hashMatch = (s.OwnerCellHash == cellHash);
         const bool posCellMatch = all(dormantCellCoord == cellCoord);
         if (!hashMatch && !posCellMatch)
             continue;
 
         // Keep dormant slots alive while their owning cell is visible,
         // but do not reactivate them here (placement pass decides that).
-        s.NormalSeenFrame.w = (float)ComputeCommon.FrameNumber;
+        s.LastSeenFrame = ComputeCommon.FrameNumber;
         SurfelPool[surfelIndex] = s;
     }
-
-#if SURFEL_GI_ENABLE_OVERFLOW
-    const uint bucketIndex = min(GetCellBucketIndex(cellCoord, maxSurfels, desiredSlotsPerCell, cascadeIndex), maxSurfels - 1u);
-    int overflowNode = OverflowHeads[bucketIndex].Head;
-    [loop] for (uint iter = 0u; iter < 32u && overflowNode >= 0; ++iter)
-    {
-        const uint nodeIndex = (uint)overflowNode;
-        if (nodeIndex >= maxSurfels)
-            break;
-
-        OverflowNode node = OverflowNodes[nodeIndex];
-        jSurfelGPU s = node.Surfel;
-        if ((uint)round(s.Extra.w) != cascadeIndex)
-        {
-            overflowNode = node.Next;
-            continue;
-        }
-
-        if (s.Extra.y > 0.5)
-        {
-            const int3 surfelCellCoord = int3(floor(s.PositionRadius.xyz / cellSize));
-            if (all(surfelCellCoord == cellCoord))
-            {
-                s.NormalSeenFrame.w = (float)ComputeCommon.FrameNumber;
-                s.Extra.y = 1.0;
-                node.Surfel = s;
-                OverflowNodes[nodeIndex] = node;
-            }
-        }
-        else
-        {
-            const bool isDormant = (abs(s.Extra.x - 5.0) < 0.5);
-            const int3 dormantCellCoord = int3(floor(s.PositionRadius.xyz / cellSize));
-            const bool hashMatch = (asuint(s.Extra.z) == cellHash);
-            const bool posCellMatch = all(dormantCellCoord == cellCoord);
-            if (isDormant && (hashMatch || posCellMatch))
-            {
-                s.NormalSeenFrame.w = (float)ComputeCommon.FrameNumber;
-                node.Surfel = s;
-                OverflowNodes[nodeIndex] = node;
-            }
-        }
-
-        overflowNode = node.Next;
-    }
-#endif
 }

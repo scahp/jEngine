@@ -1,57 +1,50 @@
 #include "common.hlsl"
+#include "SurfelGIClipmapLookup.hlsl"
 
 #ifndef SURFEL_GI_CASCADE_COUNT
     #define SURFEL_GI_CASCADE_COUNT 3
 #endif
-#define SURFEL_GI_CASCADE_PACKED_COUNT ((SURFEL_GI_CASCADE_COUNT + 3) / 4)
-#define SURFEL_GI_VISIBLE_CELL_WORKLIST_MULTIPLIER 2u
 #define SURFEL_GI_BOUNDARY_BAND_SCALE 1.0
 // Temp debug switch: 0 keeps a single cascade assignment (no boundary dual emit).
 #define SURFEL_GI_ENABLE_BOUNDARY_OVERLAP 0
 
-float GetCascadeScale(uint cascadeIndex)
-{
-    float scale = 1.0;
-    [loop] for (uint i = 1u; i <= cascadeIndex && i < (uint)SURFEL_GI_CASCADE_COUNT; ++i)
-    {
-        const uint packIndex = i >> 2u;
-        const uint lane = i & 3u;
-        const float4 packed = ComputeCommon.CascadeCellScaleFromPrevPacked[packIndex];
-        const float value = (lane == 0u) ? packed.x : ((lane == 1u) ? packed.y : ((lane == 2u) ? packed.z : packed.w));
-        scale *= max(value, 1.0);
-    }
-    return scale;
-}
-
-int GetPackedInt(float4 packedArray[SURFEL_GI_CASCADE_PACKED_COUNT], uint cascadeIndex)
-{
-    const uint c = min(cascadeIndex, (uint)(SURFEL_GI_CASCADE_COUNT - 1));
-    const uint packIndex = c >> 2u;
-    const uint lane = c & 3u;
-    const float4 packed = packedArray[packIndex];
-    const float value = (lane == 0u) ? packed.x : ((lane == 1u) ? packed.y : ((lane == 2u) ? packed.z : packed.w));
-    return (int)round(value);
-}
-
 int3 GetCascadeDim(uint cascadeIndex)
 {
     return int3(
-        max(GetPackedInt(ComputeCommon.CascadeClipmapGridDimXPacked, cascadeIndex), 1),
-        max(GetPackedInt(ComputeCommon.CascadeClipmapGridDimYPacked, cascadeIndex), 1),
-        max(GetPackedInt(ComputeCommon.CascadeClipmapGridDimZPacked, cascadeIndex), 1));
+        max((int)round(SurfelGIGetPackedFloat(ComputeCommon.CascadeClipmapGridDimXPacked, cascadeIndex)), 1),
+        max((int)round(SurfelGIGetPackedFloat(ComputeCommon.CascadeClipmapGridDimYPacked, cascadeIndex)), 1),
+        max((int)round(SurfelGIGetPackedFloat(ComputeCommon.CascadeClipmapGridDimZPacked, cascadeIndex)), 1));
 }
 
 int3 GetCascadeOriginCell(uint cascadeIndex)
 {
     return int3(
-        GetPackedInt(ComputeCommon.CascadeOriginCellXPacked, cascadeIndex),
-        GetPackedInt(ComputeCommon.CascadeOriginCellYPacked, cascadeIndex),
-        GetPackedInt(ComputeCommon.CascadeOriginCellZPacked, cascadeIndex));
+        (int)round(SurfelGIGetPackedFloat(ComputeCommon.CascadeOriginCellXPacked, cascadeIndex)),
+        (int)round(SurfelGIGetPackedFloat(ComputeCommon.CascadeOriginCellYPacked, cascadeIndex)),
+        (int)round(SurfelGIGetPackedFloat(ComputeCommon.CascadeOriginCellZPacked, cascadeIndex)));
+}
+
+bool TryWorldCellToLinear(int3 worldCell, uint cascadeIndex, out uint outCellLinear)
+{
+    return SurfelGITryWorldCellToLinear(
+        worldCell,
+        cascadeIndex,
+        ComputeCommon.CascadeClipmapGridDimXPacked,
+        ComputeCommon.CascadeClipmapGridDimYPacked,
+        ComputeCommon.CascadeClipmapGridDimZPacked,
+        ComputeCommon.CascadeOriginCellXPacked,
+        ComputeCommon.CascadeOriginCellYPacked,
+        ComputeCommon.CascadeOriginCellZPacked,
+        ComputeCommon.CascadeRingOffsetXPacked,
+        ComputeCommon.CascadeRingOffsetYPacked,
+        ComputeCommon.CascadeRingOffsetZPacked,
+        ComputeCommon.CascadeCellBasePacked,
+        outCellLinear);
 }
 
 bool TryComputeCellCoordForCascade(float3 worldPos, uint cascadeIndex, out int3 outCellCoord)
 {
-    const float cellSize = max(ComputeCommon.GridCellSize, 0.1) * GetCascadeScale(cascadeIndex);
+    const float cellSize = max(ComputeCommon.GridCellSize, 0.1) * SurfelGIGetCascadeScale(ComputeCommon.CascadeCellScalePacked, cascadeIndex);
     const int3 cellCoord = int3(floor(worldPos / cellSize));
     const int3 local = cellCoord - GetCascadeOriginCell(cascadeIndex);
     const int3 dim = GetCascadeDim(cascadeIndex);
@@ -62,38 +55,13 @@ bool TryComputeCellCoordForCascade(float3 worldPos, uint cascadeIndex, out int3 
     return true;
 }
 
-uint GetCascadeIndexByDistance(float cameraDistance)
-{
-    uint cascade = 0u;
-    [loop] for (uint i = 1u; i < (uint)SURFEL_GI_CASCADE_COUNT; ++i)
-    {
-        const uint packIndex = i >> 2u;
-        const uint lane = i & 3u;
-        const float4 packed = ComputeCommon.CascadeStartDistancePacked[packIndex];
-        const float startDistance = (lane == 0u) ? packed.x : ((lane == 1u) ? packed.y : ((lane == 2u) ? packed.z : packed.w));
-        if (cameraDistance >= max(startDistance, 0.0))
-            cascade = i;
-    }
-    return cascade;
-}
-
-float GetCascadeStartDistance(uint cascadeIndex)
-{
-    const uint c = min(cascadeIndex, (uint)(SURFEL_GI_CASCADE_COUNT - 1));
-    const uint packIndex = c >> 2u;
-    const uint lane = c & 3u;
-    const float4 packed = ComputeCommon.CascadeStartDistancePacked[packIndex];
-    const float startDistance = (lane == 0u) ? packed.x : ((lane == 1u) ? packed.y : ((lane == 2u) ? packed.z : packed.w));
-    return max(startDistance, 0.0);
-}
-
 bool TryGetBoundaryCascadePair(float cameraDistance, out uint outLowCascade, out uint outHighCascade)
 {
     [loop] for (uint i = 1u; i < (uint)SURFEL_GI_CASCADE_COUNT; ++i)
     {
-        const float startDistance = GetCascadeStartDistance(i);
-        const float lowerCellSize = max(ComputeCommon.GridCellSize, 0.1) * GetCascadeScale(i - 1u);
-        const float upperCellSize = max(ComputeCommon.GridCellSize, 0.1) * GetCascadeScale(i);
+        const float startDistance = SurfelGIGetCascadeStartDistance(ComputeCommon.CascadeStartDistancePacked, i);
+        const float lowerCellSize = max(ComputeCommon.GridCellSize, 0.1) * SurfelGIGetCascadeScale(ComputeCommon.CascadeCellScalePacked, i - 1u);
+        const float upperCellSize = max(ComputeCommon.GridCellSize, 0.1) * SurfelGIGetCascadeScale(ComputeCommon.CascadeCellScalePacked, i);
         const float boundaryBand = max(max(lowerCellSize, upperCellSize) * SURFEL_GI_BOUNDARY_BAND_SCALE, 1.0);
         if (abs(cameraDistance - startDistance) <= boundaryBand)
         {
@@ -110,7 +78,7 @@ bool TryGetBoundaryCascadePair(float cameraDistance, out uint outLowCascade, out
 
 bool TrySelectCascadeForWorldPos(float3 worldPos, float cameraDistance, out uint outCascadeIndex, out int3 outCellCoord)
 {
-    const uint desiredCascade = GetCascadeIndexByDistance(cameraDistance);
+    const uint desiredCascade = SurfelGIGetCascadeIndexByDistance(ComputeCommon.CascadeStartDistancePacked, cameraDistance);
     if (TryComputeCellCoordForCascade(worldPos, desiredCascade, outCellCoord))
     {
         outCascadeIndex = desiredCascade;
@@ -142,17 +110,16 @@ bool TrySelectCascadeForWorldPos(float3 worldPos, float cameraDistance, out uint
     return false;
 }
 
-void EmitVisibleCell(int3 cellCoord, uint cascadeIndex, uint maxVisibleCells)
+void EmitVisibleCell(int3 cellCoord, uint cascadeIndex)
 {
-    uint writeIndex = 0u;
-    InterlockedAdd(VisibleCellCounterBuffer[0], 1u, writeIndex);
+    uint cellLinear = 0u;
+    if (!TryWorldCellToLinear(cellCoord, cascadeIndex, cellLinear))
+        return;
+    if (cellLinear >= max((uint)ComputeCommon.SurfelPageTableCapacity, 1u))
+        return;
 
-    if (writeIndex < maxVisibleCells)
-    {
-        jVisibleCellGPU entry;
-        entry.CellCascade = int4(cellCoord, (int)cascadeIndex);
-        VisibleCellWorklist[writeIndex] = entry;
-    }
+    uint previousCount = 0u;
+    InterlockedAdd(VisibleCellCounterBuffer[cellLinear], 1u, previousCount);
 }
 
 [numthreads(8, 8, 1)]
@@ -175,14 +142,12 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     const float3 worldPos = mul(ComputeCommon.InvV, float4(viewPos, 1.0)).xyz;
     const float cameraDistance = length(viewPos);
     
-    // Calculate how many visible cells can be recorded in this pass.
-    const uint maxVisibleCells = (uint)max(dispatchSize.x * dispatchSize.y * (int)SURFEL_GI_VISIBLE_CELL_WORKLIST_MULTIPLIER, 1);
     uint primaryCascadeIndex = 0u;
     int3 primaryCellCoord = int3(0, 0, 0);
     if (!TrySelectCascadeForWorldPos(worldPos, cameraDistance, primaryCascadeIndex, primaryCellCoord))
         return;
 
-    EmitVisibleCell(primaryCellCoord, primaryCascadeIndex, maxVisibleCells);
+    EmitVisibleCell(primaryCellCoord, primaryCascadeIndex);
 
 #if SURFEL_GI_ENABLE_BOUNDARY_OVERLAP
     uint boundaryLowCascade = 0u;
@@ -194,7 +159,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         {
             int3 secondaryCellCoord = int3(0, 0, 0);
             if (TryComputeCellCoordForCascade(worldPos, secondaryCascadeIndex, secondaryCellCoord))
-                EmitVisibleCell(secondaryCellCoord, secondaryCascadeIndex, maxVisibleCells);
+                EmitVisibleCell(secondaryCellCoord, secondaryCascadeIndex);
         }
     }
 #endif

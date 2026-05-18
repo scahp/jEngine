@@ -6,7 +6,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
         return;
 
     const jSurfelGPU surfel = SurfelPool[surfelIndex];
-    if (surfel.Extra.y <= 0.5)
+    if (surfel.IsActive == 0u)
         return;
 
     uint outIndex = 0u;

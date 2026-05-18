@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "Math/Vector.h"
 
 enum class EDenoiser : int32
@@ -23,7 +23,6 @@ extern const char* GHWRTDirectLightingModes[2];
 #ifndef SURFEL_GI_CASCADE_COUNT
 #define SURFEL_GI_CASCADE_COUNT 3
 #endif
-#define SURFEL_GI_CASCADE_PACKED_COUNT ((SURFEL_GI_CASCADE_COUNT + 3) / 4)
 
 struct jOptions
 {

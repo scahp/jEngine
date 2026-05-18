@@ -6,9 +6,13 @@ void main(uint3 DTid : SV_DispatchThreadID)
     {
         jSurfelCandidateGPU c;
         c.Surfel.PositionRadius = float4(0.0, 0.0, 0.0, 0.0);
-        c.Surfel.NormalSeenFrame = float4(0.0, 0.0, 0.0, 0.0);
+        c.Surfel.Normal = float3(0.0, 0.0, 0.0);
+        c.Surfel.LastSeenFrame = 0u;
         c.Surfel.AlbedoWeight = float4(0.0, 0.0, 0.0, 0.0);
-        c.Surfel.Extra = float4(0.0, 0.0, 0.0, 0.0);
+        c.Surfel.State = 0;
+        c.Surfel.IsActive = 0u;
+        c.Surfel.OwnerCellHash = 0u;
+        c.Surfel.CascadeIndex = 0u;
         c.Priority = 0u;
         c.Padding0 = 0u;
         c.Padding1 = 0u;

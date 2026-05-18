@@ -724,7 +724,7 @@ float3 EvaluateSurfelGatherMissRadiance(in float3 WorldDir)
 
 float ComputeHitSurfelWeight(float3 SurfaceWorldPos, float3 SurfaceWorldNormal, jSurfelGPU Surfel, jSurfelIrradianceGPU Irradiance)
 {
-    const float3 SurfelNormal = normalize(Surfel.NormalSeenFrame.xyz);
+    const float3 SurfelNormal = normalize(Surfel.Normal);
     const float SurfelRadius = max(Surfel.PositionRadius.w, 0.001);
     const float3 Delta = SurfaceWorldPos - Surfel.PositionRadius.xyz;
     const float PlaneDistance = abs(dot(Delta, SurfelNormal));
@@ -739,7 +739,7 @@ float ComputeHitSurfelWeight(float3 SurfaceWorldPos, float3 SurfaceWorldNormal, 
 
 bool TrySampleSurfelIrradianceAtCascade(float3 SurfaceWorldPos, float3 SurfaceWorldNormal, uint CascadeIndex, out float3 OutIrradiance)
 {
-    const float CellSize = max(g_surfelGatherCB.GridCellSize, 0.1) * SurfelGIGetCascadeScale(g_surfelGatherCB.CascadeCellScaleFromPrevPacked, CascadeIndex);
+    const float CellSize = max(g_surfelGatherCB.GridCellSize, 0.1) * SurfelGIGetCascadeScale(g_surfelGatherCB.CascadeCellScalePacked, CascadeIndex);
     const int3 CellCoord = int3(floor(SurfaceWorldPos / CellSize));
     uint BaseIndex = 0u;
     if (!SurfelGITryGetCellBaseIndex(
@@ -774,9 +774,9 @@ bool TrySampleSurfelIrradianceAtCascade(float3 SurfaceWorldPos, float3 SurfaceWo
             break;
 
         const jSurfelGPU CandidateSurfel = SurfelGIPool[CandidateSurfelIndex];
-        if (CandidateSurfel.Extra.y < 0.5)
+        if (CandidateSurfel.IsActive == 0u)
             continue;
-        if ((uint)round(CandidateSurfel.Extra.w) != CascadeIndex)
+        if (CandidateSurfel.CascadeIndex != CascadeIndex)
             continue;
 
         const int3 CandidateCellCoord = int3(floor(CandidateSurfel.PositionRadius.xyz / CellSize));
@@ -1049,7 +1049,7 @@ void SurfelGIGatherIrradianceHWRT_CS(uint3 DispatchThreadID : SV_DispatchThreadI
         return;
 
     const jSurfelGPU Surfel = SurfelGIPool[SurfelIndex];
-    float3 ReceiverNormal = Surfel.NormalSeenFrame.xyz;
+    float3 ReceiverNormal = Surfel.Normal;
     const float ReceiverNormalLenSq = dot(ReceiverNormal, ReceiverNormal);
     if (ReceiverNormalLenSq <= 1e-6)
         return;
@@ -1074,7 +1074,7 @@ void SurfelGIGatherIrradianceHWRT_CS(uint3 DispatchThreadID : SV_DispatchThreadI
     const float GuideRamp = saturate(PrevCount / 16.0);
     const float GuideBlend = (g_surfelGatherCB.UseGuiding != 0 && GuidingMass > 1e-5) ? min(SURFEL_GI_GUIDE_MAX_BLEND * GuideRamp, SURFEL_GI_GUIDE_MAX_BLEND) : 0.0;
 
-    uint Seed = InitSurfelGatherSeed(SurfelIndex, (uint)max(g_surfelGatherCB.FrameNumber, 0));
+    uint Seed = InitSurfelGatherSeed(SurfelIndex, g_surfelGatherCB.FrameNumber);
     float3 AccumulatedIrradiance = 0.0;
     jSurfelGIHoverRayDebugGPU HoverRayDebug = (jSurfelGIHoverRayDebugGPU)0;
     if (CaptureHoverRays)

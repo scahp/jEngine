@@ -1,4 +1,5 @@
 #include "common.hlsl"
+#include "SurfelGIClipmapLookup.hlsl"
 
 #ifndef SURFEL_GI_AGE_CONSUME_SCALE
     #define SURFEL_GI_AGE_CONSUME_SCALE 2.0
@@ -10,7 +11,6 @@
 #ifndef SURFEL_GI_CASCADE_COUNT
     #define SURFEL_GI_CASCADE_COUNT 3
 #endif
-#define SURFEL_GI_CASCADE_PACKED_COUNT ((SURFEL_GI_CASCADE_COUNT + 3) / 4)
 #define SURFEL_GI_GUIDE_DIM 4
 #define SURFEL_GI_GUIDE_LOBE_COUNT (SURFEL_GI_GUIDE_DIM * SURFEL_GI_GUIDE_DIM)
 #define SURFEL_GI_GUIDE_TOTAL_FLOATS (SURFEL_GI_GUIDE_LOBE_COUNT + SURFEL_GI_GUIDE_DIM)
@@ -41,71 +41,43 @@ uint HashCellWithCascade(int3 cellCoord, uint cascadeIndex)
     return HashU32(h);
 }
 
-float GetCascadeScale(uint cascadeIndex)
-{
-    float scale = 1.0;
-    [loop] for (uint i = 1u; i <= cascadeIndex && i < (uint)SURFEL_GI_CASCADE_COUNT; ++i)
-    {
-        const uint packIndex = i >> 2u;
-        const uint lane = i & 3u;
-        const float4 packed = ComputeCommon.CascadeCellScaleFromPrevPacked[packIndex];
-        const float value = (lane == 0u) ? packed.x : ((lane == 1u) ? packed.y : ((lane == 2u) ? packed.z : packed.w));
-        scale *= max(value, 1.0);
-    }
-    return scale;
-}
-
-uint GetCascadeIndexByDistance(float cameraDistance)
-{
-    uint cascade = 0u;
-    [loop] for (uint i = 1u; i < (uint)SURFEL_GI_CASCADE_COUNT; ++i)
-    {
-        const uint packIndex = i >> 2u;
-        const uint lane = i & 3u;
-        const float4 packed = ComputeCommon.CascadeStartDistancePacked[packIndex];
-        const float startDistance = (lane == 0u) ? packed.x : ((lane == 1u) ? packed.y : ((lane == 2u) ? packed.z : packed.w));
-        if (cameraDistance >= max(startDistance, 0.0))
-            cascade = i;
-    }
-    return cascade;
-}
-
 bool IsBoundarySurfel(float3 surfelPos, float boundaryBand)
 {
     const float3 surfelViewPos = mul(ComputeCommon.V, float4(surfelPos, 1.0)).xyz;
     const float cameraDistance = length(surfelViewPos);
     [loop] for (uint i = 1u; i < (uint)SURFEL_GI_CASCADE_COUNT; ++i)
     {
-        const uint packIndex = i >> 2u;
-        const uint lane = i & 3u;
-        const float4 packed = ComputeCommon.CascadeStartDistancePacked[packIndex];
-        const float startDistance = (lane == 0u) ? packed.x : ((lane == 1u) ? packed.y : ((lane == 2u) ? packed.z : packed.w));
+        const float startDistance = SurfelGIGetCascadeStartDistance(ComputeCommon.CascadeStartDistancePacked, i);
         if (abs(cameraDistance - startDistance) <= boundaryBand)
             return true;
     }
     return false;
 }
 
-uint GetConsumedAge(float lastSeenFrame)
+uint GetConsumedAge(uint lastSeenFrame)
 {
-    const float rawAge = abs((float)ComputeCommon.FrameNumber - lastSeenFrame);
-    return (uint)(rawAge * SURFEL_GI_AGE_CONSUME_SCALE);
+    const uint rawAge = ComputeCommon.FrameNumber - min(lastSeenFrame, ComputeCommon.FrameNumber);
+    return (uint)((float)rawAge * SURFEL_GI_AGE_CONSUME_SCALE);
 }
 
 void MarkDormantSurfel(inout jSurfelGPU s, int3 cellCoord, uint cascadeIndex)
 {
-    s.Extra.x = 5.0;
-    s.Extra.y = 0.0;
-    s.Extra.z = asfloat(HashCellWithCascade(cellCoord, cascadeIndex));
-    s.Extra.w = (float)cascadeIndex;
+    s.State = SURFEL_GI_SURFEL_STATE_DORMANT;
+    s.IsActive = 0u;
+    s.OwnerCellHash = HashCellWithCascade(cellCoord, cascadeIndex);
+    s.CascadeIndex = cascadeIndex;
 }
 
 void ResetSurfelHard(inout jSurfelGPU s)
 {
     s.PositionRadius = float4(0.0, 0.0, 0.0, 0.0);
-    s.NormalSeenFrame = float4(0.0, 0.0, 0.0, 0.0);
+    s.Normal = float3(0.0, 0.0, 0.0);
+    s.LastSeenFrame = 0u;
     s.AlbedoWeight = float4(0.0, 0.0, 0.0, 0.0);
-    s.Extra = float4(0.0, 0.0, 0.0, 0.0);
+    s.State = SURFEL_GI_SURFEL_STATE_NEW;
+    s.IsActive = 0u;
+    s.OwnerCellHash = 0u;
+    s.CascadeIndex = 0u;
 }
 
 void ResetSurfelGuiding(uint surfelIndex)
@@ -131,9 +103,9 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     const float cascade0CellSize = max(ComputeCommon.GridCellSize, 0.1);
     const float cascadeBoundaryBand = max(cascade0CellSize * SURFEL_GI_BOUNDARY_CLEANUP_BAND_SCALE, 1.0);
 
-    if (s.Extra.y <= 0.5)
+    if (s.IsActive == 0u)
     {
-        const bool isDormant = (abs(s.Extra.x - 5.0) < 0.5);
+        const bool isDormant = (s.State == SURFEL_GI_SURFEL_STATE_DORMANT);
         if (isDormant)
         {
             // Dormant slots are still valid reuse candidates.
@@ -142,7 +114,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         }
 
         // Purge very old inactive/dormant slots to keep allocation state clean.
-        const uint inactiveAgeFrames = GetConsumedAge(s.NormalSeenFrame.w);
+        const uint inactiveAgeFrames = GetConsumedAge(s.LastSeenFrame);
         const uint inactivePurgeFrames = max(ttl * 4u, outOfViewKeepFrames * 2u);
         if (inactiveAgeFrames > inactivePurgeFrames)
         {
@@ -159,13 +131,13 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         return;
     }
 
-    const uint surfelCascade = min((uint)round(s.Extra.w), (uint)(SURFEL_GI_CASCADE_COUNT - 1));
+    const uint surfelCascade = min(s.CascadeIndex, (uint)(SURFEL_GI_CASCADE_COUNT - 1));
     const float3 surfelPos = s.PositionRadius.xyz;
     const float3 surfelViewPos = mul(ComputeCommon.V, float4(surfelPos, 1.0)).xyz;
     const float surfelCameraDistance = length(surfelViewPos);
-    const uint expectedCascade = GetCascadeIndexByDistance(surfelCameraDistance);
+    const uint expectedCascade = SurfelGIGetCascadeIndexByDistance(ComputeCommon.CascadeStartDistancePacked, surfelCameraDistance);
 
-    uint ageFrames = GetConsumedAge(s.NormalSeenFrame.w);
+    uint ageFrames = GetConsumedAge(s.LastSeenFrame);
     if (surfelCascade != expectedCascade)
         ageFrames *= 2u;
 
@@ -175,7 +147,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
     if (ageFrames > effectiveTTL && !IsBoundarySurfel(surfelPos, cascadeBoundaryBand))
     {
-        const float cellSize = cascade0CellSize * GetCascadeScale(surfelCascade);
+        const float cellSize = cascade0CellSize * SurfelGIGetCascadeScale(ComputeCommon.CascadeCellScalePacked, surfelCascade);
         const int3 cellCoord = int3(floor(surfelPos / cellSize));
         MarkDormantSurfel(s, cellCoord, surfelCascade);
         SurfelPool[surfelIndex] = s;

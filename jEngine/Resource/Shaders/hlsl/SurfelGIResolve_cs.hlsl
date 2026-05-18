@@ -5,34 +5,6 @@
 // Earlier passes store irradiance on surfels; this pass asks which surfels should influence
 // the current screen pixel and combines their irradiance into a screen-space texture.
 
-uint GetDesiredSlotsPerCell(uint cascadeIndex)
-{
-    const float value = SurfelGIGetPackedFloat(ResolveCommon.SurfelsPerCellPacked, cascadeIndex);
-    return max((uint)round(value), 1u);
-}
-
-uint GetSlotsPerCell(uint maxSurfels, uint desiredSlotsPerCell)
-{
-    const uint maxSlotsPerCell = min(max((uint)ResolveCommon.SurfelPageSize, 1u), 5u);
-    const uint clampedDesired = clamp(desiredSlotsPerCell, 1u, maxSlotsPerCell);
-    return min(max(1u, maxSurfels), clampedDesired);
-}
-
-uint GetCellCount(uint maxSurfels, uint desiredSlotsPerCell)
-{
-    const uint slotsPerCell = GetSlotsPerCell(maxSurfels, desiredSlotsPerCell);
-    return max(1u, maxSurfels / slotsPerCell);
-}
-
-uint GetCascadePartitionCapacity(uint maxSurfels, uint cascadeIndex)
-{
-    const uint cascadeCount = (uint)SURFEL_GI_CASCADE_COUNT;
-    const uint c = min(cascadeIndex, cascadeCount - 1u);
-    const uint base = maxSurfels / cascadeCount;
-    const uint rem = maxSurfels % cascadeCount;
-    return max(1u, base + ((c < rem) ? 1u : 0u));
-}
-
 float ComputeSurfelWeight(float3 pixelWorldPos, float3 pixelWorldNormal, jSurfelGPU surfel, jSurfelIrradianceGPU irradiance)
 {
     // Resolve is intentionally conservative: a surfel should only influence pixels that look like
@@ -42,7 +14,7 @@ float ComputeSurfelWeight(float3 pixelWorldPos, float3 pixelWorldNormal, jSurfel
     // - normal alignment: avoid mixing unrelated surface orientations
     // - receiver facing: avoid using the back side of the surfel too strongly
     // - confidence: favor surfels whose temporal history has matured
-    const float3 surfelNormal = normalize(surfel.NormalSeenFrame.xyz);
+    const float3 surfelNormal = normalize(surfel.Normal);
     const float surfelRadius = max(surfel.PositionRadius.w, 0.001);
     const float resolveSoftness = max(ResolveCommon.ResolveSoftness, 0.1);
     const float planeExtent = surfelRadius * (1.25 * resolveSoftness);
@@ -99,11 +71,9 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     // the surfel clipmap. The same cell-lookup logic is shared with visualization / hover select.
     [loop] for (uint cascadeIndex = 0u; cascadeIndex < (uint)SURFEL_GI_CASCADE_COUNT; ++cascadeIndex)
     {
-        const float cellSize = cascade0CellSize * SurfelGIGetCascadeScale(ResolveCommon.CascadeCellScaleFromPrevPacked, cascadeIndex);
+        const float cellSize = cascade0CellSize * SurfelGIGetCascadeScale(ResolveCommon.CascadeCellScalePacked, cascadeIndex);
         const int3 baseCellCoord = int3(floor(worldPos / cellSize));
-        const uint desiredSlotsPerCell = GetDesiredSlotsPerCell(cascadeIndex);
-        const uint cascadeCapacity = GetCascadePartitionCapacity(maxSurfels, cascadeIndex);
-        const uint slotsPerCell = GetSlotsPerCell(cascadeCapacity, desiredSlotsPerCell);
+        const uint desiredSlotsPerCell = SurfelGIGetDesiredSlotsPerCell(ResolveCommon.SurfelsPerCellPacked, cascadeIndex);
 
         [loop] for (int z = -neighborRadius; z <= neighborRadius; ++z)
         {
@@ -134,13 +104,13 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                         continue;
                     }
 
-                    [loop] for (uint slot = 0u; slot < slotsPerCell; ++slot)
+                    [loop] for (uint slot = 0u; slot < desiredSlotsPerCell; ++slot)
                     {
                         const uint surfelIndex = baseIndex + slot;
                         const jSurfelGPU surfel = SurfelPool[surfelIndex];
-                        if (surfel.Extra.y < 0.5)
+                        if (surfel.IsActive == 0u)
                             continue;
-                        if ((uint)round(surfel.Extra.w) != cascadeIndex)
+                        if (surfel.CascadeIndex != cascadeIndex)
                             continue;
 
                         const float3 surfelPos = surfel.PositionRadius.xyz;
