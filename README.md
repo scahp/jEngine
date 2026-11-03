@@ -11,6 +11,9 @@
 Simple toy engine for implementing graphics feature with multiple api
  - Documentation : https://scahp.tistory.com/120
 
+[**User manual (Korean)**](docs/manual/README.md) — numbered screenshots, scene loading,
+object placement, SurfelGI, and console commands.
+
 ## Supported platforms
 
 - **Windows**: DirectX 12 and Vulkan.

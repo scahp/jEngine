@@ -74,11 +74,14 @@ rendered on/off images, and rejects Vulkan/Metal validation errors. Only after a
 checks pass does it activate this driver for the normal run script. The Homebrew
 installation is preserved; no system driver or scheduler is changed.
 
-Use the existing **SurfelGI → Enable SurfelGI** and **Enable Inline Ray Gather**
-checkboxes, ray count, guiding, distance, bias and history controls. Turning inline
-gather off pauses new ray samples while retaining existing irradiance history;
-placement can still seed new surfels from neighboring history. Turning SurfelGI
-off skips its contribution. Unsupported drivers show the inline checkbox disabled.
+Open **Features → SurfelGI** and use **Enable SurfelGI** for its contribution.
+In the console, query `r.surfelgi.inline_ray.enable`, or set it with
+`r.surfelgi.inline_ray.enable 1` / `0`. The active panel exposes intensity,
+pool, spawn, radius and debug controls; the inline-ray checkbox belongs to an
+inactive legacy panel. Turning inline gather off pauses new ray samples while
+retaining existing irradiance history; placement can still seed new surfels from
+neighboring history. Unsupported drivers use the fallback even if the option is
+enabled. See the [illustrated SurfelGI guide](manual/05-surfelgi.md).
 
 To select the original Homebrew driver explicitly:
 
