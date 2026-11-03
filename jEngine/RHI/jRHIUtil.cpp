@@ -2,10 +2,13 @@
 #include "jRHIUtil.h"
 #include "FileLoader/jImageFileLoader.h"
 #include "jRenderTargetPool.h"
+#ifdef _WIN32
 #include "DX12/jTexture_DX12.h"
+#endif
 #include "Renderer/jSceneRenderTargets.h"
 #include "jPrimitiveUtil.h"
 #include "jOptions.h"
+#include "Renderer/jDrawCommand.h"
 #include "Scene/jRenderObject.h"
 #include "Shader/jShaderParameterSet.h"
 
@@ -164,6 +167,7 @@ std::shared_ptr<jRenderTarget> ConvertToCubeMap(jName InDestFilePath, Vector2i I
     InRenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
     g_rhi->Flush();
 
+#ifdef _WIN32
     // Capture image form texture
     DirectX::ScratchImage image;
     jTexture_DX12* texture_dx12 = (jTexture_DX12*)CubeMap->GetTexture();
@@ -174,6 +178,7 @@ std::shared_ptr<jRenderTarget> ConvertToCubeMap(jName InDestFilePath, Vector2i I
 
     // Save image
     DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::DDS_FLAGS::DDS_FLAGS_NONE, DestFilePath.c_str());
+#endif
     g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), CubeMap->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 
     return CubeMap;
@@ -235,6 +240,7 @@ std::shared_ptr<jRenderTarget> GenerateIrradianceMap(jName InDestFilePath, Vecto
     InRenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
     g_rhi->Flush();
 
+#ifdef _WIN32
     // Capture image form texture
     DirectX::ScratchImage image;
     jTexture_DX12* texture_dx12 = (jTexture_DX12*)IrradianceMap->GetTexture();
@@ -245,6 +251,7 @@ std::shared_ptr<jRenderTarget> GenerateIrradianceMap(jName InDestFilePath, Vecto
 
     // Save image
     DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::DDS_FLAGS::DDS_FLAGS_NONE, DestFilePath.c_str());
+#endif
     g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), IrradianceMap->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 
     return IrradianceMap;
@@ -312,6 +319,7 @@ std::shared_ptr<jRenderTarget> GenerateFilteredEnvironmentMap(jName InDestFilePa
     InRenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
     g_rhi->Flush();
 
+#ifdef _WIN32
     // Capture from texture
     DirectX::ScratchImage image;
     jTexture_DX12* texture_dx12 = (jTexture_DX12*)FilteredEnvMap->GetTexture();
@@ -322,6 +330,7 @@ std::shared_ptr<jRenderTarget> GenerateFilteredEnvironmentMap(jName InDestFilePa
 
     // Save image
     DirectX::SaveToDDSFile(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::DDS_FLAGS::DDS_FLAGS_NONE, DestFilePath.c_str());
+#endif
     g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), FilteredEnvMap->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 
     return FilteredEnvMap;

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "RHI/jRHIType.h"
 #include "RHI/jMemoryPool.h"
@@ -6,7 +6,7 @@
 
 class jSubMemoryAllocator_Vulkan : public jSubMemoryAllocator
 {
-    virtual ~jSubMemoryAllocator_Vulkan() {}
+    virtual ~jSubMemoryAllocator_Vulkan();
 
     virtual void Initialize(EVulkanBufferBits InUsage, EVulkanMemoryBits InProperties, uint64 InSize) override;
     virtual void* GetBuffer() const { return Buffer; }
@@ -19,7 +19,7 @@ class jSubMemoryAllocator_Vulkan : public jSubMemoryAllocator
 class jMemoryPool_Vulkan : public jMemoryPool
 {
 public:
-    virtual ~jMemoryPool_Vulkan() {}
+    virtual ~jMemoryPool_Vulkan();
 
     virtual jSubMemoryAllocator* CreateSubMemoryAllocator() const override
     {

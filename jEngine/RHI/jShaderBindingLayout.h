@@ -299,7 +299,7 @@ template <typename T>
 struct TShaderBinding : public jShaderBinding
 {
     TShaderBinding(const int32 InBindingPoint, const int32 InNumOfDescriptors, const EShaderBindingType InBindingType, const EShaderAccessStageFlag InAccessStageFlags, const T& InData)
-        : jShaderBinding(InBindingPoint, InNumOfDescriptors, InBindingType, InAccessStageFlags), Data(InData)
+        : jShaderBinding(InBindingPoint, InNumOfDescriptors, InBindingType, false, InAccessStageFlags), Data(InData)
     { }
     T Data = T();
 };

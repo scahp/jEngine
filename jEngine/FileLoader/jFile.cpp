@@ -5,51 +5,21 @@ uint64 jFile::GetFileTimeStamp(const char* filename)
 {
 	JASSERT(filename);
 
-	WIN32_FILE_ATTRIBUTE_DATA attributes;
-	GetFileAttributesExA(filename, GetFileExInfoStandard, &attributes);
-	return attributes.ftLastWriteTime.dwLowDateTime | static_cast<uint64>(attributes.ftLastWriteTime.dwHighDateTime) << 32;
+    std::error_code ec;
+    const auto stamp = std::filesystem::last_write_time(filename, ec);
+    return ec ? 0 : static_cast<uint64>(stamp.time_since_epoch().count());
 }
 
 void jFile::SearchFilesRecursive(std::vector<std::string>& OutFiles, const std::string& InTargetDirectory, const std::vector<std::string>& extensions)
 {
-    WIN32_FIND_DATAA findFileData;
-    HANDLE hFind = INVALID_HANDLE_VALUE;
-
-    // Find first file
-    hFind = FindFirstFileA((InTargetDirectory + "\\*").c_str(), &findFileData);
-    if (hFind == INVALID_HANDLE_VALUE)
-        return;
-
-    do
+    std::error_code ec;
+    for (std::filesystem::recursive_directory_iterator it(InTargetDirectory, ec), end; !ec && it != end; it.increment(ec))
     {
-        if (findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-        {
-			// Remove Current and Parent directory
-            if (strcmp(findFileData.cFileName, ".") != 0 && strcmp(findFileData.cFileName, "..") != 0)
-            {
-                SearchFilesRecursive(OutFiles, InTargetDirectory + "\\" + findFileData.cFileName, extensions); // 재귀 호출
-            }
-        }
-        else 
-		{
-            // Find Ext
-            std::string fileName = findFileData.cFileName;
-            auto it = fileName.rfind('.');
-            if (it != std::string::npos)
-            {
-                std::string ext = fileName.substr(it);
-                for (const auto& allowedExt : extensions)
-                {
-                    if (ext == allowedExt)
-                    {
-                        OutFiles.push_back(InTargetDirectory + "\\" + fileName); // Added file path to container which meet matching ext condition.
-                        break;
-                    }
-                }
-            }
-        }
-    } while (FindNextFileA(hFind, &findFileData) != 0);
-    FindClose(hFind);
+        if (!it->is_regular_file()) continue;
+        const auto ext = it->path().extension().string();
+        if (std::find(extensions.begin(), extensions.end(), ext) != extensions.end())
+            OutFiles.push_back(it->path().string());
+    }
 }
 
 std::string jFile::ExtractFileName(const std::string& path)

@@ -14,7 +14,118 @@ concurrency:
   group: ci-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
+env:
+  HOMEBREW_NO_AUTO_UPDATE: '1'
+  HOMEBREW_NO_INSTALL_CLEANUP: '1'
+
 jobs:
+  macos-toolchain:
+    name: macOS DXC toolchain
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Restore native DXC
+        id: dxc
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: .ci-tools/dxc
+          key: dxc-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/ci/dependencies.json', 'scripts/ci/setup-macos-dxc.sh') }}
+      - name: Build pinned native DXC
+        if: steps.dxc.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          brew install cmake ninja
+          mkdir -p build/ci-toolchain
+          scripts/ci/setup-macos-dxc.sh 2>&1 | tee build/ci-toolchain/setup.log
+      - name: Check cached compiler
+        run: .ci-tools/dxc/bin/dxc --version
+      - name: Upload toolchain logs
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: macos-toolchain-logs
+          path: build/ci-toolchain/*.log
+          if-no-files-found: ignore
+          retention-days: 5
+
+  macos:
+    name: macOS ${{ matrix.configuration }}
+    needs: macos-toolchain
+    runs-on: macos-26
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - configuration: Debug
+            preset: macos-debug
+          - configuration: Release
+            preset: macos-release
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ci-cache/ccache
+      CCACHE_BASEDIR: ${{ github.workspace }}
+      CCACHE_MAXSIZE: 256M
+      CCACHE_SLOPPINESS: pch_defines,time_macros
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install build dependencies
+        run: brew install cmake ninja ccache molten-vk vulkan-headers vulkan-loader glfw assimp
+      - name: Restore native DXC
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: .ci-tools/dxc
+          key: dxc-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/ci/dependencies.json', 'scripts/ci/setup-macos-dxc.sh') }}
+          fail-on-cache-miss: true
+      - name: Cache compilation
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: .ci-cache/ccache
+          key: ccache-${{ runner.os }}-${{ runner.arch }}-${{ matrix.configuration }}-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'scripts/ci/dependencies.json') }}-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ runner.arch }}-${{ matrix.configuration }}-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'scripts/ci/dependencies.json') }}-
+      - name: Configure
+        shell: bash
+        env:
+          PRESET: ${{ matrix.preset }}
+        run: |
+          mkdir -p "build/$PRESET"
+          cmake --preset "$PRESET" -DJENGINE_DXC_EXECUTABLE="$PWD/.ci-tools/dxc/bin/dxc" -DCMAKE_CXX_COMPILER_LAUNCHER=ccache 2>&1 | tee "build/$PRESET/configure.log"
+      - name: Build
+        shell: bash
+        env:
+          PRESET: ${{ matrix.preset }}
+        run: cmake --build --preset "$PRESET" 2>&1 | tee "build/$PRESET/build.log"
+      - name: CPU and shader checks
+        shell: bash
+        env:
+          PRESET: ${{ matrix.preset }}
+        run: ctest --preset "$PRESET" --output-junit "$PWD/build/$PRESET/tests.xml" 2>&1 | tee "build/$PRESET/tests.log"
+      - name: Archive build output
+        shell: bash
+        env:
+          PRESET: ${{ matrix.preset }}
+        run: tar -czf "build/$PRESET/jEngine-${PRESET}-build.tar.gz" -C "build/$PRESET" jEngine
+      - name: Cache statistics
+        if: always()
+        run: ccache --show-stats
+      - name: Upload build and diagnostics
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ${{ matrix.preset }}
+          retention-days: 5
+          if-no-files-found: warn
+          path: |
+            build/${{ matrix.preset }}/*.log
+            build/${{ matrix.preset }}/*.xml
+            build/${{ matrix.preset }}/*.tar.gz
+            build/${{ matrix.preset }}/shader-checks/**
+
   windows:
     name: Windows ${{ matrix.configuration }}
     runs-on: windows-2025-vs2026
@@ -33,11 +144,26 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-      - name: Build engine
+      - name: Cache DXC distribution
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: .ci-tools/dxc
+          key: dxc-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/ci/dependencies.json', 'scripts/ci/setup-windows-dxc.ps1') }}
+      - name: Install pinned shader compiler
+        shell: pwsh
+        run: scripts/ci/setup-windows-dxc.ps1
+      - name: Build engine and run CPU checks
         shell: pwsh
         env:
           CONFIGURATION: ${{ matrix.configuration }}
         run: scripts/ci/build-windows.ps1 -Configuration $env:CONFIGURATION
+      - name: Generated shader compilation and layout checks
+        shell: pwsh
+        env:
+          CONFIGURATION: ${{ matrix.configuration }}
+        run: |
+          python scripts/ci/check-shaders.py --engine "build/windows-$env:CONFIGURATION/bin/jEngine.exe" --dxc .ci-tools/dxc/bin/x64/dxc.exe --source jEngine --output "build/windows-$env:CONFIGURATION/shader-checks"
+          if ($LASTEXITCODE -ne 0) { throw 'Shader checks failed' }
       - name: Upload build and diagnostics
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -50,3 +176,4 @@ jobs:
             build/windows-${{ matrix.configuration }}/*.binlog
             build/windows-${{ matrix.configuration }}/bin/*.exe
             build/windows-${{ matrix.configuration }}/bin/*.dll
+            build/windows-${{ matrix.configuration }}/shader-checks/**

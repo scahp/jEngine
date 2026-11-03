@@ -1,6 +1,6 @@
-﻿#pragma once
-#include "Math\Vector.h"
-#include "Math\Matrix.h"
+#pragma once
+#include "Math/Vector.h"
+#include "Math/Matrix.h"
 #include "jBoundPrimitiveType.h"
 #include "jSceneObject.h"
 #include "jObjectTypes.h"

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "jRHIType_Vulkan.h"
 #include "jBuffer_Vulkan.h"
 
@@ -110,6 +110,10 @@ struct jVertexBuffer_Vulkan : public jVertexBuffer
 
         // primitiveRestartEnable 옵션이 VK_TRUE 이면, 인덱스버퍼의 특수한 index 0xFFFF or 0xFFFFFFFF 를 사용해서 line 과 triangle topology mode를 사용할 수 있다.
         inputAssembly.primitiveRestartEnable = VK_FALSE;
+#ifdef __APPLE__
+        inputAssembly.primitiveRestartEnable = inputAssembly.topology == VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
+            || inputAssembly.topology == VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
+#endif
 
         return inputAssembly;
     }

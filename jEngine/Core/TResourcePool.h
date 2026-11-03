@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "jLock.h"
 
 template <typename T, typename LOCK_TYPE = jEmtpyRWLock>
@@ -87,10 +87,10 @@ public:
         }
     }
 
-    template <typename TInitializer>
+    template <typename TInitializer> requires (!std::is_integral_v<TInitializer>)
     T* Release(const TInitializer& initializer)
     {
-        return Release(initializer.GetHash());
+        return Release(static_cast<size_t>(initializer.GetHash()));
     }
 
     T* Release(size_t InHash)

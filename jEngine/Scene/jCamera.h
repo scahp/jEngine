@@ -1,8 +1,8 @@
-﻿#pragma once
+#pragma once
 
-#include "Math\Matrix.h"
-#include "Math\Vector.h"
-#include "Math\Plane.h"
+#include "Math/Matrix.h"
+#include "Math/Vector.h"
+#include "Math/Plane.h"
 
 //class jLight;
 //class jAmbientLight;

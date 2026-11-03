@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jResourceBarrierBatcher_Vulkan.h"
 #include "jBuffer_Vulkan.h"
 
@@ -10,8 +10,8 @@ void jResourceBarrierBatcher_Vulkan::AddUAV(jBuffer* InBuffer)
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
 
 	// todo : need to control pipeline stage
-	const auto SrcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-	const auto DstStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+	const auto SrcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT | VK_PIPELINE_STAGE_HOST_BIT;
+	const auto DstStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT | VK_PIPELINE_STAGE_HOST_BIT;
 	AddBarrier(SrcStage, DstStage, barrier);
 }
 
@@ -23,8 +23,8 @@ void jResourceBarrierBatcher_Vulkan::AddUAV(jTexture* InTexture)
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
 
 	// todo : need to control pipeline stage
-	const auto SrcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-	const auto DstStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+	const auto SrcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT | VK_PIPELINE_STAGE_HOST_BIT;
+	const auto DstStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT | VK_PIPELINE_STAGE_HOST_BIT;
 	AddBarrier(SrcStage, DstStage, barrier);
 }
 
@@ -108,8 +108,8 @@ void jResourceBarrierBatcher_Vulkan::AddTransition(jBuffer* InBuffer, EResourceL
     }
 
 	// todo : need to control pipeline stage
-	const auto SrcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-	const auto DstStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+	const auto SrcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT | VK_PIPELINE_STAGE_HOST_BIT;
+	const auto DstStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT | VK_PIPELINE_STAGE_HOST_BIT;
 	AddBarrier(SrcStage, DstStage, barrier);
 }
 
@@ -190,6 +190,9 @@ void jResourceBarrierBatcher_Vulkan::AddTransition(jTexture* InTexture, EResourc
     // before it will be transitioned to the new layout
     switch (SrcLayout)
     {
+    case VK_IMAGE_LAYOUT_GENERAL:
+        barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+        break;
     case VK_IMAGE_LAYOUT_UNDEFINED:
         // Image layout is undefined (or does not matter)
         // Only valid as initial layout
@@ -242,6 +245,9 @@ void jResourceBarrierBatcher_Vulkan::AddTransition(jTexture* InTexture, EResourc
     // Destination access mask controls the dependency for the new image layout
     switch (DstLayout)
     {
+    case VK_IMAGE_LAYOUT_GENERAL:
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+        break;
     case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
         // Image will be used as a transfer destination
         // Make sure any writes to the image have been finished
@@ -283,8 +289,8 @@ void jResourceBarrierBatcher_Vulkan::AddTransition(jTexture* InTexture, EResourc
     }
 
 	// todo : need to control pipeline stage
-	const auto SrcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-	const auto DstStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+	const auto SrcStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT | VK_PIPELINE_STAGE_HOST_BIT;
+	const auto DstStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT | VK_PIPELINE_STAGE_HOST_BIT;
 	AddBarrier(SrcStage, DstStage, barrier);
 }
 

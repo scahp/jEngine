@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jVulkanDeviceUtil.h"
 #include "jOptions.h"
 
@@ -104,6 +104,9 @@ jVulkanDeviceUtil::QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device,
         ++i;
     }
 
+    // Graphics queues also support compute/transfer; dedicated families are optional.
+    if (!indices.ComputeFamily) indices.ComputeFamily = indices.GraphicsFamily;
+    if (!indices.CopyFamily) indices.CopyFamily = indices.GraphicsFamily;
     return indices;
 }
 
@@ -137,8 +140,10 @@ bool IsDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface)
     vkGetPhysicalDeviceProperties2KHR(device, &deviceProps2);
 
     // 현재는 Geometry Shader 지원 여부만 판단
+#ifndef __APPLE__
     if (deviceProperties.deviceType != VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU || !deviceFeatures.geometryShader)
         return false;
+#endif
 
     QueueFamilyIndices indices = FindQueueFamilies(device, surface);
     bool extensionsSupported = CheckDeviceExtensionSupport(device);
@@ -271,6 +276,9 @@ std::vector<const char*> GetRequiredInstanceExtensions()
 #endif
 
     extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+#ifdef __APPLE__
+    extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+#endif
 
     return extensions;
 }

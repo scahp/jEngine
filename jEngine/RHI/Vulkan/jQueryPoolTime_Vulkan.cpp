@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jQueryPoolTime_Vulkan.h"
 #include "Profiler/jPerformanceProfile.h"
 
@@ -32,7 +32,7 @@ void jQueryPoolTime_Vulkan::Release()
 
 int32 jQueryPoolTime_Vulkan::GetUsedQueryCount(int32 InFrameIndex) const
 {
-    return QueryIndex[InFrameIndex] - InFrameIndex * MaxQueryTimeCount;
+    return std::max(0, QueryIndex[InFrameIndex] - static_cast<int32>(InFrameIndex * MaxQueryTimeCount));
 }
 
 std::vector<uint64> jQueryPoolTime_Vulkan::GetWholeQueryResult(int32 InFrameIndex, int32 InCount) const
@@ -48,8 +48,10 @@ std::vector<uint64> jQueryPoolTime_Vulkan::GetWholeQueryResult(int32 InFrameInde
 {
     std::vector<uint64> queryResult;
     queryResult.resize(MaxQueryTimeCount);
-    VkResult result = vkGetQueryPoolResults(g_rhi_vk->Device, QueryPool, InFrameIndex * MaxQueryTimeCount, MaxQueryTimeCount
-        , sizeof(uint64) * MaxQueryTimeCount, queryResult.data(), sizeof(uint64), VK_QUERY_RESULT_64_BIT);
+    const auto count = GetUsedQueryCount(InFrameIndex);
+    if (count > 0)
+        vkGetQueryPoolResults(g_rhi_vk->Device, QueryPool, InFrameIndex * MaxQueryTimeCount, count,
+            sizeof(uint64) * count, queryResult.data(), sizeof(uint64), VK_QUERY_RESULT_64_BIT);
     return queryResult;
 }
 

@@ -1,3 +1,9 @@
+// Vulkan BUFFER_SRV descriptors are storage buffers; DX12 uses typed views.
+#ifdef __spirv__
+#define JENGINE_INDEX_BUFFER StructuredBuffer<uint>
+#else
+#define JENGINE_INDEX_BUFFER Buffer<uint>
+#endif
 #include "common.hlsl"
 #include "BRDF.hlsl"
 
@@ -80,7 +86,7 @@ float3 HitWorldPosition()
 
 void GetShaderBindingResources(
     inout StructuredBuffer<uint2> VertexIndexOffsetBuffer,
-    inout Buffer<uint> IndexBuffer,
+    inout JENGINE_INDEX_BUFFER IndexBuffer,
     inout StructuredBuffer<RenderObjectUniformBuffer> RenderObjParam,
     inout ByteAddressBuffer VerticesBuffer,
     inout MaterialUniformBuffer MaterialBuffer,
@@ -410,7 +416,7 @@ void MeshClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 {
     // SRV_UAV DescHeap
     StructuredBuffer<uint2> VertexIndexOffset;
-    Buffer<uint> IndexBindless;
+    JENGINE_INDEX_BUFFER IndexBindless;
     StructuredBuffer<RenderObjectUniformBuffer> RenderObjParam;
     ByteAddressBuffer VerticesBindless;
     MaterialUniformBuffer MaterialBindless;
@@ -494,7 +500,7 @@ void LightClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 {
     // SRV_UAV DescHeap
     StructuredBuffer<uint2> VertexIndexOffset;
-    Buffer<uint> IndexBindless;
+    JENGINE_INDEX_BUFFER IndexBindless;
     StructuredBuffer<RenderObjectUniformBuffer> RenderObjParam;
     ByteAddressBuffer VerticesBindless;
     MaterialUniformBuffer MaterialBindless;

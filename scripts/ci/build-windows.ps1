@@ -13,4 +13,6 @@ try {
         "/p:Configuration=$Configuration" /p:Platform=x64 "/p:OutDir=$out\bin\" "/p:IntDir=$out\obj\" `
         "/bl:$out/build.binlog" /fl "/flp:logfile=$out/build.log;verbosity=normal"
     if ($LASTEXITCODE -ne 0) { throw "MSBuild failed ($LASTEXITCODE)" }
+    & "$out/bin/jEngine.exe" --ci-cpu 2>&1 | Tee-Object "$out/cpu-tests.log"
+    if ($LASTEXITCODE -ne 0) { throw 'CPU checks failed' }
 } finally { Pop-Location }

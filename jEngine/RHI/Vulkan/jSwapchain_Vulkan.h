@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "../jSwapchain.h"
 
 class jSemaphore;
@@ -14,6 +14,7 @@ public:
     void ReleaseInternal();
     virtual void Release() override;
 
+    VkFence AvailableLastUseFence = VK_NULL_HANDLE;
     VkFence CommandBufferFence = nullptr;   // 이 스왑체인에 렌더링하고 있는 이미지가 완료됨을 알 수 있는 CommandBuffer의 Fence.
 
     // Semaphore 는 GPU - GPU 간의 동기화를 맞춰줌.여러개의 프레임이 동시에 만들어질 수 있게 함.

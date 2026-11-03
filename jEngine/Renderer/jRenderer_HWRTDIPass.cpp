@@ -52,12 +52,15 @@ namespace
     {
     };
 
+}
     template <>
     struct TShaderParameterHLSLTypeInfo<jHWRTDIBindlessUInt2>
     {
         static constexpr const char* GetTypeName() { return "uint2"; }
         static void AppendTypeDeclaration(std::string&) {}
     };
+namespace
+{
 
     BEGIN_SHADER_STRUCT(HWRTDILightData)
         SHADER_STRUCT_MEMBER(Vector4, ColorAndType)

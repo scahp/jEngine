@@ -37,8 +37,10 @@ bool IsSizeMinimize = false;
 #pragma comment(lib,"dxguid.lib")
 
 // DirectX 12 Agility SDK 613
+#ifdef _WIN32
 extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = 613; }
 extern "C" { __declspec(dllexport) extern const char* D3D12SDKPath = ".\\D3D12\\"; }
+#endif
 
 std::wstring ConvertToWchar(const char* InPath, int32 InLength)
 {
@@ -49,11 +51,15 @@ std::wstring ConvertToWchar(const char* InPath, int32 InLength)
     {
         result.resize(InLength + 1);
         {
+#ifdef _WIN32
             const int32 ResultFilePathLength = MultiByteToWideChar(CP_ACP, 0, InPath, -1, NULL, NULL);
             check(ResultFilePathLength < 256);
 
             MultiByteToWideChar(CP_ACP, 0, InPath
                 , InLength, &result[0], (int32)(result.size() - 1));
+#else
+            return std::wstring_convert<std::codecvt_utf8<wchar_t>>{}.from_bytes(InPath, InPath + InLength);
+#endif
             result[InLength] = 0;
         }
     }

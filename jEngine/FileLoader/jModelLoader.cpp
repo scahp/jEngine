@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jModelLoader.h"
 
 #include "assimp/Importer.hpp"
@@ -472,8 +472,10 @@ jThreadPool::jThreadPool(size_t num_threads) : IsStop(false)
 	{
         WorkerThreads.emplace_back([this] 
 		{
+#ifdef _WIN32
 			const HRESULT comInitResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
 			const bool shouldUninitializeCOM = SUCCEEDED(comInitResult);
+#endif
 
             while (true) 
 			{
@@ -504,8 +506,10 @@ jThreadPool::jThreadPool(size_t num_threads) : IsStop(false)
 				}
             }
 
+#ifdef _WIN32
 			if (shouldUninitializeCOM)
 				CoUninitialize();
+#endif
         });
 
     }

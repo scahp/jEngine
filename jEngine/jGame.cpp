@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jGame.h"
 #include "Math/Vector.h"
 #include "Scene/jCamera.h"
@@ -16,7 +16,9 @@
 #include "Scene/jMeshObject.h"
 #include "FileLoader/jImageFileLoader.h"
 #include "Renderer/jSceneRenderTargets.h"    // temp
+#ifdef _WIN32
 #include "dxcapi.h"
+#endif
 #include "RHI/jRaytracingScene.h"
 #include "Renderer/jDirectionalLightDrawCommandGenerator.h"
 #include "Code/Engine/ConsoleVariables/jConsole.h"
@@ -1243,7 +1245,7 @@ void jGame::LoadPathTracingSceneByIndex(int32 InIndex, bool InRebuildRaytracingS
 
 	ApplyScenePlacementPreset(InIndex);
 
-	if (InRebuildRaytracingScene && GSupportRaytracing && g_rhi && g_rhi->RaytracingScene)
+	if (InRebuildRaytracingScene && IsRaytracingSceneSupported() && g_rhi && g_rhi->RaytracingScene)
 	{
 		g_rhi->RaytracingScene->Clear();
 
@@ -1358,7 +1360,7 @@ static jConsoleVariableInt* cvar_SurfelGIInlineRayCount = new jConsoleVariableIn
 	InitializePathTracingSceneBrowser();
 
 	g_rhi->Finish(); // todo : Instead of this, it needs UAV barrier here
-	if (GSupportRaytracing)
+	if (IsRaytracingSceneSupported())
 	{
 		jRatracingInitializer Initializer;
 		Initializer.CommandBuffer = g_rhi->BeginSingleTimeCommands();
@@ -1431,7 +1433,7 @@ void jGame::Update(float deltaTime)
 	jObject::FlushDirtyState();
 
     // Sync raytracing scene with placement/editor changes
-    if (GSupportRaytracing && g_rhi && g_rhi->RaytracingScene && g_rhi->RaytracingScene->ShouldUpdate())
+    if (IsRaytracingSceneSupported() && g_rhi && g_rhi->RaytracingScene && g_rhi->RaytracingScene->ShouldUpdate())
     {
         jRatracingInitializer Initializer;
         Initializer.RenderObjects = jObject::GetStaticRenderObject();
@@ -1527,6 +1529,7 @@ void jGame::OnMouseButton()
 			GLFWwindow* window = static_cast<GLFWwindow*>(g_rhi->GetWindow());
 			glfwGetCursorPos(window, &xpos, &ypos);
 		}
+		#ifdef _WIN32
 		else if (IsUseDX12())
 		{
 			POINT pt;
@@ -1538,6 +1541,8 @@ void jGame::OnMouseButton()
 				ypos = pt.y;
 			}
 		}
+
+		#endif
 
 		// Request object picking
 		g_Editor->Placement.bPickRequested = true;

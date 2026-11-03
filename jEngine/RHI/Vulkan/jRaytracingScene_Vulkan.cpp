@@ -104,7 +104,7 @@ void jRaytracingScene_Vulkan::CreateOrUpdateBLAS(const jRatracingInitializer& In
         }
 
         geometry.geometry.triangles.vertexData = VkDeviceOrHostAddressConstKHR(VertexStart);
-        geometry.geometry.triangles.maxVertex = VertexCount;
+        geometry.geometry.triangles.maxVertex = std::max(0, VertexCount - 1);
         geometry.geometry.triangles.vertexStride = VertexBufferVulkanPtr->Streams[0].Stride;
         geometry.geometry.triangles.transformData.deviceAddress = 0;
 
@@ -192,6 +192,7 @@ void jRaytracingScene_Vulkan::CreateOrUpdateBLAS(const jRatracingInitializer& In
 
 void jRaytracingScene_Vulkan::CreateOrUpdateTLAS(const jRatracingInitializer& InInitializer)
 {
+    if (InstanceList.empty()) return;
     auto CmdBuffer = (jCommandBuffer_Vulkan*)InInitializer.CommandBuffer;
 
     const bool IsUpdate = !!ScratchTLASBufferPtr;
@@ -259,7 +260,7 @@ void jRaytracingScene_Vulkan::CreateOrUpdateTLAS(const jRatracingInitializer& In
     VkAccelerationStructureBuildGeometryInfoKHR accelerationStructureBuildGeometryInfo{};
     accelerationStructureBuildGeometryInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
     accelerationStructureBuildGeometryInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
-    accelerationStructureBuildGeometryInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
+    accelerationStructureBuildGeometryInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
     accelerationStructureBuildGeometryInfo.geometryCount = 1;
     accelerationStructureBuildGeometryInfo.pGeometries = &accelerationStructureGeometry;
 

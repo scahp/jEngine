@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jRenderObject.h"
 #include "jGame.h"
 #include "Scene/jCamera.h"
@@ -8,9 +8,15 @@
 #include "RHI/Vulkan/jUniformBufferBlock_Vulkan.h"
 #include "Material/jMaterial.h"
 #include "jOptions.h"
+#ifdef _WIN32
 #include "RHI/DX12/jVertexBuffer_DX12.h"
+#endif
+#ifdef _WIN32
 #include "RHI/DX12/jIndexBuffer_DX12.h"
+#endif
+#ifdef _WIN32
 #include "RHI/DX12/jBufferUtil_DX12.h"
+#endif
 #include "RHI/jRHI.h"
 #include "RHI/jRaytracingScene.h"
 #include "Shader/jCommonShaderParameters.h"

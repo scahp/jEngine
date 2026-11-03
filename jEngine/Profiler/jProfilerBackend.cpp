@@ -3,11 +3,15 @@
 #endif
 #include "pch.h"
 #include "Profiler/jProfilerBackend.h"
+#ifdef _WIN32
 #include "RHI/DX12/jTexture_DX12.h"
+#endif
 #include "RHI/Vulkan/jTexture_Vulkan.h"
 #include "RHI/Vulkan/jBuffer_Vulkan.h"
 #include <new>
+#ifdef _WIN32
 #include <malloc.h>
+#endif
 #if defined(_WIN32)
 #ifndef GLFW_EXPOSE_NATIVE_WIN32
 #define GLFW_EXPOSE_NATIVE_WIN32
@@ -73,6 +77,7 @@ namespace
 	TracyVkCtx g_TracyVkCtx[(int32)ECommandBufferType::MAX] = { nullptr, };
 #endif
 
+	#ifdef _WIN32
 	HWND GetMainWindowHandle()
 	{
 		if (!g_rhi)
@@ -93,6 +98,7 @@ namespace
 		return nullptr;
 	}
 
+	#endif
 	int32 AlignDownTo4(int32 InValue)
 	{
 		return InValue & ~3;

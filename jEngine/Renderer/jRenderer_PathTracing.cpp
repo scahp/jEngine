@@ -35,8 +35,6 @@ BEGIN_SHADER_PARAMETER_SET(jPathTracingGlobalParameters)
     SHADER_TEXTURECUBE_SRV(EnvTexture)
 END_SHADER_PARAMETER_SET()
 
-namespace
-{
     struct jPathTracingBindlessUInt2
     {
     };
@@ -47,7 +45,6 @@ namespace
         static constexpr const char* GetTypeName() { return "uint2"; }
         static void AppendTypeDeclaration(std::string&) {}
     };
-}
 
 BEGIN_SHADER_STRUCT(MaterialUniformBuffer)
     SHADER_STRUCT_MEMBER(Vector, baseColor)

@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jBuffer_Vulkan.h"
 #include "jRHI_Vulkan.h"
 
@@ -9,6 +9,12 @@ void jBuffer_Vulkan::Release()
 
 void jBuffer_Vulkan::ReleaseInternal()
 {
+    if (AccelerationStructure) {
+        auto resource = std::make_shared<jStandaloneResourceVulkan>();
+        resource->AccelerationStructure = AccelerationStructure;
+        g_rhi_vk->DeallocatorMultiFrameStandaloneResource.Free(resource);
+        AccelerationStructure = VK_NULL_HANDLE;
+    }
     if (!HasBufferOwnership)
     {
         // Return an allocated memory to vulkan memory pool
