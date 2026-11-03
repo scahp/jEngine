@@ -50,21 +50,26 @@ std::shared_ptr<jSyncAcrossCommandQueue_Vulkan> jRenderFrameContext_Vulkan::Queu
     std::shared_ptr<jSyncAcrossCommandQueue_Vulkan> CommandQueueSyncObjectPtr;
     if (CommandBuffer)
     {
+        auto* SubmittedCommandBuffer = CommandBuffer;
+        const auto SubmittedFence = (VkFence)SubmittedCommandBuffer->GetFenceHandle();
         CommandBuffer->End();
 
         jCommandBufferManager_Vulkan* CommandBufferManager = (jCommandBufferManager_Vulkan*)g_rhi->GetCommandBufferManager(CommandBuffer->Type);
 
         CommandQueueSyncObjectPtr = g_rhi_vk->QueueSubmit(shared_from_this(), InSignalSemaphore);
-        CommandBufferManager->ReturnCommandBuffer(CommandBuffer);
+
+        // Wait before returning the submitted buffer to the pool. The replacement
+        // buffer has an unrelated, usually already-signaled fence.
+        if (bWaitUntilExecuteComplete && SubmittedCommandBuffer->GetFence())
+            SubmittedCommandBuffer->GetFence()->WaitForFence();
+
+        CommandBufferManager->ReturnCommandBuffer(SubmittedCommandBuffer);
 
         // get new commandbuffer
         CommandBuffer = CommandBufferManager->GetOrCreateCommandBuffer();
         
         if (CommandBuffer->Type == ECommandBufferType::GRAPHICS)
-            g_rhi_vk->Swapchain->Images[FrameIndex]->CommandBufferFence = (VkFence)CommandBuffer->GetFenceHandle();
-
-        if (bWaitUntilExecuteComplete && CommandBuffer->GetFence())
-            CommandBuffer->GetFence()->WaitForFence();
+            g_rhi_vk->Swapchain->Images[FrameIndex]->CommandBufferFence = SubmittedFence;
     }
     return CommandQueueSyncObjectPtr;
 }

@@ -6,11 +6,7 @@
 
 jDescriptorPool_Vulkan::~jDescriptorPool_Vulkan()
 {
-    if (DescriptorPool)
-    {
-        vkDestroyDescriptorPool(g_rhi_vk->Device, DescriptorPool, nullptr);
-        DescriptorPool = nullptr;
-    }
+    Release();
     DeallocateMultiframeShaderBindingInstance.FreeDelegate = nullptr;
 }
 
@@ -32,28 +28,21 @@ void jDescriptorPool_Vulkan::Create(uint32 InMaxDescriptorSets)
     check(!DescriptorPool);
 
     MaxDescriptorSets = InMaxDescriptorSets;
-
-    constexpr int32 NumOfPoolSize = _countof(DefaultPoolSizes);
-    VkDescriptorPoolSize Types[NumOfPoolSize];
-    memset(Types, 0, sizeof(Types));
-
-    for (uint32 i = 0; i < NumOfPoolSize; ++i)
-    {
-        
-        EShaderBindingType DescriptorType = static_cast<EShaderBindingType>(VK_DESCRIPTOR_TYPE_SAMPLER + i);
-
-        PoolSizes[i] = (uint32)Max(DefaultPoolSizes[i] * InMaxDescriptorSets, 4.0f);
-
-        Types[i].type = GetVulkanShaderBindingType(DescriptorType);
-        Types[i].descriptorCount = PoolSizes[i];
-    }
+    for (auto Pool : OverflowDescriptorPools) vkDestroyDescriptorPool(g_rhi_vk->Device, Pool, nullptr);
+    OverflowDescriptorPools.clear();
+    RemainingDescriptors.clear();
+    AllocatedDescriptorSetCount = 0;
 
     VkDescriptorPoolCreateInfo PoolInfo{};
     PoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     std::vector<VkDescriptorPoolSize> supportedTypes;
-    for (const auto& type : Types)
-        if (type.type != VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR || IsRaytracingSceneSupported())
-            supportedTypes.push_back(type);
+    for (const auto& Budget : jVulkanDescriptorPoolSizing::DefaultPoolSizes)
+    {
+        if (Budget.Type == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR && !IsRaytracingSceneSupported()) continue;
+        const uint32 Count = static_cast<uint32>(Max(Budget.PerSet * InMaxDescriptorSets, 4.0f));
+        supportedTypes.push_back({Budget.Type, Count});
+        RemainingDescriptors[Budget.Type] = Count;
+    }
     PoolInfo.poolSizeCount = static_cast<uint32>(supportedTypes.size());
     PoolInfo.pPoolSizes = supportedTypes.data();
     PoolInfo.maxSets = InMaxDescriptorSets;
@@ -74,7 +63,8 @@ void jDescriptorPool_Vulkan::Reset()
 #endif
 }
 
-std::shared_ptr<jShaderBindingInstance> jDescriptorPool_Vulkan::AllocateDescriptorSet(VkDescriptorSetLayout InLayout)
+std::shared_ptr<jShaderBindingInstance> jDescriptorPool_Vulkan::AllocateDescriptorSet(VkDescriptorSetLayout InLayout,
+    const std::vector<VkDescriptorPoolSize>& InRequirements)
 {
     jScopedLock s(&DescriptorPoolLock);
 #if !USE_RESET_DESCRIPTOR_POOL
@@ -92,15 +82,46 @@ std::shared_ptr<jShaderBindingInstance> jDescriptorPool_Vulkan::AllocateDescript
     }
 #endif
 
+    bool UsePrimaryPool = AllocatedDescriptorSetCount < MaxDescriptorSets;
+    for (const auto& Requirement : InRequirements)
+    {
+        const auto Capacity = RemainingDescriptors.find(Requirement.type);
+        if (Capacity == RemainingDescriptors.end() || Capacity->second < Requirement.descriptorCount)
+            UsePrimaryPool = false;
+    }
+    VkDescriptorPool AllocationPool = DescriptorPool;
+    if (!UsePrimaryPool)
+    {
+        // A bindless set can exceed the default per-type budget. Size a cached
+        // overflow allocation from the actual layout, without guessing a cap.
+        VkDescriptorPoolCreateInfo PoolInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+        PoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
+        PoolInfo.maxSets = 1;
+        PoolInfo.poolSizeCount = static_cast<uint32>(InRequirements.size());
+        PoolInfo.pPoolSizes = InRequirements.data();
+        if (!ensure(VK_SUCCESS == vkCreateDescriptorPool(g_rhi_vk->Device, &PoolInfo, nullptr, &AllocationPool)))
+            return nullptr;
+    }
+
     VkDescriptorSetAllocateInfo DescriptorSetAllocateInfo{};
     DescriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    DescriptorSetAllocateInfo.descriptorPool = DescriptorPool;
+    DescriptorSetAllocateInfo.descriptorPool = AllocationPool;
     DescriptorSetAllocateInfo.descriptorSetCount = 1;
     DescriptorSetAllocateInfo.pSetLayouts = &InLayout;
 
     VkDescriptorSet NewDescriptorSet = nullptr;
     if (!ensure(VK_SUCCESS == vkAllocateDescriptorSets(g_rhi_vk->Device, &DescriptorSetAllocateInfo, &NewDescriptorSet)))
+    {
+        if (!UsePrimaryPool) vkDestroyDescriptorPool(g_rhi_vk->Device, AllocationPool, nullptr);
         return nullptr;
+    }
+    if (UsePrimaryPool)
+    {
+        ++AllocatedDescriptorSetCount;
+        for (const auto& Requirement : InRequirements)
+            RemainingDescriptors[Requirement.type] -= Requirement.descriptorCount;
+    }
+    else OverflowDescriptorPools.push_back(AllocationPool);
 
     auto NewShaderBindingInstance_Vulkan = std::make_shared<jShaderBindingInstance_Vulkan>();
     NewShaderBindingInstance_Vulkan->DescriptorSet = NewDescriptorSet;
@@ -127,6 +148,10 @@ void jDescriptorPool_Vulkan::Release()
         vkDestroyDescriptorPool(g_rhi_vk->Device, DescriptorPool, nullptr);
         DescriptorPool = nullptr;
     }
+    for (auto Pool : OverflowDescriptorPools) vkDestroyDescriptorPool(g_rhi_vk->Device, Pool, nullptr);
+    OverflowDescriptorPools.clear();
+    RemainingDescriptors.clear();
+    AllocatedDescriptorSetCount = 0;
 
     {
         jScopedLock s(&DescriptorPoolLock);
@@ -140,6 +165,6 @@ void jDescriptorPool_Vulkan::Release()
         //    }
         //}
         AllocatedDescriptorSets.clear();
+        PendingDescriptorSets.clear();
     }
 }
-

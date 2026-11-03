@@ -112,6 +112,7 @@ public:
 	FORCEINLINE void Set(const char* pName, size_t size)
 	{
 		check(pName);
+		NameStringW = nullptr;
 		const uint32 NewNameHash = GenerateNameHash(pName, size);
 
 		auto find_func = [&]()
@@ -140,7 +141,7 @@ public:
             if (find_func())
                 return;
 
-			const auto it_ret = s_NameTable.emplace(NewNameHash, CreateNewName_Internal(pName, NewNameHash));
+			const auto it_ret = s_NameTable.emplace(NewNameHash, CreateNewName_Internal(pName, size));
 			if (it_ret.second)
 			{
 				NameHash = NewNameHash;
@@ -175,6 +176,7 @@ public:
 		NameHash = In.NameHash;
         NameString = In.NameString;
         NameStringLength = In.NameStringLength;
+		NameStringW = In.NameStringW;
 		return *this;
 	}
 
@@ -249,7 +251,7 @@ public:
 		if (!IsValid())
 			return 0;
 
-		if (!NameStringLength)
+		if (NameString)
 			return NameStringLength;
 
 		{
@@ -267,11 +269,11 @@ public:
 	FORCEINLINE uint32 GetNameHash() const { return NameHash; }
 
 private:
-	FORCEINLINE static std::shared_ptr<std::string> CreateNewName_Internal(const char* pName, uint32 NameHash)
+	FORCEINLINE static std::shared_ptr<std::string> CreateNewName_Internal(const char* pName, size_t size)
 	{
 		check(pName);
 
-		return std::make_shared<std::string>(pName);
+		return std::make_shared<std::string>(pName, size);
 	}
 
 	uint32 NameHash = -1;

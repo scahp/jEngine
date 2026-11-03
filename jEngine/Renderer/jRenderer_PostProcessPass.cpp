@@ -12,6 +12,13 @@
 #include "Profiler/jPerformanceProfile.h"
 #include "Shader/jShader.h"
 #include "Shader/jShaderParameterSet.h"
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+
+#ifdef __APPLE__
+namespace { jTexture* GEffectAuditLastExposure = nullptr; }
+#endif
 
 BEGIN_SHADER_PARAMETER_SET(jTonemapPSParameters)
     SHADER_TEXTURE2D(BloomTexture)
@@ -330,7 +337,8 @@ void jRenderer::PostProcess()
 		if (gOptions.BloomEyeAdaptation && !gOptions.ShowAOOnly)
 		{
 			//////////////////////////////////////////////////////////////////////////
-			// Todo remove this hardcode
+			// A newly allocated exposure texture has no GPU contents yet.
+			const bool HasEyeAdaptationHistory = g_EyeAdaptationARTPtr && g_EyeAdaptationBRTPtr;
 			if (!g_EyeAdaptationARTPtr)
 			{
 				jRenderTargetInfo Info = {
@@ -340,9 +348,9 @@ void jRenderer::PostProcess()
 					.Height = 1,
 					.LayerCount = 1,
 					.IsGenerateMipmap = false,
-					.SampleCount = g_rhi->GetSelectedMSAASamples(),
+					.SampleCount = EMSAASamples::COUNT_1,
 					.RTClearValue = jRTClearValue::Invalid,
-					.TextureCreateFlag = (ETextureCreateFlag::RTV | ETextureCreateFlag::UAV),
+					.TextureCreateFlag = (ETextureCreateFlag::RTV | ETextureCreateFlag::UAV | ETextureCreateFlag::TransferSrc),
 					.ResourceName = jNameStatic("g_EyeAdaptationARTPtr")
 				};
 				g_EyeAdaptationARTPtr = jRenderTargetPool::GetRenderTarget(Info);
@@ -356,9 +364,9 @@ void jRenderer::PostProcess()
 					.Height = 1,
 					.LayerCount = 1,
 					.IsGenerateMipmap = false,
-					.SampleCount = g_rhi->GetSelectedMSAASamples(),
+					.SampleCount = EMSAASamples::COUNT_1,
 					.RTClearValue = jRTClearValue::Invalid,
-					.TextureCreateFlag = (ETextureCreateFlag::RTV | ETextureCreateFlag::UAV),
+					.TextureCreateFlag = (ETextureCreateFlag::RTV | ETextureCreateFlag::UAV | ETextureCreateFlag::TransferSrc),
 					.ResourceName = jNameStatic("g_EyeAdaptationBRTPtr")
 				};
 				g_EyeAdaptationBRTPtr = jRenderTargetPool::GetRenderTarget(Info);
@@ -369,6 +377,8 @@ void jRenderer::PostProcess()
 
 			jTexture* EyeAdaptationTextureOld = FlipEyeAdaptation ? g_EyeAdaptationARTPtr->GetTexture() : g_EyeAdaptationBRTPtr->GetTexture();
 			EyeAdaptationTextureCurrent = FlipEyeAdaptation ? g_EyeAdaptationBRTPtr->GetTexture() : g_EyeAdaptationARTPtr->GetTexture();
+			if (!HasEyeAdaptationHistory)
+				EyeAdaptationTextureOld = GWhiteTexture.get();
 
 			if (1)
 			{
@@ -479,6 +489,9 @@ void jRenderer::PostProcess()
 		g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), SceneRT->ColorPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 		g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), EyeAdaptationTextureCurrent, EResourceLayout::SHADER_READ_ONLY);
 
+#ifdef __APPLE__
+        GEffectAuditLastExposure = EyeAdaptationTextureCurrent;
+#endif
 		jTonemapPSParameters TonemapParameters;
 		TonemapParameters.BloomTexture = { SourceRT, PostProcessSamplerState };
 		TonemapParameters.Texture = { SceneRT->ColorPtr->GetTexture(), PostProcessSamplerState };
@@ -488,3 +501,71 @@ void jRenderer::PostProcess()
 			, TonemapParameters);
 	}
 }
+
+// Use the production parameter declarations for offline SPIR-V/DXIL checks.
+int ExportAtmosphericEffectShaderFixtures(const char* Directory, bool Vulkan);
+
+int ExportPostProcessShaderFixtures(const char* Directory, bool Vulkan)
+{
+    try
+    {
+        gAPIType = Vulkan ? EAPIType::Vulkan : EAPIType::DX12;
+        const std::filesystem::path Target(Directory);
+        std::filesystem::create_directories(Target);
+        auto Write = [&](const char* Name, const std::string& Declarations, const char* Shader, bool Compute) {
+            std::ofstream File(Target / (std::string(Name) + ".hlsl"));
+            File.exceptions(std::ios::badbit | std::ios::failbit);
+            File << "#define COMPUTE_SHADER " << (Compute ? 1 : 0)
+                 << "\n#define PIXEL_SHADER " << (Compute ? 0 : 1) << '\n'
+                 << Declarations << "\n#include \"" << Shader << "\"\n";
+        };
+        Write("effect-eye-adaptation", jShaderParameterSet::GenerateHLSL<jEyeAdaptationCSParameters>(0), "eyeadaptation_cs.hlsl", true);
+        Write("effect-bloom-setup", jShaderParameterSet::GenerateHLSL<jBloomSetupPSParameters>(0), "bloom_and_eyeadaptation_setup_ps.hlsl", false);
+        Write("effect-bloom-down-vs", jShaderParameterSet::GenerateHLSL<jBloomDownPSParameters>(0), "bloom_down_vs.hlsl", false);
+        Write("effect-bloom-down-ps", jShaderParameterSet::GenerateHLSL<jBloomDownPSParameters>(0), "bloom_down_ps.hlsl", false);
+        Write("effect-bloom-up-vs", jShaderParameterSet::GenerateHLSL<jBloomUpPSParameters>(0), "bloom_up_vs.hlsl", false);
+        Write("effect-bloom-up-ps", jShaderParameterSet::GenerateHLSL<jBloomUpPSParameters>(0), "bloom_up_ps.hlsl", false);
+        Write("effect-tonemap", jShaderParameterSet::GenerateHLSL<jTonemapPSParameters>(0), "tonemap_ps.hlsl", false);
+        return ExportAtmosphericEffectShaderFixtures(Directory, Vulkan);
+    }
+    catch (const std::exception& Error)
+    {
+        std::cerr << "Postprocess shader export failed: " << Error.what() << std::endl;
+        return EXIT_FAILURE;
+    }
+}
+
+#ifdef __APPLE__
+#include "RHI/Vulkan/jBufferUtil_Vulkan.h"
+// Only called by the bounded effects regression mode after frame submission.
+void DumpEffectAuditDiagnostics()
+{
+    auto* texture = GEffectAuditLastExposure;
+    if (!texture || texture->Format != ETextureFormat::R16F)
+        throw std::runtime_error("Effects audit did not produce an exposure texture");
+    g_rhi->Flush();
+    auto target = jBufferUtil_Vulkan::CreateBuffer(EVulkanBufferBits::TRANSFER_DST,
+        EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT, 4, EResourceLayout::TRANSFER_DST);
+    auto* cmd = g_rhi->BeginSingleTimeCommands();
+    const auto previous = texture->GetLayout();
+    g_rhi->TransitionLayout(cmd, texture, EResourceLayout::TRANSFER_SRC);
+    cmd->FlushBarrierBatch();
+    jTextureCopyRegion region{}; region.Width = 1; region.Height = 1;
+    g_rhi->CopyTextureRegionToBuffer(cmd, texture, region, target.get(), target->Offset);
+    g_rhi->TransitionLayout(cmd, texture, previous);
+    cmd->FlushBarrierBatch();
+    VkMemoryBarrier host{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+    host.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    host.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
+    vkCmdPipelineBarrier(static_cast<jCommandBuffer_Vulkan*>(cmd)->GetRef(), VK_PIPELINE_STAGE_TRANSFER_BIT,
+        VK_PIPELINE_STAGE_HOST_BIT, 0, 1, &host, 0, nullptr, 0, nullptr);
+    g_rhi->EndSingleTimeCommands(cmd);
+    uint16 half = 0;
+    std::memcpy(&half, target->Map(), sizeof(half));
+    target->Unmap();
+    const bool finitePositive = !(half & 0x8000u) && (half & 0x7c00u) != 0x7c00u && (half & 0x7fffu) != 0;
+    std::cout << "Effects audit: frame=" << g_rhi->GetCurrentFrameNumber() << " width=" << SCR_WIDTH
+              << " height=" << SCR_HEIGHT << " exposure_finite_positive=" << finitePositive << " exposure_half=" << half << std::endl;
+    if (!finitePositive) throw std::runtime_error("Effects audit produced invalid exposure");
+}
+#endif

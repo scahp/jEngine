@@ -1,4 +1,5 @@
 #include "common.hlsl"
+#include "effect_sampling.hlsl"
 #include "PBR.hlsl"
 
 #ifndef SSGI_MAX_STEPS
@@ -28,7 +29,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_Gro
     if (GlobalInvocationID.x >= ComputeCommon.Width || GlobalInvocationID.y >= ComputeCommon.Height)
         return;
 
-    float2 uv = GlobalInvocationID.xy / float2(ComputeCommon.Width - 1, ComputeCommon.Height - 1);
+    float2 uv = EffectPixelUV(GlobalInvocationID.xy, uint2(ComputeCommon.Width, ComputeCommon.Height));
 
     // Get view-space position and normal
     float3 viewPos = CalcViewPositionFromDepth(DepthTexture, DepthTextureSampler, uv, ComputeCommon.InvP);
@@ -71,13 +72,13 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_Gro
         float r2s = sqrt(r2);
         float3 sampleDir = mul(tbn, float3(cos(r1) * r2s, sin(r1) * r2s, sqrt(1.0 - r2)));
 
-        viewPos += sampleDir * 50;
+        float3 rayOrigin = viewPos + sampleDir * 50.0f;
 
         float stepSize = ComputeCommon.SSGI_MaxDistance / ComputeCommon.SSGI_MaxSteps;
         for (int i = 0; i < ComputeCommon.SSGI_MaxSteps; ++i)
         {
             // March along the reflection vector in view space
-            float3 rayPos = viewPos + sampleDir * stepSize * (float(i) + rayJitter);
+            float3 rayPos = rayOrigin + sampleDir * stepSize * (float(i) + rayJitter);
 
             // Project ray position to screen space
             float4 projectedPos = mul(ComputeCommon.P, float4(rayPos, 1.0));
@@ -131,5 +132,4 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_Gro
 
     Result[GlobalInvocationID.xy] = float4(indirectLight, 1.0);
 }
-
 

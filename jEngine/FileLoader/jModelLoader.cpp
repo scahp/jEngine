@@ -11,7 +11,9 @@
 #include "Math/Vector.h"
 #include "Scene/jRenderObject.h"
 #include "jImageFileLoader.h"
+#include "jModelLoaderUtils.h"
 #include <filesystem>
+#include <utility>
 
 #if defined _DEBUG
 #pragma comment(lib, "assimp-vc143-mtd.lib")
@@ -47,18 +49,20 @@ jModelLoader::~jModelLoader()
 
 jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materialRootDir)
 {
+	if (!filename || !filename[0])
+		return nullptr;
 	Assimp::Importer importer;
 	const aiScene* scene = importer.ReadFile(filename, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_CalcTangentSpace
-		| aiProcess_MakeLeftHanded
+		| aiProcess_MakeLeftHanded | aiProcess_GenSmoothNormals
 	);
 
 	if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
 	{
-		JASSERT(!importer.GetErrorString());
+		std::cerr << "Model load failed: " << filename << ": " << importer.GetErrorString() << std::endl;
 		return nullptr;
 	}
 
-	jMeshObject* object = new jMeshObject();
+	auto object = std::make_unique<jMeshObject>();
 
 	jMeshData* meshData = new jMeshData();
 	object->MeshData = meshData;
@@ -68,55 +72,11 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 		const aiMesh* assimpMesh = scene->mMeshes[i];
 
 		jSubMesh subMesh;
-		if (assimpMesh->mName.length > 0)
-			subMesh.Name = assimpMesh->mName.C_Str();
-
-		subMesh.StartVertex = static_cast<int32>(meshData->Vertices.size());
-		meshData->Vertices.resize(meshData->Vertices.size() + assimpMesh->mNumVertices);
-		subMesh.EndVertex = static_cast<int32>(meshData->Vertices.size());
-
-		memcpy(&meshData->Vertices[subMesh.StartVertex], &assimpMesh->mVertices[0], assimpMesh->mNumVertices * sizeof(Vector));
-
-		const bool HasTangentBitangent = assimpMesh->HasTangentsAndBitangents();
-		if (HasTangentBitangent)
+		if (!assimpMesh || !jModelLoaderUtils::AppendMesh(*assimpMesh, *meshData, subMesh))
 		{
-			meshData->Tangents.resize(meshData->Tangents.size() + assimpMesh->mNumVertices);
-			memcpy(&meshData->Tangents[subMesh.StartVertex], &assimpMesh->mTangents[0], assimpMesh->mNumVertices * sizeof(Vector));
-
-			meshData->Bitangents.resize(meshData->Bitangents.size() + assimpMesh->mNumVertices);
-			memcpy(&meshData->Bitangents[subMesh.StartVertex], &assimpMesh->mBitangents[0], assimpMesh->mNumVertices * sizeof(Vector));
+			std::cerr << "Unsupported or invalid triangle mesh: " << filename << std::endl;
+			return nullptr;
 		}
-
-		if (assimpMesh->HasNormals())
-		{
-			meshData->Normals.resize(meshData->Normals.size() + assimpMesh->mNumVertices);
-			memcpy(&meshData->Normals[subMesh.StartVertex], &assimpMesh->mNormals[0], assimpMesh->mNumVertices * sizeof(Vector));
-		}
-
-		if (assimpMesh->HasTextureCoords(0))
-		{
-			meshData->TexCoord.resize(meshData->TexCoord.size() + assimpMesh->mNumVertices);
-			for (uint32 k = 0; k < assimpMesh->mNumVertices; ++k)
-			{
-				auto& texCoord = meshData->TexCoord[subMesh.StartVertex + k];
-				auto& assimpTexCoord = assimpMesh->mTextureCoords[0][k];
-				texCoord.x = assimpTexCoord.x;
-				texCoord.y = assimpTexCoord.y;
-			}
-		}
-
-		if (assimpMesh->HasFaces())
-		{
-			subMesh.StartFace = static_cast<int32>(meshData->Faces.size());
-			meshData->Faces.resize(meshData->Faces.size() + assimpMesh->mNumFaces * 3);
-			subMesh.EndFace = static_cast<int32>(meshData->Faces.size());
-			for (unsigned int k = 0; k < assimpMesh->mNumFaces; ++k)
-			{
-				aiFace& face = assimpMesh->mFaces[k];
-				memcpy(&meshData->Faces[subMesh.StartFace + k * 3], &face.mIndices[0], sizeof(uint32) * 3);
-			}
-		}
-		subMesh.MaterialIndex = assimpMesh->mMaterialIndex;
 		object->SubMeshes.emplace_back(subMesh);
 	}
 
@@ -223,11 +183,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 			const bool isDataUri = (texturePath.rfind("data:", 0) == 0);
 			if (!isEmbeddedTexture && !isDataUri && !texturePath.empty())
 			{
-				std::filesystem::path resolvedPath(texturePath);
-				if (!resolvedPath.is_absolute() && materialRootDir)
-					resolvedPath = std::filesystem::path(materialRootDir) / resolvedPath;
-
-				resolvedPath = resolvedPath.lexically_normal();
+				const auto resolvedPath = jModelLoaderUtils::ResolveTexturePath(texturePath, materialRootDir);
 				std::error_code errorCode;
 				if (std::filesystem::exists(resolvedPath, errorCode) && !errorCode)
 				{
@@ -237,7 +193,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 
 					Materials.push_back(newMeshMaterial);
 					jTask T;
-					T.pHashFunc = [&FilePathName]()
+					T.pHashFunc = [FilePathName]()
 					{
 						return (size_t)FilePathName.GetNameHash();
 					};
@@ -320,7 +276,15 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 		meshData->Materials.emplace(std::make_pair(i, std::shared_ptr<jMaterial>(newMeshMaterial)));
 	}
 
-    ThreadPool.WaitAll();
+    try
+    {
+        ThreadPool.WaitAll();
+    }
+    catch (const std::exception& error)
+    {
+        std::cerr << "Model texture load failed: " << filename << ": " << error.what() << std::endl;
+        return nullptr;
+    }
     
     for (jMaterial* mat : Materials)
     {
@@ -336,13 +300,11 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 	{
 		jMeshNode* rootNode = new jMeshNode();
 
-		rootNode->MeshIndex.resize(scene->mRootNode->mNumMeshes);
-		memcpy(&rootNode->MeshIndex[0], scene->mRootNode->mMeshes, scene->mRootNode->mNumMeshes * sizeof(int32));
-
 		auto fillUpMeshNode = [](jMeshNode* node, aiNode* assimpNode)
 		{
 			node->MeshIndex.resize(assimpNode->mNumMeshes);
-			memcpy(&node->MeshIndex[0], assimpNode->mMeshes, assimpNode->mNumMeshes * sizeof(int32));
+			if (assimpNode->mNumMeshes)
+				memcpy(node->MeshIndex.data(), assimpNode->mMeshes, assimpNode->mNumMeshes * sizeof(int32));
 		};
 
 		std::function<void(jMeshNode*, aiNode*)> fillupChildNode = [&](jMeshNode* node, aiNode* assimpNode)
@@ -350,6 +312,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 			for (uint32 i = 0; i < assimpNode->mNumChildren; ++i)
 			{
 				auto newNode = new jMeshNode();
+				newNode->Parent = node;
 				fillUpMeshNode(newNode, assimpNode->mChildren[i]);
 				fillupChildNode(newNode, assimpNode->mChildren[i]);
 				node->childNode.push_back(newNode);
@@ -416,7 +379,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 
 	auto indexStreamData = std::make_shared<jIndexStreamData>();
 	indexStreamData->ElementCount = static_cast<int32>(meshData->Faces.size());
-	if (indexStreamData->ElementCount > 65535)
+	if (jModelLoaderUtils::Requires32BitIndices(meshData->Faces))
 	{
 		auto streamParam = new jStreamParam<uint32>();
 		streamParam->BufferType = EBufferType::STATIC;
@@ -458,7 +421,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 		object->AddRenderObject(StaticMeshRenderObject);  // Use AddRenderObject to automatically set Owner
 	}
 
-	return object;
+	return object.release();
 }
 
 jMeshObject* jModelLoader::LoadFromFile(const char* filename)
@@ -468,7 +431,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename)
 
 jThreadPool::jThreadPool(size_t num_threads) : IsStop(false)
 {
-    for (size_t i = 0; i < num_threads; ++i) 
+    for (size_t i = 0; i < Max(size_t(1), num_threads); ++i)
 	{
         WorkerThreads.emplace_back([this] 
 		{
@@ -499,11 +462,21 @@ jThreadPool::jThreadPool(size_t num_threads) : IsStop(false)
 					}
                 }
 
-				if (task.IsValid())
-				{
-					task.Do();
-					--RemainTask;
-				}
+                try
+                {
+                    task.Do();
+                }
+                catch (...)
+                {
+                    std::lock_guard<std::mutex> lock(QueueLock);
+                    if (!TaskException)
+                        TaskException = std::current_exception();
+                }
+                {
+                    std::lock_guard<std::mutex> lock(QueueLock);
+                    --RemainTask;
+                }
+                CompletionConditionVariable.notify_all();
             }
 
 #ifdef _WIN32
@@ -532,16 +505,32 @@ jThreadPool::~jThreadPool()
 
 void jThreadPool::Enqueue(const jTask& file_path)
 {
+    if (!file_path.IsValid())
+        return;
     std::unique_lock<std::mutex> lock(QueueLock);
+    if (IsStop)
+        throw std::runtime_error("Cannot enqueue on a stopped asset thread pool");
 
     // 중복 작업인지 확인
     auto hash = file_path.GetHash();
-    if (ProcessingTaskHashes.find(hash) == ProcessingTaskHashes.end())
+    if (!file_path.pHashFunc || ProcessingTaskHashes.find(hash) == ProcessingTaskHashes.end())
 	{
         // 중복이 아닐 때만 작업 큐에 추가
         TaskQueue.push(file_path);
         RemainTask++;
-		ProcessingTaskHashes.insert(hash);
+        if (file_path.pHashFunc)
+            ProcessingTaskHashes.insert(hash);
         ConditionVariable.notify_one();
     }
+}
+
+void jThreadPool::WaitAll()
+{
+    std::unique_lock<std::mutex> lock(QueueLock);
+    CompletionConditionVariable.wait(lock, [this] { return RemainTask == 0; });
+    ProcessingTaskHashes.clear();
+    const auto error = std::exchange(TaskException, nullptr);
+    lock.unlock();
+    if (error)
+        std::rethrow_exception(error);
 }

@@ -1,4 +1,5 @@
 #include "common.hlsl"
+#include "effect_sampling.hlsl"
 #include "Sphericalmap.hlsl"
 #include "PBR.hlsl"
 
@@ -89,7 +90,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_Gro
     if (GlobalInvocationID.x >= AtmosphericParam.RTWidth || GlobalInvocationID.y >= AtmosphericParam.RTHeight)
         return;
 
-    float2 uv = GlobalInvocationID.xy / float2(AtmosphericParam.RTWidth - 1, AtmosphericParam.RTHeight - 1);
+    float2 uv = EffectPixelUV(GlobalInvocationID.xy, uint2(AtmosphericParam.RTWidth, AtmosphericParam.RTHeight));
     float3 WorldPos = CalcWorldPositionFromDepth(DepthTexture, DepthTextureSampler, uv, AtmosphericParam.InvVP);
 
     float3 ToPixel = (WorldPos - AtmosphericParam.CameraPos);

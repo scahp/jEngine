@@ -123,6 +123,7 @@ public:
 	static jMeshMaterial NullMeshMateral;
 
 	jMeshObject();
+	~jMeshObject() override;
 	
 	jMeshData* MeshData = nullptr;
 	mutable std::vector<jSubMesh> SubMeshes;

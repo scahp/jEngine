@@ -31,6 +31,7 @@ public:
 
 	// Console Variable Management
 	void RegisterVariable(IConsoleVariable* variable);
+	void UnregisterVariable(IConsoleVariable* variable);
 	IConsoleVariable* FindVariable(const std::string& name);
 
 	// Console Command Management

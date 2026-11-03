@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "jSceneRenderTargets.h"
+#include "jBloomDimensions.h"
 #include "RHI/jRenderTargetPool.h"
 #include "RHI/jSwapchain.h"
 #include "Scene/Light/jDirectionalLight.h"
@@ -53,8 +54,8 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
     ColorPtr = jRenderTargetPool::GetRenderTarget(ColorRTInfo);
 
     {
-        int32 Width = SCR_WIDTH / 4;
-        int32 Height = SCR_HEIGHT / 4;
+        int32 Width = jBloomDimensions::Downsample(SCR_WIDTH, 4);
+        int32 Height = jBloomDimensions::Downsample(SCR_HEIGHT, 4);
 
         jRenderTargetInfo BloomSetupRTInfo = {
             .Type = ETextureType::TEXTURE_2D,
@@ -72,8 +73,8 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
         wchar_t TempStr[1024];
         for (int32 i = 0; i < _countof(DownSample); ++i)
         {
-            Width /= 2;
-            Height /= 2;
+            Width = jBloomDimensions::Downsample(Width, 2);
+            Height = jBloomDimensions::Downsample(Height, 2);
 
             wsprintf(TempStr, TEXT("DownSample[%d]"), i);
             jRenderTargetInfo DownSampleRTInfo = {

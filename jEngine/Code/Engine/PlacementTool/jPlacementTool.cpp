@@ -107,7 +107,7 @@ jPlacementTool::~jPlacementTool()
 
 void jPlacementTool::ProcessInput(float deltaTime, jCamera* mainCamera, float lightColorScale)
 {
-	if (!mainCamera)
+	if (!mainCamera || ImGui::GetIO().WantCaptureKeyboard)
 		return;
 
 	ProcessGizmoHotkeys();
@@ -482,14 +482,15 @@ void jPlacementTool::CreateCube(const Vector& position)
 	Vector4 color = Vector4(0.7f, 0.7f, 0.7f, 1.0f);
 
 	auto* cube = jPrimitiveUtil::CreateCube(position, size, scale, color);
-	jObject::AddObject(cube);
 
-	// Add to placed objects
+	// AddObject also registers with the editor. Publish the metadata first so
+	// that callback finds this entry instead of adding a second one.
 	PlacedObjectInfo info;
 	info.Object = cube;
 	info.Type = EPlacedObjectType::SHAPE;
 	info.ShapeType = EPlacementShapeType::CUBE;
 	PlacedObjects.push_back(info);
+	jObject::AddObject(cube);
 }
 
 void jPlacementTool::CreateSphere(const Vector& position)
@@ -501,14 +502,14 @@ void jPlacementTool::CreateSphere(const Vector& position)
 	Vector4 color = Vector4(0.7f, 0.7f, 0.7f, 1.0f);
 
 	auto* sphere = jPrimitiveUtil::CreateSphere(position, radius, slices, stacks, scale, color, false, true);
-	jObject::AddObject(sphere);
 
-	// Add to placed objects
+	// AddObject's registration callback must reuse this entry.
 	PlacedObjectInfo info;
 	info.Object = sphere;
 	info.Type = EPlacedObjectType::SHAPE;
 	info.ShapeType = EPlacementShapeType::SPHERE;
 	PlacedObjects.push_back(info);
+	jObject::AddObject(sphere);
 }
 
 void jPlacementTool::DeletePlacedObject(int32 index)
@@ -516,7 +517,12 @@ void jPlacementTool::DeletePlacedObject(int32 index)
 	if (index < 0 || index >= static_cast<int32>(PlacedObjects.size()))
 		return;
 
-	const auto& objectInfo = PlacedObjects[index];
+	// Scene removal calls back into UnregisterStaticObject. Remove our entry
+	// first and keep a value copy so that callback cannot invalidate a reference
+	// or make us erase the next object (or end()) a second time.
+	const auto objectInfo = PlacedObjects[index];
+	PlacedObjects.erase(PlacedObjects.begin() + index);
+	SelectObject(static_cast<jObject*>(nullptr));
 
 	// Remove from scene based on type
 	if (objectInfo.Type == EPlacedObjectType::LIGHT)
@@ -529,7 +535,7 @@ void jPlacementTool::DeletePlacedObject(int32 index)
 		// Remove debug object
 		if (objectInfo.Object)
 		{
-			jObject::RemoveObject(objectInfo.Object);
+			jObject::RemoveDebugObject(objectInfo.Object);
 		}
 	}
 	else if (objectInfo.Type == EPlacedObjectType::SHAPE)
@@ -541,14 +547,6 @@ void jPlacementTool::DeletePlacedObject(int32 index)
 		}
 	}
 
-	// Remove from list
-	if (PlacedObjects.size() > 0)
-	{
-		PlacedObjects.erase(PlacedObjects.begin() + index);
-	}
-
-	// Reset selection
-	SelectedPlacedObjectIndex = -1;
 }
 
 void jPlacementTool::RenderUI(jCamera* mainCamera)
@@ -1392,9 +1390,8 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 void jPlacementTool::Clear()
 {
 	PlacedObjects.clear();
-	SelectedPlacedObjectIndex = -1;
-	SelectedRenderObjectIndex = -1;
-	SelectedRenderObjectIndices.clear();
+	SelectObject(static_cast<jObject*>(nullptr));
+	bPickRequested = false;
 	CurrentTab = EPlacementTab::LIGHT;
 	SelectedLightType = EPlacementLightType::POINT;
 	SelectedShapeType = EPlacementShapeType::CUBE;
@@ -1431,7 +1428,7 @@ void jPlacementTool::UnregisterStaticObject(jObject* obj)
 	{
 		int32 index = static_cast<int32>(std::distance(PlacedObjects.begin(), it));
 		if (index == SelectedPlacedObjectIndex)
-			SelectedPlacedObjectIndex = -1;
+			SelectObject(static_cast<jObject*>(nullptr));
 		else if (index < SelectedPlacedObjectIndex)
 			SelectedPlacedObjectIndex--;
 
@@ -1469,7 +1466,7 @@ void jPlacementTool::UnregisterLight(jLight* light)
 	{
 		int32 index = static_cast<int32>(std::distance(PlacedObjects.begin(), it));
 		if (index == SelectedPlacedObjectIndex)
-			SelectedPlacedObjectIndex = -1;
+			SelectObject(static_cast<jObject*>(nullptr));
 		else if (index < SelectedPlacedObjectIndex)
 			SelectedPlacedObjectIndex--;
 
@@ -1479,6 +1476,8 @@ void jPlacementTool::UnregisterLight(jLight* light)
 
 void jPlacementTool::SelectObject(jObject* obj)
 {
+	PickedObject = nullptr;
+	SelectedRenderObjectIndices.clear();
 	if (!obj)
 	{
 		SelectedPlacedObjectIndex = -1;
@@ -1492,6 +1491,7 @@ void jPlacementTool::SelectObject(jObject* obj)
 
 	if (it != PlacedObjects.end())
 	{
+		PickedObject = obj;
 		SelectedPlacedObjectIndex = static_cast<int32>(std::distance(PlacedObjects.begin(), it));
 		SelectedRenderObjectIndex = -1;  // Reset RenderObject selection
 	}
@@ -1504,6 +1504,7 @@ void jPlacementTool::SelectObject(jObject* obj)
 
 void jPlacementTool::SelectObject(jRenderObject* renderObj)
 {
+	SelectObject(static_cast<jObject*>(nullptr));
 	if (!renderObj || !renderObj->Owner)
 	{
 		SelectedPlacedObjectIndex = -1;
@@ -1521,7 +1522,8 @@ void jPlacementTool::SelectObject(jRenderObject* renderObj)
 	if (it != renderObjects.end())
 	{
 		SelectObject(ownerObj);
-		SelectedRenderObjectIndex = static_cast<int32>(std::distance(renderObjects.begin(), it));
+		if (SelectedPlacedObjectIndex >= 0)
+			SelectedRenderObjectIndex = static_cast<int32>(std::distance(renderObjects.begin(), it));
 	}
 	else
 	{

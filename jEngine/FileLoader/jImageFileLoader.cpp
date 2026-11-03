@@ -48,6 +48,7 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
     static jName ExtHDR(".hdr");
 
     std::shared_ptr<jImageData> NewImageDataPatr = std::make_shared<jImageData>();
+    NewImageDataPatr->Filename = filename;
     bool IsHDR = false;
 
     {
@@ -56,37 +57,42 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
         DirectX::ScratchImage image;
         if (ExtName == ExtDDS)
         {
-            if (JFAIL(DirectX::LoadFromDDSFile(FilenameWChar.c_str(), DirectX::DDS_FLAGS_NONE, nullptr, image)))
+            if (FAILED(DirectX::LoadFromDDSFile(FilenameWChar.c_str(), DirectX::DDS_FLAGS_NONE, nullptr, image)))
                 return std::weak_ptr<jImageData>();
         }
         else if (ExtName == ExtHDR)
         {
-            if (JFAIL(DirectX::LoadFromHDRFile(FilenameWChar.c_str(), nullptr, image)))
+            if (FAILED(DirectX::LoadFromHDRFile(FilenameWChar.c_str(), nullptr, image)))
                 return std::weak_ptr<jImageData>();
         }
         else
         {
             DirectX::ScratchImage imageOrigin;
-            if (JFAIL(DirectX::LoadFromWICFile(FilenameWChar.c_str(), DirectX::WIC_FLAGS_FORCE_RGB, nullptr, imageOrigin)))
+            if (FAILED(DirectX::LoadFromWICFile(FilenameWChar.c_str(), DirectX::WIC_FLAGS_FORCE_RGB, nullptr, imageOrigin)))
                 return std::weak_ptr<jImageData>();
 
             if (UseBlockCompressionForWIC)
             {
                 DirectX::ScratchImage temp;
                 int32 mipLevel = jTexture::GetMipLevels((int32)imageOrigin.GetMetadata().width, (int32)imageOrigin.GetMetadata().height);
-                DirectX::GenerateMipMaps(*imageOrigin.GetImages(), DirectX::TEX_FILTER_BOX | DirectX::TEX_FILTER_SEPARATE_ALPHA, mipLevel, temp);
+                if (FAILED(DirectX::GenerateMipMaps(*imageOrigin.GetImages(), DirectX::TEX_FILTER_BOX | DirectX::TEX_FILTER_SEPARATE_ALPHA, mipLevel, temp)))
+                    return {};
 
-                DirectX::Compress(temp.GetImages(), temp.GetImageCount(),
-                    temp.GetMetadata(), DXGI_FORMAT_BC3_UNORM, TEX_COMPRESS_DEFAULT, TEX_THRESHOLD_DEFAULT, image);
+                if (FAILED(DirectX::Compress(temp.GetImages(), temp.GetImageCount(),
+                    temp.GetMetadata(), DXGI_FORMAT_BC3_UNORM, TEX_COMPRESS_DEFAULT, TEX_THRESHOLD_DEFAULT, image)))
+                    return {};
             }
             else
             {
                 int32 mipLevel = jTexture::GetMipLevels((int32)imageOrigin.GetMetadata().width, (int32)imageOrigin.GetMetadata().height);
-                DirectX::GenerateMipMaps(*imageOrigin.GetImages(), DirectX::TEX_FILTER_BOX | DirectX::TEX_FILTER_SEPARATE_ALPHA, mipLevel, image);
+                if (FAILED(DirectX::GenerateMipMaps(*imageOrigin.GetImages(), DirectX::TEX_FILTER_BOX | DirectX::TEX_FILTER_SEPARATE_ALPHA, mipLevel, image)))
+                    return {};
             }
         }
 
-        check(image.GetMetadata().dimension == TEX_DIMENSION_TEXTURE2D);		// todo : 2D image 만 지원
+        if (image.GetMetadata().dimension != TEX_DIMENSION_TEXTURE2D
+            || !image.GetImageCount() || !image.GetPixelsSize())
+            return {};
 
         if (image.GetMetadata().IsCubemap())
         {
@@ -143,10 +149,10 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
                 {
                     const uint64 subResourceIdx = mipIdx + (arrayIdx * image.GetMetadata().mipLevels);
                     const Image& subImage = image.GetImages()[subResourceIdx];
-                    size_t LocalSizeInByte = subImage.width * subImage.height * (DirectX::BitsPerPixel(image.GetMetadata().format) / 8);
-                    LocalSizeInByte = Align(LocalSizeInByte, subImage.slicePitch);
-                    LocalSizeInByte = Align(LocalSizeInByte, subImage.rowPitch);
-                    SizeInBytes += LocalSizeInByte;
+                    // DirectXTex's slice pitch includes complete compressed
+                    // blocks, including the 1x1 and 2x2 mip tails. A pixel-count
+                    // estimate truncates BC3 tails and becomes zero for BC1.
+                    SizeInBytes += subImage.slicePitch;
                 }
             }
 
@@ -163,10 +169,8 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
                     NewImageDataPatr->ImageBulkData.SubresourceFootprints[subResourceIdx].Depth = (uint32)arrayIdx;
                     NewImageDataPatr->ImageBulkData.SubresourceFootprints[subResourceIdx].Offset = Offset;
 
-                    size_t LocalSizeInByte = subImage.width * subImage.height * (DirectX::BitsPerPixel(image.GetMetadata().format) / 8);
+                    const size_t LocalSizeInByte = subImage.slicePitch;
                     memcpy(&NewImageDataPatr->ImageBulkData.ImageData[Offset], subImage.pixels, LocalSizeInByte);
-                    LocalSizeInByte = Align(LocalSizeInByte, subImage.slicePitch);
-                    LocalSizeInByte = Align(LocalSizeInByte, subImage.rowPitch);
                     Offset += LocalSizeInByte;
                 }
             }
@@ -258,20 +262,19 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
 
 std::weak_ptr<jTexture> jImageFileLoader::LoadTextureFromFile(const jName& filename)
 {
+    jScopedLock lock(&CachedTextureLock);
     auto it_find = CachedTextureMap.find(filename);
     if (CachedTextureMap.end() != it_find)
         return it_find->second;
 
     std::shared_ptr<jTexture> NewTexture;
 
-    std::weak_ptr<jImageData> imageDataWeakPtr = LoadImageDataFromFile(filename);
-    jImageData* pImageData = imageDataWeakPtr.lock().get();
-    JASSERT(pImageData);
-    if (pImageData)
-    {
-        NewTexture = g_rhi->CreateTextureFromData(pImageData);
-    }
+    const auto imageData = LoadImageDataFromFile(filename).lock();
+    if (!imageData)
+        return {};
+    NewTexture = g_rhi->CreateTextureFromData(imageData.get());
 
-    CachedTextureMap[filename] = NewTexture;
+    if (NewTexture)
+        CachedTextureMap[filename] = NewTexture;
     return NewTexture;
 }

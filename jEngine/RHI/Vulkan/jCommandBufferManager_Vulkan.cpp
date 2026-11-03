@@ -72,31 +72,25 @@ std::shared_ptr<jSyncAcrossCommandQueue_Vulkan> jCommandBufferManager_Vulkan::Qu
 
     check(WaitSemaphoreValues.size() == WaitSemaphores.size());
 
-    VkPipelineStageFlags WaitStage;
-    switch (InCommandBuffer->Type)
-    {
-    case ECommandBufferType::GRAPHICS:	WaitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT; break;
-    case ECommandBufferType::COMPUTE:	WaitStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT; break;
-    case ECommandBufferType::COPY:		WaitStage = VK_PIPELINE_STAGE_TRANSFER_BIT; break;
-    default:
-        check(0);
-        break;
-    }
+    // A submission can start with a copy, AS build, or compute pass even on the
+    // graphics queue. A color-output wait would leave those consumers unprotected.
+    const VkPipelineStageFlags WaitStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
 
     uint64 signalValue = 0;
 
-    const bool UseWaitTimeline = InWaitSemaphore && InWaitSemaphore->GetType() == ESemaphoreType::TIMELINE;
     const bool UseSignalTimeline = InSignalSemaphore && InSignalSemaphore->GetType() == ESemaphoreType::TIMELINE;
 
     VkTimelineSemaphoreSubmitInfo timelineSemaphoreSubmitInfo = {};
-    if (UseWaitTimeline || UseSignalTimeline)
+    // Include queued cross-queue waits even if the explicit wait/signal is binary.
+    // Values corresponding to binary semaphores are ignored by Vulkan.
+    if (!WaitSemaphoreValues.empty() || UseSignalTimeline)
     {
         timelineSemaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
         timelineSemaphoreSubmitInfo.waitSemaphoreValueCount = (uint32)WaitSemaphoreValues.size();
         timelineSemaphoreSubmitInfo.pWaitSemaphoreValues = WaitSemaphoreValues.data();
         
-        signalValue = InSignalSemaphore->IncrementValue();
-        timelineSemaphoreSubmitInfo.signalSemaphoreValueCount = 1;
+        signalValue = UseSignalTimeline ? InSignalSemaphore->IncrementValue() : 0;
+        timelineSemaphoreSubmitInfo.signalSemaphoreValueCount = InSignalSemaphore ? 1 : 0;
         timelineSemaphoreSubmitInfo.pSignalSemaphoreValues = &signalValue;
         submitInfo.pNext = &timelineSemaphoreSubmitInfo;
     }
@@ -128,7 +122,9 @@ std::shared_ptr<jSyncAcrossCommandQueue_Vulkan> jCommandBufferManager_Vulkan::Qu
         check(0);
     }
 
-    return std::make_shared<jSyncAcrossCommandQueue_Vulkan>(InCommandBuffer->Type, (jSemaphore_Vulkan*)InSignalSemaphore);
+    return InSignalSemaphore
+        ? std::make_shared<jSyncAcrossCommandQueue_Vulkan>(InCommandBuffer->Type, (jSemaphore_Vulkan*)InSignalSemaphore)
+        : nullptr;
 }
 
 void jSyncAcrossCommandQueue_Vulkan::WaitSyncAcrossCommandQueue(ECommandBufferType InWaitCommandQueueType)

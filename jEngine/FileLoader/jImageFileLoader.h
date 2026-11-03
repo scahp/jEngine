@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include <mutex>
+
 struct jImageData
 {
 	bool CreateMipmapIfPossible = true;
@@ -25,6 +27,7 @@ public:
 
 	static jImageFileLoader& GetInstance()
 	{
+		std::lock_guard<std::mutex> lock(GetInstanceMutex());
 		if (!_instance)
 			_instance = new jImageFileLoader();
 		return *_instance; 
@@ -32,6 +35,7 @@ public:
 
 	static void ReleaseInstance()
 	{
+		std::lock_guard<std::mutex> lock(GetInstanceMutex());
 		if (_instance)
 		{
 			_instance->CachedImageDataMap.clear();
@@ -49,10 +53,15 @@ private:
 	std::map<jName, std::shared_ptr<jImageData> > CachedImageDataMap;
 	std::map<jName, std::shared_ptr<jTexture> > CachedTextureMap;
     jMutexLock CachedImageDataLock;
+    jMutexLock CachedTextureLock;
 
 private:
 	jImageFileLoader();
+	static std::mutex& GetInstanceMutex()
+	{
+		static std::mutex mutex;
+		return mutex;
+	}
 
 	static jImageFileLoader* _instance;
 };
-

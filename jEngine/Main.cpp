@@ -18,6 +18,7 @@
 #ifdef __APPLE__
 void DumpSurfelGIDiagnostics();
 void UpdateSurfelGIAuditOptions(uint32 frame);
+void DumpEffectAuditDiagnostics();
 #endif
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
@@ -48,19 +49,105 @@ namespace
         return value ? value : "";
 #endif
     }
+
+    bool ReadEngineBoolean(const char* name, bool& result)
+    {
+        const auto value = ReadEngineEnvironment(name);
+        if (value.empty())
+            return true;
+        uint32 parsed = 0;
+        if (!jCommandLineArgument::TryParseUInt32(value, parsed) || parsed > 1)
+        {
+            std::cerr << name << " must be 0 or 1" << std::endl;
+            return false;
+        }
+        result = parsed != 0;
+        return true;
+    }
 }
 
 int RunCpuSelfTests();
 int ExportSurfelGIShaderFixtures(const char* directory, bool vulkan);
+int ExportPostProcessShaderFixtures(const char* directory, bool vulkan);
+int ExportAOEffectShaderFixtures(const char* directory, bool vulkan);
 
 int main(int argc, char** argv)
 {
-    std::string commandLine;
-    for (int i = 1; i < argc; ++i) { commandLine += argv[i]; commandLine += " "; }
-    gCommandLineArgument.Init(commandLine.c_str());
+    gCommandLineArgument.Init(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "--ci-cpu") == 0) return RunCpuSelfTests();
-    if (argc >= 3 && std::strcmp(argv[1], "--ci-export-shaders") == 0)
-        return ExportSurfelGIShaderFixtures(argv[2], argc < 4 || std::strcmp(argv[3], "dx12") != 0);
+    if (argc >= 2 && std::strcmp(argv[1], "--ci-export-shaders") == 0)
+    {
+        if (argc < 3 || argc > 4 || (argc == 4 && std::strcmp(argv[3], "dx12") != 0 && std::strcmp(argv[3], "vulkan") != 0))
+        {
+            std::cerr << "Usage: --ci-export-shaders <directory> [vulkan|dx12]" << std::endl;
+            return EXIT_FAILURE;
+        }
+        const bool vulkan = argc < 4 || std::strcmp(argv[3], "dx12") != 0;
+        if (ExportSurfelGIShaderFixtures(argv[2], vulkan) != EXIT_SUCCESS) return EXIT_FAILURE;
+        if (ExportPostProcessShaderFixtures(argv[2], vulkan) != EXIT_SUCCESS) return EXIT_FAILURE;
+        return ExportAOEffectShaderFixtures(argv[2], vulkan);
+    }
+
+    // Validate external input before creating a window, GPU resources or worker threads.
+    uint32 frameLimit = 0;
+    const auto frameLimitText = ReadEngineEnvironment("JENGINE_MAX_FRAMES");
+    if (!frameLimitText.empty() && !jCommandLineArgument::TryParseUInt32(frameLimitText, frameLimit))
+    {
+        std::cerr << "JENGINE_MAX_FRAMES must be an unsigned 32-bit integer" << std::endl;
+        return EXIT_FAILURE;
+    }
+    float fixedStep = 0.0f;
+    const auto fixedStepText = ReadEngineEnvironment("JENGINE_FIXED_TIMESTEP");
+    if (!fixedStepText.empty() && !jCommandLineArgument::TryParseNonNegativeFloat(fixedStepText, fixedStep))
+    {
+        std::cerr << "JENGINE_FIXED_TIMESTEP must be a finite nonnegative number" << std::endl;
+        return EXIT_FAILURE;
+    }
+    if (!ReadEngineBoolean("JENGINE_SURFEL_GI", gOptions.UseSurfelGI)
+        || !ReadEngineBoolean("JENGINE_INLINE_RAY", gOptions.SurfelGIInlineRayEnable))
+        return EXIT_FAILURE;
+#ifdef __APPLE__
+    bool inlineToggle = false;
+    if (!ReadEngineBoolean("JENGINE_TEST_INLINE_TOGGLE", inlineToggle))
+        return EXIT_FAILURE;
+#endif
+    if (gCommandLineArgument.HasArgument("-dx12") && gCommandLineArgument.HasArgument("-vulkan"))
+    {
+        std::cerr << "Select only one rendering API: -dx12 or -vulkan" << std::endl;
+        return EXIT_FAILURE;
+    }
+#ifndef _WIN32
+    if (gCommandLineArgument.HasArgument("-dx12"))
+    {
+        std::cerr << "DX12 is available only on Windows; use -vulkan" << std::endl;
+        return EXIT_FAILURE;
+    }
+#endif
+#ifdef __APPLE__
+    const auto effectsAudit = ReadEngineEnvironment("JENGINE_TEST_EFFECTS");
+    if (!effectsAudit.empty())
+    {
+        if (effectsAudit != "odd" && effectsAudit != "tiny")
+        {
+            std::cerr << "JENGINE_TEST_EFFECTS must be odd or tiny" << std::endl;
+            return EXIT_FAILURE;
+        }
+        SCR_WIDTH = effectsAudit == "odd" ? 1283 : 17;
+        SCR_HEIGHT = effectsAudit == "odd" ? 723 : 17;
+        gOptions.BloomEyeAdaptation = true;
+        gOptions.UseSurfelGI = false;
+        gOptions.UseSSGI = true;
+        gOptions.UseSSGITemporalAccumulation = true;
+        gOptions.UseSSGIReprojection = true;
+        gOptions.UseDiscontinuityWeightForSSGI = true;
+        gOptions.SSGIResolutionScale = 0.5f;
+        gOptions.SSGIDenoiser = EDenoiser::GAUSSIAN_SEPARABLE;
+        gOptions.Denoiser = EDenoiser::GAUSSIAN_SEPARABLE;
+        gOptions.AOType = 1; // SSAO, independent of RT-pipeline support.
+        gOptions.UseResolution = "50";
+        gOptions.UseAtmosphericShadowing = true;
+    }
+#endif
 	GMainThreadID = std::this_thread::get_id();
 
 	g_Engine = new jEngine();
@@ -91,18 +178,12 @@ int main(int argc, char** argv)
 
 	// glfwSwapInterval(0);		// 0 is no limit fps
 
-    if (const auto value = ReadEngineEnvironment("JENGINE_SURFEL_GI"); !value.empty()) gOptions.UseSurfelGI = std::atoi(value.c_str()) != 0;
-    if (const auto value = ReadEngineEnvironment("JENGINE_INLINE_RAY"); !value.empty()) gOptions.SurfelGIInlineRayEnable = std::atoi(value.c_str()) != 0;
 #ifdef __APPLE__
     if (std::getenv("JENGINE_TEST_SURFEL_RECONFIGURE")) UpdateSurfelGIAuditOptions(0);
 #endif
 	g_Engine->Init();
     std::cout << "SurfelGI: " << gOptions.UseSurfelGI << "; inline ray option: " << gOptions.SurfelGIInlineRayEnable << std::endl;
     uint32 renderedFrames = 0;
-    const auto frameLimitText = ReadEngineEnvironment("JENGINE_MAX_FRAMES");
-    const uint32 frameLimit = !frameLimitText.empty() ? static_cast<uint32>(std::stoul(frameLimitText)) : 0;
-    const auto fixedStepText = ReadEngineEnvironment("JENGINE_FIXED_TIMESTEP");
-    const float fixedStep = !fixedStepText.empty() ? std::stof(fixedStepText) : 0.0f;
     std::cout << "jEngine initialized: " << g_rhi->GetRHIName().ToStr() << std::endl;
 
 	// render loop
@@ -111,13 +192,15 @@ int main(int argc, char** argv)
 	if (IsUseDX12())
 	{
 		MSG msg = {};
-		while (::IsWindow((HWND)g_rhi->GetWindow()))
+		while (::IsWindow((HWND)g_rhi->GetWindow()) && msg.message != WM_QUIT)
 		{
-			static std::chrono::system_clock::time_point lastTime = std::chrono::system_clock::now();
-			std::chrono::system_clock::time_point currentTime = std::chrono::system_clock::now();
+			static std::chrono::steady_clock::time_point lastTime = std::chrono::steady_clock::now();
+			std::chrono::steady_clock::time_point currentTime = std::chrono::steady_clock::now();
 			std::chrono::duration<double> elapsed_seconds = currentTime - lastTime;
 			g_timeDeltaSecond = (float)elapsed_seconds.count();
 			lastTime = currentTime;
+
+            if (fixedStep > 0) g_timeDeltaSecond = fixedStep;
 
             g_Engine->ProcessInput(g_timeDeltaSecond);
                 
@@ -126,8 +209,16 @@ int main(int argc, char** argv)
 			g_Engine->Draw();
 			g_Engine->EndOfFrame();
 
+            ++renderedFrames;
+            if (renderedFrames == 1 || renderedFrames % 120 == 0)
+                std::cout << "Rendered frames: " << renderedFrames << std::endl;
+            if (frameLimit && renderedFrames >= frameLimit)
+                break;
+
 			while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
 			{
+				if (msg.message == WM_QUIT)
+					break;
 				::TranslateMessage(&msg);
 				::DispatchMessage(&msg);
 			}
@@ -138,8 +229,8 @@ int main(int argc, char** argv)
 	{
 		while (!glfwWindowShouldClose(window))
 		{
-			static std::chrono::system_clock::time_point lastTime = std::chrono::system_clock::now();
-			std::chrono::system_clock::time_point currentTime = std::chrono::system_clock::now();
+			static std::chrono::steady_clock::time_point lastTime = std::chrono::steady_clock::now();
+			std::chrono::steady_clock::time_point currentTime = std::chrono::steady_clock::now();
 			std::chrono::duration<double> elapsed_seconds = currentTime - lastTime;
 			g_timeDeltaSecond = (float)elapsed_seconds.count();
 			lastTime = currentTime;
@@ -159,13 +250,14 @@ int main(int argc, char** argv)
 
             ++renderedFrames;
 #ifdef __APPLE__
+            if (!effectsAudit.empty() && (renderedFrames == 1 || renderedFrames == 2 || renderedFrames == 90)) DumpEffectAuditDiagnostics();
             if (std::getenv("JENGINE_TEST_SURFEL_RECONFIGURE") && renderedFrames == 100) UpdateSurfelGIAuditOptions(renderedFrames);
             if (std::getenv("JENGINE_TEST_SURFEL_RECONFIGURE") && (renderedFrames == 30 || renderedFrames == 60 || renderedFrames == 90 || renderedFrames == 110))
             {
                 DumpSurfelGIDiagnostics();
                 UpdateSurfelGIAuditOptions(renderedFrames);
             }
-            if (std::getenv("JENGINE_TEST_INLINE_TOGGLE") && std::atoi(std::getenv("JENGINE_TEST_INLINE_TOGGLE")) != 0 && (renderedFrames == 30 || renderedFrames == 60)) {
+            if (inlineToggle && (renderedFrames == 30 || renderedFrames == 60)) {
                 DumpSurfelGIDiagnostics();
                 gOptions.SurfelGIInlineRayEnable = renderedFrames == 60;
                 std::cout << "Inline ray option toggled: " << gOptions.SurfelGIInlineRayEnable
@@ -229,6 +321,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
 void char_callback(GLFWwindow* window, uint32 codepoint)
 {
+	ImGui_ImplGlfw_CharCallback(window, codepoint);
 }
 
 void cursor_position_callback(GLFWwindow* window, double x, double y)

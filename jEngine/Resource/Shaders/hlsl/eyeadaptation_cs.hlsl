@@ -10,7 +10,7 @@ float2 ComputeWeightedSubRegion(uint2 InSubRectMin, uint2 InSubRectMax, float2 I
 
     if (((InSubRectMax.x - InSubRectMin.x) == 0) || ((InSubRectMax.y - InSubRectMin.y) == 0))
     {
-        return float2(0.0, 0.0000001f);
+        return float2(0.0, 0.0);
     }
 
     const float2 InvViewportSize = 1.0f / (InViewportMax - InViewportMin);
@@ -54,30 +54,16 @@ void main(uint GIndex : SV_GroupIndex, uint2 GTId : SV_GroupThreadID)
     SubRectTotalValueWeight[GIndex] = LogLuminanceAverageWeight;
     GroupMemoryBarrierWithGroupSync();
 
-    // Merge all value from all threads
-    SubRectTotalValueWeight[GIndex] += SubRectTotalValueWeight[GIndex ^ 1];
-    GroupMemoryBarrierWithGroupSync();
-
-    SubRectTotalValueWeight[GIndex] += SubRectTotalValueWeight[GIndex ^ 2];
-    GroupMemoryBarrierWithGroupSync();
-
-    SubRectTotalValueWeight[GIndex] += SubRectTotalValueWeight[GIndex ^ 4];
-    GroupMemoryBarrierWithGroupSync();
-
-    SubRectTotalValueWeight[GIndex] += SubRectTotalValueWeight[GIndex ^ 8];
-    GroupMemoryBarrierWithGroupSync();
-
-    SubRectTotalValueWeight[GIndex] += SubRectTotalValueWeight[GIndex ^ 16];
-    GroupMemoryBarrierWithGroupSync();
-
-    SubRectTotalValueWeight[GIndex] += SubRectTotalValueWeight[GIndex ^ 32];
-    GroupMemoryBarrierWithGroupSync();
-
-    SubRectTotalValueWeight[GIndex] += SubRectTotalValueWeight[GIndex ^ 64];
-    GroupMemoryBarrierWithGroupSync();
-
-    SubRectTotalValueWeight[GIndex] += SubRectTotalValueWeight[GIndex ^ 128];
-    GroupMemoryBarrierWithGroupSync();
+    // Only the lower half writes at each step; the upper half is read-only.
+    // All 64 lanes reach each barrier, including lanes no longer participating.
+    for (uint Stride = TILE_SIZE * TILE_SIZE / 2; Stride > 0; Stride >>= 1)
+    {
+        if (GIndex < Stride)
+        {
+            SubRectTotalValueWeight[GIndex] += SubRectTotalValueWeight[GIndex + Stride];
+        }
+        GroupMemoryBarrierWithGroupSync();
+    }
 
     float LogLuminanceAverage = SubRectTotalValueWeight[0].x / SubRectTotalValueWeight[0].y;
     float LuminanceAverage = exp2(LogLuminanceAverage);

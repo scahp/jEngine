@@ -47,6 +47,20 @@ jMeshObject::jMeshObject()
 {
 }
 
+jMeshObject::~jMeshObject()
+{
+	const auto deleteNode = [](auto&& self, jMeshNode* node) -> void
+	{
+		if (!node)
+			return;
+		for (auto* child : node->childNode)
+			self(self, child);
+		delete node;
+	};
+	deleteNode(deleteNode, RootNode);
+	delete MeshData;
+}
+
 //void jMeshObject::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, const jCamera* camera, const jShader* shader, const std::list<const jLight*>& lights, int32 instanceCount /*= 0*/) const
 //{
 //	if (Visible && RenderObject)

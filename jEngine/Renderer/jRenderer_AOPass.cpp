@@ -18,6 +18,11 @@
 #include "RHI/jRenderTargetPool.h"
 #include "Shader/jAOShaderParameters.h"
 #include "Shader/jShaderParameterSet.h"
+#include "jEffectHistory.h"
+#include <algorithm>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
 
 static float RTScale = 0.0f;
 static int32 RayRTWidth = 0;
@@ -462,6 +467,7 @@ void DispatchGaussianBlurPass(const std::shared_ptr<jRenderFrameContext>& InRend
     , jName InShaderName, jName InEntryPoint)
 {
     g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InSourceTexture, EResourceLayout::SHADER_READ_ONLY);
+    g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InDestTexture, EResourceLayout::UAV);
 
     jGaussianBlurCSParameters Parameters;
     Parameters.resultImage = { InDestTexture };
@@ -474,6 +480,30 @@ void DispatchGaussianBlurPass(const std::shared_ptr<jRenderFrameContext>& InRend
     DispatchShaderParameterComputePass(InRenderFrameContextPtr, InShaderName
         , jNameStatic("Resource/Shaders/hlsl/gaussianblur_cs.hlsl"), InEntryPoint, Parameters, GroupX, GroupY, 1);
 }
+
+jRHIUtil::FuncBindingShaderResources MakeSSGICopyBindingCallback(jTexture* Texture, const jSamplerStateInfo* SamplerState)
+{
+    return [Texture, SamplerState](const std::shared_ptr<jRenderFrameContext>&, jShaderBindingArray& Bindings,
+        jShaderBindingResourceInlineAllocator& Allocator)
+    {
+        jRHIUtil::BuildSingleTextureFragmentBindings(Texture, SamplerState, Bindings, Allocator);
+    };
+}
+}
+
+// Execute the same resource callback used by both Gaussian SSGI copy passes.
+// No device is needed to assemble and inspect these descriptor declarations.
+bool VerifySSGICopyBindingCallback()
+{
+    jTexture Texture;
+    jShaderBindingArray Bindings;
+    jShaderBindingResourceInlineAllocator Allocator;
+    MakeSSGICopyBindingCallback(&Texture, nullptr)({}, Bindings, Allocator);
+    return Bindings.NumOfData == 1 && Bindings[0]->BindingPoint == 0
+        && Bindings[0]->BindingType == EShaderBindingType::TEXTURE_SAMPLER_SRV
+        && Bindings[0]->NumOfDescriptors == 1
+        && Bindings[0]->AccessStageFlags == EShaderAccessStageFlag::FRAGMENT
+        && Bindings[0]->Resource && Bindings[0]->Resource->GetResource() == &Texture;
 }
 
 std::shared_ptr<jTexture> ReprojectionAO(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, const std::shared_ptr<jTexture>& InTexture)
@@ -699,6 +729,7 @@ std::shared_ptr<jTexture> jRenderer::Denoise(const std::shared_ptr<jTexture>& In
 				jNameStatic("GaussianKernel"), jLifeTimeType::OneFrame, sizeof(KernelData)));
 			OneFrameGaussianKernelUniformBuffer->UpdateBufferData(&KernelData, sizeof(KernelData));
 
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::GaussianH.get(), EResourceLayout::UAV);
             g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), InTexture.get(), EResourceLayout::SHADER_READ_ONLY);
             g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 
@@ -737,6 +768,7 @@ std::shared_ptr<jTexture> UpdateHistoryBuffer(const std::shared_ptr<jRenderFrame
 	SCOPE_CPU_PROFILE(CopyHistoryBuffer);
 	SCOPE_GPU_PROFILE(InRenderFrameContextPtr, CopyHistoryBuffer);
 
+	g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::HistoryBuffer.get(), EResourceLayout::UAV);
 	jRHIUtil::CopyTexture2D(InRenderFrameContextPtr, jSceneRenderTarget::HistoryBuffer.get(), InTexture.get());
 
 	return InTexture;
@@ -1189,8 +1221,8 @@ void ApplyAOToFinalColor(const std::shared_ptr<jRenderFrameContext>& InRenderFra
 void jRenderer::AOPass()
 {
 	RTScale = (float)(atof(gOptions.UseResolution) / 100.0f);
-	RayRTWidth = (int32)(SCR_WIDTH * RTScale);
-	RayRTHeight = (int32)(SCR_HEIGHT * RTScale);
+	RayRTWidth = std::max(1, (int32)(SCR_WIDTH * RTScale));
+	RayRTHeight = std::max(1, (int32)(SCR_HEIGHT * RTScale));
 
     // Create Persistent Resources
 	if (!jSceneRenderTarget::GaussianV || jSceneRenderTarget::GaussianV->Width != (int32)RayRTWidth || jSceneRenderTarget::GaussianV->Height != (int32)RayRTHeight)
@@ -1232,8 +1264,8 @@ void jRenderer::SSGIPass()
     SCOPE_GPU_PROFILE(RenderFrameContextPtr, SSGIPass);
 
     const float RTScale = gOptions.SSGIResolutionScale;
-    const int32 RayRTWidth = (int32)(SCR_WIDTH * RTScale);
-    const int32 RayRTHeight = (int32)(SCR_HEIGHT * RTScale);
+    const int32 RayRTWidth = std::max(1, (int32)(SCR_WIDTH * RTScale));
+    const int32 RayRTHeight = std::max(1, (int32)(SCR_HEIGHT * RTScale));
 
     char eventName[128];
     sprintf_s(eventName, "SSGIPass (Res:%.0f%%, RPP:%d)", RTScale * 100.0f, gOptions.SSGIRayCount);
@@ -1341,11 +1373,13 @@ void jRenderer::SSGIAccumulatePass()
     DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "SSGIAccumulatePass", Vector4(0.0f, 0.8f, 0.5f, 1.0f));
 
     const float RTScale = gOptions.SSGIResolutionScale;
-    const int32 RayRTWidth = (int32)(SCR_WIDTH * RTScale);
-    const int32 RayRTHeight = (int32)(SCR_HEIGHT * RTScale);
+    const int32 RayRTWidth = std::max(1, (int32)(SCR_WIDTH * RTScale));
+    const int32 RayRTHeight = std::max(1, (int32)(SCR_HEIGHT * RTScale));
 
+    static jEffectHistory<jRenderTarget> AccumulationHistory;
     if (!jSceneRenderTarget::SSGI_Accum_RT[0] || jSceneRenderTarget::SSGI_Accum_RT[0]->Info.Width != RayRTWidth || jSceneRenderTarget::SSGI_Accum_RT[0]->Info.Height != RayRTHeight)
     {
+        AccumulationHistory.Invalidate();
         jRenderTargetInfo Info = {
             .Type = ETextureType::TEXTURE_2D,
             .Format = ETextureFormat::RGBA16F,
@@ -1366,10 +1400,21 @@ void jRenderer::SSGIAccumulatePass()
     }
 
     const int32 RTIndex = RenderFrameContextPtr->FrameIndex % 3;
-    const int32 PrevRTIndex = (RenderFrameContextPtr->FrameIndex + 2) % 3;
+    const uint32 FrameNumber = g_rhi->GetCurrentFrameNumber();
 
     auto SSGI_Accum_RT_Dest = jSceneRenderTarget::SSGI_Accum_RT[RTIndex];
-    auto SSGI_Accum_RT_Prev = jSceneRenderTarget::SSGI_Accum_RT[PrevRTIndex];
+    auto SSGI_Accum_RT_Prev = AccumulationHistory.GetPrevious(FrameNumber, SSGI_Accum_RT_Dest);
+
+    if (!SSGI_Accum_RT_Prev)
+    {
+        // Seed real GPU contents before sampling history, including after
+        // re-enabling the effect, resizing, or re-acquiring the same image.
+        g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), SSGI_Accum_RT_Dest->GetTexture(), EResourceLayout::UAV);
+        jRHIUtil::CopyTexture2D(RenderFrameContextPtr, SSGI_Accum_RT_Dest->GetTexture(), jSceneRenderTarget::SSGI_RT->GetTexture());
+        g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), SSGI_Accum_RT_Dest->GetTexture());
+        AccumulationHistory.Commit(SSGI_Accum_RT_Dest, FrameNumber);
+        return;
+    }
 
     if (gOptions.UseSSGIReprojection)
     {
@@ -1445,7 +1490,7 @@ void jRenderer::SSGIAccumulatePass()
     }
     else
     {
-        jSSGIAccumulateUniformBuffer CommonComputeData;
+        jSSGIAccumulateUniformBuffer CommonComputeData = {};
         CommonComputeData.g_Width = SSGI_Accum_RT_Dest->Info.Width;
         CommonComputeData.g_Height = SSGI_Accum_RT_Dest->Info.Height;
         CommonComputeData.g_SSGIAccumBlendFactor = gOptions.SSGIAccumBlendFactor;
@@ -1460,6 +1505,7 @@ void jRenderer::SSGIAccumulatePass()
 
         g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::SSGI_RT->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
         g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), SSGI_Accum_RT_Prev->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+        g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), SSGI_Accum_RT_Dest->GetTexture(), EResourceLayout::UAV);
 
         jSSGIAccumulateCSParameters Parameters;
         Parameters.OutSSGIAccum = { SSGI_Accum_RT_Dest->GetTexture() };
@@ -1478,6 +1524,7 @@ void jRenderer::SSGIAccumulatePass()
     }
 
     g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), SSGI_Accum_RT_Dest->GetTexture());
+    AccumulationHistory.Commit(SSGI_Accum_RT_Dest, FrameNumber);
 }
 
 std::shared_ptr<jRenderTarget> SeparableGaussianBlur(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr
@@ -1644,6 +1691,7 @@ std::shared_ptr<jTexture> jRenderer::BlurSSGI(const std::shared_ptr<jRenderTarge
                 jNameStatic("GaussianKernel"), jLifeTimeType::OneFrame, sizeof(KernelData)));
             OneFrameGaussianKernelUniformBuffer->UpdateBufferData(&KernelData, sizeof(KernelData));
 
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), DenoiseTarget->GetTexture(), EResourceLayout::UAV);
             g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), InRenderTarget->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
             g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 
@@ -1786,6 +1834,10 @@ std::shared_ptr<jTexture> jRenderer::BlurSSGI(const std::shared_ptr<jRenderTarge
         SCOPE_CPU_PROFILE(BlurSSGI);
         SCOPE_GPU_PROFILE(RenderFrameContextPtr, BlurSSGI);
 
+        const jSamplerStateInfo* CopySamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
+            , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
+            , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
+
         auto Downsample = [&](std::shared_ptr<jRenderTarget> InRT, const Vector2i& InSize) -> std::shared_ptr<jRenderTarget>
         {
             auto DownsampleRT = jRenderTargetPool::GetRenderTargetForOneFrame({
@@ -1799,17 +1851,9 @@ std::shared_ptr<jTexture> jRenderer::BlurSSGI(const std::shared_ptr<jRenderTarge
 				.RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
 				.TextureCreateFlag = ETextureCreateFlag::UAV
 			});
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), InRT->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
             jRHIUtil::DrawQuad(RenderFrameContextPtr, DownsampleRT, { 0, 0, InSize.x, InSize.y },
-                [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
-                {
-                    g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InRT->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
-
-                    const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
-                        , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
-                        , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
-
-                    jRHIUtil::BuildSingleTextureFragmentBindings(InRT->GetTexture(), SamplerState, InOutShaderBindingArray, InOutResourceInlineAllactor);
-                },
+                MakeSSGICopyBindingCallback(InRT->GetTexture(), CopySamplerState),
                 [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
                 {
                     jShaderInfo shaderInfo;
@@ -1853,34 +1897,11 @@ std::shared_ptr<jTexture> jRenderer::BlurSSGI(const std::shared_ptr<jRenderTarge
             Vector2i DstSize(Dst->Info.Width, Dst->Info.Height);
 
             auto Upsampled = Downsample(Src, DstSize);
-            // Additive Blending
+            // CopyPS only declares the source texture and its sampler.
             {
-                struct jUniformBuffer
-                {
-                    Vector4 DstTextureSize;
-                };
-                jUniformBuffer UniformData;
-                UniformData.DstTextureSize.x = (float)Dst->Info.Width;
-                UniformData.DstTextureSize.y = (float)Dst->Info.Height;
-                UniformData.DstTextureSize.z = 1.0f / Dst->Info.Width;
-                UniformData.DstTextureSize.w = 1.0f / Dst->Info.Height;
-
-                auto UniformBuffer = g_rhi->CreateUniformBufferBlock(jNameStatic("SSGIBlurUniformBuffer"), jLifeTimeType::OneFrame, sizeof(UniformData));
-                UniformBuffer->UpdateBufferData(&UniformData, sizeof(UniformData));
-
+                g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), Upsampled->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
                 jRHIUtil::DrawQuad(RenderFrameContextPtr, Dst, { 0, 0, Dst->Info.Width, Dst->Info.Height },
-                    [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
-                    {
-                        g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), Upsampled->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
-
-                        const jSamplerStateInfo* SamplerState = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR
-                            , ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE
-                            , 0.0f, 1.0f, Vector4(1.0f, 1.0f, 1.0f, 1.0f)>::Create();
-
-                        jRHIUtil::BuildSingleTextureFragmentBindings(Upsampled->GetTexture(), SamplerState, InOutShaderBindingArray, InOutResourceInlineAllactor);
-                        InOutShaderBindingArray.Add(jShaderBinding::Create(0, 1, EShaderBindingType::UNIFORMBUFFER, EShaderAccessStageFlag::FRAGMENT
-                            , InOutResourceInlineAllactor.Alloc<jUniformBufferResource>(UniformBuffer.get())));
-                    },
+                    MakeSSGICopyBindingCallback(Upsampled->GetTexture(), CopySamplerState),
                     [](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
                     {
                         jShaderInfo shaderInfo;
@@ -1905,4 +1926,36 @@ std::shared_ptr<jTexture> jRenderer::BlurSSGI(const std::shared_ptr<jRenderTarge
         return DownsampleChain[0]->GetTexturePtr();
     }
     return InRenderTarget->GetTexturePtr();
+}
+
+int ExportAOEffectShaderFixtures(const char* Directory, bool Vulkan)
+{
+    try
+    {
+        gAPIType = Vulkan ? EAPIType::Vulkan : EAPIType::DX12;
+        const std::filesystem::path Target(Directory);
+        std::filesystem::create_directories(Target);
+        auto Write = [&](const char* Name, const std::string& Declarations, const char* Shader,
+            bool Compute = true, const char* Defines = "") {
+            std::ofstream File(Target / (std::string(Name) + ".hlsl"));
+            File.exceptions(std::ios::badbit | std::ios::failbit);
+            File << "#define COMPUTE_SHADER " << (Compute ? 1 : 0)
+                 << "\n#define PIXEL_SHADER " << (Compute ? 0 : 1) << '\n'
+                 << Defines << Declarations << "\n#include \"" << Shader << "\"\n";
+        };
+        Write("effect-gaussian-vertical", jShaderParameterSet::GenerateHLSL<jGaussianBlurCSParameters>(0), "gaussianblur_cs.hlsl");
+        Write("effect-gaussian-horizontal", jShaderParameterSet::GenerateHLSL<jGaussianBlurCSParameters>(0), "gaussianblur_cs.hlsl");
+        Write("effect-ssao", jShaderParameterSet::GenerateHLSL<jSSAOCSParameters>(0), "SSAO_cs.hlsl", true, "#define SSAO_KERNEL_SIZE 64\n");
+        Write("effect-ssgi", jShaderParameterSet::GenerateHLSL<jSSGICSParameters>(0), "SSGI_cs.hlsl");
+        Write("effect-ssgi-accumulate", jShaderParameterSet::GenerateHLSL<jSSGIAccumulateCSParameters>(0), "SSGI_Accumulate_cs.hlsl");
+        Write("effect-ssgi-reprojection", jShaderParameterSet::GenerateHLSL<jSSGIReprojectionPSParameters>(0), "SSGIReprojection_cs.hlsl", false);
+        Write("effect-ssgi-reprojection-discontinuity", jShaderParameterSet::GenerateHLSL<jSSGIReprojectionPSParameters>(0),
+            "SSGIReprojection_cs.hlsl", false, "#define USE_DISCONTINUITY_WEIGHT 1\n");
+        return EXIT_SUCCESS;
+    }
+    catch (const std::exception& Error)
+    {
+        std::cerr << "AO effect shader export failed: " << Error.what() << std::endl;
+        return EXIT_FAILURE;
+    }
 }

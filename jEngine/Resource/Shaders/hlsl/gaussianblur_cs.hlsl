@@ -16,7 +16,7 @@ void Vertical(uint3 GlobalInvocationID : SV_DispatchThreadID)
         float CurrentKernel = K[j % 4];
         int y = (j - center);
         
-        float2 CurPixelPos = clamp(PixelPos + float2(0, y), float2(0, 0), float2(ComputeCommon.Width, ComputeCommon.Height));
+        int2 CurPixelPos = clamp(PixelPos + int2(0, y), int2(0, 0), int2(ComputeCommon.Width - 1, ComputeCommon.Height - 1));
         Color += inputImage[CurPixelPos] * CurrentKernel;
         
         TotalWeight += CurrentKernel;
@@ -43,7 +43,7 @@ void Horizon(uint3 GlobalInvocationID : SV_DispatchThreadID)
         float CurrentKernel = K[j % 4];
         int x = (j - center);
         
-        float2 CurPixelPos = clamp(PixelPos + float2(x, 0), float2(0, 0), float2(ComputeCommon.Width, ComputeCommon.Height));
+        int2 CurPixelPos = clamp(PixelPos + int2(x, 0), int2(0, 0), int2(ComputeCommon.Width - 1, ComputeCommon.Height - 1));
         Color += inputImage[CurPixelPos] * CurrentKernel;
         
         TotalWeight += CurrentKernel;
@@ -51,4 +51,3 @@ void Horizon(uint3 GlobalInvocationID : SV_DispatchThreadID)
     Color /= TotalWeight;
     resultImage[int2(GlobalInvocationID.xy)] = Color;
 }
-

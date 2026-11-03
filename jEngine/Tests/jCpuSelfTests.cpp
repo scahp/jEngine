@@ -2,6 +2,13 @@
 #include "Math/Quaternion.h"
 #include "Renderer/jSurfelGILimits.h"
 
+int RunCoreAuditTests();
+int RunEditorAssetSelfTests();
+int RunIoAuditTests();
+int RunEffectsAuditTests();
+int RunRuntimeShaderAuditTests();
+int RunGraphicsAuditTests();
+
 int RunCpuSelfTests()
 {
     int failures = 0;
@@ -28,6 +35,12 @@ int RunCpuSelfTests()
     expect(!jSurfelGILimits::CanAllocate(int64_t(3) * 512 * 512 * 512, 160 * 90), "oversized surfel clipmap rejected before allocation");
     expect(jSurfelGILimits::CanAllocate(jSurfelGILimits::MaxSurfels, jSurfelGILimits::MaxLinearDispatchThreads)
         && !jSurfelGILimits::CanAllocate(jSurfelGILimits::MaxSurfels, jSurfelGILimits::MaxLinearDispatchThreads + 1), "surfel dispatch boundary");
+    failures += RunCoreAuditTests();
+    failures += RunEditorAssetSelfTests();
+    failures += RunIoAuditTests();
+    failures += RunEffectsAuditTests();
+    failures += RunGraphicsAuditTests();
+    failures += RunRuntimeShaderAuditTests();
     std::cout << "CPU checks: " << (failures ? "FAILED" : "PASSED") << std::endl;
     return failures ? EXIT_FAILURE : EXIT_SUCCESS;
 }

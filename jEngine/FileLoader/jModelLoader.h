@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include <exception>
+
 class jMeshObject;
 
 #define MINIMUM_WORKER_THREAD_COUNT 10
@@ -28,21 +30,20 @@ public:
     
     void Enqueue(const jTask& file_path);
     
-    void WaitAll() 
-    {
-        while (RemainTask.load() != 0) {}
-        ProcessingTaskHashes.clear();
-    }
+    // Wait for the batch to finish, then propagate its first worker failure.
+    void WaitAll();
     
 private:
     std::vector<std::thread> WorkerThreads;
     std::condition_variable ConditionVariable;
+    std::condition_variable CompletionConditionVariable;
     std::atomic<bool> IsStop;
 
     std::queue<jTask> TaskQueue;
     std::mutex QueueLock;
-    std::atomic<int32> RemainTask;
+    std::atomic<int32> RemainTask{0};
     std::unordered_set<size_t> ProcessingTaskHashes;
+    std::exception_ptr TaskException;
 };
 
 
@@ -71,4 +72,3 @@ private:
 
 	static jModelLoader* _instance;
 };
-

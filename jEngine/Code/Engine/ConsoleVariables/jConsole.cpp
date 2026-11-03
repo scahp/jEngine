@@ -83,6 +83,18 @@ void jConsole::RegisterVariable(IConsoleVariable* variable)
 	Variables[name] = variable;
 }
 
+void jConsole::UnregisterVariable(IConsoleVariable* variable)
+{
+	if (!variable)
+		return;
+	std::lock_guard<std::recursive_mutex> lock(Mutex);
+	auto it = Variables.find(variable->GetName());
+	// A later registration may have replaced this instance. Its predecessor's
+	// destructor must not remove the still-live replacement with the same name.
+	if (it != Variables.end() && it->second == variable)
+		Variables.erase(it);
+}
+
 IConsoleVariable* jConsole::FindVariable(const std::string& name)
 {
 	std::lock_guard<std::recursive_mutex> lock(Mutex);
@@ -707,6 +719,8 @@ void jConsole::ClearLog()
 
 void jConsole::ExecuteCommand(const std::string& commandLine)
 {
+	// Serialize registry mutations with command/query execution.
+	std::lock_guard<std::recursive_mutex> lock(Mutex);
 	// Trim whitespace
 	std::string trimmed = commandLine;
 	trimmed.erase(0, trimmed.find_first_not_of(" \t"));
@@ -821,6 +835,11 @@ void jConsole::ExecuteCommand(const std::string& commandLine)
 		}
 		else
 		{
+			if (var->GetType() != EConsoleVariableType::String && tokens.size() != 2)
+			{
+				LogError("Expected a single value for variable '" + command + "'.");
+				return;
+			}
 			// Set variable value
 			std::string value = tokens[1];
 

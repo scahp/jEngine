@@ -1,5 +1,9 @@
 #pragma once
 
+#include <cstdlib>
+#include <limits>
+#include <new>
+
 #define ENABLE_ALLOCATOR_LOG 0
 #define DEFAULT_ALIGNMENT 16
 
@@ -17,13 +21,17 @@ struct jMemoryChunk
 
     FORCEINLINE void* Alloc(size_t InNumOfBytes)
     {
-        const uint64 allocOffset = Align<uint64>(Offset, DEFAULT_ALIGNMENT);
-        if (allocOffset + InNumOfBytes <= DataSize)
-        {
-            Offset = allocOffset + InNumOfBytes;
-            return (Address + allocOffset);
-        }
-        return nullptr;
+        if (Offset > DataSize)
+            return nullptr;
+
+        const uint64 Padding = (DEFAULT_ALIGNMENT - Offset % DEFAULT_ALIGNMENT) % DEFAULT_ALIGNMENT;
+        const uint64 Available = DataSize - Offset;
+        if (Padding > Available || InNumOfBytes > Available - Padding)
+            return nullptr;
+
+        const uint64 AllocOffset = Offset + Padding;
+        Offset = AllocOffset + InNumOfBytes;
+        return Address + AllocOffset;
     }
 };
 
@@ -35,10 +43,7 @@ public:
 
     static jPageAllocator* Get()
     {
-        static jPageAllocator* s_pageAllocator = nullptr;
-        if (!s_pageAllocator)
-            s_pageAllocator = new jPageAllocator();
-
+        static jPageAllocator* const s_pageAllocator = new jPageAllocator();
         return s_pageAllocator;
     }
 
@@ -50,11 +55,14 @@ public:
             {
                 jMemoryChunk* Chunk = FreeChunk;
                 FreeChunk = FreeChunk->Next;
+                Chunk->Next = nullptr;
                 return Chunk;
             }
         }
 
         uint8* NewLowMemory = static_cast<uint8*>(malloc(PageSize));
+        if (!NewLowMemory)
+            throw std::bad_alloc();
         jMemoryChunk* NewMemoryChunk = new (NewLowMemory) jMemoryChunk(NewLowMemory, sizeof(jMemoryChunk), jPageAllocator::PageSize);
         return NewMemoryChunk;
     }
@@ -70,62 +78,43 @@ public:
 
     jMemoryChunk* AllocateBigSize(uint64 InNumOfBytes)
     {
+        if (InNumOfBytes > std::numeric_limits<size_t>::max() - sizeof(jMemoryChunk))
+            throw std::bad_alloc();
         const uint64 NeedToAllocateBytes = InNumOfBytes + sizeof(jMemoryChunk);
 
-        if (FreeChunkBigSize)
         {
-            jMemoryChunk* ChunkPrev = nullptr;
-            jMemoryChunk* CurChunk = FreeChunkBigSize;
-            while (CurChunk)
+            jScopedLock s(&Lock);
+            jMemoryChunk** ChunkLink = &FreeChunkBigSize;
+            while (*ChunkLink)
             {
+                jMemoryChunk* CurChunk = *ChunkLink;
                 if (CurChunk->DataSize >= NeedToAllocateBytes)
                 {
-                    if (ChunkPrev)
-                        ChunkPrev->Next = CurChunk->Next;
-
+                    *ChunkLink = CurChunk->Next;
+                    CurChunk->Next = nullptr;
                     return CurChunk;
                 }
-
-                ChunkPrev = CurChunk;
-                CurChunk = CurChunk->Next;
+                ChunkLink = &CurChunk->Next;
             }
         }
 
         uint8* NewLowMemory = static_cast<uint8*>(malloc(NeedToAllocateBytes));
+        if (!NewLowMemory)
+            throw std::bad_alloc();
         jMemoryChunk* NewChunk = new (NewLowMemory) jMemoryChunk(NewLowMemory, sizeof(jMemoryChunk), NeedToAllocateBytes);
         return NewChunk;
     }
 
     void FreeBigSize(jMemoryChunk* InChunk)
     {
+        jScopedLock s(&Lock);
         InChunk->Offset = sizeof(jMemoryChunk);
 
-        if (FreeChunkBigSize)
-        {
-            jMemoryChunk* ChunkPrev = nullptr;
-            jMemoryChunk* CurChunk = FreeChunkBigSize;
-            while (CurChunk)
-            {
-                if (CurChunk->DataSize >= InChunk->DataSize)
-                {
-                    if (ChunkPrev)
-                        ChunkPrev->Next = InChunk;
-                    InChunk->Next = CurChunk;
-                    return;
-                }
-
-                ChunkPrev = CurChunk;
-                CurChunk = CurChunk->Next;
-            }
-
-            if (ChunkPrev)
-            {
-                ChunkPrev->Next = InChunk;
-                return;
-            }
-        }
-
-        FreeChunkBigSize = InChunk;
+        jMemoryChunk** ChunkLink = &FreeChunkBigSize;
+        while (*ChunkLink && (*ChunkLink)->DataSize < InChunk->DataSize)
+            ChunkLink = &(*ChunkLink)->Next;
+        InChunk->Next = *ChunkLink;
+        *ChunkLink = InChunk;
     }
 
     void Flush()
@@ -134,8 +123,14 @@ public:
         while (FreeChunk)
         {
             jMemoryChunk* Next = FreeChunk->Next;
-            delete[] FreeChunk;
+            std::free(FreeChunk);
             FreeChunk = Next;
+        }
+        while (FreeChunkBigSize)
+        {
+            jMemoryChunk* Next = FreeChunkBigSize->Next;
+            std::free(FreeChunkBigSize);
+            FreeChunkBigSize = Next;
         }
     }
 
@@ -155,10 +150,8 @@ class jMemStack
 public:
     static jMemStack* Get()
     {
-        static jMemStack* s_memStack = nullptr;
-        if (!s_memStack)
-            s_memStack = new jMemStack();
-
+        // Allocation and Flush on this frame arena remain owned by the frame thread.
+        static jMemStack* const s_memStack = new jMemStack();
         return s_memStack;
     }
 
@@ -239,6 +232,8 @@ public:
 
     pointer allocate(size_t InNumOfElement)
     {
+        if (InNumOfElement > std::numeric_limits<size_t>::max() / sizeof(T))
+            throw std::bad_array_new_length();
 #if ENABLE_ALLOCATOR_LOG
         pointer allocatedAddress = static_cast<pointer>(jMemStack::Get()->Alloc(InNumOfElement * sizeof(T)));
         std::cout << "Called jMemstackAllocator::allocate with 0x" << allocatedAddress << " address and " << InNumOfElement << " elements" << std::endl;

@@ -23,6 +23,10 @@
 #include <unordered_map>
 #include <cstddef>
 
+#ifdef __APPLE__
+static void RunVulkanResourceAudit(const std::shared_ptr<jRenderFrameContext>& frame);
+#endif
+
 namespace
 {
 BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jApplySurfelGIVisualizeUniformBuffer)
@@ -1100,6 +1104,11 @@ bool DispatchSurfelGIHWRTDIGather(
     auto SurfelGatherBindingInstance = jShaderParameterSet::CreateShaderBindingInstance(
         SurfelGatherParameters, EShaderAccessStageFlag::COMPUTE, jShaderBindingInstanceType::SingleFrame);
 
+    if (!GlobalShaderBindingInstance || !SurfelGatherBindingInstance
+        || std::any_of(BindlessShaderBindingInstances.begin(), BindlessShaderBindingInstances.end(),
+            [](const auto& Binding) { return !Binding; }))
+        return false;
+
     jShaderBindingInstanceGroup ShaderBindingGroup;
     ShaderBindingGroup.Add(GlobalShaderBindingInstance);
     ShaderBindingGroup.Add(SurfelGatherBindingInstance);
@@ -1520,6 +1529,10 @@ void jRenderer::SurfelGIPass()
     GSurfelGIFrameValid = false;
     if (!gOptions.UseSurfelGI)
         return;
+
+#ifdef __APPLE__
+    if (std::getenv("JENGINE_TEST_VULKAN_RESOURCES")) RunVulkanResourceAudit(RenderFrameContextPtr);
+#endif
 
     SCOPE_CPU_PROFILE(SurfelGIPass);
     SCOPE_GPU_PROFILE(RenderFrameContextPtr, SurfelGIPass);
@@ -2555,6 +2568,60 @@ void jRenderer::ApplySurfelGI()
 
 #ifdef __APPLE__
 #include "RHI/Vulkan/jBufferUtil_Vulkan.h"
+// Bounded-run diagnostics only. This deliberately uses the regular frame-submit
+// and Readback allocation paths rather than the synchronous single-use helper.
+static void RunVulkanResourceAudit(const std::shared_ptr<jRenderFrameContext>& frame)
+{
+    if (!IsUseVulkan()) return;
+    static uint32 auditFrame = 0;
+    static uint64 requestedSceneIndex = 0;
+    ++auditFrame;
+    if (auditFrame == 1)
+    {
+        gOptions.QueueSubmitAfterShadowPass = true;
+        gOptions.QueueSubmitAfterBasePass = true;
+        constexpr uint32 words = 256;
+        constexpr uint32 pattern = 0x6A17C0DEu;
+        constexpr uint64 bytes = words * sizeof(uint32);
+        auto readback = g_rhi->CreateRawBuffer<jBuffer_Vulkan>(bytes, 0, EBufferCreateFlag::Readback,
+            EResourceLayout::TRANSFER_DST, nullptr, 0, jNameStatic("VulkanAuditReadback"));
+        auto* command = static_cast<jCommandBuffer_Vulkan*>(frame->GetActiveCommandBuffer());
+        g_rhi->GetGlobalBarrierBatcher()->Flush(command);
+        command->FlushBarrierBatch();
+        vkCmdFillBuffer(command->GetRef(), readback->Buffer, readback->Offset, bytes, pattern);
+        VkMemoryBarrier host{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+        host.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        host.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
+        vkCmdPipelineBarrier(command->GetRef(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT,
+            0, 1, &host, 0, nullptr, 0, nullptr);
+        const auto submittedFence = static_cast<VkFence>(command->GetFenceHandle());
+        frame->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, true);
+        const bool signaled = vkGetFenceStatus(g_rhi_vk->Device, submittedFence) == VK_SUCCESS;
+        const auto* data = static_cast<const uint32*>(readback->Map());
+        uint32 mismatches = 0;
+        if (data)
+        {
+            for (uint32 i = 0; i < words; ++i) mismatches += data[i] != pattern;
+            readback->Unmap();
+        }
+        else mismatches = words;
+        std::cout << "Vulkan resource audit: readback_words=" << words << " mismatches=" << mismatches
+            << " submitted_fence_signaled=" << signaled << std::endl;
+    }
+    if (g_rhi->RaytracingScene && g_rhi->RaytracingScene->IsValid())
+    {
+        if (auditFrame == 31 || auditFrame == 61 || auditFrame == 91)
+            std::cout << "Vulkan resource audit: tlas_update_frame=" << auditFrame
+                << " advanced=" << (g_rhi->RaytracingScene->GetSceneUpdateIndex() > requestedSceneIndex) << std::endl;
+        if (auditFrame == 30 || auditFrame == 60 || auditFrame == 90)
+        {
+            requestedSceneIndex = g_rhi->RaytracingScene->GetSceneUpdateIndex();
+            gOptions.EarthQuake = auditFrame != 60;
+            g_rhi->RaytracingScene->ForceRebuildTLAS();
+        }
+    }
+}
+
 void UpdateSurfelGIAuditOptions(uint32 frame)
 {
     if (frame == 0)

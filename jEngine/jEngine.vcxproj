@@ -396,6 +396,14 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     </ClCompile>
     <ClCompile Include="Math\Vector.cpp" />
     <ClCompile Include="Tests\jCpuSelfTests.cpp" />
+    <ClCompile Include="Tests\jCoreAuditTests.cpp" />
+    <ClCompile Include="Tests\jEditorAssetSelfTests.cpp" />
+    <ClCompile Include="Tests\jIoAuditTests.cpp" />
+    <ClCompile Include="Tests\jRuntimeShaderAuditTests.cpp" />
+    <ClCompile Include="Tests\jGraphicsAuditTests.cpp" />
+    <ClCompile Include="Tests\jEffectsAuditTests.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>

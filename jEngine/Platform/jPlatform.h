@@ -20,7 +20,7 @@
 #define FALSE 0
 #define _countof(x) (sizeof(x) / sizeof((x)[0]))
 #define _alloca alloca
-#define sscanf_s std::sscanf
+#include "jSecureScanf.h"
 #define strtok_s strtok_r
 inline void OutputDebugStringA(const char* s) { std::fputs(s, stderr); }
 inline void Sleep(unsigned ms) { std::this_thread::sleep_for(std::chrono::milliseconds(ms)); }

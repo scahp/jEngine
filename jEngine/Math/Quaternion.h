@@ -191,15 +191,16 @@ struct Quaternion
 			(1.0f - 2.0f * y * y - 2.0f * z * z), (2.0f * x * y - 2.0f * w * z), (2.0f * x * z + 2.0f * w * y), 0.0f,
 			(2.0f * x * y + 2.0f * w * z), (1.0f - 2.0f * x * x - 2.0f * z * z), (2.0f * y * z - 2.0f * w * x), 0.0f,
 			(2.0f * x * z - 2.0f * w * y), (2.0f * y * z + 2.0f * w * x), (1.0f - 2.0f * x * x - 2.0f * y * y), 0.0f,
-			0.0f, 0.0f, 0.0f, 0.0f
+			0.0f, 0.0f, 0.0f, 1.0f
 		);
 	}
 
 	FORCEINLINE void SetRotation(Matrix const& matrix)
 	{
-		w = sqrt(matrix.m00 + matrix.m11 + matrix.m22 + 1.0f) / 2.0f;
-		if (w > 0.0f)
+		const float Trace = matrix.m00 + matrix.m11 + matrix.m22;
+		if (Trace > 0.0f)
 		{
+			w = sqrt(Trace + 1.0f) / 2.0f;
 			const float w4 = 4.0f * w;
 			x = (matrix.m21 - matrix.m12) / w4;
 			y = (matrix.m02 - matrix.m20) / w4;
@@ -207,37 +208,34 @@ struct Quaternion
 		}
 		else
 		{
-			if (matrix.m00 > matrix.m11 && matrix.m00 > matrix.m22)			// m00 is the biggest
+			// Select a large component to avoid dividing by a near-zero w at half turns.
+			if (matrix.m00 >= matrix.m11 && matrix.m00 >= matrix.m22)		// m00 is the biggest (including ties)
 			{
-				x = sqrt(1.0f + matrix.m00 - matrix.m11 - matrix.m22);
+				x = sqrt(1.0f + matrix.m00 - matrix.m11 - matrix.m22) / 2.0f;
 				
 				const float x4 = 4.0f * x;
 				w = (matrix.m21 - matrix.m12) / x4;
 				y = (matrix.m10 + matrix.m01) / x4;
 				z = (matrix.m02 + matrix.m20) / x4;
 			}
-            else if (matrix.m11 > matrix.m00 && matrix.m11 > matrix.m22)	// m11 is the biggest
+            else if (matrix.m11 >= matrix.m22)	// m11 is the biggest remaining diagonal
             {
-				y = sqrt(1.0f + matrix.m11 - matrix.m00 - matrix.m22);
+				y = sqrt(1.0f + matrix.m11 - matrix.m00 - matrix.m22) / 2.0f;
 
 				const float y4 = 4.0f * y;
 				w = (matrix.m02 - matrix.m20) / y4;
 				x = (matrix.m10 + matrix.m01) / y4;
 				z = (matrix.m21 + matrix.m12) / y4;
             }
-            else if (matrix.m22 > matrix.m00 && matrix.m22 > matrix.m11)	// m22 is the biggest
+            else	// m22 is the biggest
             {
-                z = sqrt(1.0f + matrix.m22 - matrix.m00 - matrix.m11);
+                z = sqrt(1.0f + matrix.m22 - matrix.m00 - matrix.m11) / 2.0f;
 
                 const float z4 = 4.0f * z;
 				w = (matrix.m10 - matrix.m01) / z4;
 				x = (matrix.m02 + matrix.m20) / z4;
 				y = (matrix.m21 + matrix.m12) / z4;
             }
-			else
-			{
-				check(0);
-			}
 		}
 	}
 

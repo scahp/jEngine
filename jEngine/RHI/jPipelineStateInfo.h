@@ -285,7 +285,7 @@ struct jPipelineStateFixedInfo
     jPipelineStateFixedInfo(jRasterizationStateInfo* rasterizationState, jDepthStencilStateInfo* depthStencilState
         , jBlendingStateInfo* blendingState, const std::vector<jViewport>& viewports, const std::vector<jScissor>& scissors, bool isUseVRS)
         : RasterizationState(rasterizationState), DepthStencilState(depthStencilState)
-        , BlendingState(blendingState), Viewports(Viewports), Scissors(scissors), IsUseVRS(isUseVRS)
+        , BlendingState(blendingState), Viewports(viewports), Scissors(scissors), IsUseVRS(isUseVRS)
     {
         CreateHash();
     }

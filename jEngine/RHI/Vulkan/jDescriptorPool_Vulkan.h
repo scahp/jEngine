@@ -1,22 +1,6 @@
 ﻿#pragma once
 #include "../jRHIType.h"
-
-const float DefaultPoolSizes[] =
-{
-    2,		    // VK_DESCRIPTOR_TYPE_SAMPLER
-    2,		    // VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
-    2,		    // VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
-    1 / 8.0,	// VK_DESCRIPTOR_TYPE_STORAGE_IMAGE
-    1 / 2.0,	// VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER
-    1 / 8.0,	// VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER
-    1 / 4.0,	// VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
-    1 / 8.0,	// VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
-    4,		    // VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC
-    1 / 8.0,	// VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC
-    1 / 8.0,    // VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT
-    1 / 8.0,    // VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK
-    1 / 8.0,    // VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR
-};
+#include "jDescriptorPoolSizing_Vulkan.h"
 
 struct jDescriptorPool_Vulkan
 {
@@ -28,7 +12,8 @@ struct jDescriptorPool_Vulkan
 
     virtual void Create(uint32 InMaxDescriptorSets = 128);
     virtual void Reset();
-    virtual std::shared_ptr<jShaderBindingInstance> AllocateDescriptorSet(VkDescriptorSetLayout InLayout);
+    virtual std::shared_ptr<jShaderBindingInstance> AllocateDescriptorSet(VkDescriptorSetLayout InLayout,
+        const std::vector<VkDescriptorPoolSize>& InRequirements);
     virtual void Free(std::shared_ptr<jShaderBindingInstance> InShaderBindingInstance);
     void Release();
 
@@ -43,7 +28,9 @@ struct jDescriptorPool_Vulkan
     }
 
     uint32 MaxDescriptorSets = 128;
-    uint32 PoolSizes[_countof(DefaultPoolSizes)];
+    std::map<VkDescriptorType, uint32> RemainingDescriptors;
+    uint32 AllocatedDescriptorSetCount = 0;
+    std::vector<VkDescriptorPool> OverflowDescriptorPools;
     VkDescriptorPool DescriptorPool = nullptr;;
     mutable jMutexLock DescriptorPoolLock;
 
