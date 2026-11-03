@@ -108,7 +108,8 @@ storage-buffer declarations while retaining DX12 typed-buffer declarations.
   x64 Debug and Release. The separate Tracy profiler application is not part of CI.
 - macOS 26 / Apple Silicon: CMake/Ninja Debug and Release.
 - Both platforms run `--ci-cpu` and compile actual engine-generated SurfelGI
-  placement, resolve, and inline-gather declarations to SPIR-V and DXIL. The
+  candidate gathering/selection, placement, history snapshots, resolve, visualization,
+  hover selection, and inline-gather declarations to SPIR-V and DXIL. The
   SPIR-V member offsets and structured-buffer strides are compared with C++
   metadata. A deliberately unaligned control shader must be rejected.
 

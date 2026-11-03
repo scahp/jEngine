@@ -17,6 +17,7 @@
 
 #ifdef __APPLE__
 void DumpSurfelGIDiagnostics();
+void UpdateSurfelGIAuditOptions(uint32 frame);
 #endif
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
@@ -92,6 +93,9 @@ int main(int argc, char** argv)
 
     if (const auto value = ReadEngineEnvironment("JENGINE_SURFEL_GI"); !value.empty()) gOptions.UseSurfelGI = std::atoi(value.c_str()) != 0;
     if (const auto value = ReadEngineEnvironment("JENGINE_INLINE_RAY"); !value.empty()) gOptions.SurfelGIInlineRayEnable = std::atoi(value.c_str()) != 0;
+#ifdef __APPLE__
+    if (std::getenv("JENGINE_TEST_SURFEL_RECONFIGURE")) UpdateSurfelGIAuditOptions(0);
+#endif
 	g_Engine->Init();
     std::cout << "SurfelGI: " << gOptions.UseSurfelGI << "; inline ray option: " << gOptions.SurfelGIInlineRayEnable << std::endl;
     uint32 renderedFrames = 0;
@@ -155,6 +159,11 @@ int main(int argc, char** argv)
 
             ++renderedFrames;
 #ifdef __APPLE__
+            if (std::getenv("JENGINE_TEST_SURFEL_RECONFIGURE") && (renderedFrames == 30 || renderedFrames == 60 || renderedFrames == 90))
+            {
+                DumpSurfelGIDiagnostics();
+                UpdateSurfelGIAuditOptions(renderedFrames);
+            }
             if (std::getenv("JENGINE_TEST_INLINE_TOGGLE") && std::atoi(std::getenv("JENGINE_TEST_INLINE_TOGGLE")) != 0 && (renderedFrames == 30 || renderedFrames == 60)) {
                 DumpSurfelGIDiagnostics();
                 gOptions.SurfelGIInlineRayEnable = renderedFrames == 60;

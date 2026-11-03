@@ -789,7 +789,7 @@ bool TrySampleSurfelIrradianceAtCascade(float3 SurfaceWorldPos, float3 SurfaceWo
         if (any(CandidateCellCoord != CellCoord))
             continue;
 
-        const jSurfelIrradianceGPU CandidateIrradiance = SurfelGIIrradianceBuffer[CandidateSurfelIndex];
+        const jSurfelIrradianceGPU CandidateIrradiance = SurfelGIPreviousIrradianceBuffer[CandidateSurfelIndex];
         if (CandidateIrradiance.IrradianceAndCount.w <= 0.01)
             continue;
 
@@ -1071,7 +1071,7 @@ void SurfelGIGatherIrradianceHWRT_CS(uint3 DispatchThreadID : SV_DispatchThreadI
 
     // Temporal state from previous frames. PrevCount is used both as confidence and as a guide
     // ramp so newly created surfels start in a conservative mode before guiding/history mature.
-    const jSurfelIrradianceGPU Prev = SurfelGIIrradianceBuffer[SurfelIndex];
+    const jSurfelIrradianceGPU Prev = SurfelGIPreviousIrradianceBuffer[SurfelIndex];
     const float PrevCount = max(Prev.IrradianceAndCount.w, 0.0);
     const uint BaseRayCount = max(g_surfelGatherCB.RayCount, 1u);
     const uint BootstrapRayCount = max(g_surfelGatherCB.BootstrapRayCount, 1u);

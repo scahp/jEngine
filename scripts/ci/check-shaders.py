@@ -7,7 +7,7 @@ import re
 import subprocess
 from pathlib import Path
 
-SHADERS = {'resolve': 'main', 'placement': 'main', 'gather': 'SurfelGIGatherIrradianceHWRT_CS'}
+SHADERS = {'candidate-gather': 'main', 'winner-select': 'main', 'visualize': 'main', 'hover-select': 'main', 'snapshot': 'main', 'resolve': 'main', 'placement': 'main', 'gather': 'SurfelGIGatherIrradianceHWRT_CS'}
 
 
 def spirv_layout(path):
