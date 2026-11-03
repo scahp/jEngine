@@ -1,0 +1,52 @@
+name: Build and test
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: Windows ${{ matrix.configuration }}
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [Debug, Release]
+    steps:
+      - name: Enable long source paths on the disposable runner
+        shell: pwsh
+        run: |
+          $before = git config --global --get core.longpaths
+          Write-Host "Previous core.longpaths: $before"
+          git config --global core.longpaths true
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Build engine
+        shell: pwsh
+        env:
+          CONFIGURATION: ${{ matrix.configuration }}
+        run: scripts/ci/build-windows.ps1 -Configuration $env:CONFIGURATION
+      - name: Upload build and diagnostics
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: windows-${{ matrix.configuration }}
+          retention-days: 5
+          if-no-files-found: warn
+          path: |
+            build/windows-${{ matrix.configuration }}/*.log
+            build/windows-${{ matrix.configuration }}/*.binlog
+            build/windows-${{ matrix.configuration }}/bin/*.exe
+            build/windows-${{ matrix.configuration }}/bin/*.dll

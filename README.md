@@ -59,3 +59,11 @@ Simple toy engine for implementing graphics feature with multiple api
 12. WinPixEventRuntime : https://devblogs.microsoft.com/pix/winpixeventruntime/
 13. xxHash : https://github.com/Cyan4973/xxHash
 
+
+## GitHub Actions CI
+
+`Build and test` automatically builds the Windows x64 Debug and Release
+configurations on branch pushes and pull requests targeting `main`. Manual runs
+are also available. Build outputs and diagnostic logs are retained for five days.
+The workflow uses standard GitHub-hosted Windows Server 2025 / Visual Studio 2026
+runners and builds the existing `jEngine/jEngine.vcxproj`.
