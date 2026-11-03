@@ -89,6 +89,8 @@ Windows and macOS Debug/Release builds, CPU tests, and shader checks run on ever
 code push and on PRs targeting `main`. Build artifacts and logs are kept for five days.
 [Workflows](https://github.com/scahp/jEngine/actions) · [Details](docs/platform-and-ci.md#github-actions-ci)
 
+[Engine roadmap](docs/engine-roadmap.md) · [Editor foundation measurements](docs/reports/editor-foundation-performance.md)
+
 ## Third party libraries
 
 See [third-party notices](THIRD_PARTY_NOTICES.md).

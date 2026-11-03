@@ -1,0 +1,17 @@
+{
+  "benchmark": "production-image-decode",
+  "conditions": "Same PNG files; warm OS filesystem cache; cold engine cache each trial; no GPU; thread start gate excludes thread creation.",
+  "files": 24,
+  "samples": [
+    {"workers": 1, "trial": 0, "elapsed_ms": 80.341, "invalid": 0},
+    {"workers": 1, "trial": 1, "elapsed_ms": 65.966, "invalid": 0},
+    {"workers": 1, "trial": 2, "elapsed_ms": 68.484, "invalid": 0},
+    {"workers": 1, "trial": 3, "elapsed_ms": 68.508, "invalid": 0},
+    {"workers": 1, "trial": 4, "elapsed_ms": 68.168, "invalid": 0},
+    {"workers": 8, "trial": 0, "elapsed_ms": 68.846, "invalid": 0},
+    {"workers": 8, "trial": 1, "elapsed_ms": 66.588, "invalid": 0},
+    {"workers": 8, "trial": 2, "elapsed_ms": 66.237, "invalid": 0},
+    {"workers": 8, "trial": 3, "elapsed_ms": 67.444, "invalid": 0},
+    {"workers": 8, "trial": 4, "elapsed_ms": 68.553, "invalid": 0}
+  ]
+}

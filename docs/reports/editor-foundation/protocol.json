@@ -1,0 +1,16 @@
+{
+  "baseline": "ecb49a121773d2b066b47d95be218c547798d21c",
+  "cpu": "Apple M4",
+  "memory_gib": 16,
+  "logical_cpus": 10,
+  "macos": "26.6.2",
+  "release_flags": "-O3 -DNDEBUG",
+  "render_resolution": [
+    1280,
+    720
+  ],
+  "decode_fixture": "24 distinct PNG paths, same 1024x1024 RGBA pixel data; cold engine cache each trial, OS page cache warm",
+  "ui": "actual RenderUI, 100/1000/10000 null-payload registered rows; 30 warmup + 120 measured frames, no GPU",
+  "console": "same production-console headless driver; before unbounded retention, after capped1024+clipping; file sink disabled for paired UI measurement",
+  "frames": "same saved model scene, new publication marker required before frame120; frames120to360 walltime average; alternating3runs; initialized time is not scene-ready time"
+}
