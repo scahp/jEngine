@@ -14,7 +14,8 @@ permissions:
 
 concurrency:
   group: ci-macos-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.head_ref || github.ref_name }}
-  cancel-in-progress: true
+  # Preserve the first cold DXC build so its cache can serve newer commits.
+  cancel-in-progress: false
 
 env:
   HOMEBREW_NO_AUTO_UPDATE: '1'

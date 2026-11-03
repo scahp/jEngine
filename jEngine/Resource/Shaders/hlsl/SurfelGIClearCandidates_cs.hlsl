@@ -24,6 +24,5 @@ void main(uint3 DTid : SV_DispatchThreadID)
     {
         WinnerScoreBuffer[idx] = 0u;
         WinnerIndexBuffer[idx] = 0xffffffffu;
-        WinnerLockBuffer[idx] = 0u;
     }
 }

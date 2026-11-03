@@ -50,6 +50,9 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
+  <PropertyGroup>
+    <JEngineDxcDirectory Condition="'$(JEngineDxcDirectory)' == ''">$(ProjectDir)..\.ci-tools\dxc\bin\x64</JEngineDxcDirectory>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <PrecompiledHeader>Use</PrecompiledHeader>
@@ -60,7 +63,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;_ITERATOR_DEBUG_LEVEL=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>./;./glad/include;./External/assimp/include;./External;./External/vulkan/1.3.239.0/Include;./External/glslang;./External/IMGUI;./External/EASTL/include;./External/EABase/include/Common;./External/glad/include;./External/stb;./External/loadpng;./External/TinyXml2;./External/ShaderConductor/include;./External/DirectX12/include;./External/WinPixEventRuntime/Include;./External/DirectXTex/include;./External/xxHash;./External/tracy/public</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./External/spdlog/include;./;./glad/include;./External/assimp/include;./External;./External/vulkan/1.3.239.0/Include;./External/glslang;./External/IMGUI;./External/EASTL/include;./External/EABase/include/Common;./External/glad/include;./External/stb;./External/loadpng;./External/TinyXml2;./External/ShaderConductor/include;./External/DirectX12/include;./External/WinPixEventRuntime/Include;./External/DirectXTex/include;./External/xxHash;./External/tracy/public</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>
@@ -78,7 +81,9 @@
       <Command>xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"
 xcopy /s /y /d  "$(ProjectDir)External\ShaderConductor\Lib\Debug\*.dll" "$(OutDir)"
 xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"
-xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutDir)"</Command>
+xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutDir)"
+xcopy /y /i "$(JEngineDxcDirectory)\dxcompiler.dll" "$(OutDir)"
+xcopy /y /i "$(JEngineDxcDirectory)\dxil.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -92,7 +97,7 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>./;./glad/include;./External/assimp/include;./External;./External/vulkan/1.3.239.0/Include;./External/glslang;./External/IMGUI;./External/EASTL/include;./External/EABase/include/Common;./External/glad/include;./External/stb;./External/loadpng;./External/TinyXml2;./External/ShaderConductor/include;./External/DirectX12/include;./External/WinPixEventRuntime/Include;./External/DirectXTex/include;./External/xxHash;./External/tracy/public</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./External/spdlog/include;./;./glad/include;./External/assimp/include;./External;./External/vulkan/1.3.239.0/Include;./External/glslang;./External/IMGUI;./External/EASTL/include;./External/EABase/include/Common;./External/glad/include;./External/stb;./External/loadpng;./External/TinyXml2;./External/ShaderConductor/include;./External/DirectX12/include;./External/WinPixEventRuntime/Include;./External/DirectXTex/include;./External/xxHash;./External/tracy/public</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>
@@ -110,11 +115,15 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
       <Command>xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"
 xcopy /s /y /d  "$(ProjectDir)External\ShaderConductor\Lib\Debug\*.dll" "$(OutDir)"
 xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"
-xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutDir)"</Command>
+xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutDir)"
+xcopy /y /i "$(JEngineDxcDirectory)\dxcompiler.dll" "$(OutDir)"
+xcopy /y /i "$(JEngineDxcDirectory)\dxil.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Core\jMemStackAllocator.h" />
+    <ClInclude Include="Core\jLog.h" />
+    <ClInclude Include="FileLoader\jAssetImportService.h" />
     <ClInclude Include="Core\jLock.h" />
     <ClInclude Include="Core\jName.h" />
     <ClInclude Include="Core\jParallelFor.h" />
@@ -396,6 +405,21 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
     </ClCompile>
     <ClCompile Include="Math\Vector.cpp" />
     <ClCompile Include="Tests\jCpuSelfTests.cpp" />
+    <ClCompile Include="Core\jLog.cpp" />
+    <ClCompile Include="FileLoader\jAssetImportService.cpp" />
+    <ClCompile Include="Tests\jLogSelfTests.cpp" />
+    <ClCompile Include="Tests\jLogBenchmark.cpp" />
+    <ClCompile Include="Tests\jAssetImportTests.cpp" />
+    <ClCompile Include="Tests\jAssetPipelineBenchmarks.cpp" />
+    <ClCompile Include="Tests\jEditorWorkflowTests.cpp" />
+    <ClCompile Include="Tests\jCoreAuditTests.cpp" />
+    <ClCompile Include="Tests\jEditorAssetSelfTests.cpp" />
+    <ClCompile Include="Tests\jIoAuditTests.cpp" />
+    <ClCompile Include="Tests\jRuntimeShaderAuditTests.cpp" />
+    <ClCompile Include="Tests\jGraphicsAuditTests.cpp" />
+    <ClCompile Include="Tests\jEffectsAuditTests.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
@@ -895,4 +919,8 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <Target Name="VerifyPinnedShaderCompiler" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('$(JEngineDxcDirectory)\dxcompiler.dll') Or !Exists('$(JEngineDxcDirectory)\dxil.dll')"
+      Text="Run powershell -File scripts/ci/setup-windows-dxc.ps1 from the repository root, or set JEngineDxcDirectory to the matching DXC bin/x64 directory." />
+  </Target>
 </Project>

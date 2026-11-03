@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "Core/jLog.h"
 
 #include "jRHI_Vulkan.h"
 
@@ -109,7 +110,11 @@ bool jRHI_Vulkan::InitRHI()
     }
 
 #endif
-    glfwSetErrorCallback([](int code, const char* description) { std::cerr << "GLFW " << code << ": " << description << std::endl; });
+    glfwSetErrorCallback([](int code, const char* description) {
+        const auto message = "GLFW " + std::to_string(code) + ": " + (description ? description : "unknown error");
+        jLog::Get().Write(EjLogLevel::Error, "Window", message);
+        std::cerr << message << std::endl;
+    });
     if (!glfwInit()) return false;
     std::cout << "GLFW initialized: " << glfwGetVersionString() << std::endl;
 
@@ -878,11 +883,6 @@ std::shared_ptr<jTexture> jRHI_Vulkan::CreateTextureFromData(const jImageData* I
     {
         MipLevel = jTexture::GetMipLevels(InImageData->Width, InImageData->Height);
     }
-
-	auto stagingBufferPtr = jBufferUtil_Vulkan::CreateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
-        , InImageData->ImageBulkData.ImageData.size(), EResourceLayout::TRANSFER_SRC);
-
-	stagingBufferPtr->UpdateBuffer(&InImageData->ImageBulkData.ImageData[0], InImageData->ImageBulkData.ImageData.size());
 
 	std::shared_ptr<jTexture_Vulkan> TexturePtr;
 	if (InImageData->TextureType == ETextureType::TEXTURE_CUBE)
@@ -2454,7 +2454,9 @@ std::shared_ptr<jBuffer> jRHI_Vulkan::CreateBufferInternal(uint64 InSize, uint64
 	}
 
     EVulkanMemoryBits MemoryBits = EVulkanMemoryBits::DEVICE_LOCAL;
-    if (!!(EBufferCreateFlag::CPUAccess & InBufferCreateFlag))
+    const bool IsReadback = !!(EBufferCreateFlag::Readback & InBufferCreateFlag);
+    const bool IsHostAccessible = IsReadback || !!(EBufferCreateFlag::CPUAccess & InBufferCreateFlag);
+    if (IsHostAccessible)
     {
 		// EBufferCreateFlag::CPUAccess 사용시 고민해볼 점
         // Map -> Unmap 했다가 메모리에 데이터가 즉시 반영되는게 아님, 바로 사용하려면 아래 2가지 방법이 있음.
@@ -2462,14 +2464,18 @@ std::shared_ptr<jBuffer> jRHI_Vulkan::CreateBufferInternal(uint64 InSize, uint64
 		// 2. 쓰기 이후 vkFlushMappedMemoryRanges 호출, 읽기 이후 vkInvalidateMappedMemoryRanges 호출
 		// 위의 2가지 방법을 사용해도 이 데이터가 GPU에 바로 보인다고 보장할 수는 없지만 다음 vkQueueSubmit 호출 전에는 완료될 것을 보장함.
 		
-		// 현재 코드는 모든 CPUAccess 는 HOST_COHERENT 로 사용.
-        MemoryBits |= EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT;
+		// Readback must be mappable on discrete GPUs too; a host-visible heap
+		// is not required to also be device local.
+		if (IsReadback)
+			MemoryBits = EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT;
+		else
+			MemoryBits |= EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT;
     }
 
 	auto Buffer_Vulkan = jBufferUtil_Vulkan::CreateBuffer(BufferBits, MemoryBits, InSize, InInitialState);
     if (InData && InDataSize > 0)
     {
-		if (!!(EBufferCreateFlag::CPUAccess & InBufferCreateFlag))
+		if (IsHostAccessible)
 		{
 			Buffer_Vulkan->UpdateBuffer(InData, InDataSize);
 		}

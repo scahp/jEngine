@@ -1,5 +1,16 @@
 #include "pch.h"
 #include "Math/Quaternion.h"
+#include "Renderer/jSurfelGILimits.h"
+
+int RunCoreAuditTests();
+int RunLogSelfTests();
+int RunAssetImportTests();
+int RunEditorWorkflowSelfTests();
+int RunEditorAssetSelfTests();
+int RunIoAuditTests();
+int RunEffectsAuditTests();
+int RunRuntimeShaderAuditTests();
+int RunGraphicsAuditTests();
 
 int RunCpuSelfTests()
 {
@@ -23,6 +34,19 @@ int RunCpuSelfTests()
     const auto direction = Quaternion(0, 0, 0, 1).TransformDirection(a);
     expect(nearlyEqual(direction.x, a.x) && nearlyEqual(direction.y, a.y) && nearlyEqual(direction.z, a.z), "identity quaternion direction");
     expect(Align<uint64>(257, 256) == 512 && Align<uint64>(256, 256) == 256, "buffer alignment boundaries");
+    expect(jSurfelGILimits::CanAllocate(241664, 160 * 90), "default surfel clipmap budget");
+    expect(!jSurfelGILimits::CanAllocate(int64_t(3) * 512 * 512 * 512, 160 * 90), "oversized surfel clipmap rejected before allocation");
+    expect(jSurfelGILimits::CanAllocate(jSurfelGILimits::MaxSurfels, jSurfelGILimits::MaxLinearDispatchThreads)
+        && !jSurfelGILimits::CanAllocate(jSurfelGILimits::MaxSurfels, jSurfelGILimits::MaxLinearDispatchThreads + 1), "surfel dispatch boundary");
+    failures += RunCoreAuditTests();
+    failures += RunLogSelfTests();
+    failures += RunAssetImportTests();
+    failures += RunEditorWorkflowSelfTests();
+    failures += RunEditorAssetSelfTests();
+    failures += RunIoAuditTests();
+    failures += RunEffectsAuditTests();
+    failures += RunGraphicsAuditTests();
+    failures += RunRuntimeShaderAuditTests();
     std::cout << "CPU checks: " << (failures ? "FAILED" : "PASSED") << std::endl;
     return failures ? EXIT_FAILURE : EXIT_SUCCESS;
 }

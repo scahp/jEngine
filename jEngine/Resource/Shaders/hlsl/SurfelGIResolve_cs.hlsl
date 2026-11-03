@@ -24,7 +24,7 @@ float ComputeSurfelWeight(float3 pixelWorldPos, float3 pixelWorldNormal, jSurfel
     const float3 tangentOffset = delta - surfelNormal * dot(delta, surfelNormal);
     const float radialDistance = length(tangentOffset);
     const float normalAlignment = saturate(dot(pixelWorldNormal, surfelNormal));
-    const float receiverFacing = saturate(dot(surfelNormal, normalize(pixelWorldPos - surfel.PositionRadius.xyz)) * 0.5 + 0.5);
+    const float receiverFacing = saturate(dot(surfelNormal, (delta * rsqrt(max(dot(delta, delta), 1e-12)))) * 0.5 + 0.5);
     const float planeWeight = saturate(1.0 - planeDistance / max(planeExtent, 0.001));
     const float radialWeight = saturate(1.0 - radialDistance / max(radialExtent, 0.001));
     const float confidenceWeight = saturate(irradiance.IrradianceAndCount.w / 16.0);
@@ -73,7 +73,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
     {
         const float cellSize = cascade0CellSize * SurfelGIGetCascadeScale(ResolveCommon.CascadeCellScalePacked, cascadeIndex);
         const int3 baseCellCoord = int3(floor(worldPos / cellSize));
-        const uint desiredSlotsPerCell = SurfelGIGetDesiredSlotsPerCell(ResolveCommon.SurfelsPerCellPacked, cascadeIndex);
+        const uint desiredSlotsPerCell = min(SurfelGIGetDesiredSlotsPerCell(ResolveCommon.SurfelsPerCellPacked, cascadeIndex), max((uint)ResolveCommon.SurfelPageSize, 1u));
 
         [loop] for (int z = -neighborRadius; z <= neighborRadius; ++z)
         {
@@ -107,6 +107,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                     [loop] for (uint slot = 0u; slot < desiredSlotsPerCell; ++slot)
                     {
                         const uint surfelIndex = baseIndex + slot;
+                        if (surfelIndex >= maxSurfels) break;
                         const jSurfelGPU surfel = SurfelPool[surfelIndex];
                         if (surfel.IsActive == 0u)
                             continue;

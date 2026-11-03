@@ -10,6 +10,9 @@
 #include "jOptions.h"
 #include "Scene/jRenderObject.h"
 #include "Shader/jShaderParameterSet.h"
+#include <filesystem>
+#include <fstream>
+#include <iostream>
 
 BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jAtmosphericShadowingApplyData)
     SHADER_UNIFORM_BUFFER_MEMBER(float, Intensity)
@@ -276,5 +279,31 @@ void jRenderer::AtmosphericShadow()
             DrawCommand.Draw();
             RenderPass->EndRenderPass();
         }
+    }
+}
+
+int ExportAtmosphericEffectShaderFixtures(const char* Directory, bool Vulkan)
+{
+    try
+    {
+        gAPIType = Vulkan ? EAPIType::Vulkan : EAPIType::DX12;
+        const std::filesystem::path Target(Directory);
+        std::filesystem::create_directories(Target);
+        auto Write = [&](const char* Name, const std::string& Declarations, const char* Shader, bool Compute) {
+            std::ofstream File(Target / (std::string(Name) + ".hlsl"));
+            File.exceptions(std::ios::badbit | std::ios::failbit);
+            File << "#define COMPUTE_SHADER " << (Compute ? 1 : 0)
+                 << "\n#define PIXEL_SHADER " << (Compute ? 0 : 1) << '\n'
+                 << Declarations << "\n#include \"" << Shader << "\"\n";
+        };
+        Write("effect-atmospheric-shadow", jShaderParameterSet::GenerateHLSL<jAtmosphericShadowingCSParameters>(0), "AtmosphericShadowing_cs.hlsl", true);
+        Write("effect-atmospheric-apply-ps", jShaderParameterSet::GenerateHLSL<jAtmosphericShadowingApplyPSParameters>(0), "AtmosphericShadowingApply_ps.hlsl", false);
+        Write("effect-atmospheric-apply-cs", "", "AtmosphericShadowingApply_cs.hlsl", true);
+        return EXIT_SUCCESS;
+    }
+    catch (const std::exception& Error)
+    {
+        std::cerr << "Atmospheric effect shader export failed: " << Error.what() << std::endl;
+        return EXIT_FAILURE;
     }
 }

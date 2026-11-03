@@ -253,7 +253,7 @@ bool TryGetCellBaseIndex(int3 cellCoord, uint maxSurfels, uint cascadeIndex, out
 
 uint GetCascadeBucketCount(uint maxSurfels, uint cascadeIndex)
 {
-    const uint desiredSlotsPerCell = SurfelGIGetDesiredSlotsPerCell(VisualizeCommon.SurfelsPerCellPacked, cascadeIndex);
+    const uint desiredSlotsPerCell = min(SurfelGIGetDesiredSlotsPerCell(VisualizeCommon.SurfelsPerCellPacked, cascadeIndex), max((uint)VisualizeCommon.SurfelPageSize, 1u));
     const uint cascadeCapacity = GetCascadePartitionCapacity();
     return GetCellCount(cascadeCapacity, desiredSlotsPerCell);
 }
@@ -314,7 +314,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
         const float cascadeScale = SurfelGIGetCascadeScale(VisualizeCommon.CascadeCellScalePacked, cascadeIndex);
         const float cellSize = cascade0CellSize * cascadeScale;
         const int3 baseCellCoord = int3(floor(worldPos / cellSize));
-        const uint desiredSlotsPerCell = SurfelGIGetDesiredSlotsPerCell(VisualizeCommon.SurfelsPerCellPacked, cascadeIndex);
+        const uint desiredSlotsPerCell = min(SurfelGIGetDesiredSlotsPerCell(VisualizeCommon.SurfelsPerCellPacked, cascadeIndex), max((uint)VisualizeCommon.SurfelPageSize, 1u));
 
         [loop] for (int z = -neighborRadius; z <= neighborRadius; ++z)
         {
@@ -329,6 +329,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
                     [loop] for (uint slot = 0u; slot < desiredSlotsPerCell; ++slot)
                     {
                         const uint surfelIndex = baseIndex + slot;
+                        if (surfelIndex >= maxSurfels) break;
                         const jSurfelGPU s = SurfelPool[surfelIndex];
                         const bool isDormant = (s.IsActive == 0u) && (s.State == SURFEL_GI_SURFEL_STATE_DORMANT);
                         if (s.IsActive == 0u && !isDormant)

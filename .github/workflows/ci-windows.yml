@@ -52,6 +52,11 @@ jobs:
         env:
           CONFIGURATION: ${{ matrix.configuration }}
         run: scripts/ci/build-windows.ps1 -Configuration $env:CONFIGURATION
+      - name: Verify preserved native Visual Studio project
+        shell: pwsh
+        env:
+          CONFIGURATION: ${{ matrix.configuration }}
+        run: scripts/ci/build-windows-native.ps1 -Configuration $env:CONFIGURATION
       - name: Upload build and diagnostics
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -67,3 +72,5 @@ jobs:
             build/windows-vs2026/${{ matrix.configuration }}/*.exe
             build/windows-vs2026/${{ matrix.configuration }}/**/*.dll
             build/windows-vs2026/shader-checks/**
+            build/windows-native-${{ matrix.configuration }}/*.log
+            build/windows-native-${{ matrix.configuration }}/*.binlog

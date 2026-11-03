@@ -9,6 +9,13 @@ public:
         CommandLineArguments = GetTokenizedResult(InCommandLine);
     }
 
+    // argv already contains token boundaries, including paths with spaces.
+    void Init(int InArgc, const char* const* InArgv);
+
+    // Require the entire value and leave the output unchanged on invalid input.
+    static bool TryParseUInt32(const std::string& InValue, uint32& OutValue);
+    static bool TryParseNonNegativeFloat(const std::string& InValue, float& OutValue);
+
     bool HasArgument(const std::string& InToken) const
     {
         for (int32 i = 0; i < (int32)CommandLineArguments.size(); ++i)

@@ -1,0 +1,15 @@
+{
+  "benchmark": "public-placement-render-ui",
+  "imgui_version": "1.88 WIP",
+  "build": "Release",
+  "display": [600, 1040],
+  "window": [560, 1000],
+  "warmup_frames": 30,
+  "measured_frames": 120,
+  "conditions": "Fresh ImGui context; default font/style; no backend/GPU; null object payloads; no selection, search, scrolling or input; frame CPU includes NewFrame/Begin/RenderUI/End/Render. Layout changes can alter visible rows and vertices.",
+  "scenes": [
+    {"rows": 100, "median_us": 6.000, "p95_us": 6.084, "draw_vertices": 1726, "draw_indices": 2985},
+    {"rows": 1000, "median_us": 5.959, "p95_us": 6.084, "draw_vertices": 1734, "draw_indices": 2997},
+    {"rows": 10000, "median_us": 6.000, "p95_us": 6.042, "draw_vertices": 1742, "draw_indices": 3009}
+  ]
+}

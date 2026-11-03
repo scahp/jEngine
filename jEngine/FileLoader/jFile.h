@@ -35,10 +35,15 @@ public:
 
 	jFile() : m_fp(nullptr) {}
 	~jFile();
+	jFile(const jFile&) = delete;
+	jFile& operator=(const jFile&) = delete;
 
 	bool OpenFile(const char* szFileName, FileType::Enum fileType = FileType::BINARY, ReadWriteType::Enum readWriteType = ReadWriteType::READ);
+	// index is a file byte offset; count == 0 reads the remaining file. Returns bytes read
+	// by this call. Appending preserves the existing payload and replaces its trailing NUL.
 	size_t ReadFileToBuffer(bool appendToEndofBuffer = true, unsigned int index = 0, unsigned int count = 0);
 	void CloseFile();
+	// count == 0 selects the remaining payload; invalid ranges return nullptr.
 	const char* GetBuffer(unsigned int index = 0, unsigned int count = 0) const;
 	bool GetBuffer(FILE_BUFFER& outBuffer, const char* startToken, const char* endToken);
 	bool IsBufferEmpty() const { return m_buffer.empty(); }
@@ -49,4 +54,3 @@ private:
 };
 
 #endif // __FILE_H__
-

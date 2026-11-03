@@ -7,7 +7,28 @@ import re
 import subprocess
 from pathlib import Path
 
-SHADERS = {'resolve': 'main', 'placement': 'main', 'gather': 'SurfelGIGatherIrradianceHWRT_CS'}
+SHADERS = {'candidate-gather': 'main', 'winner-select': 'main', 'visualize': 'main', 'hover-select': 'main', 'snapshot': 'main', 'resolve': 'main', 'placement': 'main', 'gather': 'SurfelGIGatherIrradianceHWRT_CS'}
+
+SHADERS = {name: (entry, 'cs_6_6') for name, entry in SHADERS.items()}
+SHADERS.update({
+    'effect-eye-adaptation': ('main', 'cs_6_6'),
+    'effect-bloom-setup': ('main', 'ps_6_6'),
+    'effect-bloom-down-vs': ('main', 'vs_6_6'),
+    'effect-bloom-down-ps': ('main', 'ps_6_6'),
+    'effect-bloom-up-vs': ('main', 'vs_6_6'),
+    'effect-bloom-up-ps': ('main', 'ps_6_6'),
+    'effect-tonemap': ('main', 'ps_6_6'),
+    'effect-gaussian-vertical': ('Vertical', 'cs_6_6'),
+    'effect-gaussian-horizontal': ('Horizon', 'cs_6_6'),
+    'effect-ssao': ('main', 'cs_6_6'),
+    'effect-ssgi': ('main', 'cs_6_6'),
+    'effect-ssgi-accumulate': ('main', 'cs_6_6'),
+    'effect-ssgi-reprojection': ('SSGIReprojectionPS', 'ps_6_6'),
+    'effect-ssgi-reprojection-discontinuity': ('SSGIReprojectionPS', 'ps_6_6'),
+    'effect-atmospheric-shadow': ('main', 'cs_6_6'),
+    'effect-atmospheric-apply-cs': ('main', 'cs_6_6'),
+    'effect-atmospheric-apply-ps': ('main', 'ps_6_6'),
+})
 
 
 def spirv_layout(path):
@@ -53,8 +74,8 @@ def check_layout(path, contracts):
 
 
 def run(command, log, cwd):
-    result = subprocess.run([str(v) for v in command], cwd=cwd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    log.write_text(result.stdout)
+    result = subprocess.run([str(v) for v in command], cwd=cwd, text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    log.write_text(result.stdout, encoding="utf-8")
     if result.returncode:
         raise RuntimeError(f'Command failed ({result.returncode}): {command}\n{result.stdout}')
 
@@ -89,11 +110,11 @@ def main():
             target.mkdir(exist_ok=True)
             run([args.engine, '--ci-export-shaders', target, api], target / 'export.log', args.source)
             contracts = json.loads((target / 'cpu-layout.json').read_text())
-            for name, entry in SHADERS.items():
+            for name, (entry, profile) in SHADERS.items():
                 output = target / (name + ('.spv' if api == 'vulkan' else '.dxil'))
                 flattened = target / (name + '.flattened.hlsl')
                 flattened.write_text(flatten_includes((target / (name + '.hlsl')).read_text(), args.source / 'Resource/Shaders/hlsl', set()))
-                command = [args.dxc, '-T', 'cs_6_6', '-E', entry, '-I', args.source / 'Resource/Shaders/hlsl',
+                command = [args.dxc, '-T', profile, '-E', entry, '-I', args.source / 'Resource/Shaders/hlsl',
                            '-Fo', output, flattened]
                 if api == 'vulkan':
                     command += ['-spirv', '-fspv-target-env=vulkan1.1spirv1.4', '-fvk-use-scalar-layout',

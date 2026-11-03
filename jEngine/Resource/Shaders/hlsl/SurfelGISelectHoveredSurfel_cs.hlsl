@@ -96,7 +96,7 @@ void main(uint3 DispatchThreadID : SV_DispatchThreadID)
     {
         const float cellSize = cascade0CellSize * SurfelGIGetCascadeScale(HoverSelectCommon.CascadeCellScalePacked, cascadeIndex);
         const int3 baseCellCoord = int3(floor(worldPos / cellSize));
-        const uint desiredSlotsPerCell = SurfelGIGetDesiredSlotsPerCell(HoverSelectCommon.SurfelsPerCellPacked, cascadeIndex);
+        const uint desiredSlotsPerCell = min(SurfelGIGetDesiredSlotsPerCell(HoverSelectCommon.SurfelsPerCellPacked, cascadeIndex), max((uint)HoverSelectCommon.SurfelPageSize, 1u));
 
         [loop] for (int z = -neighborRadius; z <= neighborRadius; ++z)
         {
@@ -112,6 +112,7 @@ void main(uint3 DispatchThreadID : SV_DispatchThreadID)
                     [loop] for (uint slot = 0u; slot < desiredSlotsPerCell; ++slot)
                     {
                         const uint surfelIndex = baseIndex + slot;
+                        if (surfelIndex >= maxSurfels) break;
                         const jSurfelGPU s = SurfelPool[surfelIndex];
                         const bool isDormant = (s.IsActive == 0u) && (s.State == SURFEL_GI_SURFEL_STATE_DORMANT);
                         if (s.IsActive == 0u && !isDormant)

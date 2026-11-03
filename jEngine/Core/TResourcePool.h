@@ -68,7 +68,7 @@ public:
     template <typename TInitializer, typename T1 = T>
     void Add(TInitializer&& initializer, T1* InResource)
     {
-        jScopeReadLock sr(&Lock);
+        jScopeWriteLock sw(&Lock);
         const size_t hash = initializer.GetHash();
         check(hash);
 
@@ -80,6 +80,7 @@ public:
 
     void GetAllResource(std::vector<T*>& Out)
     {
+        jScopeReadLock sr(&Lock);
         Out.reserve(Pool.size());
         for(auto it : Pool)
         {
@@ -95,7 +96,7 @@ public:
 
     T* Release(size_t InHash)
     {
-        jScopeReadLock sr(&Lock);
+        jScopeWriteLock sw(&Lock);
         auto it_find = Pool.find(InHash);
         if (Pool.end() != it_find)
         {

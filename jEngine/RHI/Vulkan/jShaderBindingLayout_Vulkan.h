@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include "jRHIType_Vulkan.h"
+#include "jDescriptorPoolSizing_Vulkan.h"
 
 struct jWriteDescriptorInfo
 {
@@ -70,40 +71,7 @@ struct jShaderBindingLayout_Vulkan : public jShaderBindingLayout
 
     std::vector<VkDescriptorPoolSize> GetDescriptorPoolSizeArray(uint32 maxAllocations) const
     {
-        std::vector<VkDescriptorPoolSize> resultArray;
-
-        if (!ShaderBindingArray.NumOfData)
-        {
-            uint32 NumOfSameType = 0;
-            VkDescriptorType PrevType = GetVulkanShaderBindingType(ShaderBindingArray[0]->BindingType);
-            for (int32 i = 0; i < ShaderBindingArray.NumOfData; ++i)
-            {
-                if (PrevType == GetVulkanShaderBindingType(ShaderBindingArray[i]->BindingType))
-                {
-                    ++NumOfSameType;
-                }
-                else
-                {
-                    VkDescriptorPoolSize poolSize;
-                    poolSize.type = PrevType;
-                    poolSize.descriptorCount = NumOfSameType * maxAllocations;
-                    resultArray.push_back(poolSize);
-
-                    PrevType = GetVulkanShaderBindingType(ShaderBindingArray[i]->BindingType);
-                    NumOfSameType = 1;
-                }
-            }
-
-            if (NumOfSameType > 0)
-            {
-                VkDescriptorPoolSize poolSize;
-                poolSize.type = PrevType;
-                poolSize.descriptorCount = NumOfSameType * maxAllocations;
-                resultArray.push_back(poolSize);
-            }
-        }
-
-        return std::move(resultArray);
+        return jVulkanDescriptorPoolSizing::GetRequirements(ShaderBindingArray, maxAllocations);
     }
 
 public:

@@ -16,9 +16,33 @@ namespace
     static constexpr uint8 HWRTDI_InstanceMask_Sky = 0x02;
 }
 
+std::vector<jRenderObject*> jRaytracingScene_Vulkan::CollectBLASBuildWorkList(const jRatracingInitializer& InInitializer)
+{
+    std::vector<jRenderObject*> WorkList;
+    std::unordered_set<jRenderObject*> Seen;
+    const auto Append = [&](jRenderObject* Object) {
+        if (Object && !PendingRemove.count(Object) && Object->IsSupportRaytracing() && Seen.insert(Object).second)
+            WorkList.push_back(Object);
+    };
+    if (ShouldUpdate())
+    {
+        // Transform changes and explicit TLAS rebuilds do not change geometry.
+        for (auto* Object : PendingAdd) Append(Object);
+        for (auto* Object : DirtyBLAS) Append(Object);
+    }
+    else
+    {
+        InstanceList.clear();
+        for (auto* Object : InInitializer.RenderObjects) Append(Object);
+        bForceTLASRebuild = true;
+    }
+    return WorkList;
+}
+
 void jRaytracingScene_Vulkan::CreateOrUpdateBLAS(const jRatracingInitializer& InInitializer)
 {
     auto CmdBuffer = (jCommandBuffer_Vulkan*)InInitializer.CommandBuffer;
+    if (!CmdBuffer) return;
 
     auto getBufferDeviceAddress = [](VkBuffer buffer)
         {
@@ -28,12 +52,10 @@ void jRaytracingScene_Vulkan::CreateOrUpdateBLAS(const jRatracingInitializer& In
             return g_rhi_vk->vkGetBufferDeviceAddressKHR(g_rhi_vk->Device, &bufferDeviceAI);
         };
 
-    std::vector<jRenderObject*> RTObjects;
-    for (int32 i = 0; i < InInitializer.RenderObjects.size(); ++i)
+    const auto WorkList = CollectBLASBuildWorkList(InInitializer);
+    jBuffer_Vulkan* LastBuiltBLAS = nullptr;
+    for (jRenderObject* RObj : WorkList)
     {
-        jRenderObject* RObj = InInitializer.RenderObjects[i];
-        check(RObj->IsSupportRaytracing());
-
         // Remove Old BLAS
         RObj->BottomLevelASBuffer.reset();
 
@@ -181,32 +203,66 @@ void jRaytracingScene_Vulkan::CreateOrUpdateBLAS(const jRatracingInitializer& In
             &accelerationBuildGeometryInfo,
             accelerationBuildStructureRangeInfos.data());
 
+        LastBuiltBLAS = BLAS_Vulkan;
+
         VkAccelerationStructureDeviceAddressInfoKHR accelerationDeviceAddressInfo{};
         accelerationDeviceAddressInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
         accelerationDeviceAddressInfo.accelerationStructure = BLAS_Vulkan->AccelerationStructure;
         BLAS_Vulkan->DeviceAddress = g_rhi_vk->vkGetAccelerationStructureDeviceAddressKHR(g_rhi_vk->Device, &accelerationDeviceAddressInfo);
 
-        InstanceList.push_back(RObj);
+        if (std::find(InstanceList.begin(), InstanceList.end(), RObj) == InstanceList.end())
+            InstanceList.push_back(RObj);
+        bForceTLASRebuild = true;
+        PendingAdd.erase(RObj);
+        DirtyBLAS.erase(RObj);
+    }
+
+    if (LastBuiltBLAS)
+    {
+        // This global dependency publishes all preceding BLAS builds for a TLAS
+        // build, without serializing independent BLAS builds against each other.
+        g_rhi->UAVBarrier(CmdBuffer, LastBuiltBLAS);
+        CmdBuffer->FlushBarrierBatch();
     }
 }
 
 void jRaytracingScene_Vulkan::CreateOrUpdateTLAS(const jRatracingInitializer& InInitializer)
 {
-    if (InstanceList.empty()) return;
     auto CmdBuffer = (jCommandBuffer_Vulkan*)InInitializer.CommandBuffer;
+    if (!CmdBuffer) return;
 
-    const bool IsUpdate = !!ScratchTLASBufferPtr;
+    for (auto* Object : PendingRemove)
+    {
+        // Removed objects may already have been destroyed by their scene owner.
+        InstanceList.erase(std::remove(InstanceList.begin(), InstanceList.end(), Object), InstanceList.end());
+        bForceTLASRebuild = true;
+    }
+    if (InstanceList.empty())
+    {
+        TLASBufferPtr.reset();
+        ScratchTLASBufferPtr.reset();
+        InstanceUploadBufferPtr.reset();
+        LastTLASInstanceCount = 0;
+        ClearDirtyFlags();
+        BumpSceneUpdateIndex();
+        return;
+    }
+
+    const bool IsUpdate = TLASBufferPtr && ScratchTLASBufferPtr && !bForceTLASRebuild
+        && LastTLASInstanceCount == InstanceList.size();
 
     if (IsUpdate)
     {
         g_rhi->UAVBarrier(CmdBuffer, GetTLASBuffer<jBuffer_Vulkan>());
+        // vkCmdBuildAccelerationStructuresKHR bypasses the RHI dispatch helpers
+        // that normally flush pending barriers.
+        CmdBuffer->FlushBarrierBatch();
     }
-    else
-    {
-        InstanceUploadBufferPtr = g_rhi->CreateStructuredBuffer(sizeof(VkAccelerationStructureInstanceKHR) * InstanceList.size()
-            , sizeof(VkAccelerationStructureInstanceKHR), sizeof(VkAccelerationStructureInstanceKHR)
-            , EBufferCreateFlag::CPUAccess | EBufferCreateFlag::AccelerationStructureBuildInput, EResourceLayout::UAV);
-    }
+    // Keep prior instance bytes alive while earlier frames can still build from
+    // them. The existing buffer allocator defers recycling released allocations.
+    InstanceUploadBufferPtr = g_rhi->CreateStructuredBuffer(sizeof(VkAccelerationStructureInstanceKHR) * InstanceList.size()
+        , sizeof(VkAccelerationStructureInstanceKHR), sizeof(VkAccelerationStructureInstanceKHR)
+        , EBufferCreateFlag::CPUAccess | EBufferCreateFlag::AccelerationStructureBuildInput, EResourceLayout::UAV);
     auto InstanceUploadBufferVulkan = GetInstanceUploadBuffer<jBuffer_Vulkan>();
 
     VkBufferDeviceAddressInfoKHR instanceDataDeviceAddress{};
@@ -295,7 +351,9 @@ void jRaytracingScene_Vulkan::CreateOrUpdateTLAS(const jRatracingInitializer& In
     // Create a small scratch buffer used during build of the bottom level acceleration structure
     if (!IsUpdate)
     {
-        ScratchTLASBufferPtr = g_rhi->CreateRawBuffer(accelerationStructureBuildSizesInfo.buildScratchSize, 0, EBufferCreateFlag::UAV | EBufferCreateFlag::AccelerationStructureBuildInput, EResourceLayout::UAV);
+        ScratchTLASBufferPtr = g_rhi->CreateRawBuffer(Max(accelerationStructureBuildSizesInfo.buildScratchSize,
+            accelerationStructureBuildSizesInfo.updateScratchSize), 0,
+            EBufferCreateFlag::UAV | EBufferCreateFlag::AccelerationStructureBuildInput, EResourceLayout::UAV);
     }
     auto ScratchASBufferVulkan = (jBuffer_Vulkan*)ScratchTLASBufferPtr.get();
 
@@ -328,10 +386,15 @@ void jRaytracingScene_Vulkan::CreateOrUpdateTLAS(const jRatracingInitializer& In
         &accelerationBuildGeometryInfo,
         accelerationBuildStructureRangeInfos.data());
 
+    g_rhi->UAVBarrier(CmdBuffer, TLASBufferVulkan);
+    CmdBuffer->FlushBarrierBatch();
+
     VkAccelerationStructureDeviceAddressInfoKHR accelerationDeviceAddressInfo{};
     accelerationDeviceAddressInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
     accelerationDeviceAddressInfo.accelerationStructure = TLASBufferVulkan->AccelerationStructure;
     TLASBufferVulkan->DeviceAddress = g_rhi_vk->vkGetAccelerationStructureDeviceAddressKHR(g_rhi_vk->Device, &accelerationDeviceAddressInfo);
 
+    LastTLASInstanceCount = primitive_count;
+    ClearDirtyFlags();
     BumpSceneUpdateIndex();
 }

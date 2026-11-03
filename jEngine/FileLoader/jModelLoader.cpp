@@ -11,7 +11,10 @@
 #include "Math/Vector.h"
 #include "Scene/jRenderObject.h"
 #include "jImageFileLoader.h"
+#include "jModelLoaderUtils.h"
+#include "Core/jLog.h"
 #include <filesystem>
+#include <utility>
 
 #if defined _DEBUG
 #pragma comment(lib, "assimp-vc143-mtd.lib")
@@ -19,115 +22,133 @@
 #pragma comment(lib, "assimp-vc143-mt.lib")
 #endif
 
-jModelLoader* jModelLoader::_instance = nullptr;
+namespace
+{
+    bool IsCancelled(const jAssetCancellation& cancellation)
+    {
+        return cancellation && cancellation->load();
+    }
+
+    struct jPreparationFutures
+    {
+        std::vector<std::future<void>> Tasks;
+        ~jPreparationFutures()
+        {
+            // An exception/early cancellation must not leave a task referring to
+            // preparation-local data. These are this request's futures only.
+            for (auto& task : Tasks)
+                if (task.valid())
+                    task.wait();
+        }
+    };
+}
+
+struct jPreparedModel::Data
+{
+    struct Image
+    {
+        jName Filename;
+        std::shared_ptr<jImageData> Decoded;
+    };
+    std::unique_ptr<jMeshData> MeshData = std::make_unique<jMeshData>();
+    std::vector<jSubMesh> SubMeshes;
+    std::vector<std::unique_ptr<jMeshNode>> Nodes;
+    jMeshNode* RootNode = nullptr;
+    std::shared_ptr<jVertexStreamData> VertexStream;
+    std::shared_ptr<jVertexStreamData> PositionStream;
+    std::shared_ptr<jIndexStreamData> IndexStream;
+    std::vector<std::shared_ptr<Image>> Images;
+    jModelPreparationStats Stats;
+};
+
+jPreparedModel::jPreparedModel() : Payload(std::make_unique<Data>()) {}
+jPreparedModel::~jPreparedModel() = default;
+jPreparedModel::jPreparedModel(jPreparedModel&&) noexcept = default;
+jPreparedModel& jPreparedModel::operator=(jPreparedModel&&) noexcept = default;
+const jModelPreparationStats& jPreparedModel::GetStats() const { return Payload->Stats; }
+
+jModelLoader& jModelLoader::GetInstance()
+{
+    static jModelLoader instance;
+    return instance;
+}
 
 jModelLoader::jModelLoader()
-	: ThreadPool(MINIMUM_WORKER_THREAD_COUNT)
-{	
-}
-
-
-jModelLoader::~jModelLoader()
+    : ThreadPool(jThreadPool::DefaultWorkerCount())
+    , OwnerThread(std::this_thread::get_id())
 {
 }
 
-//bool jModelLoader::ConvertToFBX(const char* destFilename, const char* filename) const
-//{
-//	Assimp::Exporter exporter;
-//	//for (int32 i = 0; i < exporter.GetExportFormatCount(); ++i)
-//	//	const aiExportFormatDesc* format = exporter.GetExportFormatDescription(i);
-//
-//	Assimp::Importer importer;
-//	const aiScene* scene = importer.ReadFile(filename, 0);
-//	aiReturn Ret = exporter.Export(scene, "fbx", destFilename, 0, nullptr);
-//	//aiReleaseImport(scene);
-//
-//	return (Ret == aiReturn_SUCCESS);
-//}
+jModelLoader::~jModelLoader() = default;
 
-jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materialRootDir)
+bool jModelLoader::IsOwnerThread() const
 {
+    return OwnerThread == std::this_thread::get_id();
+}
+
+void jModelLoader::Shutdown()
+{
+    ThreadPool.Shutdown();
+}
+
+std::unique_ptr<jPreparedModel> jModelLoader::PrepareModel(const char* filename,
+    const char* materialRootDir, const jAssetCancellation& cancellation, std::string* error)
+{
+    if (error)
+        error->clear();
+    const auto fail = [&](const std::string& message) -> std::unique_ptr<jPreparedModel> {
+        if (error)
+            *error = message;
+        return nullptr;
+    };
+    if (!filename || !filename[0])
+        return fail("Empty model filename");
+    if (IsCancelled(cancellation))
+        return fail("Cancelled");
+    const auto started = std::chrono::steady_clock::now();
+    try
+    {
+    jPreparationFutures pending;
 	Assimp::Importer importer;
 	const aiScene* scene = importer.ReadFile(filename, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_CalcTangentSpace
-		| aiProcess_MakeLeftHanded
+		| aiProcess_MakeLeftHanded | aiProcess_GenSmoothNormals
 	);
 
 	if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
 	{
-		JASSERT(!importer.GetErrorString());
-		return nullptr;
+        return fail(std::string("Model load failed: ") + filename + ": " + importer.GetErrorString());
 	}
 
-	jMeshObject* object = new jMeshObject();
-
-	jMeshData* meshData = new jMeshData();
-	object->MeshData = meshData;
+    if (IsCancelled(cancellation))
+        return fail("Cancelled");
+    auto prepared = std::make_unique<jPreparedModel>();
+    auto& data = *prepared->Payload;
+    jMeshData* meshData = data.MeshData.get();
+    std::unordered_set<std::string> imagePaths;
+    std::unordered_set<std::string> warnedPaths;
 
 	for (uint32 i = 0; i < scene->mNumMeshes; ++i)
 	{
+        if (IsCancelled(cancellation))
+            return fail("Cancelled");
 		const aiMesh* assimpMesh = scene->mMeshes[i];
 
 		jSubMesh subMesh;
-		if (assimpMesh->mName.length > 0)
-			subMesh.Name = assimpMesh->mName.C_Str();
-
-		subMesh.StartVertex = static_cast<int32>(meshData->Vertices.size());
-		meshData->Vertices.resize(meshData->Vertices.size() + assimpMesh->mNumVertices);
-		subMesh.EndVertex = static_cast<int32>(meshData->Vertices.size());
-
-		memcpy(&meshData->Vertices[subMesh.StartVertex], &assimpMesh->mVertices[0], assimpMesh->mNumVertices * sizeof(Vector));
-
-		const bool HasTangentBitangent = assimpMesh->HasTangentsAndBitangents();
-		if (HasTangentBitangent)
+		if (!assimpMesh || !jModelLoaderUtils::AppendMesh(*assimpMesh, *meshData, subMesh))
 		{
-			meshData->Tangents.resize(meshData->Tangents.size() + assimpMesh->mNumVertices);
-			memcpy(&meshData->Tangents[subMesh.StartVertex], &assimpMesh->mTangents[0], assimpMesh->mNumVertices * sizeof(Vector));
-
-			meshData->Bitangents.resize(meshData->Bitangents.size() + assimpMesh->mNumVertices);
-			memcpy(&meshData->Bitangents[subMesh.StartVertex], &assimpMesh->mBitangents[0], assimpMesh->mNumVertices * sizeof(Vector));
+            return fail(std::string("Unsupported or invalid triangle mesh: ") + filename);
 		}
-
-		if (assimpMesh->HasNormals())
-		{
-			meshData->Normals.resize(meshData->Normals.size() + assimpMesh->mNumVertices);
-			memcpy(&meshData->Normals[subMesh.StartVertex], &assimpMesh->mNormals[0], assimpMesh->mNumVertices * sizeof(Vector));
-		}
-
-		if (assimpMesh->HasTextureCoords(0))
-		{
-			meshData->TexCoord.resize(meshData->TexCoord.size() + assimpMesh->mNumVertices);
-			for (uint32 k = 0; k < assimpMesh->mNumVertices; ++k)
-			{
-				auto& texCoord = meshData->TexCoord[subMesh.StartVertex + k];
-				auto& assimpTexCoord = assimpMesh->mTextureCoords[0][k];
-				texCoord.x = assimpTexCoord.x;
-				texCoord.y = assimpTexCoord.y;
-			}
-		}
-
-		if (assimpMesh->HasFaces())
-		{
-			subMesh.StartFace = static_cast<int32>(meshData->Faces.size());
-			meshData->Faces.resize(meshData->Faces.size() + assimpMesh->mNumFaces * 3);
-			subMesh.EndFace = static_cast<int32>(meshData->Faces.size());
-			for (unsigned int k = 0; k < assimpMesh->mNumFaces; ++k)
-			{
-				aiFace& face = assimpMesh->mFaces[k];
-				memcpy(&meshData->Faces[subMesh.StartFace + k * 3], &face.mIndices[0], sizeof(uint32) * 3);
-			}
-		}
-		subMesh.MaterialIndex = assimpMesh->mMaterialIndex;
-		object->SubMeshes.emplace_back(subMesh);
+		data.SubMeshes.emplace_back(subMesh);
 	}
 
-	std::vector<jMaterial*> Materials;
 	for (uint32 i = 0; i < scene->mNumMaterials; ++i)
 	{
+        if (IsCancelled(cancellation))
+            return fail("Cancelled");
 		aiMaterial* material = scene->mMaterials[i];
-
-		std::string name = material->GetName().C_Str();
-
-		auto newMeshMaterial = new jMeshMaterial();
+        auto materialOwner = std::make_shared<jMeshMaterial>();
+        auto* newMeshMaterial = materialOwner.get();
+        meshData->Materials.emplace(i, std::move(materialOwner));
 #if USE_SPONZA_PBR
 		for (uint32 k = aiTextureType_NONE; k <= aiTextureType_UNKNOWN; ++k)
 #else
@@ -223,11 +244,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 			const bool isDataUri = (texturePath.rfind("data:", 0) == 0);
 			if (!isEmbeddedTexture && !isDataUri && !texturePath.empty())
 			{
-				std::filesystem::path resolvedPath(texturePath);
-				if (!resolvedPath.is_absolute() && materialRootDir)
-					resolvedPath = std::filesystem::path(materialRootDir) / resolvedPath;
-
-				resolvedPath = resolvedPath.lexically_normal();
+				const auto resolvedPath = jModelLoaderUtils::ResolveTexturePath(texturePath, materialRootDir);
 				std::error_code errorCode;
 				if (std::filesystem::exists(resolvedPath, errorCode) && !errorCode)
 				{
@@ -235,17 +252,27 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 					jName FilePathName = jName(filePath);
 					curTexData.FilePath = FilePathName;
 
-					Materials.push_back(newMeshMaterial);
-					jTask T;
-					T.pHashFunc = [&FilePathName]()
-					{
-						return (size_t)FilePathName.GetNameHash();
-					};
-					T.pFunc = [filePath]() {
-						jImageFileLoader::GetInstance().LoadImageDataFromFile(jName(filePath));
-					};
-					ThreadPool.Enqueue(T);
+                    if (imagePaths.insert(filePath).second)
+                    {
+                        auto image = std::make_shared<jPreparedModel::Data::Image>();
+                        image->Filename = FilePathName;
+                        data.Images.push_back(image);
+                        pending.Tasks.emplace_back(ThreadPool.Submit([image, cancellation] {
+                            if (!IsCancelled(cancellation))
+                            {
+                                image->Decoded = jImageFileLoader::GetInstance().LoadImageDataFromFile(image->Filename).lock();
+                                if (!image->Decoded && !IsCancelled(cancellation))
+                                    throw std::runtime_error(std::string("Image decode failed: ") + image->Filename.ToStr());
+                            }
+                        }));
+                    }
 				}
+                else if (!IsCancelled(cancellation) && warnedPaths.insert(resolvedPath.generic_string()).second)
+                {
+                    jLog::Get().Write(EjLogLevel::Warning, "Assets",
+                        std::string("Optional texture fallback: ") + resolvedPath.generic_string() + ": "
+                        + (errorCode ? errorCode.message() : "file not found"));
+                }
 			}
 		}
 
@@ -317,39 +344,35 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 		newMeshMaterial->Data.Reflectivity = Reflectivity;
 		newMeshMaterial->Data.IndexOfRefraction = IndexOfRefraction;
 
-		meshData->Materials.emplace(std::make_pair(i, std::shared_ptr<jMaterial>(newMeshMaterial)));
 	}
 
-    ThreadPool.WaitAll();
-    
-    for (jMaterial* mat : Materials)
-    {
-		for (int32 i = 0; i < _countof(mat->TexData); ++i)
-		{
-			if (mat->TexData[i].FilePath.IsValid())
-				mat->TexData[i].Texture = jImageFileLoader::GetInstance().LoadTextureFromFile(mat->TexData[i].FilePath).lock().get();
-		}
-    }
+    if (meshData->Vertices.empty() || meshData->Faces.empty())
+        return fail("Model contains no supported triangle geometry");
+    if (IsCancelled(cancellation))
+        return fail("Cancelled");
 
 	JASSERT(scene->mRootNode);
 	if (scene->mRootNode)
 	{
-		jMeshNode* rootNode = new jMeshNode();
-
-		rootNode->MeshIndex.resize(scene->mRootNode->mNumMeshes);
-		memcpy(&rootNode->MeshIndex[0], scene->mRootNode->mMeshes, scene->mRootNode->mNumMeshes * sizeof(int32));
+        auto rootOwner = std::make_unique<jMeshNode>();
+        jMeshNode* rootNode = rootOwner.get();
+        data.Nodes.push_back(std::move(rootOwner));
 
 		auto fillUpMeshNode = [](jMeshNode* node, aiNode* assimpNode)
 		{
 			node->MeshIndex.resize(assimpNode->mNumMeshes);
-			memcpy(&node->MeshIndex[0], assimpNode->mMeshes, assimpNode->mNumMeshes * sizeof(int32));
+			if (assimpNode->mNumMeshes)
+				memcpy(node->MeshIndex.data(), assimpNode->mMeshes, assimpNode->mNumMeshes * sizeof(int32));
 		};
 
 		std::function<void(jMeshNode*, aiNode*)> fillupChildNode = [&](jMeshNode* node, aiNode* assimpNode)
 		{
 			for (uint32 i = 0; i < assimpNode->mNumChildren; ++i)
 			{
-				auto newNode = new jMeshNode();
+                auto nodeOwner = std::make_unique<jMeshNode>();
+                auto* newNode = nodeOwner.get();
+                data.Nodes.push_back(std::move(nodeOwner));
+				newNode->Parent = node;
 				fillUpMeshNode(newNode, assimpNode->mChildren[i]);
 				fillupChildNode(newNode, assimpNode->mChildren[i]);
 				node->childNode.push_back(newNode);
@@ -359,7 +382,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 		fillUpMeshNode(rootNode, scene->mRootNode);
 		fillupChildNode(rootNode, scene->mRootNode);
 
-		object->RootNode = rootNode;
+		data.RootNode = rootNode;
 	}
 
 	const int32 elementCount = static_cast<int32>(meshData->Vertices.size());
@@ -416,7 +439,7 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
 
 	auto indexStreamData = std::make_shared<jIndexStreamData>();
 	indexStreamData->ElementCount = static_cast<int32>(meshData->Faces.size());
-	if (indexStreamData->ElementCount > 65535)
+	if (jModelLoaderUtils::Requires32BitIndices(meshData->Faces))
 	{
 		auto streamParam = new jStreamParam<uint32>();
 		streamParam->BufferType = EBufferType::STATIC;
@@ -444,104 +467,252 @@ jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materi
         indexStreamData->Param = streamParam;
 	}
 
-    object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>();
-	object->RenderObjectGeometryDataPtr->CreateNew_ForRaytracing(vertexStreamData, positionOnlyVertexStreamData, indexStreamData, false, true);
+    data.VertexStream = std::move(vertexStreamData);
+    data.PositionStream = std::move(positionOnlyVertexStreamData);
+    data.IndexStream = std::move(indexStreamData);
+    for (auto& task : pending.Tasks)
+        task.get(); // Never waits for another request's textures.
+    if (IsCancelled(cancellation))
+        return fail("Cancelled");
+    data.Stats.VertexCount = meshData->Vertices.size();
+    data.Stats.IndexCount = meshData->Faces.size();
+    data.Stats.SubMeshCount = data.SubMeshes.size();
+    data.Stats.TextureCount = data.Images.size();
+    data.Stats.CpuMilliseconds = std::chrono::duration<double, std::milli>(
+        std::chrono::steady_clock::now() - started).count();
+    return prepared;
+    }
+    catch (const std::exception& exception)
+    {
+        return fail(std::string("Model preparation failed: ") + exception.what());
+    }
+    catch (...)
+    {
+        return fail("Unknown model preparation failure");
+    }
+}
 
-	for (int32 i = 0; i < (int32)object->SubMeshes.size(); ++i)
-	{
-		const jSubMesh& subMesh = object->SubMeshes[i];
+jMeshObject* jModelLoader::FinalizeModel(std::unique_ptr<jPreparedModel> prepared, std::string* error)
+{
+    if (error)
+        error->clear();
+    const auto fail = [&](const char* message) -> jMeshObject* {
+        if (error)
+            *error = message;
+        return nullptr;
+    };
+    if (!IsOwnerThread())
+        return fail("Model finalization requires the model loader owner thread");
+    if (!prepared || !prepared->Payload || !prepared->Payload->VertexStream)
+        return fail("No prepared model data");
+    if (!g_rhi)
+        return fail("Model finalization requires an initialized RHI");
+    try
+    {
+        auto& data = *prepared->Payload;
+        // No cache lock spans RHI creation. Failed GPU resources leave the
+        // caller's existing scene intact; publication is the caller's decision.
+        for (auto& material : data.MeshData->Materials)
+        {
+            for (auto& texture : material.second->TexData)
+            {
+                if (!texture.FilePath.IsValid())
+                    continue;
+                const auto decoded = std::find_if(data.Images.begin(), data.Images.end(), [&](const auto& image) {
+                    return image->Filename == texture.FilePath;
+                });
+                if (decoded != data.Images.end() && (*decoded)->Decoded)
+                {
+                    auto gpuTexture = jImageFileLoader::GetInstance().LoadTextureFromImageData((*decoded)->Decoded).lock();
+                    if (!gpuTexture)
+                        return fail("Texture upload failed");
+                    texture.Texture = gpuTexture.get(); // Cache retains ownership, as existing materials require.
+                }
+            }
+        }
+        auto object = std::make_unique<jMeshObject>();
+        object->MeshData = data.MeshData.release();
+        object->SubMeshes = std::move(data.SubMeshes);
+        object->RootNode = data.RootNode;
+        for (auto& node : data.Nodes)
+            node.release(); // jMeshObject now owns the node tree.
+        object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>();
+        object->RenderObjectGeometryDataPtr->CreateNew_ForRaytracing(
+            data.VertexStream, data.PositionStream, data.IndexStream, false, true);
+        const auto& geometry = *object->RenderObjectGeometryDataPtr;
+        if (!geometry.VertexBufferPtr || !geometry.VertexBuffer_PositionOnlyPtr || !geometry.IndexBufferPtr)
+            return fail("Geometry upload failed");
+        const auto validBuffer = [](const jBuffer* buffer) {
+            return buffer && buffer->GetHandle() && buffer->GetAllocatedSize() && buffer->GetBufferSize();
+        };
+        if (!validBuffer(geometry.VertexBufferPtr->GetBuffer(0))
+            || !validBuffer(geometry.VertexBuffer_PositionOnlyPtr->GetBuffer(0))
+            || !validBuffer(geometry.IndexBufferPtr->GetBuffer()))
+            return fail("Geometry upload did not produce usable buffers");
+        for (const auto& subMesh : object->SubMeshes)
+        {
+            auto renderObject = std::make_unique<jRenderObjectElement>();
+            renderObject->SubMesh = subMesh;
+            const auto material = object->MeshData->Materials.find(subMesh.MaterialIndex);
+            if (material != object->MeshData->Materials.end())
+                renderObject->MaterialPtr = material->second;
+            renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
+            object->AddRenderObject(renderObject.get());
+            renderObject.release();
+        }
+        return object.release();
+    }
+    catch (const std::exception& exception)
+    {
+        return fail(exception.what());
+    }
+    catch (...)
+    {
+        return fail("Unknown model finalization failure");
+    }
+}
 
-		auto StaticMeshRenderObject = new jRenderObjectElement();
-		StaticMeshRenderObject->SubMesh = subMesh;
-		StaticMeshRenderObject->MaterialPtr = meshData->Materials[subMesh.MaterialIndex];
-		StaticMeshRenderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
-		object->AddRenderObject(StaticMeshRenderObject);  // Use AddRenderObject to automatically set Owner
-	}
-
-	return object;
+jMeshObject* jModelLoader::LoadFromFile(const char* filename, const char* materialRootDir)
+{
+    if (!IsOwnerThread())
+        return nullptr;
+    std::string error;
+    auto prepared = PrepareModel(filename, materialRootDir, {}, &error);
+    auto* object = prepared ? FinalizeModel(std::move(prepared), &error) : nullptr;
+    if (!object && !error.empty())
+        std::cerr << error << std::endl;
+    return object;
 }
 
 jMeshObject* jModelLoader::LoadFromFile(const char* filename)
 {
-	return LoadFromFile(filename, "Image/");
+    return LoadFromFile(filename, "Image/");
 }
 
-jThreadPool::jThreadPool(size_t num_threads) : IsStop(false)
+size_t jThreadPool::DefaultWorkerCount()
 {
-    for (size_t i = 0; i < num_threads; ++i) 
-	{
-        WorkerThreads.emplace_back([this] 
-		{
-#ifdef _WIN32
-			const HRESULT comInitResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-			const bool shouldUninitializeCOM = SUCCEEDED(comInitResult);
-#endif
+    const size_t hardware = std::thread::hardware_concurrency();
+    return std::clamp(hardware > 2 ? hardware - 2 : size_t(1), size_t(1), size_t(4));
+}
 
-            while (true) 
-			{
-				jTask task;
+jThreadPool::jThreadPool(size_t numThreads, size_t queueCapacity)
+    : QueueCapacity(queueCapacity ? queueCapacity : std::max(size_t(1), numThreads) * 2)
+{
+    try
+    {
+        for (size_t i = 0; i < std::max(size_t(1), numThreads); ++i)
+        {
+            WorkerThreads.emplace_back([this] {
+#ifdef _WIN32
+                const HRESULT comInitResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+                const bool shouldUninitializeCOM = SUCCEEDED(comInitResult);
+#endif
+                for (;;)
                 {
-                    std::unique_lock<std::mutex> lock(QueueLock);
-
-                    // 작업이 없고 스레드 풀 종료 요청도 없다면 대기
-                    ConditionVariable.wait(lock, [this] { return IsStop || !TaskQueue.empty(); });
-
-                    if (IsStop && TaskQueue.empty()) 
-					{
-                        break;
-
+                    jTask task;
+                    {
+                        std::unique_lock<std::mutex> lock(QueueLock);
+                        ConditionVariable.wait(lock, [this] { return IsStop || !TaskQueue.empty(); });
+                        if (IsStop && TaskQueue.empty())
+                            break;
+                        task = std::move(TaskQueue.front());
+                        TaskQueue.pop();
                     }
-
-					if (TaskQueue.size() > 0)
-					{
-						task = TaskQueue.front();
-						TaskQueue.pop();
-					}
+                    QueueSpaceConditionVariable.notify_all();
+                    try
+                    {
+                        task.Do();
+                    }
+                    catch (...)
+                    {
+                        std::lock_guard<std::mutex> lock(QueueLock);
+                        if (!TaskException)
+                            TaskException = std::current_exception();
+                    }
+                    {
+                        std::lock_guard<std::mutex> lock(QueueLock);
+                        --RemainTask;
+                    }
+                    CompletionConditionVariable.notify_all();
                 }
-
-				if (task.IsValid())
-				{
-					task.Do();
-					--RemainTask;
-				}
-            }
-
 #ifdef _WIN32
-			if (shouldUninitializeCOM)
-				CoUninitialize();
+                if (shouldUninitializeCOM)
+                    CoUninitialize();
 #endif
-        });
-
+            });
+        }
+    }
+    catch (...)
+    {
+        Shutdown();
+        throw;
     }
 }
 
 jThreadPool::~jThreadPool()
 {
-    {
-        std::unique_lock<std::mutex> lock(QueueLock);
-        IsStop = true;
-    }
-
-    ConditionVariable.notify_all();
-
-    for (std::thread& worker : WorkerThreads) 
-	{
-        worker.join();
-    }
+    Shutdown();
 }
 
-void jThreadPool::Enqueue(const jTask& file_path)
+void jThreadPool::Shutdown()
+{
+    {
+        std::lock_guard<std::mutex> lock(QueueLock);
+        IsStop = true;
+    }
+    ConditionVariable.notify_all();
+    QueueSpaceConditionVariable.notify_all();
+    for (auto& worker : WorkerThreads)
+        if (worker.joinable())
+            worker.join();
+    WorkerThreads.clear();
+}
+
+void jThreadPool::Enqueue(const jTask& task)
+{
+    if (!task.IsValid())
+        return;
+    std::unique_lock<std::mutex> lock(QueueLock);
+    const auto hash = task.GetHash();
+    if (task.pHashFunc && ProcessingTaskHashes.count(hash))
+        return;
+    QueueSpaceConditionVariable.wait(lock, [this] { return IsStop || TaskQueue.size() < QueueCapacity; });
+    if (IsStop)
+        throw std::runtime_error("Cannot enqueue on a stopped asset thread pool");
+    // Recheck after the wait because another producer may have queued this hash.
+    if (task.pHashFunc && !ProcessingTaskHashes.insert(hash).second)
+        return;
+    try
+    {
+        TaskQueue.push(task);
+    }
+    catch (...)
+    {
+        if (task.pHashFunc)
+            ProcessingTaskHashes.erase(hash);
+        throw;
+    }
+    ++RemainTask;
+    ConditionVariable.notify_one();
+}
+
+std::future<void> jThreadPool::Submit(std::function<void()> function)
+{
+    auto task = std::make_shared<std::packaged_task<void()>>(std::move(function));
+    auto future = task->get_future();
+    jTask queued;
+    queued.pFunc = [task] { (*task)(); };
+    Enqueue(queued);
+    return future;
+}
+
+void jThreadPool::WaitAll()
 {
     std::unique_lock<std::mutex> lock(QueueLock);
-
-    // 중복 작업인지 확인
-    auto hash = file_path.GetHash();
-    if (ProcessingTaskHashes.find(hash) == ProcessingTaskHashes.end())
-	{
-        // 중복이 아닐 때만 작업 큐에 추가
-        TaskQueue.push(file_path);
-        RemainTask++;
-		ProcessingTaskHashes.insert(hash);
-        ConditionVariable.notify_one();
-    }
+    CompletionConditionVariable.wait(lock, [this] { return RemainTask == 0; });
+    ProcessingTaskHashes.clear();
+    const auto error = std::exchange(TaskException, nullptr);
+    lock.unlock();
+    if (error)
+        std::rethrow_exception(error);
 }

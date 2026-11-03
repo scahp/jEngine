@@ -351,6 +351,7 @@ void CopyTexture2D(const std::shared_ptr<jRenderFrameContext>& InRenderFrameCont
     OneFrameUniformBuffer->UpdateBufferData(&UniformBufferData, sizeof(UniformBufferData));
 
     g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InSourceTexture, EResourceLayout::SHADER_READ_ONLY);
+    g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), InDestTexture, EResourceLayout::UAV);
 
     jCopyCSParameters Parameters;
     Parameters.resultImage = { InDestTexture };

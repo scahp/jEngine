@@ -7,11 +7,6 @@
 #define SURFEL_GI_BOUNDARY_BAND_SCALE 1.0
 // Temp debug switch: 0 keeps candidate placement on primary cascade only.
 #define SURFEL_GI_ENABLE_BOUNDARY_OVERLAP 0
-#ifndef SURFEL_GI_ENABLE_STATE1_RETRY
-    // 1: handle State==1 (allocating) with short spin/retry to reduce duplicate page allocations.
-    // 0: keep legacy behavior (skip allocating slots and continue probing).
-    #define SURFEL_GI_ENABLE_STATE1_RETRY 1
-#endif
 
 uint HashU32(uint x)
 {
@@ -377,25 +372,6 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
     uint prevWinnerScore = 0u;
     InterlockedMax(WinnerScoreBuffer[cellLinear], priority, prevWinnerScore);
-    if (priority < prevWinnerScore)
-        return;
-
-    [loop] for (uint spin = 0u; spin < 256u; ++spin)
-    {
-        uint prevLock = 0u;
-        InterlockedCompareExchange(WinnerLockBuffer[cellLinear], 0u, 1u, prevLock);
-        if (prevLock != 0u)
-            continue;
-
-        if (priority >= WinnerScoreBuffer[cellLinear])
-        {
-            WinnerScoreBuffer[cellLinear] = priority;
-            WinnerIndexBuffer[cellLinear] = candidateIndex;
-        }
-        WinnerLockBuffer[cellLinear] = 0u;
-        break;
-    }
-
     AttemptOutput[pixel] = float4(1.0, 1.0, 1.0, 1.0);
     DebugOutput[pixel] = float4(overlapFaceScore, centerPriority, saturate((float)priority / 16777215.0), 1.0);
 }

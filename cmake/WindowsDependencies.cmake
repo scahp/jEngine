@@ -56,6 +56,10 @@ foreach(runtime_dir IN ITEMS
     "${external_dir}/WinPixEventRuntime/lib/x64")
   file(GLOB_RECURSE runtime_dlls CONFIGURE_DEPENDS "${runtime_dir}/*.dll")
   foreach(dll IN LISTS runtime_dlls)
+    get_filename_component(runtime_name "${dll}" NAME)
+    if(runtime_name STREQUAL "dxcompiler.dll" OR runtime_name STREQUAL "dxil.dll")
+      continue() # Deploy the selected compiler pair below, never the older vendor copy.
+    endif()
     file(RELATIVE_PATH relative_dll "${runtime_dir}" "${dll}")
     get_filename_component(relative_dir "${relative_dll}" DIRECTORY)
     add_custom_command(TARGET jEngine POST_BUILD
@@ -65,3 +69,18 @@ foreach(runtime_dir IN ITEMS
       VERBATIM)
   endforeach()
 endforeach()
+
+# Keep runtime compilation aligned with the compiler used by shader checks.
+# A dependency target also refreshes the pair when only the cached DLLs change.
+get_filename_component(dxc_bin "${JENGINE_DXC_EXECUTABLE}" DIRECTORY)
+foreach(dxc_library IN ITEMS dxcompiler.dll dxil.dll)
+  if(NOT EXISTS "${dxc_bin}/${dxc_library}")
+    message(FATAL_ERROR "${dxc_library} must be beside ${JENGINE_DXC_EXECUTABLE}; run scripts/ci/setup-windows-dxc.ps1")
+  endif()
+endforeach()
+add_custom_target(jEngineDXCRuntime
+  COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:jEngine>"
+  COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+    "${dxc_bin}/dxcompiler.dll" "${dxc_bin}/dxil.dll" "$<TARGET_FILE_DIR:jEngine>"
+  VERBATIM)
+add_dependencies(jEngine jEngineDXCRuntime)

@@ -347,3 +347,6 @@ jEngine/imgui.ini
 /.ci-tools/
 /.ci-cache/
 __pycache__/
+
+# Per-process rotating engine diagnostics
+logs/

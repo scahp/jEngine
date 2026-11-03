@@ -1,0 +1,23 @@
+[
+  {
+    "trial": "after-0",
+    "cpu_preparation_wall_ms": 314.185,
+    "owner_publish_wall_ms": 138.851,
+    "vertices": 192496,
+    "textures": 68
+  },
+  {
+    "trial": "after-1",
+    "cpu_preparation_wall_ms": 312.646,
+    "owner_publish_wall_ms": 130.929,
+    "vertices": 192496,
+    "textures": 68
+  },
+  {
+    "trial": "after-2",
+    "cpu_preparation_wall_ms": 311.737,
+    "owner_publish_wall_ms": 135.553,
+    "vertices": 192496,
+    "textures": 68
+  }
+]

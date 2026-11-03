@@ -74,11 +74,14 @@ rendered on/off images, and rejects Vulkan/Metal validation errors. Only after a
 checks pass does it activate this driver for the normal run script. The Homebrew
 installation is preserved; no system driver or scheduler is changed.
 
-Use the existing **SurfelGI → Enable SurfelGI** and **Enable Inline Ray Gather**
-checkboxes, ray count, guiding, distance, bias and history controls. Turning inline
-gather off pauses new ray samples while retaining existing irradiance history;
-placement can still seed new surfels from neighboring history. Turning SurfelGI
-off skips its contribution. Unsupported drivers show the inline checkbox disabled.
+Open **Features → SurfelGI** and use **Enable SurfelGI** for its contribution.
+In the console, query `r.surfelgi.inline_ray.enable`, or set it with
+`r.surfelgi.inline_ray.enable 1` / `0`. The active panel exposes intensity,
+pool, spawn, radius and debug controls; the inline-ray checkbox belongs to an
+inactive legacy panel. Turning inline gather off pauses new ray samples while
+retaining existing irradiance history; placement can still seed new surfels from
+neighboring history. Unsupported drivers use the fallback even if the option is
+enabled. See the [illustrated SurfelGI guide](manual/05-surfelgi.md).
 
 To select the original Homebrew driver explicitly:
 
@@ -108,7 +111,8 @@ storage-buffer declarations while retaining DX12 typed-buffer declarations.
   x64 Debug and Release. The separate Tracy profiler application is not part of CI.
 - macOS 26 / Apple Silicon: CMake/Ninja Debug and Release.
 - Both platforms run `--ci-cpu` and compile actual engine-generated SurfelGI
-  placement, resolve, and inline-gather declarations to SPIR-V and DXIL. The
+  candidate gathering/selection, placement, history snapshots, resolve, visualization,
+  hover selection, and inline-gather declarations to SPIR-V and DXIL. The
   SPIR-V member offsets and structured-buffer strides are compared with C++
   metadata. A deliberately unaligned control shader must be rejected.
 
@@ -133,7 +137,8 @@ CMake 4.2+ for the Visual Studio 2026 generator, MSVC x64, and Python 3. Configu
 with `cmake --preset windows-vs2026`; build/test with `windows-debug` or
 `windows-release`. The generated solution lives in `build/windows-vs2026/`.
 The CMake target includes both DX12 and Vulkan, retains Tracy, uses the bundled
-Windows dependencies, and copies runtime DLLs beside the executable, preserving
+Windows dependencies and the selected DXC package's `dxcompiler.dll`/`dxil.dll`,
+and copies runtime DLLs beside the executable, preserving
 the Agility SDK's `D3D12/` subdirectory. The IDE working directory is `jEngine/`
 for existing asset paths. CPU and shader tests use the same CTest interface as
 macOS and do not require a GPU or a Vulkan driver on the runner.
@@ -142,7 +147,8 @@ DXC is pinned in `scripts/ci/dependencies.json`. macOS builds it once per cache
 key and shares its native executable/library between the build configurations;
 Windows verifies the official release ZIP's SHA-256. macOS object compilation
 uses a bounded 256 MB ccache per configuration. Workflow actions are pinned to
-commit SHAs, permissions are read-only, and superseded runs are cancelled.
+commit SHAs and permissions are read-only. Windows superseded runs are cancelled;
+macOS lets the active run finish so its first native-DXC build can populate the cache.
 
 Each configuration uploads build outputs and diagnostics even after a failure:
 compiler logs, CTest XML on macOS, MSBuild logs/binlog on Windows, generated HLSL,
@@ -150,3 +156,13 @@ SPIR-V/DXIL, and the shader-contract JSON report. Artifacts expire after five da
 The binaries are developer build artifacts, not self-contained installers: scene
 assets, runtime dependency bundling, signing, and release publication are a
 separate packaging step. No release or self-hosted runner is created by this CI.
+
+The preserved `jEngine.vcxproj` also requires `scripts/ci/setup-windows-dxc.ps1`
+before building; `JEngineDxcDirectory` can select an alternative matching package.
+Windows CI checks CMake and the native project in both configurations. Runtime
+shader smoke checks compile real generated resolve/gather source through the
+application wrapper and check the loaded compiler path/version. CMake builds also
+compare the deployed DLL bytes with the selected package.
+The CMake runtime dependency refreshes the DLL pair even when no source relink is needed.
+
+See [the full-system audit](system-audit.md) for repairs, regression coverage and limits.

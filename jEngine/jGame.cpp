@@ -13,6 +13,7 @@
 #include "jPrimitiveUtil.h"
 #include "jOptions.h"
 #include "FileLoader/jModelLoader.h"
+#include "FileLoader/jAssetImportService.h"
 #include "Scene/jMeshObject.h"
 #include "FileLoader/jImageFileLoader.h"
 #include "Renderer/jSceneRenderTargets.h"    // temp
@@ -720,6 +721,104 @@ bool jGame::CanLoadSelectedPathTracingScene() const
 			|| ResolveSceneLoader(PathTracingSceneBrowser.Scenes[selectedIndex]) != PathTracingSceneBrowser.ActiveLoader));
 }
 
+void jGame::CancelSceneImport()
+{
+    if (AssetImports) AssetImports->CancelAll();
+    PendingImportId = 0;
+    PendingImportSceneId.clear();
+    PathTracingSceneBrowser.PendingLoadIndex = -1;
+    SceneImportStatus = "Import cancelled; current scene retained.";
+}
+
+bool jGame::WaitForSceneImportForTesting(uint32 timeoutMilliseconds)
+{
+    std::string expected = PendingImportSceneId;
+    const auto pending = PathTracingSceneBrowser.PendingLoadIndex;
+    if (pending >= 0 && pending < static_cast<int32>(PathTracingSceneBrowser.Scenes.size()))
+        expected = PathTracingSceneBrowser.Scenes[pending].SceneId;
+    if (expected.empty()) return true;
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMilliseconds);
+    do
+    {
+        ProcessSceneImports();
+        if (!PendingImportId && PathTracingSceneBrowser.PendingLoadIndex < 0)
+        {
+            const auto index = FindPathTracingSceneIndexById(expected);
+            return index >= 0 && index == PathTracingSceneBrowser.ActiveIndex;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    } while (std::chrono::steady_clock::now() < deadline);
+    CancelSceneImport();
+    return false;
+}
+
+void jGame::ProcessSceneImports()
+{
+    const int32 requested = PathTracingSceneBrowser.PendingLoadIndex;
+    if (requested >= 0 && requested < static_cast<int32>(PathTracingSceneBrowser.Scenes.size()))
+    {
+        const auto descriptor = PathTracingSceneBrowser.Scenes[requested];
+        PathTracingSceneBrowser.PendingLoadIndex = -1;
+        CancelSceneImport();
+        if (ResolveSceneLoader(descriptor) == ESceneLoader::PathTracing)
+        {
+            // The legacy path-tracing importer also builds its scene. Keep that
+            // explicit owner-thread path until it gains a CPU-only payload.
+            SceneImportStatus = "Loading with legacy synchronous path-tracing importer.";
+            LoadPathTracingSceneByIndex(requested, true);
+        }
+        else
+        {
+            if (!AssetImports) AssetImports = std::make_unique<jAssetImportService>();
+            const auto source = std::filesystem::path(descriptor.FilePath);
+            PendingImportId = AssetImports->Request(descriptor.FilePath,
+                source.has_parent_path() ? source.parent_path().generic_string() : std::string());
+            PendingImportSceneId = descriptor.SceneId;
+            SceneImportStatus = PendingImportId ? "Preparing asset on a CPU worker: " + descriptor.DisplayName
+                : "Import request rejected (queue full or shutting down).";
+            if (!PendingImportId) jConsole::Get().LogWarning(SceneImportStatus);
+        }
+    }
+    if (!AssetImports || !PendingImportId) return;
+    auto result = AssetImports->Poll();
+    if (!result || result->Id != PendingImportId) return;
+    PendingImportId = 0;
+    const int32 index = FindPathTracingSceneIndexById(PendingImportSceneId);
+    PendingImportSceneId.clear();
+    if (result->State != jAssetImportService::Status::Ready || index < 0)
+    {
+        SceneImportStatus = "Import failed; current scene retained: " + result->Error;
+        jConsole::Get().LogError(SceneImportStatus);
+        return;
+    }
+    const auto stats = result->Model->GetStats();
+    const auto start = std::chrono::steady_clock::now();
+    std::string error;
+    std::unique_ptr<jMeshObject> model(jModelLoader::GetInstance().FinalizeModel(std::move(result->Model), &error));
+    if (!model)
+    {
+        SceneImportStatus = "GPU finalization failed; current scene retained: " + error;
+        jConsole::Get().LogError(SceneImportStatus);
+        return;
+    }
+    // At most one finalization per frame. GPU uploads and scene publication still
+    // run synchronously on the owner; this is not a hard millisecond budget.
+    LoadPathTracingSceneByIndex(index, true, model.release());
+    const double publishMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+    std::ostringstream message;
+    message << "Import complete: CPU " << stats.CpuMilliseconds << " ms, GPU/scene publish "
+        << publishMs << " ms; " << stats.VertexCount << " vertices, " << stats.TextureCount << " textures.";
+    SceneImportStatus = message.str();
+    jConsole::Get().Log(SceneImportStatus);
+#ifdef _WIN32
+    char emitMarker[2] = {};
+    if (GetEnvironmentVariableA("JENGINE_BENCHMARK_SCENE_MARKERS", emitMarker, sizeof(emitMarker)) == 1 && emitMarker[0] == '1')
+#else
+    if (const char* emitMarker = std::getenv("JENGINE_BENCHMARK_SCENE_MARKERS"); emitMarker && std::strcmp(emitMarker, "1") == 0)
+#endif
+        std::cout << "Scene import published: vertices=" << stats.VertexCount << std::endl;
+}
+
 void jGame::InitializePathTracingSceneBrowser()
 {
 	if (PathTracingSceneBrowser.Initialized)
@@ -1180,13 +1279,30 @@ void jGame::ApplyScenePlacementPreset(int32 InIndex)
 	}
 }
 
-void jGame::LoadPathTracingSceneByIndex(int32 InIndex, bool InRebuildRaytracingScene)
+void jGame::LoadPathTracingSceneByIndex(int32 InIndex, bool InRebuildRaytracingScene, jMeshObject* preparedModel)
 {
 	if (InIndex < 0 || InIndex >= (int32)PathTracingSceneBrowser.Scenes.size())
 		return;
 
 	const jLoadableSceneDesc& sceneDesc = PathTracingSceneBrowser.Scenes[InIndex];
 	PathTracingSceneBrowser.PendingLoadIndex = -1;
+    const ESceneLoader resolvedLoader = preparedModel ? ESceneLoader::Model : ResolveSceneLoader(sceneDesc);
+    const bool usePathTracingSceneLoader = resolvedLoader == ESceneLoader::PathTracing;
+    std::unique_ptr<jMeshObject> readyModel(preparedModel);
+    if (!usePathTracingSceneLoader && !readyModel)
+    {
+        const auto source = std::filesystem::path(sceneDesc.FilePath);
+        const auto materialRoot = source.has_parent_path() ? source.parent_path().generic_string() : std::string();
+        readyModel.reset(jModelLoader::GetInstance().LoadFromFile(sceneDesc.FilePath.c_str(), materialRoot.c_str()));
+        if (!readyModel)
+        {
+            SceneImportStatus = "Model import failed; current scene retained: " + sceneDesc.FilePath;
+            jConsole::Get().LogError(SceneImportStatus);
+            return;
+        }
+    }
+    // Retain the previous scene until a replacement model is fully prepared.
+    g_rhi->Flush();
 
 	if (gPathTracingScene)
 	{
@@ -1198,8 +1314,6 @@ void jGame::LoadPathTracingSceneByIndex(int32 InIndex, bool InRebuildRaytracingS
 	ClearSceneBrowserLoadedLights();
 	ClearSceneBrowserLoadedObjects();
 
-	const ESceneLoader resolvedLoader = ResolveSceneLoader(sceneDesc);
-	const bool usePathTracingSceneLoader = (resolvedLoader == ESceneLoader::PathTracing);
 	if (usePathTracingSceneLoader)
 	{
 		gPathTracingScene = jPathTracingLoadData::LoadPathTracingData(sceneDesc.FilePath);
@@ -1210,13 +1324,7 @@ void jGame::LoadPathTracingSceneByIndex(int32 InIndex, bool InRebuildRaytracingS
 	}
 	else
 	{
-		const std::filesystem::path scenePath(sceneDesc.FilePath);
-		const std::string materialRootDir = scenePath.has_parent_path() ? scenePath.parent_path().generic_string() : std::string();
-		jMeshObject* loadedScene = jModelLoader::GetInstance().LoadFromFile(sceneDesc.FilePath.c_str()
-			, materialRootDir.empty() ? nullptr : materialRootDir.c_str());
-		check(loadedScene);
-		if (!loadedScene)
-			return;
+		jMeshObject* loadedScene = readyModel.release();
 
 		jObject::AddObject(loadedScene);
 		SceneBrowserLoadedObjects.push_back(loadedScene);
@@ -1267,10 +1375,8 @@ void jGame::ProcessInput(float deltaTime)
 {
 	// If console is visible, don't process game input
 	// All console keys (ESC, `, ') are handled by ImGui in RenderInputField
-	if (jConsole::Get().IsVisible())
-	{
-		return;
-	}
+	const bool captureKeyboard = jConsole::Get().IsVisible()
+        || (ImGui::GetCurrentContext() && (ImGui::GetIO().WantCaptureKeyboard || ImGui::GetIO().WantTextInput));
 
 	// Note: ` and ' keys are handled in ImGui (jConsole.cpp RenderInputField)
 	// to avoid double-triggering issues between Win32 and ImGui input systems
@@ -1280,6 +1386,8 @@ void jGame::ProcessInput(float deltaTime)
 	//static float MoveDistancePerSecond = 10.0f;
 	const float CurrentDistance = MoveDistancePerSecond * deltaTime;
 
+	if (!captureKeyboard && MainCamera)
+	{
 	// Process Key Event
 	if (IsKeyDown(EInputKey::A)) MainCamera->MoveShift(-CurrentDistance);
 	if (IsKeyDown(EInputKey::D)) MainCamera->MoveShift(CurrentDistance);
@@ -1293,6 +1401,8 @@ void jGame::ProcessInput(float deltaTime)
 	if (IsKeyDown(EInputKey::S)) MainCamera->MoveForward(-CurrentDistance);
 	if (IsKeyDown(EInputKey::PLUS)) MoveDistancePerSecond = Max(MoveDistancePerSecond + 10.0f, 0.0f);
 	if (IsKeyDown(EInputKey::MINUS)) MoveDistancePerSecond = Max(MoveDistancePerSecond - 10.0f, 0.0f);
+
+	}
 
 #ifdef ENABLE_EDITOR_FEATURES
 	// Editor-specific input handling (e.g., Placement Tool)
@@ -1392,11 +1502,7 @@ void jGame::Update(float deltaTime)
 {
 	SCOPE_DEBUG_EVENT(g_rhi, "Game::Update");
 
-	if (PathTracingSceneBrowser.PendingLoadIndex >= 0
-		&& PathTracingSceneBrowser.PendingLoadIndex != PathTracingSceneBrowser.ActiveIndex)
-	{
-		LoadPathTracingSceneByIndex(PathTracingSceneBrowser.PendingLoadIndex, true);
-	}
+    ProcessSceneImports();
 
 	// Update application property by using UI Pannel.
 	// UpdateAppSetting();
@@ -1580,6 +1686,9 @@ void jGame::Resize(int32 width, int32 height)
 
 void jGame::Release()
 {
+    CancelSceneImport();
+    if (AssetImports) { AssetImports->Shutdown(); AssetImports.reset(); }
+    jModelLoader::GetInstance().Shutdown();
 	g_rhi->Flush();
 
 	delete jDirectionalLightDrawCommandGenerator::GlobalFullscreenPrimitive;
@@ -1660,7 +1769,6 @@ void jGame::SpawnGraphTestFunc()
 	auto graphObj2 = jPrimitiveUtil::CreateGraph2D({ 360, 700 }, { 360, 300 }, graph2);
 	jObject::AddUIDebugObject(graphObj2);
 }
-
 
 
 

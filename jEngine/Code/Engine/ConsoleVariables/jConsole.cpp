@@ -1,8 +1,9 @@
 #include "pch.h"
 #include "jConsole.h"
 #include "jConsoleVariable.h"
-#include "External/ImGui/imgui.h"
-#include "External/ImGui/imgui_internal.h"
+#include "Core/jLog.h"
+#include "External/IMGUI/imgui.h"
+#include "External/IMGUI/imgui_internal.h"
 #include <sstream>
 #include <algorithm>
 
@@ -11,12 +12,7 @@ jConsole::jConsole()
 	// Initialize built-in commands first
 	RegisterBuiltInCommands();
 
-	// Add initialization message directly without using Mutex
-	// (Mutex should be initialized by now, but being safe in constructor)
-	LogEntry entry;
-	entry.Message = "Console initialized. Press ` to toggle display modes.";
-	entry.LogType = LogEntry::Type::Normal;
-	LogMessages.push_back(entry);
+	Log("Console initialized. Press ` to toggle display modes.");
 }
 
 jConsole::~jConsole()
@@ -31,8 +27,6 @@ jConsole& jConsole::Get()
 
 void jConsole::Toggle()
 {
-	std::lock_guard<std::recursive_mutex> lock(Mutex);
-
 	// Cycle through modes: Hidden -> Small -> Large -> Hidden
 	switch (DisplayMode)
 	{
@@ -53,8 +47,6 @@ void jConsole::Toggle()
 
 void jConsole::SetDisplayMode(EConsoleDisplayMode mode)
 {
-	std::lock_guard<std::recursive_mutex> lock(Mutex);
-
 	if (DisplayMode != mode)
 	{
 		DisplayMode = mode;
@@ -81,6 +73,18 @@ void jConsole::RegisterVariable(IConsoleVariable* variable)
 	}
 
 	Variables[name] = variable;
+}
+
+void jConsole::UnregisterVariable(IConsoleVariable* variable)
+{
+	if (!variable)
+		return;
+	std::lock_guard<std::recursive_mutex> lock(Mutex);
+	auto it = Variables.find(variable->GetName());
+	// A later registration may have replaced this instance. Its predecessor's
+	// destructor must not remove the still-live replacement with the same name.
+	if (it != Variables.end() && it->second == variable)
+		Variables.erase(it);
 }
 
 IConsoleVariable* jConsole::FindVariable(const std::string& name)
@@ -177,6 +181,7 @@ void jConsole::RegisterBuiltInCommands()
 
 std::vector<std::string> jConsole::GetAutocompleteSuggestions(const std::string& input)
 {
+	std::lock_guard<std::recursive_mutex> lock(Mutex);
 	std::vector<std::string> suggestions;
 
 	if (input.empty())
@@ -335,8 +340,6 @@ void jConsole::RenderSuggestions()
 
 void jConsole::Render()
 {
-	std::lock_guard<std::recursive_mutex> lock(Mutex);
-
 	// Check for ` key to open console even when hidden
 	// Use repeat=false to prevent multiple toggles from a single key press
 	if (DisplayMode == EConsoleDisplayMode::Hidden)
@@ -442,30 +445,61 @@ void jConsole::RenderSmall()
 
 void jConsole::RenderLogOutput()
 {
+	// Snapshot only immutable record pointers. Worker producers can continue for
+	// the entire draw, including input callbacks and expensive ImGui operations.
+	const auto records = jLog::Get().SnapshotRecent();
+	const auto stats = jLog::Get().GetStats();
+	ImGui::TextDisabled("UTC | Recent %zu/%zu | File drops %llu | Sink errors %llu",
+		stats.RecentCount, stats.RecentCapacity,
+		static_cast<unsigned long long>(stats.Dropped), static_cast<unsigned long long>(stats.SinkErrors));
+	if (stats.SinkErrors && ImGui::IsItemHovered())
+		ImGui::SetTooltip("%s", jLog::Get().GetLastError().c_str());
+
 	// Log output area with scrolling
 	ImGui::BeginChild("LogOutput", ImVec2(0, -30), true, ImGuiWindowFlags_HorizontalScrollbar);
+	const bool wasAtBottom = ImGui::GetScrollY() >= ImGui::GetScrollMaxY();
 
-	for (const auto& entry : LogMessages)
+	// One line per record permits clipping even for multi-line shader messages.
+	// The hover view retains the original message and its producer metadata.
+	ImGuiListClipper clipper;
+	clipper.Begin(static_cast<int>(records.size()), ImGui::GetTextLineHeightWithSpacing());
+	while (clipper.Step())
 	{
-		ImVec4 color(1, 1, 1, 1);  // Default white
-
-		switch (entry.LogType)
+		for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i)
 		{
-		case LogEntry::Type::Warning:
-			color = ImVec4(1, 1, 0, 1);  // Yellow
-			break;
-		case LogEntry::Type::Error:
-			color = ImVec4(1, 0, 0, 1);  // Red
-			break;
-		default:
-			break;
+			const auto& entry = *records[i];
+			ImVec4 color(1, 1, 1, 1);
+			if (entry.Level == EjLogLevel::Warning)
+				color = ImVec4(1, 1, 0, 1);
+			else if (entry.Level == EjLogLevel::Error || entry.Level == EjLogLevel::Fatal)
+				color = ImVec4(1, 0.3f, 0.3f, 1);
+			else if (entry.Level == EjLogLevel::Trace || entry.Level == EjLogLevel::Debug)
+				color = ImVec4(0.7f, 0.7f, 0.7f, 1);
+			std::string message = entry.Message;
+			std::string category = entry.Category;
+			const auto isControl = [](unsigned char c) { return c < 0x20; };
+			std::replace_if(message.begin(), message.end(), isControl, ' ');
+			std::replace_if(category.begin(), category.end(), isControl, ' ');
+			const auto time = entry.TimestampMilliseconds;
+			ImGui::TextColored(color, "%02d:%02d:%02d.%03d [%s] [%s] %s",
+				static_cast<int>((time / 3600000) % 24), static_cast<int>((time / 60000) % 60),
+				static_cast<int>((time / 1000) % 60), static_cast<int>(time % 1000),
+				jLogLevelName(entry.Level), category.c_str(), message.c_str());
+			if (ImGui::IsItemHovered())
+			{
+				ImGui::BeginTooltip();
+				ImGui::Text("Record %llu | Producer thread %llu", static_cast<unsigned long long>(entry.Sequence),
+					static_cast<unsigned long long>(entry.ThreadID));
+				ImGui::PushTextWrapPos(ImGui::GetFontSize() * 60.0f);
+				ImGui::TextUnformatted(entry.Message.data(), entry.Message.data() + entry.Message.size());
+				ImGui::PopTextWrapPos();
+				ImGui::EndTooltip();
+			}
 		}
-
-		ImGui::TextColored(color, "%s", entry.Message.c_str());
 	}
 
 	// Auto-scroll to bottom when new messages arrive
-	if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
+	if (wasAtBottom)
 		ImGui::SetScrollHereY(1.0f);
 
 	ImGui::EndChild();
@@ -671,42 +705,28 @@ void jConsole::RenderInputField()
 
 void jConsole::Log(const std::string& message)
 {
-	std::lock_guard<std::recursive_mutex> lock(Mutex);
-
-	LogEntry entry;
-	entry.Message = message;
-	entry.LogType = LogEntry::Type::Normal;
-	LogMessages.push_back(entry);
+	jLog::Get().Write(EjLogLevel::Info, "Console", message);
 }
 
 void jConsole::LogWarning(const std::string& message)
 {
-	std::lock_guard<std::recursive_mutex> lock(Mutex);
-
-	LogEntry entry;
-	entry.Message = "[WARNING] " + message;
-	entry.LogType = LogEntry::Type::Warning;
-	LogMessages.push_back(entry);
+	jLog::Get().Write(EjLogLevel::Warning, "Console", message);
 }
 
 void jConsole::LogError(const std::string& message)
 {
-	std::lock_guard<std::recursive_mutex> lock(Mutex);
-
-	LogEntry entry;
-	entry.Message = "[ERROR] " + message;
-	entry.LogType = LogEntry::Type::Error;
-	LogMessages.push_back(entry);
+	jLog::Get().Write(EjLogLevel::Error, "Console", message);
 }
 
 void jConsole::ClearLog()
 {
-	std::lock_guard<std::recursive_mutex> lock(Mutex);
-	LogMessages.clear();
+	jLog::Get().ClearRecent();
 }
 
 void jConsole::ExecuteCommand(const std::string& commandLine)
 {
+	// Serialize registry mutations with command/query execution.
+	std::lock_guard<std::recursive_mutex> lock(Mutex);
 	// Trim whitespace
 	std::string trimmed = commandLine;
 	trimmed.erase(0, trimmed.find_first_not_of(" \t"));
@@ -821,6 +841,11 @@ void jConsole::ExecuteCommand(const std::string& commandLine)
 		}
 		else
 		{
+			if (var->GetType() != EConsoleVariableType::String && tokens.size() != 2)
+			{
+				LogError("Expected a single value for variable '" + command + "'.");
+				return;
+			}
 			// Set variable value
 			std::string value = tokens[1];
 

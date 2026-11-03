@@ -24,7 +24,7 @@ mkdir -p "$out/bin" "$out/lib"
 cp -L "$source_dir/build/macos/bin/dxc" "$out/bin/dxc"
 cp "$source_dir/build/macos/lib/libdxcompiler.dylib" "$out/lib/"
 cp "$source_dir/LICENSE.TXT" "$out/"
-if ! otool -l "$out/bin/dxc" | rg -q 'path @executable_path/../lib '; then
+if ! otool -l "$out/bin/dxc" | grep -F 'path @executable_path/../lib ' > /dev/null; then
   install_name_tool -add_rpath '@executable_path/../lib' "$out/bin/dxc"
   codesign --force --sign - "$out/bin/dxc"
 fi

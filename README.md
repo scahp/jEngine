@@ -11,6 +11,9 @@
 Simple toy engine for implementing graphics feature with multiple api
  - Documentation : https://scahp.tistory.com/120
 
+[**User manual (Korean)**](docs/manual/README.md) — numbered screenshots, scene loading,
+object placement, SurfelGI, and console commands.
+
 ## Supported platforms
 
 - **Windows**: DirectX 12 and Vulkan.
@@ -89,7 +92,12 @@ Windows and macOS Debug/Release builds, CPU tests, and shader checks run on ever
 code push and on PRs targeting `main`. Build artifacts and logs are kept for five days.
 [Workflows](https://github.com/scahp/jEngine/actions) · [Details](docs/platform-and-ci.md#github-actions-ci)
 
+[Engine roadmap](docs/engine-roadmap.md) · [Editor foundation measurements](docs/reports/editor-foundation-performance.md)
+
 ## Third party libraries
+
+See [third-party notices](THIRD_PARTY_NOTICES.md).
+
 1. ImGUI : https://github.com/ocornut/imgui
 2. assimp : https://github.com/assimp/assimp
 3. cityhash : https://github.com/google/cityhash

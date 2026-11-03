@@ -1,0 +1,146 @@
+{
+  "capture_source_commit": "0310df58750951edce22afb5a3a655a417e1591b",
+  "platform": "macOS Apple Silicon M4; Vulkan; verified experimental MoltenVK ray-query runtime",
+  "capture": "Actual GPU-rendered frames; disposable capture driver; production engine source unchanged. UI panels selected and cube added using existing engine paths. Font scale 1.15. Runtime settings restored after capture.",
+  "annotation_tool": "Built-in imagegen edit mode; final outputs visually compared with originals. Raw captures remain authoritative.",
+  "annotation_prompt_set": {
+    "common": "Preserve the entire input screenshot UI, labels, controls and 3D scene. Add only red rectangular outlines and numbered red badges with white numerals. No new controls or text.",
+    "01-overview": "1 top menu; 2 Main status; 3 viewport; 4 feature tabs; 5 VSync/FPS.",
+    "02-scene-browser": "1 Scene Browser tab; 2 Filter; 3 active scene/renderer/loader; 4 scene tree; 5 Scene Loader; 6 Load Scene (disabled for active scene).",
+    "03-placement-inspector": "1 Placement Tool tab; 2 add type/button; 3 search; 4 scene list; 5 gizmo mode/space/snap; 6 Position/Rotation/Scale; 7 Delete Selected Object.",
+    "04-surfelgi": "1 SurfelGI tab; 2 single Enable SurfelGI checkbox; 3 radiance/intensity; 4 pool/spawn/radius; 5 five debug checkboxes.",
+    "05-console": "1 console mode; 2 recent/drop/error statistics; 3 log output; 4 empty command input."
+  },
+  "captures": [
+    {
+      "mode": "overview",
+      "rendered_frames": 120,
+      "clean_shutdown": true,
+      "validation_errors": 0,
+      "files": [
+        {
+          "path": "raw/01-overview.png",
+          "pixels": [
+            1280,
+            900
+          ],
+          "bytes": 1048663,
+          "sha256": "c33c8187f8ffb674ac3b825ee59ab82f95afa40d71bfcd3f39ad9fc8100b4fb8"
+        },
+        {
+          "path": "01-overview.png",
+          "pixels": [
+            1495,
+            1052
+          ],
+          "bytes": 1690845,
+          "sha256": "028a1bad10cf99627ce7d26d1a49186f233b2a489388c2c56a839b8811c65e0c"
+        }
+      ]
+    },
+    {
+      "mode": "scene",
+      "rendered_frames": 120,
+      "clean_shutdown": true,
+      "validation_errors": 0,
+      "files": [
+        {
+          "path": "raw/02-scene-browser.png",
+          "pixels": [
+            1280,
+            900
+          ],
+          "bytes": 1062059,
+          "sha256": "ab283d2c15024c386ebfa0a32796e0ebd6e83bf7caccefbb8aaec5358c2ece3f"
+        },
+        {
+          "path": "02-scene-browser.png",
+          "pixels": [
+            1495,
+            1052
+          ],
+          "bytes": 1754145,
+          "sha256": "5309856aa82154f711d6c686d4c71b695dca9d27b661ef982ae13264f5334a91"
+        }
+      ]
+    },
+    {
+      "mode": "placement",
+      "rendered_frames": 120,
+      "clean_shutdown": true,
+      "validation_errors": 0,
+      "files": [
+        {
+          "path": "raw/03-placement-inspector.png",
+          "pixels": [
+            1280,
+            900
+          ],
+          "bytes": 907788,
+          "sha256": "d3742238612d3d05d6e0e7a8b12dac87a9b9e5ca548443688dd081e9a433550c"
+        },
+        {
+          "path": "03-placement-inspector.png",
+          "pixels": [
+            1495,
+            1052
+          ],
+          "bytes": 1669867,
+          "sha256": "055a9aa5c971a69fe43880df14983c861d6af1c0a84310bcab58be3a2f4058ec"
+        }
+      ]
+    },
+    {
+      "mode": "surfel",
+      "rendered_frames": 120,
+      "clean_shutdown": true,
+      "validation_errors": 0,
+      "files": [
+        {
+          "path": "raw/04-surfelgi.png",
+          "pixels": [
+            1280,
+            900
+          ],
+          "bytes": 1036385,
+          "sha256": "853ce755ae9afe325e5ce844711fad5986703931abd84e6eb21f793189cdf9d3"
+        },
+        {
+          "path": "04-surfelgi.png",
+          "pixels": [
+            1495,
+            1052
+          ],
+          "bytes": 1685041,
+          "sha256": "55571a551e65f72ac4e49efddf9329d5876e8bff4e595081f27f3b32a296ed98"
+        }
+      ]
+    },
+    {
+      "mode": "console",
+      "rendered_frames": 120,
+      "clean_shutdown": true,
+      "validation_errors": 0,
+      "files": [
+        {
+          "path": "raw/05-console.png",
+          "pixels": [
+            1280,
+            900
+          ],
+          "bytes": 807344,
+          "sha256": "b438c0520673e1f03fc226f5430e78df4c2aa640ba83608351f3fe8012fd178a"
+        },
+        {
+          "path": "05-console.png",
+          "pixels": [
+            1495,
+            1052
+          ],
+          "bytes": 1785228,
+          "sha256": "d3e22dd387e84b2899e9ba432c54f2ce241a9f2314c27228fbf4c742576b9e91"
+        }
+      ]
+    }
+  ]
+}

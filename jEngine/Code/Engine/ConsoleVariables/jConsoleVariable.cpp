@@ -2,6 +2,19 @@
 #include "jConsoleVariable.h"
 #include "jConsole.h"
 #include <sstream>
+#include <cctype>
+#include <cmath>
+
+namespace
+{
+	std::string TrimConsoleValue(const std::string& value)
+	{
+		const auto first = value.find_first_not_of(" \t\r\n\f\v");
+		if (first == std::string::npos)
+			return {};
+		return value.substr(first, value.find_last_not_of(" \t\r\n\f\v") - first + 1);
+	}
+}
 
 // ============================================================================
 // jConsoleVariableBool
@@ -30,7 +43,9 @@ jConsoleVariableBool::jConsoleVariableBool(const std::string& name, bool default
 
 jConsoleVariableBool::~jConsoleVariableBool()
 {
-	// Note: We don't unregister from console here as it might be destroyed after console
+	// Registration initializes Get() before this object's construction finishes,
+	// so static variables unregister before the singleton is destroyed.
+	jConsole::Get().UnregisterVariable(this);
 }
 
 bool jConsoleVariableBool::GetValue() const
@@ -47,9 +62,9 @@ void jConsoleVariableBool::SetValue(bool value)
 void jConsoleVariableBool::SetFromString(const std::string& value)
 {
 	// Parse bool from string
-	std::string lower = value;
+	std::string lower = TrimConsoleValue(value);
 	for (auto& c : lower)
-		c = (char)tolower(c);
+		c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
 
 	if (lower == "true" || lower == "1" || lower == "yes" || lower == "on")
 		SetValue(true);
@@ -92,6 +107,7 @@ jConsoleVariableInt::jConsoleVariableInt(const std::string& name, int defaultVal
 
 jConsoleVariableInt::~jConsoleVariableInt()
 {
+	jConsole::Get().UnregisterVariable(this);
 }
 
 int jConsoleVariableInt::GetValue() const
@@ -109,13 +125,19 @@ void jConsoleVariableInt::SetFromString(const std::string& value)
 {
 	try
 	{
-		int intValue = std::stoi(value);
-		SetValue(intValue);
+		const auto trimmed = TrimConsoleValue(value);
+		size_t consumed = 0;
+		const int intValue = std::stoi(trimmed, &consumed);
+		if (consumed == trimmed.size())
+		{
+			SetValue(intValue);
+			return;
+		}
 	}
-	catch (...)
+	catch (const std::exception&)
 	{
-		jConsole::Get().LogError("Invalid int value: " + value);
 	}
+	jConsole::Get().LogError("Invalid int value: " + value);
 }
 
 std::string jConsoleVariableInt::GetAsString() const
@@ -148,6 +170,7 @@ jConsoleVariableFloat::jConsoleVariableFloat(const std::string& name, float defa
 
 jConsoleVariableFloat::~jConsoleVariableFloat()
 {
+	jConsole::Get().UnregisterVariable(this);
 }
 
 float jConsoleVariableFloat::GetValue() const
@@ -165,13 +188,19 @@ void jConsoleVariableFloat::SetFromString(const std::string& value)
 {
 	try
 	{
-		float floatValue = std::stof(value);
-		SetValue(floatValue);
+		const auto trimmed = TrimConsoleValue(value);
+		size_t consumed = 0;
+		const float floatValue = std::stof(trimmed, &consumed);
+		if (consumed == trimmed.size() && std::isfinite(floatValue))
+		{
+			SetValue(floatValue);
+			return;
+		}
 	}
-	catch (...)
+	catch (const std::exception&)
 	{
-		jConsole::Get().LogError("Invalid float value: " + value);
 	}
+	jConsole::Get().LogError("Invalid float value: " + value);
 }
 
 std::string jConsoleVariableFloat::GetAsString() const
@@ -206,6 +235,7 @@ jConsoleVariableString::jConsoleVariableString(const std::string& name, const st
 
 jConsoleVariableString::~jConsoleVariableString()
 {
+	jConsole::Get().UnregisterVariable(this);
 }
 
 const std::string& jConsoleVariableString::GetValue() const

@@ -1,4 +1,5 @@
 #include "common.hlsl"
+#include "effect_sampling.hlsl"
 
 #ifndef SSAO_KERNEL_SIZE
 #error "SSAO_KERNEL_SIZE is not defined"
@@ -36,7 +37,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_Gro
     if (GlobalInvocationID.x >= ComputeCommon.Width || GlobalInvocationID.y >= ComputeCommon.Height)
         return;
 
-    float2 uv = GlobalInvocationID.xy / float2(ComputeCommon.Width - 1, ComputeCommon.Height - 1);
+    float2 uv = EffectPixelUV(GlobalInvocationID.xy, uint2(ComputeCommon.Width, ComputeCommon.Height));
 
     // Get view-space Pos, Normal
     float3 ViewPos = CalcViewPositionFromDepth(DepthTexture, DepthTextureSampler, uv, ComputeCommon.InvP);

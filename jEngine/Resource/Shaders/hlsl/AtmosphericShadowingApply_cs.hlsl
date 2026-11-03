@@ -1,4 +1,4 @@
-
+#include "effect_sampling.hlsl"
 struct CommonComputeUniformBuffer
 {
     int Width;
@@ -21,7 +21,7 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID, uint3 GroupID : SV_Gro
     if (GlobalInvocationID.x >= ComputeCommon.Width || GlobalInvocationID.y >= ComputeCommon.Height)
         return;
     
-    float2 uv = GlobalInvocationID.xy / float2(ComputeCommon.Width - 1, ComputeCommon.Height - 1);
+    float2 uv = EffectPixelUV(GlobalInvocationID.xy, uint2(ComputeCommon.Width, ComputeCommon.Height));
     
     float t = Texture.SampleLevel(TextureSampler, uv, 0).x;
     ResultImage[int2(GlobalInvocationID.xy)] += float4(t, t, t, 1);

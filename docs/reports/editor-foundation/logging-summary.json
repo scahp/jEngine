@@ -1,0 +1,85 @@
+{
+  "measured_at_utc": "2026-11-03T18:33:36.098790+00:00",
+  "baseline_commit": "ecb49a121773d2b066b47d95be218c547798d21c",
+  "current_head": "edc270d10326e47d068559478aa7177d33b9305c",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "machine": "arm64",
+  "compiler": "/usr/bin/c++",
+  "method": "Real console and ImGui; 1280x720; Release; 3x30 draws after 5 warmups; concurrent worker at 1ms / UI at 16ms; console comparison has no file sink",
+  "source_sha256": {
+    "jEngine/Core/jLog.h": "b241ab519d8869121ee64f04471d48104cdbca727bf8379c891d15837f37f746",
+    "jEngine/Core/jLog.cpp": "3820ec183160ae3e7786b23841deb3f02f05bd16a244dbfb5539e21236bf95e0",
+    "jEngine/Code/Engine/ConsoleVariables/jConsole.h": "4a08a9cd76ebf33ccc037e00559a1df525746810a3909d64d4a49cb99d2e8bdd",
+    "jEngine/Code/Engine/ConsoleVariables/jConsole.cpp": "059040bbefd72d0e6f2a13478247ffa857855dc7ba32299e0bb2acf45d9b3e1c",
+    "jEngine/Tests/jLogBenchmark.cpp": "12921fd10333d01127787cdf306ac1095ba5812b572f73de00641b773a17b118"
+  },
+  "console": [
+    {
+      "input_records": 1000,
+      "before": {
+        "render_median_ms": 0.589001,
+        "render_p95_ms": 0.80225,
+        "producer_p95_ms": 0.044167,
+        "producer_p99_ms": 1.211958,
+        "producer_max_ms": 1.585792
+      },
+      "after": {
+        "render_median_ms": 0.091312,
+        "render_p95_ms": 0.10325,
+        "producer_p95_ms": 0.003458,
+        "producer_p99_ms": 0.004667,
+        "producer_max_ms": 0.005334
+      },
+      "render_median_ratio": 6.450422726476257
+    },
+    {
+      "input_records": 10000,
+      "before": {
+        "render_median_ms": 2.955104,
+        "render_p95_ms": 4.427667,
+        "producer_p95_ms": 3.562042,
+        "producer_p99_ms": 4.077958,
+        "producer_max_ms": 4.529125
+      },
+      "after": {
+        "render_median_ms": 0.059292,
+        "render_p95_ms": 0.061208,
+        "producer_p95_ms": 0.003166,
+        "producer_p99_ms": 0.003875,
+        "producer_max_ms": 0.015958
+      },
+      "render_median_ratio": 49.839843486473725
+    },
+    {
+      "input_records": 50000,
+      "before": {
+        "render_median_ms": 13.459709,
+        "render_p95_ms": 13.525875,
+        "producer_p95_ms": 12.874125,
+        "producer_p99_ms": 13.013333,
+        "producer_max_ms": 13.494083
+      },
+      "after": {
+        "render_median_ms": 0.044083,
+        "render_p95_ms": 0.051792,
+        "producer_p95_ms": 0.004416,
+        "producer_p99_ms": 0.005166,
+        "producer_max_ms": 0.053542
+      },
+      "render_median_ratio": 305.32652042737567
+    }
+  ],
+  "new_async_file_only": [
+    {
+      "benchmark": "async_file",
+      "producers": 4,
+      "records": 10000,
+      "producer_wall_ms": 33.351459,
+      "drained_wall_ms": 34.566792,
+      "submitted": 10000,
+      "written": 10000,
+      "dropped": 0,
+      "sink_errors": 0
+    }
+  ]
+}
