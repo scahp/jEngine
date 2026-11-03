@@ -32,6 +32,23 @@ void window_size_callback(GLFWwindow* window, int width, int height);
 #include "Math/Matrix.h"
 #include "Math/Vector.h"
 
+namespace
+{
+    std::string ReadEngineEnvironment(const char* name)
+    {
+#ifdef _WIN32
+        char* value = nullptr; size_t length = 0;
+        if (_dupenv_s(&value, &length, name) != 0 || !value) return {};
+        std::string result(value);
+        std::free(value);
+        return result;
+#else
+        const char* value = std::getenv(name);
+        return value ? value : "";
+#endif
+    }
+}
+
 int RunCpuSelfTests();
 int ExportSurfelGIShaderFixtures(const char* directory, bool vulkan);
 
@@ -73,15 +90,15 @@ int main(int argc, char** argv)
 
 	// glfwSwapInterval(0);		// 0 is no limit fps
 
-    if (const char* value = std::getenv("JENGINE_SURFEL_GI")) gOptions.UseSurfelGI = std::atoi(value) != 0;
-    if (const char* value = std::getenv("JENGINE_INLINE_RAY")) gOptions.SurfelGIInlineRayEnable = std::atoi(value) != 0;
+    if (const auto value = ReadEngineEnvironment("JENGINE_SURFEL_GI"); !value.empty()) gOptions.UseSurfelGI = std::atoi(value.c_str()) != 0;
+    if (const auto value = ReadEngineEnvironment("JENGINE_INLINE_RAY"); !value.empty()) gOptions.SurfelGIInlineRayEnable = std::atoi(value.c_str()) != 0;
 	g_Engine->Init();
     std::cout << "SurfelGI: " << gOptions.UseSurfelGI << "; inline ray option: " << gOptions.SurfelGIInlineRayEnable << std::endl;
     uint32 renderedFrames = 0;
-    const char* frameLimitText = std::getenv("JENGINE_MAX_FRAMES");
-    const uint32 frameLimit = frameLimitText ? static_cast<uint32>(std::stoul(frameLimitText)) : 0;
-    const char* fixedStepText = std::getenv("JENGINE_FIXED_TIMESTEP");
-    const float fixedStep = fixedStepText ? std::stof(fixedStepText) : 0.0f;
+    const auto frameLimitText = ReadEngineEnvironment("JENGINE_MAX_FRAMES");
+    const uint32 frameLimit = !frameLimitText.empty() ? static_cast<uint32>(std::stoul(frameLimitText)) : 0;
+    const auto fixedStepText = ReadEngineEnvironment("JENGINE_FIXED_TIMESTEP");
+    const float fixedStep = !fixedStepText.empty() ? std::stof(fixedStepText) : 0.0f;
     std::cout << "jEngine initialized: " << g_rhi->GetRHIName().ToStr() << std::endl;
 
 	// render loop
