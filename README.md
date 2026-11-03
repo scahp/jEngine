@@ -2,6 +2,7 @@
 
 [![Windows](https://github.com/scahp/jEngine/actions/workflows/ci-windows.yml/badge.svg?branch=main)](https://github.com/scahp/jEngine/actions/workflows/ci-windows.yml)
 [![macOS](https://github.com/scahp/jEngine/actions/workflows/ci-macos.yml/badge.svg?branch=main)](https://github.com/scahp/jEngine/actions/workflows/ci-macos.yml)
+[![CMake (macOS)](https://img.shields.io/badge/CMake-macOS-064F8C?logo=cmake)](CMakePresets.json)
 
 Simple toy engine for implementing graphics feature with multiple api
  - Documentation : https://scahp.tistory.com/120
