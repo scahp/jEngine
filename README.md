@@ -1,6 +1,7 @@
 # jEngine
 
-[![Build and test](https://github.com/scahp/jEngine/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/scahp/jEngine/actions/workflows/ci.yml)
+[![Windows](https://github.com/scahp/jEngine/actions/workflows/ci-windows.yml/badge.svg?branch=main)](https://github.com/scahp/jEngine/actions/workflows/ci-windows.yml)
+[![macOS](https://github.com/scahp/jEngine/actions/workflows/ci-macos.yml/badge.svg?branch=main)](https://github.com/scahp/jEngine/actions/workflows/ci-macos.yml)
 
 Simple toy engine for implementing graphics feature with multiple api
  - Documentation : https://scahp.tistory.com/120
@@ -66,8 +67,8 @@ See [setup and verification details](docs/platform-and-ci.md#surfelgi-hardware-i
 ## GitHub Actions
 
 Windows and macOS Debug/Release builds, CPU tests, and shader checks run on every
-branch push and on PRs targeting `main`. Build artifacts and logs are kept for five days.
-[Workflow](https://github.com/scahp/jEngine/actions/workflows/ci.yml) · [Details](docs/platform-and-ci.md#github-actions-ci)
+code push and on PRs targeting `main`. Build artifacts and logs are kept for five days.
+[Workflows](https://github.com/scahp/jEngine/actions) · [Details](docs/platform-and-ci.md#github-actions-ci)
 
 ## Third party libraries
 1. ImGUI : https://github.com/ocornut/imgui

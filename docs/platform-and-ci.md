@@ -100,8 +100,8 @@ storage-buffer declarations while retaining DX12 typed-buffer declarations.
 
 ## GitHub Actions CI
 
-`Build and test` runs on branch pushes, pull requests targeting `main`, and
-manual dispatch. It uses standard public-repository GitHub-hosted runners:
+`Windows` and `macOS` run independently on branch pushes, pull requests targeting
+`main`, and manual dispatch. README-only and `docs/`-only changes are skipped. It uses standard public-repository GitHub-hosted runners:
 
 - Windows Server 2025 / Visual Studio 2026: the existing `jEngine.vcxproj`, x64
   Debug and Release. The separate Tracy profiler application is not part of CI.
