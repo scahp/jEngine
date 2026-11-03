@@ -3,6 +3,10 @@
 [![Windows](https://github.com/scahp/jEngine/actions/workflows/ci-windows.yml/badge.svg?branch=main)](https://github.com/scahp/jEngine/actions/workflows/ci-windows.yml)
 [![macOS](https://github.com/scahp/jEngine/actions/workflows/ci-macos.yml/badge.svg?branch=main)](https://github.com/scahp/jEngine/actions/workflows/ci-macos.yml)
 [![CMake](https://img.shields.io/badge/CMake-Windows%20%7C%20macOS-064F8C?logo=cmake)](CMakePresets.json)
+[![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C?logo=cplusplus)](CMakeLists.txt)
+[![Vulkan](https://img.shields.io/badge/Vulkan-supported-AC162C?logo=vulkan)](#supported-platforms)
+[![DirectX 12](https://img.shields.io/badge/DirectX-12-107C10)](#supported-platforms)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Simple toy engine for implementing graphics feature with multiple api
  - Documentation : https://scahp.tistory.com/120
