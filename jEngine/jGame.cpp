@@ -810,7 +810,12 @@ void jGame::ProcessSceneImports()
         << publishMs << " ms; " << stats.VertexCount << " vertices, " << stats.TextureCount << " textures.";
     SceneImportStatus = message.str();
     jConsole::Get().Log(SceneImportStatus);
-    if (std::getenv("JENGINE_BENCHMARK_SCENE_MARKERS"))
+#ifdef _WIN32
+    char emitMarker[2] = {};
+    if (GetEnvironmentVariableA("JENGINE_BENCHMARK_SCENE_MARKERS", emitMarker, sizeof(emitMarker)) == 1 && emitMarker[0] == '1')
+#else
+    if (const char* emitMarker = std::getenv("JENGINE_BENCHMARK_SCENE_MARKERS"); emitMarker && std::strcmp(emitMarker, "1") == 0)
+#endif
         std::cout << "Scene import published: vertices=" << stats.VertexCount << std::endl;
 }
 
@@ -1764,7 +1769,6 @@ void jGame::SpawnGraphTestFunc()
 	auto graphObj2 = jPrimitiveUtil::CreateGraph2D({ 360, 700 }, { 360, 300 }, graph2);
 	jObject::AddUIDebugObject(graphObj2);
 }
-
 
 
 

@@ -4,9 +4,14 @@
 #ifdef _WIN32
 #define SPDLOG_WCHAR_FILENAMES
 #endif
+// fmt's Windows wide-character support includes range traits named check().
+// Keep the engine assertion macro local to engine code, without editing vendor headers.
+#pragma push_macro("check")
+#undef check
 #include <spdlog/async_logger.h>
 #include <spdlog/details/thread_pool.h>
 #include <spdlog/sinks/rotating_file_sink.h>
+#pragma pop_macro("check")
 
 #include <atomic>
 #include <algorithm>
