@@ -12,7 +12,7 @@ IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderFullscreenQuadVertexShader
     , "main"
     , EShaderAccessStageFlag::VERTEX)
 
-bool jShader::IsRunningCheckUpdateShaderThread = false;
+std::atomic_bool jShader::IsRunningCheckUpdateShaderThread{false};
 std::thread jShader::CheckUpdateShaderThread;
 std::vector<jShader*> jShader::WaitForUpdateShaders;
 std::map<const jShader*, std::vector<size_t>> jShader::gConnectedPipelineStateHash;
@@ -116,10 +116,10 @@ void jShader::StartAndRunCheckUpdateShaderThread()
     static jMutexLock Lock;
     if (!CheckUpdateShaderThread.joinable())
     {
-        IsRunningCheckUpdateShaderThread = true;
+        IsRunningCheckUpdateShaderThread.store(true);
         CheckUpdateShaderThread = std::thread([]()
         {
-            while (IsRunningCheckUpdateShaderThread)
+            while (IsRunningCheckUpdateShaderThread.load())
             {
                 std::vector<jShader*> Shaders = g_rhi->GetAllShaders();
 
@@ -204,7 +204,7 @@ void jShader::ReleaseCheckUpdateShaderThread()
 {
     if (CheckUpdateShaderThread.joinable())
     {
-        IsRunningCheckUpdateShaderThread = false;
+        IsRunningCheckUpdateShaderThread.store(false);
         CheckUpdateShaderThread.join();
     }
 }

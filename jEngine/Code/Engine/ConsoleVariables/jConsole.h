@@ -23,6 +23,7 @@ public:
 	static jConsole& Get();
 
 	// UI Control
+	// ImGui and display/input state belong to the engine's main/UI thread.
 	void Toggle();  // Called when ` key is pressed
 	void SetDisplayMode(EConsoleDisplayMode mode);  // Directly set display mode
 	void Render();
@@ -84,14 +85,6 @@ private:
 	};
 	std::unordered_map<std::string, CommandInfo> Commands;
 
-	// Log entries
-	struct LogEntry
-	{
-		std::string Message;
-		enum class Type { Normal, Warning, Error } LogType = Type::Normal;
-	};
-	std::vector<LogEntry> LogMessages;
-
 	// Input
 	char InputBuffer[512] = {};
 	bool bNeedFocusInput = false;
@@ -106,6 +99,7 @@ private:
 	std::vector<std::string> History;
 	int32 HistoryIndex = -1;
 
-	// Thread safety
+	// Registry/command execution only. Logging has its own bounded store; this
+	// mutex is never held across an ImGui draw or acquired by worker log calls.
 	mutable std::recursive_mutex Mutex;
 };

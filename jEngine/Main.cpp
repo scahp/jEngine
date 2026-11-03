@@ -10,6 +10,7 @@
 #endif
 #include "jCommandlineArgument.h"
 #include "jOptions.h"
+#include "Core/jLog.h"
 #ifdef _WIN32
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
@@ -67,6 +68,9 @@ namespace
 }
 
 int RunCpuSelfTests();
+int RunLogBenchmark();
+int RunAssetDecodeBenchmarks(const char* fixtureDirectory, const char* outputPath);
+int RunEditorWorkflowBenchmarks(const char* outputPath);
 int ExportSurfelGIShaderFixtures(const char* directory, bool vulkan);
 int ExportPostProcessShaderFixtures(const char* directory, bool vulkan);
 int ExportAOEffectShaderFixtures(const char* directory, bool vulkan);
@@ -75,6 +79,18 @@ int main(int argc, char** argv)
 {
     gCommandLineArgument.Init(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "--ci-cpu") == 0) return RunCpuSelfTests();
+    if (argc == 2 && std::strcmp(argv[1], "--ci-log-benchmark") == 0) return RunLogBenchmark();
+    if (argc >= 2 && (std::strcmp(argv[1], "--benchmark-assets") == 0 || std::strcmp(argv[1], "--benchmark-editor") == 0))
+    {
+        const bool assets = std::strcmp(argv[1], "--benchmark-assets") == 0;
+        if (argc != (assets ? 4 : 3))
+        {
+            std::cerr << (assets ? "Usage: --benchmark-assets <PNG-directory> <output.json>" : "Usage: --benchmark-editor <output.json>") << std::endl;
+            return EXIT_FAILURE;
+        }
+        try { return assets ? RunAssetDecodeBenchmarks(argv[2], argv[3]) : RunEditorWorkflowBenchmarks(argv[2]); }
+        catch (const std::exception& error) { std::cerr << "Benchmark failed: " << error.what() << std::endl; return EXIT_FAILURE; }
+    }
     if (argc >= 2 && std::strcmp(argv[1], "--ci-export-shaders") == 0)
     {
         if (argc < 3 || argc > 4 || (argc == 4 && std::strcmp(argv[3], "dx12") != 0 && std::strcmp(argv[3], "vulkan") != 0))
@@ -103,6 +119,8 @@ int main(int argc, char** argv)
         std::cerr << "JENGINE_FIXED_TIMESTEP must be a finite nonnegative number" << std::endl;
         return EXIT_FAILURE;
     }
+    bool waitForTestScene = false;
+    if (!ReadEngineBoolean("JENGINE_TEST_WAIT_FOR_SCENE", waitForTestScene)) return EXIT_FAILURE;
     if (!ReadEngineBoolean("JENGINE_SURFEL_GI", gOptions.UseSurfelGI)
         || !ReadEngineBoolean("JENGINE_INLINE_RAY", gOptions.SurfelGIInlineRayEnable))
         return EXIT_FAILURE;
@@ -148,13 +166,26 @@ int main(int argc, char** argv)
         gOptions.UseAtmosphericShadowing = true;
     }
 #endif
+    jLogConfig logConfig;
+    const auto logFile = ReadEngineEnvironment("JENGINE_LOG_FILE");
+    if (!logFile.empty()) logConfig.FilePath = std::filesystem::path(logFile);
+    struct LogSession { ~LogSession() { jLog::Get().Shutdown(); } } logSession;
+    if (!jLog::Get().Initialize(logConfig))
+    {
+        std::cerr << "Log initialization failed: " << jLog::Get().GetLastError() << std::endl;
+        return EXIT_FAILURE;
+    }
+    jLog::Get().Write(EjLogLevel::Info, "Engine", "Starting jEngine");
 	GMainThreadID = std::this_thread::get_id();
 
 	g_Engine = new jEngine();
 	g_Engine->PreInit();
 
 	if (!g_rhi->InitRHI())
-		return EXIT_FAILURE;
+    {
+        jLog::Get().Write(EjLogLevel::Error, "RHI", "Graphics initialization failed");
+        return EXIT_FAILURE;
+    }
 
 	g_rhi->OnInitRHI();
 
@@ -182,9 +213,18 @@ int main(int argc, char** argv)
     if (std::getenv("JENGINE_TEST_SURFEL_RECONFIGURE")) UpdateSurfelGIAuditOptions(0);
 #endif
 	g_Engine->Init();
+    if (waitForTestScene && !g_Engine->Game.WaitForSceneImportForTesting())
+    {
+        jLog::Get().Write(EjLogLevel::Error, "Assets", "GPU test scene import did not complete successfully");
+        g_Engine->Release();
+        g_rhi->ReleaseRHI();
+        glfwTerminate();
+        return EXIT_FAILURE;
+    }
     std::cout << "SurfelGI: " << gOptions.UseSurfelGI << "; inline ray option: " << gOptions.SurfelGIInlineRayEnable << std::endl;
     uint32 renderedFrames = 0;
     std::cout << "jEngine initialized: " << g_rhi->GetRHIName().ToStr() << std::endl;
+    jLog::Get().Write(EjLogLevel::Info, "Engine", std::string("Initialized: ") + g_rhi->GetRHIName().ToStr());
 
 	// render loop
 	// -----------
@@ -280,6 +320,12 @@ int main(int argc, char** argv)
 	// ------------------------------------------------------------------
 	glfwTerminate();
     std::cout << "jEngine clean shutdown; rendered frames: " << renderedFrames << std::endl;
+    jLog::Get().Write(EjLogLevel::Info, "Engine", "Clean shutdown; rendered frames: " + std::to_string(renderedFrames));
+    if (!jLog::Get().Shutdown())
+    {
+        std::cerr << "Log shutdown failed: " << jLog::Get().GetLastError() << std::endl;
+        return EXIT_FAILURE;
+    }
 	return 0;
 }
 

@@ -30,7 +30,7 @@ namespace
 	inline bool IsValidScale(float value)
 	{
 		constexpr float MIN_SCALE = 0.001f;
-		return IsValidFloat(value) && value > MIN_SCALE;
+		return IsValidFloat(value) && value >= MIN_SCALE;
 	}
 
 	// Validate if a Vector contains valid float values
@@ -105,218 +105,75 @@ jPlacementTool::~jPlacementTool()
 {
 }
 
+bool jPlacementTool::IsKeyPressed(EInputKey key) const
+{
+	return PressedKeys[InputKeyIndex(key)];
+}
+
 void jPlacementTool::ProcessInput(float deltaTime, jCamera* mainCamera, float lightColorScale)
 {
-	if (!mainCamera || ImGui::GetIO().WantCaptureKeyboard)
+	// Consume edges even while a field/modal/another panel owns input. A held
+	// Delete or P must not fire when focus returns to the placement viewport.
+	for (size_t i = 0; i < PreviousKeys.size(); ++i)
+	{
+		const bool down = IsKeyDown(static_cast<EInputKey>(i));
+		PressedKeys[i] = down && !PreviousKeys[i];
+		PreviousKeys[i] = down;
+	}
+	const auto& io = ImGui::GetIO();
+	if (!EnablePlacementMode || io.WantTextInput || ImGui::IsAnyItemActive()
+		|| (io.WantCaptureKeyboard && !SceneListHasFocus) || ImGuizmo::IsUsing())
+		return;
+
+	if (IsKeyPressed(EInputKey::G) && IsKeyDown(EInputKey::CTRL))
+		UseSnap = !UseSnap;
+	if (IsKeyDown(EInputKey::CTRL) || IsKeyDown(EInputKey::ALT))
 		return;
 
 	ProcessGizmoHotkeys();
 	ProcessTypeSelectionHotkeys();
 	ProcessPlacementHotkeys(mainCamera, lightColorScale);
-
-	// Delete: Remove selected object
-	static bool wasDeletePressed = false;
-	if (IsKeyDown(EInputKey::DELETE_KEY))
-	{
-		if (!wasDeletePressed && SelectedPlacedObjectIndex >= 0 &&
-			SelectedPlacedObjectIndex < static_cast<int32>(PlacedObjects.size()))
-		{
-			DeletePlacedObject(SelectedPlacedObjectIndex);
-		}
-		wasDeletePressed = true;
-	}
-	else
-	{
-		wasDeletePressed = false;
-	}
+	if (IsKeyPressed(EInputKey::UP))
+		MoveSceneSelection(-1);
+	if (IsKeyPressed(EInputKey::DOWN))
+		MoveSceneSelection(1);
+	if (IsKeyPressed(EInputKey::ESCAPE))
+		SelectPlacedObject(-1);
+	if (IsKeyPressed(EInputKey::DELETE_KEY))
+		DeletePlacedObject(SelectedPlacedObjectIndex);
 }
 
 void jPlacementTool::ProcessGizmoHotkeys()
 {
-	// Gizmo mode switching hotkeys (when not in ImGui window)
-	if (!ImGui::GetIO().WantCaptureKeyboard)
+	if (IsKeyDown(EInputKey::SHIFT))
 	{
-		static bool wasWPressed = false;
-		static bool wasEPressed = false;
-		static bool wasRPressed = false;
-		static bool wasQPressed = false;
-		static bool wasCtrlPressed = false;
-
-		// W: Translate mode
-		if (IsKeyDown(EInputKey::W))
-		{
-			if (!wasWPressed && IsKeyDown(EInputKey::SHIFT))  // Shift+W
-			{
-				GizmoOperation = ImGuizmo::TRANSLATE;
-			}
-			wasWPressed = true;
-		}
-		else
-		{
-			wasWPressed = false;
-		}
-
-		// E: Rotate mode
-		if (IsKeyDown(EInputKey::E))
-		{
-			if (!wasEPressed && IsKeyDown(EInputKey::SHIFT))  // Shift+E
-			{
-				GizmoOperation = ImGuizmo::ROTATE;
-			}
-			wasEPressed = true;
-		}
-		else
-		{
-			wasEPressed = false;
-		}
-
-		// R: Scale mode
-		if (IsKeyDown(EInputKey::R))
-		{
-			if (!wasRPressed && IsKeyDown(EInputKey::SHIFT))  // Shift+R
-			{
-				GizmoOperation = ImGuizmo::SCALE;
-			}
-			wasRPressed = true;
-		}
-		else
-		{
-			wasRPressed = false;
-		}
-
-		// Q: Toggle Local/World space
-		if (IsKeyDown(EInputKey::Q))
-		{
-			if (!wasQPressed)
-			{
-				GizmoMode = (GizmoMode == ImGuizmo::LOCAL) ? ImGuizmo::WORLD : ImGuizmo::LOCAL;
-			}
-			wasQPressed = true;
-		}
-		else
-		{
-			wasQPressed = false;
-		}
-
-		// Ctrl: Toggle snap
-		if (IsKeyDown(EInputKey::CTRL))
-		{
-			if (!wasCtrlPressed)
-			{
-				UseSnap = !UseSnap;
-			}
-			wasCtrlPressed = true;
-		}
-		else
-		{
-			wasCtrlPressed = false;
-		}
+		if (IsKeyPressed(EInputKey::W)) GizmoOperation = ImGuizmo::TRANSLATE;
+		if (IsKeyPressed(EInputKey::E)) GizmoOperation = ImGuizmo::ROTATE;
+		if (IsKeyPressed(EInputKey::R)) GizmoOperation = ImGuizmo::SCALE;
 	}
+	if (IsKeyPressed(EInputKey::Q))
+		GizmoMode = GizmoMode == ImGuizmo::LOCAL ? ImGuizmo::WORLD : ImGuizmo::LOCAL;
 }
 
 void jPlacementTool::ProcessTypeSelectionHotkeys()
 {
-	// Light type selection hotkeys
-	static bool wasLPressed = false;
-	static bool wasKPressed = false;
-	static bool wasJPressed = false;
-
-	// L: Select Point Light
-	if (IsKeyDown(EInputKey::L))
+	if (IsKeyPressed(EInputKey::L) || IsKeyPressed(EInputKey::K) || IsKeyPressed(EInputKey::J))
 	{
-		if (!wasLPressed)
-		{
-			CurrentTab = EPlacementTab::LIGHT;
-			SelectedLightType = EPlacementLightType::POINT;
-		}
-		wasLPressed = true;
+		CurrentTab = EPlacementTab::LIGHT;
+		SelectedLightType = IsKeyPressed(EInputKey::L) ? EPlacementLightType::POINT
+			: IsKeyPressed(EInputKey::K) ? EPlacementLightType::SPOT : EPlacementLightType::DIRECTIONAL;
 	}
-	else
+	if (IsKeyPressed(EInputKey::N) || IsKeyPressed(EInputKey::M))
 	{
-		wasLPressed = false;
-	}
-
-	// K: Select Spot Light
-	if (IsKeyDown(EInputKey::K))
-	{
-		if (!wasKPressed)
-		{
-			CurrentTab = EPlacementTab::LIGHT;
-			SelectedLightType = EPlacementLightType::SPOT;
-		}
-		wasKPressed = true;
-	}
-	else
-	{
-		wasKPressed = false;
-	}
-
-	// J: Select Directional Light
-	if (IsKeyDown(EInputKey::J))
-	{
-		if (!wasJPressed)
-		{
-			CurrentTab = EPlacementTab::LIGHT;
-			SelectedLightType = EPlacementLightType::DIRECTIONAL;
-		}
-		wasJPressed = true;
-	}
-	else
-	{
-		wasJPressed = false;
-	}
-
-	// Shape type selection hotkeys
-	static bool wasNPressed = false;
-	static bool wasMPressed = false;
-
-	// N: Select Cube
-	if (IsKeyDown(EInputKey::N))
-	{
-		if (!wasNPressed)
-		{
-			CurrentTab = EPlacementTab::SHAPE;
-			SelectedShapeType = EPlacementShapeType::CUBE;
-		}
-		wasNPressed = true;
-	}
-	else
-	{
-		wasNPressed = false;
-	}
-
-	// M: Select Sphere
-	if (IsKeyDown(EInputKey::M))
-	{
-		if (!wasMPressed)
-		{
-			CurrentTab = EPlacementTab::SHAPE;
-			SelectedShapeType = EPlacementShapeType::SPHERE;
-		}
-		wasMPressed = true;
-	}
-	else
-	{
-		wasMPressed = false;
+		CurrentTab = EPlacementTab::SHAPE;
+		SelectedShapeType = IsKeyPressed(EInputKey::N) ? EPlacementShapeType::CUBE : EPlacementShapeType::SPHERE;
 	}
 }
 
 void jPlacementTool::ProcessPlacementHotkeys(jCamera* mainCamera, float lightColorScale)
 {
-	// P: Place selected object
-	static bool wasPPressed = false;
-	if (IsKeyDown(EInputKey::P))
-	{
-		if (!wasPPressed)
-		{
-			PlaceSelectedObject(mainCamera, lightColorScale);
-		}
-		wasPPressed = true;
-	}
-	else
-	{
-		wasPPressed = false;
-	}
+	if (IsKeyPressed(EInputKey::P))
+		PlaceSelectedObject(mainCamera, lightColorScale);
 }
 
 void jPlacementTool::PlaceSelectedObject(jCamera* mainCamera, float lightColorScale)
@@ -324,6 +181,7 @@ void jPlacementTool::PlaceSelectedObject(jCamera* mainCamera, float lightColorSc
 	if (!mainCamera)
 		return;
 
+	const size_t previousCount = PlacedObjects.size();
 	if (CurrentTab == EPlacementTab::LIGHT)
 	{
 		PlaceLight(SelectedLightType, mainCamera, lightColorScale);
@@ -331,6 +189,12 @@ void jPlacementTool::PlaceSelectedObject(jCamera* mainCamera, float lightColorSc
 	else if (CurrentTab == EPlacementTab::SHAPE)
 	{
 		PlaceShape(SelectedShapeType, mainCamera);
+	}
+	if (PlacedObjects.size() > previousCount)
+	{
+		SceneListDirty = true;
+		SetSceneFilter("");
+		SelectPlacedObject(static_cast<int32>(PlacedObjects.size() - 1));
 	}
 }
 
@@ -522,6 +386,7 @@ void jPlacementTool::DeletePlacedObject(int32 index)
 	// or make us erase the next object (or end()) a second time.
 	const auto objectInfo = PlacedObjects[index];
 	PlacedObjects.erase(PlacedObjects.begin() + index);
+	SceneListDirty = true;
 	SelectObject(static_cast<jObject*>(nullptr));
 
 	// Remove from scene based on type
@@ -551,206 +416,208 @@ void jPlacementTool::DeletePlacedObject(int32 index)
 
 void jPlacementTool::RenderUI(jCamera* mainCamera)
 {
-	// Initialize ImGuizmo for this frame
 	ImGuizmo::BeginFrame();
-
-	// Render vertical tab bar
+	ImGui::PushID(this);
 	RenderTabBar();
-
-	ImGui::Separator();
-
-	// Render selected tab content
+	ImGui::BeginDisabled(!mainCamera);
 	if (CurrentTab == EPlacementTab::LIGHT)
-	{
-		RenderLightTab(mainCamera, 1.0f);
-	}
-	else if (CurrentTab == EPlacementTab::SHAPE)
-	{
+		RenderLightTab(mainCamera, gOptions.LightColorScale);
+	else
 		RenderShapeTab(mainCamera);
-	}
-
-	ImGui::Separator();
-
-	// Common sections (shared between Light and Shape)
-	RenderGizmoControls();
+	ImGui::SameLine();
+	if (ImGui::Button("Add (P)", ImVec2(96, 0)))
+		PlaceSelectedObject(mainCamera, gOptions.LightColorScale);
+	ImGui::EndDisabled();
+	ImGui::TextDisabled(mainCamera ? "Adds 100 units in front of the camera."
+		: "A scene camera is required to add objects.");
 	ImGui::Separator();
 	RenderPlacedObjectsList(mainCamera);
+	ImGui::PopID();
 }
 
 void jPlacementTool::RenderTabBar()
 {
-	ImGui::TextColored(ImVec4(1, 1, 0, 1), "Object Types:");
-
-	// Vertical tab buttons
-	ImGui::BeginGroup();
+	ImGui::TextUnformatted("Add");
+	ImGui::SameLine();
+	if (ImGui::RadioButton("Light", CurrentTab == EPlacementTab::LIGHT))
+		CurrentTab = EPlacementTab::LIGHT;
+	ImGui::SameLine();
+	if (ImGui::RadioButton("Shape", CurrentTab == EPlacementTab::SHAPE))
 	{
-		if (ImGui::Selectable("Light", CurrentTab == EPlacementTab::LIGHT, 0, ImVec2(120, 30)))
-		{
-			CurrentTab = EPlacementTab::LIGHT;
-		}
-		if (ImGui::Selectable("Shape", CurrentTab == EPlacementTab::SHAPE, 0, ImVec2(120, 30)))
-		{
-			CurrentTab = EPlacementTab::SHAPE;
-			// Auto-select first shape (Cube) when switching to Shape tab
-			if (SelectedShapeType == EPlacementShapeType::NONE)
-			{
-				SelectedShapeType = EPlacementShapeType::CUBE;
-			}
-		}
+		CurrentTab = EPlacementTab::SHAPE;
+		if (SelectedShapeType == EPlacementShapeType::NONE)
+			SelectedShapeType = EPlacementShapeType::CUBE;
 	}
-	ImGui::EndGroup();
 }
 
 void jPlacementTool::RenderLightTab(jCamera* mainCamera, float lightColorScale)
 {
-	ImGui::TextColored(ImVec4(0, 1, 1, 1), "Light Type Selection:");
-
-	ImGui::Indent();
-
-	// Light type selection
-	if (ImGui::RadioButton("Point Light (L)", SelectedLightType == EPlacementLightType::POINT))
-		SelectedLightType = EPlacementLightType::POINT;
-
-	if (ImGui::RadioButton("Spot Light (K)", SelectedLightType == EPlacementLightType::SPOT))
-		SelectedLightType = EPlacementLightType::SPOT;
-
-	if (ImGui::RadioButton("Directional Light (J)", SelectedLightType == EPlacementLightType::DIRECTIONAL))
-		SelectedLightType = EPlacementLightType::DIRECTIONAL;
-
-	ImGui::Unindent();
-
-	ImGui::Spacing();
-
-	// Hotkeys
-	ImGui::TextColored(ImVec4(1, 1, 0, 1), "Hotkeys:");
-	ImGui::Text("  L/K/J - Select Light Type");
-	ImGui::Text("  P - Place Selected Light");
+	const char* names[] = { "Point Light (L)", "Spot Light (K)", "Directional Light (J)" };
+	int type = SelectedLightType == EPlacementLightType::SPOT ? 1
+		: SelectedLightType == EPlacementLightType::DIRECTIONAL ? 2 : 0;
+	ImGui::SetNextItemWidth(Max(80.0f, ImGui::GetContentRegionAvail().x - 104.0f));
+	if (ImGui::Combo("##LightType", &type, names, 3))
+		SelectedLightType = type == 1 ? EPlacementLightType::SPOT
+			: type == 2 ? EPlacementLightType::DIRECTIONAL : EPlacementLightType::POINT;
 }
 
 void jPlacementTool::RenderShapeTab(jCamera* mainCamera)
 {
-	ImGui::TextColored(ImVec4(0, 1, 1, 1), "Shape Type Selection:");
-
-	ImGui::Indent();
-
-	// Shape type selection
-	if (ImGui::RadioButton("Cube (N)", SelectedShapeType == EPlacementShapeType::CUBE))
-		SelectedShapeType = EPlacementShapeType::CUBE;
-
-	if (ImGui::RadioButton("Sphere (M)", SelectedShapeType == EPlacementShapeType::SPHERE))
-		SelectedShapeType = EPlacementShapeType::SPHERE;
-
-	ImGui::Unindent();
-
-	ImGui::Spacing();
-
-	// Hotkeys
-	ImGui::TextColored(ImVec4(1, 1, 0, 1), "Hotkeys:");
-	ImGui::Text("  N/M - Select Shape Type");
-	ImGui::Text("  P - Place Selected Shape");
+	const char* names[] = { "Cube (N)", "Sphere (M)" };
+	int type = SelectedShapeType == EPlacementShapeType::SPHERE ? 1 : 0;
+	ImGui::SetNextItemWidth(Max(80.0f, ImGui::GetContentRegionAvail().x - 104.0f));
+	if (ImGui::Combo("##ShapeType", &type, names, 2))
+		SelectedShapeType = type == 1 ? EPlacementShapeType::SPHERE : EPlacementShapeType::CUBE;
 }
 
 void jPlacementTool::RenderGizmoControls()
 {
-	ImGui::TextColored(ImVec4(0, 1, 1, 1), "Gizmo Controls:");
-	ImGui::Text("Operation Mode:");
-	ImGui::Indent();
-	if (ImGui::RadioButton("Translate (Shift+W)", GizmoOperation == ImGuizmo::TRANSLATE))
-		GizmoOperation = ImGuizmo::TRANSLATE;
-	if (ImGui::RadioButton("Rotate (Shift+E)", GizmoOperation == ImGuizmo::ROTATE))
-		GizmoOperation = ImGuizmo::ROTATE;
-	if (ImGui::RadioButton("Scale (Shift+R)", GizmoOperation == ImGuizmo::SCALE))
-		GizmoOperation = ImGuizmo::SCALE;
-	ImGui::Unindent();
-
-	ImGui::Spacing();
-	ImGui::Text("Coordinate Space:");
-	ImGui::Indent();
-	if (ImGui::RadioButton("Local", GizmoMode == ImGuizmo::LOCAL))
-		GizmoMode = ImGuizmo::LOCAL;
+	const char* operations[] = { "Move (Shift+W)", "Rotate (Shift+E)", "Scale (Shift+R)" };
+	int operation = GizmoOperation == ImGuizmo::ROTATE ? 1 : GizmoOperation == ImGuizmo::SCALE ? 2 : 0;
+	ImGui::SetNextItemWidth(145);
+	if (ImGui::Combo("##Operation", &operation, operations, 3))
+		GizmoOperation = operation == 1 ? ImGuizmo::ROTATE : operation == 2 ? ImGuizmo::SCALE : ImGuizmo::TRANSLATE;
 	ImGui::SameLine();
-	if (ImGui::RadioButton("World (Q)", GizmoMode == ImGuizmo::WORLD))
-		GizmoMode = ImGuizmo::WORLD;
-	ImGui::Unindent();
-
-	ImGui::Spacing();
-	ImGui::Checkbox("Enable Snap (Ctrl)", &UseSnap);
-
+	const char* spaces[] = { "World (Q)", "Local (Q)" };
+	int space = GizmoMode == ImGuizmo::LOCAL ? 1 : 0;
+	ImGui::SetNextItemWidth(100);
+	if (ImGui::Combo("##Space", &space, spaces, 2))
+		GizmoMode = space == 1 ? ImGuizmo::LOCAL : ImGuizmo::WORLD;
+	ImGui::Checkbox("Snap (Ctrl+G)", &UseSnap);
 	if (UseSnap)
 	{
-		ImGui::Indent();
 		if (GizmoOperation == ImGuizmo::TRANSLATE)
-		{
-			ImGui::DragFloat3("Translation Snap", TranslationSnap, 0.1f, 0.1f, 100.0f);
-		}
+			ImGui::DragFloat3("Move snap", TranslationSnap, 0.1f, 0.1f, 100.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
 		else if (GizmoOperation == ImGuizmo::ROTATE)
-		{
-			ImGui::DragFloat("Rotation Snap (deg)", &RotationSnap, 1.0f, 1.0f, 90.0f);
-		}
-		else if (GizmoOperation == ImGuizmo::SCALE)
-		{
-			ImGui::DragFloat3("Scale Snap", ScaleSnap, 0.01f, 0.01f, 1.0f);
-		}
-		ImGui::Unindent();
+			ImGui::DragFloat("Rotate snap (deg)", &RotationSnap, 1.0f, 1.0f, 90.0f, "%.1f", ImGuiSliderFlags_AlwaysClamp);
+		else
+			ImGui::DragFloat3("Scale snap", ScaleSnap, 0.01f, 0.01f, 1.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
 	}
+}
+
+void jPlacementTool::SetSceneFilter(const char* filter)
+{
+	if (filter != SceneFilter.InputBuf)
+		snprintf(SceneFilter.InputBuf, sizeof(SceneFilter.InputBuf), "%s", filter ? filter : "");
+	SceneFilter.Build();
+	// This bundled ImGui version returns on the first positive match. Evaluate
+	// exclusions first so "cube,-[0]" and "-[0],cube" behave consistently.
+	if (SceneFilter.Filters.Size > 1)
+		std::stable_partition(SceneFilter.Filters.begin(), SceneFilter.Filters.end(),
+			[](const ImGuiTextFilter::ImGuiTextRange& range) { return !range.empty() && *range.b == '-'; });
+	SceneListDirty = true;
+	RevealSceneSelection = false;
+}
+
+void jPlacementTool::RebuildSceneList()
+{
+	if (!SceneListDirty && SceneObjectLabels.size() == PlacedObjects.size())
+		return;
+	SceneObjectLabels.clear();
+	SceneListIndices.clear();
+	SceneObjectLabels.reserve(PlacedObjects.size());
+	SceneListIndices.reserve(PlacedObjects.size());
+	for (int32 i = 0; i < static_cast<int32>(PlacedObjects.size()); ++i)
+	{
+		const auto& info = PlacedObjects[i];
+		const char* type = "Scene Object";
+		if (info.Type == EPlacedObjectType::LIGHT)
+		{
+			type = info.LightType == EPlacementLightType::POINT ? "Point Light"
+				: info.LightType == EPlacementLightType::SPOT ? "Spot Light"
+				: info.LightType == EPlacementLightType::DIRECTIONAL ? "Directional Light" : "Light";
+		}
+		else if (info.ShapeType == EPlacementShapeType::CUBE)
+			type = "Cube";
+		else if (info.ShapeType == EPlacementShapeType::SPHERE)
+			type = "Sphere";
+		char label[128];
+		if (info.Object)
+			sprintf_s(label, "[%d] %s (ID %u)", i, type, info.Object->GetObjectID());
+		else
+			sprintf_s(label, "[%d] %s", i, type);
+		SceneObjectLabels.emplace_back(label);
+		if (SceneFilter.PassFilter(label))
+			SceneListIndices.push_back(i);
+	}
+	SceneListDirty = false;
+}
+
+const std::vector<int32>& jPlacementTool::GetSceneListIndices()
+{
+	RebuildSceneList();
+	return SceneListIndices;
+}
+
+void jPlacementTool::MoveSceneSelection(int32 direction)
+{
+	const auto& indices = GetSceneListIndices();
+	if (indices.empty())
+		return;
+	const auto found = std::find(indices.begin(), indices.end(), SelectedPlacedObjectIndex);
+	const int32 current = found == indices.end() ? (direction > 0 ? -1 : static_cast<int32>(indices.size()))
+		: static_cast<int32>(std::distance(indices.begin(), found));
+	const int32 next = std::clamp(current + direction, 0, static_cast<int32>(indices.size()) - 1);
+	SelectPlacedObject(indices[next]);
 }
 
 void jPlacementTool::RenderPlacedObjectsList(jCamera* mainCamera)
 {
-	if (!PlacedObjects.empty())
+	ImGui::TextUnformatted("Scene");
+	ImGui::SetNextItemWidth(-58);
+	if (ImGui::InputTextWithHint("##SceneFilter", "Search type or object ID (comma = OR, -term = exclude)",
+		SceneFilter.InputBuf, sizeof(SceneFilter.InputBuf)))
+		SetSceneFilter(SceneFilter.InputBuf);
+	ImGui::SameLine();
+	if (ImGui::SmallButton("Clear"))
+		SetSceneFilter("");
+	const auto& indices = GetSceneListIndices();
+	ImGui::TextDisabled("%d of %d objects | Up/Down select | Esc clear | Delete remove",
+		static_cast<int>(indices.size()), static_cast<int>(PlacedObjects.size()));
+
+	ImGui::BeginChild("PlacementListRegion", ImVec2(0, 170), true);
+	SceneListHasFocus = ImGui::IsWindowFocused();
+	if (indices.empty())
+		ImGui::TextDisabled(PlacedObjects.empty() ? "Use Add above to create an object."
+			: "No matching objects. Clear or change the search.");
+	ImGuiListClipper clipper;
+	clipper.Begin(static_cast<int>(indices.size()));
+	if (RevealSceneSelection)
 	{
-		ImGui::TextColored(ImVec4(1, 1, 0, 1), "Placed Objects: %d", (int)PlacedObjects.size());
-
-		ImGui::BeginChild("PlacementListRegion", ImVec2(0, 150), true);
-		for (int i = 0; i < (int)PlacedObjects.size(); ++i)
+		const auto selected = std::find(indices.begin(), indices.end(), SelectedPlacedObjectIndex);
+		if (selected != indices.end())
 		{
-			const auto& objInfo = PlacedObjects[i];
-			char labelBuf[128];
-
-			if (objInfo.Type == EPlacedObjectType::LIGHT)
-			{
-				const char* lightTypeName = "Unknown";
-				if (objInfo.LightType == EPlacementLightType::POINT)
-					lightTypeName = "Point";
-				else if (objInfo.LightType == EPlacementLightType::SPOT)
-					lightTypeName = "Spot";
-				else if (objInfo.LightType == EPlacementLightType::DIRECTIONAL)
-					lightTypeName = "Directional";
-
-				sprintf_s(labelBuf, "[%d] %s Light", i, lightTypeName);
-			}
-			else if (objInfo.Type == EPlacedObjectType::SHAPE)
-			{
-				const char* shapeTypeName = "Unknown";
-				if (objInfo.ShapeType == EPlacementShapeType::CUBE)
-					shapeTypeName = "Cube";
-				else if (objInfo.ShapeType == EPlacementShapeType::SPHERE)
-					shapeTypeName = "Sphere";
-
-				sprintf_s(labelBuf, "[%d] %s", i, shapeTypeName);
-			}
-			else
-			{
-				sprintf_s(labelBuf, "[%d] Unknown", i);
-			}
-
-			if (ImGui::Selectable(labelBuf, SelectedPlacedObjectIndex == i))
-			{
-				SelectedPlacedObjectIndex = i;
-				SelectedRenderObjectIndex = -1;  // Reset RenderObject selection when PlacedObject changes
-				SelectedRenderObjectIndices.clear();  // Clear multi-selection as well
-			}
+			const int row = static_cast<int>(std::distance(indices.begin(), selected));
+			clipper.ForceDisplayRangeByIndices(row, row + 1);
 		}
-		ImGui::EndChild();
-
-		// Render selected object properties
+	}
+	while (clipper.Step())
+	{
+		for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row)
+		{
+			const int32 index = indices[row];
+			ImGui::PushID(index);
+			if (ImGui::Selectable(SceneObjectLabels[index].c_str(), SelectedPlacedObjectIndex == index))
+				SelectPlacedObject(index);
+			if (RevealSceneSelection && SelectedPlacedObjectIndex == index)
+				ImGui::SetScrollHereY();
+			ImGui::PopID();
+		}
+	}
+	RevealSceneSelection = false;
+	ImGui::EndChild();
+	ImGui::Separator();
+	ImGui::TextUnformatted("Inspector");
+	if (SelectedPlacedObjectIndex >= 0 && SelectedPlacedObjectIndex < static_cast<int32>(PlacedObjects.size()))
+	{
+		ImGui::TextUnformatted(SceneObjectLabels[SelectedPlacedObjectIndex].c_str());
+		if (std::find(indices.begin(), indices.end(), SelectedPlacedObjectIndex) == indices.end())
+			ImGui::TextDisabled("Selection is hidden by the search.");
+		RenderGizmoControls();
 		RenderSelectedObjectProperties(mainCamera);
 	}
 	else
-	{
-		ImGui::Text("No objects placed yet.");
-		ImGui::Text("Select a type and press P to place!");
-	}
+		ImGui::TextDisabled("Select an object in the scene or click it in the viewport.");
 }
 
 void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
@@ -1008,7 +875,8 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 				}
 
 				Vector newPos(translation[0], translation[1], translation[2]);
-				Vector newRot(rotation[0], rotation[1], rotation[2]);
+				const Vector rotationDegrees(rotation[0], rotation[1], rotation[2]);
+				Vector newRot(DegreeToRadian(rotation[0]), DegreeToRadian(rotation[1]), DegreeToRadian(rotation[2]));
 				Vector newScale(scale[0], scale[1], scale[2]);
 
 				// Additional safety: Clamp scale to prevent extremely small values
@@ -1073,12 +941,9 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 					if (selectedObjectInfo.Object)
 					{
 						// Single selection: only update that one RenderObject
-						if (SelectedRenderObjectIndex >= 0 && SelectedRenderObjectIndex < (int)selectedObjectInfo.Object->RenderObjects.size())
+						if (ApplySelectedTransform(newPos, rotationDegrees, newScale))
 						{
-							jRenderObject* renderObj = selectedObjectInfo.Object->RenderObjects[SelectedRenderObjectIndex];
-							renderObj->SetPos(newPos);
-							renderObj->SetRot(newRot);
-							renderObj->SetScale(newScale);
+							// The same validated degrees-to-radians path serves the inspector.
 						}
 						// Multi-selection: update all selected RenderObjects
 						else if (!SelectedRenderObjectIndices.empty())
@@ -1110,7 +975,7 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 		}
 
 		ImGui::Separator();
-		ImGui::TextColored(ImVec4(0, 1, 0, 1), "Selected Object Properties:");
+		ImGui::TextDisabled("Drag values or Ctrl+click to type. Rotation is in degrees.");
 
 		// Helper for copy/paste context menu
 		auto AddCopyPasteContextMenu = [](const char* contextId, Vector& value, auto&& onPaste)
@@ -1131,7 +996,8 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 						float x, y, z;
 						if (sscanf_s(clipText, "%f, %f, %f", &x, &y, &z) == 3 || sscanf_s(clipText, "%f,%f,%f", &x, &y, &z) == 3)
 						{
-							onPaste(x, y, z);
+							if (IsValidVector(Vector(x, y, z)))
+								onPaste(x, y, z);
 						}
 					}
 				}
@@ -1152,7 +1018,7 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 				jPointLight* pointLight = static_cast<jPointLight*>(selectedLight);
 				jPointLightUniformBufferData& data = const_cast<jPointLightUniformBufferData&>(pointLight->GetLightData());
 				Vector pos = data.Position;
-				if (ImGui::SliderFloat3("Position", &pos.x, -500.0f, 500.0f))
+				if (ImGui::DragFloat3("Position", &pos.x, 0.5f) && IsValidVector(pos))
 				{
 					data.Position = pos;
 					pointLight->IsNeedToUpdateShaderBindingInstance = true;
@@ -1169,7 +1035,7 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 				jSpotLight* spotLight = static_cast<jSpotLight*>(selectedLight);
 				jSpotLightUniformBufferData& data = const_cast<jSpotLightUniformBufferData&>(spotLight->GetLightData());
 				Vector pos = data.Position;
-				if (ImGui::SliderFloat3("Position", &pos.x, -500.0f, 500.0f))
+				if (ImGui::DragFloat3("Position", &pos.x, 0.5f) && IsValidVector(pos))
 				{
 					data.Position = pos;
 					spotLight->IsNeedToUpdateShaderBindingInstance = true;
@@ -1182,15 +1048,15 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 				});
 
 				Vector dir = data.Direction;
-				if (ImGui::SliderFloat3("Direction", &dir.x, -1.0f, 1.0f))
+				if (ImGui::DragFloat3("Direction", &dir.x, 0.01f) && IsValidVector(dir) && !dir.IsNearlyZero())
 				{
 					dir = dir.GetNormalize();
 					spotLight->SetDirection(dir);
 				}
 				AddCopyPasteContextMenu("PlacedObjectDirContext", dir, [spotLight](float x, float y, float z) {
 					Vector newDir(x, y, z);
-					newDir = newDir.GetNormalize();
-					spotLight->SetDirection(newDir);
+					if (!newDir.IsNearlyZero())
+						spotLight->SetDirection(newDir.GetNormalize());
 				});
 			}
 			else if (selectedLight->GetLightType() == ELightType::DIRECTIONAL)
@@ -1198,15 +1064,15 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 				jDirectionalLight* dirLight = static_cast<jDirectionalLight*>(selectedLight);
 				jDirectionalLightUniformBufferData& data = const_cast<jDirectionalLightUniformBufferData&>(dirLight->GetLightData());
 				Vector dir = data.Direction;
-				if (ImGui::SliderFloat3("Direction", &dir.x, -1.0f, 1.0f))
+				if (ImGui::DragFloat3("Direction", &dir.x, 0.01f) && IsValidVector(dir) && !dir.IsNearlyZero())
 				{
 					dir = dir.GetNormalize();
 					dirLight->SetDirection(dir);
 				}
 				AddCopyPasteContextMenu("PlacedObjectDirContext", dir, [dirLight](float x, float y, float z) {
 					Vector newDir(x, y, z);
-					newDir = newDir.GetNormalize();
-					dirLight->SetDirection(newDir);
+					if (!newDir.IsNearlyZero())
+						dirLight->SetDirection(newDir.GetNormalize());
 				});
 			}
 
@@ -1217,7 +1083,7 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 				jPointLight* pointLight = static_cast<jPointLight*>(selectedLight);
 				jPointLightUniformBufferData& data = const_cast<jPointLightUniformBufferData&>(pointLight->GetLightData());
 				colorRGB = data.Color;
-				if (ImGui::ColorEdit3("Color", &colorRGB.x, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR))
+				if (ImGui::ColorEdit3("Color", &colorRGB.x, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR) && IsValidVector(colorRGB))
 				{
 					data.Color = colorRGB;
 					pointLight->IsNeedToUpdateShaderBindingInstance = true;
@@ -1233,7 +1099,7 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 				jSpotLight* spotLight = static_cast<jSpotLight*>(selectedLight);
 				jSpotLightUniformBufferData& data = const_cast<jSpotLightUniformBufferData&>(spotLight->GetLightData());
 				colorRGB = data.Color;
-				if (ImGui::ColorEdit3("Color", &colorRGB.x, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR))
+				if (ImGui::ColorEdit3("Color", &colorRGB.x, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR) && IsValidVector(colorRGB))
 				{
 					data.Color = colorRGB;
 					spotLight->IsNeedToUpdateShaderBindingInstance = true;
@@ -1249,7 +1115,7 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 				jDirectionalLight* dirLight = static_cast<jDirectionalLight*>(selectedLight);
 				jDirectionalLightUniformBufferData& data = const_cast<jDirectionalLightUniformBufferData&>(dirLight->GetLightData());
 				colorRGB = data.Color;
-				if (ImGui::ColorEdit3("Color", &colorRGB.x, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR))
+				if (ImGui::ColorEdit3("Color", &colorRGB.x, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR) && IsValidVector(colorRGB))
 				{
 					dirLight->SetColor(colorRGB);
 				}
@@ -1258,124 +1124,87 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 				});
 			}
 		}
-		else if (selectedObjectInfo.Type == EPlacedObjectType::SHAPE)
+		else if (selectedObjectInfo.Type == EPlacedObjectType::SHAPE && selectedObjectInfo.Object)
 		{
-			// Display RenderObject list
-			if (selectedObjectInfo.Object && !selectedObjectInfo.Object->RenderObjects.empty())
+			const auto& meshes = selectedObjectInfo.Object->RenderObjects;
+			if (meshes.size() > 1)
 			{
-				ImGui::TextColored(ImVec4(0, 1, 1, 1), "RenderObjects: %d", (int)selectedObjectInfo.Object->RenderObjects.size());
-				ImGui::SameLine();
-				ImGui::TextColored(ImVec4(1, 1, 0, 1), "(Shift+Click for multi-select)");
-
-				// Select All / Deselect All buttons
-				if (ImGui::Button("Select All"))
+				ImGui::Text("Meshes: %d (Shift+click to select several)", static_cast<int>(meshes.size()));
+				if (ImGui::Button("Select all meshes"))
 				{
 					SelectedRenderObjectIndices.clear();
-					for (int i = 0; i < (int)selectedObjectInfo.Object->RenderObjects.size(); ++i)
-					{
+					for (int32 i = 0; i < static_cast<int32>(meshes.size()); ++i)
 						SelectedRenderObjectIndices.push_back(i);
-					}
-					SelectedRenderObjectIndex = -1;  // Clear single selection
+					SelectedRenderObjectIndex = -1;
 				}
 				ImGui::SameLine();
-				if (ImGui::Button("Deselect All"))
+				if (ImGui::Button("Clear meshes"))
 				{
 					SelectedRenderObjectIndices.clear();
 					SelectedRenderObjectIndex = -1;
 				}
-
-				// Show list of RenderObjects
 				ImGui::BeginChild("RenderObjectListRegion", ImVec2(0, 100), true);
-				for (int i = 0; i < (int)selectedObjectInfo.Object->RenderObjects.size(); ++i)
+				ImGuiListClipper clipper;
+				clipper.Begin(static_cast<int>(meshes.size()));
+				while (clipper.Step())
 				{
-					char renderObjLabel[64];
-					sprintf_s(renderObjLabel, "RenderObject [%d]", i);
-
-					// Check if this index is selected (either in single or multi-selection)
-					bool isSelected = (SelectedRenderObjectIndex == i) || IsIndexSelected(SelectedRenderObjectIndices, i);
-
-					if (ImGui::Selectable(renderObjLabel, isSelected))
+					for (int32 i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i)
 					{
-						bool shiftPressed = ImGui::GetIO().KeyShift;
-
-						if (shiftPressed)
+						char label[64];
+						sprintf_s(label, "Mesh [%d]", i);
+						const bool selected = SelectedRenderObjectIndex == i || IsIndexSelected(SelectedRenderObjectIndices, i);
+						if (ImGui::Selectable(label, selected))
 						{
-							// Multi-selection mode: toggle in list
-							ToggleIndexInSelection(SelectedRenderObjectIndices, i);
-							SelectedRenderObjectIndex = -1;  // Clear single selection when using multi-selection
-						}
-						else
-						{
-							// Single selection mode: toggle single index
-							if (SelectedRenderObjectIndex == i)
+							if (ImGui::GetIO().KeyShift)
+							{
+								if (SelectedRenderObjectIndex >= 0)
+									AddIndexToSelection(SelectedRenderObjectIndices, SelectedRenderObjectIndex);
+								ToggleIndexInSelection(SelectedRenderObjectIndices, i);
 								SelectedRenderObjectIndex = -1;
+							}
 							else
+							{
 								SelectedRenderObjectIndex = i;
-
-							// Clear multi-selection when using single selection
-							SelectedRenderObjectIndices.clear();
+								SelectedRenderObjectIndices.clear();
+							}
 						}
 					}
 				}
 				ImGui::EndChild();
-
-				// Display properties of selected RenderObject(s)
-				ImGui::Separator();
-
-				// Check selection state
-				bool hasSingleSelection = (SelectedRenderObjectIndex >= 0 && SelectedRenderObjectIndex < (int)selectedObjectInfo.Object->RenderObjects.size());
-				bool hasMultiSelection = !SelectedRenderObjectIndices.empty();
-
-				if (hasSingleSelection)
-				{
-					// Single selection: display specific RenderObject properties
-					jRenderObject* targetRenderObj = selectedObjectInfo.Object->RenderObjects[SelectedRenderObjectIndex];
-					ImGui::TextColored(ImVec4(1, 1, 0, 1), "Selected RenderObject [%d]:", SelectedRenderObjectIndex);
-
-					Vector pos = targetRenderObj->GetPos();
-					if (ImGui::SliderFloat3("Position", &pos.x, -500.0f, 500.0f))
-					{
-						targetRenderObj->SetPos(pos);
-					}
-					AddCopyPasteContextMenu("PlacedObjectPosContext", pos, [targetRenderObj](float x, float y, float z) {
-						Vector newPos(x, y, z);
-						targetRenderObj->SetPos(newPos);
-					});
-
-					Vector rot = targetRenderObj->GetRot();
-					if (ImGui::SliderFloat3("Rotation", &rot.x, -180.0f, 180.0f))
-					{
-						targetRenderObj->SetRot(rot);
-					}
-					AddCopyPasteContextMenu("PlacedObjectRotContext", rot, [targetRenderObj](float x, float y, float z) {
-						Vector newRot(x, y, z);
-						targetRenderObj->SetRot(newRot);
-					});
-
-					Vector scale = targetRenderObj->GetScale();
-					if (ImGui::SliderFloat3("Scale", &scale.x, 0.1f, 10.0f))
-					{
-						targetRenderObj->SetScale(scale);
-					}
-					AddCopyPasteContextMenu("PlacedObjectScaleContext", scale, [targetRenderObj](float x, float y, float z) {
-						Vector newScale(x, y, z);
-						targetRenderObj->SetScale(newScale);
-					});
-				}
-				else if (hasMultiSelection)
-				{
-					// Multi-selection: show count only
-					ImGui::TextColored(ImVec4(1, 1, 0, 1), "Multi-Selection: %d RenderObjects selected", (int)SelectedRenderObjectIndices.size());
-					ImGui::Text("Gizmo transforms will apply to all selected RenderObjects");
-				}
-				else
-				{
-					// No selection - show info that all RenderObjects will be affected
-					ImGui::TextColored(ImVec4(0, 1, 1, 1), "No specific RenderObject selected");
-					ImGui::Text("Gizmo transforms will apply to ALL RenderObjects");
-					ImGui::Text("Click a RenderObject above to select a specific one");
-				}
 			}
+
+			int32 meshIndex = SelectedRenderObjectIndex;
+			if (meshIndex < 0 && SelectedRenderObjectIndices.size() == 1)
+				meshIndex = SelectedRenderObjectIndices[0];
+			if (meshIndex < 0 && SelectedRenderObjectIndices.empty() && meshes.size() == 1)
+				meshIndex = 0;
+			if (meshIndex >= 0 && meshIndex < static_cast<int32>(meshes.size()) && meshes[meshIndex])
+			{
+				auto* target = meshes[meshIndex];
+				Vector pos = target->GetPos();
+				const auto radians = target->GetRot();
+				Vector degrees(RadianToDegree(radians.x), RadianToDegree(radians.y), RadianToDegree(radians.z));
+				Vector scale = target->GetScale();
+				if (ImGui::DragFloat3("Position", &pos.x, 0.5f))
+					ApplySelectedTransform(pos, degrees, scale);
+				AddCopyPasteContextMenu("PlacedObjectPosContext", pos, [&](float x, float y, float z) {
+					ApplySelectedTransform(Vector(x, y, z), degrees, scale);
+				});
+				if (ImGui::DragFloat3("Rotation (deg)", &degrees.x, 0.5f))
+					ApplySelectedTransform(pos, degrees, scale);
+				AddCopyPasteContextMenu("PlacedObjectRotContext", degrees, [&](float x, float y, float z) {
+					ApplySelectedTransform(pos, Vector(x, y, z), scale);
+				});
+				if (ImGui::DragFloat3("Scale", &scale.x, 0.01f, 0.001f, 0.0f))
+					ApplySelectedTransform(pos, degrees, scale);
+				AddCopyPasteContextMenu("PlacedObjectScaleContext", scale, [&](float x, float y, float z) {
+					ApplySelectedTransform(pos, degrees, Vector(x, y, z));
+				});
+			}
+			else if (meshes.empty())
+				ImGui::TextDisabled("This object has no editable mesh.");
+			else
+				ImGui::TextWrapped("Select one mesh for numeric transforms. The gizmo applies to the selected meshes, or the whole object when none is selected.");
 		}
 
 		// Delete button
@@ -1390,6 +1219,10 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 void jPlacementTool::Clear()
 {
 	PlacedObjects.clear();
+	SetSceneFilter("");
+	SceneObjectLabels.clear();
+	SceneListIndices.clear();
+	SceneListHasFocus = false;
 	SelectObject(static_cast<jObject*>(nullptr));
 	bPickRequested = false;
 	CurrentTab = EPlacementTab::LIGHT;
@@ -1412,6 +1245,7 @@ void jPlacementTool::RegisterStaticObject(jObject* obj)
 		info.Object = obj;
 		info.Type = EPlacedObjectType::SHAPE;  // Static objects are shapes
 		PlacedObjects.push_back(info);
+		SceneListDirty = true;
 	}
 }
 
@@ -1433,6 +1267,7 @@ void jPlacementTool::UnregisterStaticObject(jObject* obj)
 			SelectedPlacedObjectIndex--;
 
 		PlacedObjects.erase(it);
+		SceneListDirty = true;
 	}
 }
 
@@ -1452,6 +1287,7 @@ void jPlacementTool::RegisterLight(jLight* light)
 	info.LightType = ToPlacementLightType(light->GetLightType());
 	info.LightPtr = light;
 	PlacedObjects.push_back(info);
+	SceneListDirty = true;
 }
 
 void jPlacementTool::UnregisterLight(jLight* light)
@@ -1471,35 +1307,55 @@ void jPlacementTool::UnregisterLight(jLight* light)
 			SelectedPlacedObjectIndex--;
 
 		PlacedObjects.erase(it);
+		SceneListDirty = true;
 	}
+}
+
+void jPlacementTool::SelectPlacedObject(int32 index)
+{
+	bPickRequested = false;
+	PickedObject = nullptr;
+	SelectedRenderObjectIndex = -1;
+	SelectedRenderObjectIndices.clear();
+	SelectedPlacedObjectIndex = index >= 0 && index < static_cast<int32>(PlacedObjects.size()) ? index : -1;
+	if (SelectedPlacedObjectIndex >= 0)
+		PickedObject = PlacedObjects[SelectedPlacedObjectIndex].Object;
+	RevealSceneSelection = SelectedPlacedObjectIndex >= 0;
 }
 
 void jPlacementTool::SelectObject(jObject* obj)
 {
-	PickedObject = nullptr;
-	SelectedRenderObjectIndices.clear();
 	if (!obj)
 	{
-		SelectedPlacedObjectIndex = -1;
-		SelectedRenderObjectIndex = -1;
+		SelectPlacedObject(-1);
 		return;
 	}
-
-	// Find the object in PlacedObjects list
-	auto it = std::find_if(PlacedObjects.begin(), PlacedObjects.end(),
+	const auto it = std::find_if(PlacedObjects.begin(), PlacedObjects.end(),
 		[obj](const PlacedObjectInfo& info) { return info.Object == obj; });
+	SelectPlacedObject(it != PlacedObjects.end() ? static_cast<int32>(std::distance(PlacedObjects.begin(), it)) : -1);
+}
 
-	if (it != PlacedObjects.end())
-	{
-		PickedObject = obj;
-		SelectedPlacedObjectIndex = static_cast<int32>(std::distance(PlacedObjects.begin(), it));
-		SelectedRenderObjectIndex = -1;  // Reset RenderObject selection
-	}
-	else
-	{
-		SelectedPlacedObjectIndex = -1;
-		SelectedRenderObjectIndex = -1;
-	}
+bool jPlacementTool::ApplySelectedTransform(const Vector& position, const Vector& rotationDegrees, const Vector& scale)
+{
+	if (!IsValidVector(position) || !IsValidVector(rotationDegrees) || !IsValidScaleVector(scale)
+		|| SelectedPlacedObjectIndex < 0 || SelectedPlacedObjectIndex >= static_cast<int32>(PlacedObjects.size()))
+		return false;
+	const auto& info = PlacedObjects[SelectedPlacedObjectIndex];
+	if (info.Type != EPlacedObjectType::SHAPE || !info.Object || SelectedRenderObjectIndices.size() > 1)
+		return false;
+	const auto& meshes = info.Object->RenderObjects;
+	int32 meshIndex = SelectedRenderObjectIndex;
+	if (meshIndex < 0 && SelectedRenderObjectIndices.size() == 1)
+		meshIndex = SelectedRenderObjectIndices[0];
+	if (meshIndex < 0 && SelectedRenderObjectIndices.empty() && meshes.size() == 1)
+		meshIndex = 0;
+	if (meshIndex < 0 || meshIndex >= static_cast<int32>(meshes.size()) || !meshes[meshIndex])
+		return false;
+	auto* target = meshes[meshIndex];
+	target->SetPos(position);
+	target->SetRot(Vector(DegreeToRadian(rotationDegrees.x), DegreeToRadian(rotationDegrees.y), DegreeToRadian(rotationDegrees.z)));
+	target->SetScale(scale);
+	return true;
 }
 
 void jPlacementTool::SelectObject(jRenderObject* renderObj)

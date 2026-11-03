@@ -3,6 +3,9 @@
 #include "Renderer/jSurfelGILimits.h"
 
 int RunCoreAuditTests();
+int RunLogSelfTests();
+int RunAssetImportTests();
+int RunEditorWorkflowSelfTests();
 int RunEditorAssetSelfTests();
 int RunIoAuditTests();
 int RunEffectsAuditTests();
@@ -36,6 +39,9 @@ int RunCpuSelfTests()
     expect(jSurfelGILimits::CanAllocate(jSurfelGILimits::MaxSurfels, jSurfelGILimits::MaxLinearDispatchThreads)
         && !jSurfelGILimits::CanAllocate(jSurfelGILimits::MaxSurfels, jSurfelGILimits::MaxLinearDispatchThreads + 1), "surfel dispatch boundary");
     failures += RunCoreAuditTests();
+    failures += RunLogSelfTests();
+    failures += RunAssetImportTests();
+    failures += RunEditorWorkflowSelfTests();
     failures += RunEditorAssetSelfTests();
     failures += RunIoAuditTests();
     failures += RunEffectsAuditTests();

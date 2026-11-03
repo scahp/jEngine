@@ -6,6 +6,7 @@
 #ifdef ENABLE_EDITOR_FEATURES
 
 #include "Code/External/IMGUI/ImGuizmo/ImGuizmo.h"
+#include "imgui.h"
 
 class jLight;
 class jObject;
@@ -47,7 +48,7 @@ enum class EPlacedObjectType
 struct PlacedObjectInfo
 {
 	jObject* Object = nullptr;
-	EPlacedObjectType Type;
+	EPlacedObjectType Type = EPlacedObjectType::SHAPE;
 	EPlacementLightType LightType = EPlacementLightType::NONE;
 	EPlacementShapeType ShapeType = EPlacementShapeType::NONE;
 	jLight* LightPtr = nullptr;  // Only valid if Type == LIGHT
@@ -78,6 +79,15 @@ public:
 	void SelectObject(jObject* obj);
 	void SelectObject(jRenderObject* renderObj);
 
+	// Editor/main thread only, just like scene registration and RenderUI. The
+	// returned list is invalidated by a filter or scene-registration change.
+	void SelectPlacedObject(int32 index);
+	void SetSceneFilter(const char* filter);
+	const std::vector<int32>& GetSceneListIndices();
+	// Single mesh/primitives: UI/gizmo angles are degrees; runtime setters use radians.
+	// Returns false without changing the scene for invalid values or a group selection.
+	bool ApplySelectedTransform(const Vector& position, const Vector& rotationDegrees, const Vector& scale);
+
 	// Register a static object (called from jObject::AddObject)
 	void RegisterStaticObject(jObject* obj);
 	void UnregisterStaticObject(jObject* obj);
@@ -102,9 +112,21 @@ public:
 
 	// Type Selection
 	EPlacementLightType SelectedLightType = EPlacementLightType::POINT;
-	EPlacementShapeType SelectedShapeType = EPlacementShapeType::NONE;
+	EPlacementShapeType SelectedShapeType = EPlacementShapeType::CUBE;
 
 private:
+	bool IsKeyPressed(EInputKey key) const;
+	void MoveSceneSelection(int32 direction);
+	void RebuildSceneList();
+	ImGuiTextFilter SceneFilter;
+	std::vector<int32> SceneListIndices;
+	std::vector<std::string> SceneObjectLabels;
+	bool SceneListDirty = true;
+	bool RevealSceneSelection = false;
+	bool SceneListHasFocus = false;
+	std::array<bool, static_cast<size_t>(EInputKey::MAX)> PreviousKeys{};
+	std::array<bool, static_cast<size_t>(EInputKey::MAX)> PressedKeys{};
+
 	// Input Handling
 	void ProcessPlacementHotkeys(jCamera* mainCamera, float lightColorScale);
 	void ProcessTypeSelectionHotkeys();

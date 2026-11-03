@@ -1606,6 +1606,14 @@ void IRenderer::UIPass()
 						auto& game = g_Engine->Game;
 						const auto& loadableScenes = game.GetLoadablePathTracingScenes();
 						const int32 activeSceneIndex = game.GetActivePathTracingSceneIndex();
+                        if (!game.GetSceneImportStatus().empty())
+                            ImGui::TextWrapped("%s", game.GetSceneImportStatus().c_str());
+                        if (game.IsSceneImportPending())
+                        {
+                            ImGui::TextUnformatted("Preparing the model. You can keep editing or cancel.");
+                            if (ImGui::Button("Cancel import")) game.CancelSceneImport();
+                        }
+
 
 						static char SceneFilter[128] = {};
 						ImGui::SetNextItemWidth(-1.0f);

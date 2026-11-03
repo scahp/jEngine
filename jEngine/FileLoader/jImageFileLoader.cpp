@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jImageFileLoader.h"
 #include "lodepng.h"
 
@@ -24,6 +24,11 @@ jImageFileLoader::~jImageFileLoader()
 
 std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& filename)
 {
+    return GetOrDecodeImage(filename);
+}
+
+std::shared_ptr<jImageData> jImageFileLoader::DecodeImageData(const jName& filename)
+{
     char Ext[128] = "";
     _splitpath_s(filename.ToStr(), nullptr, 0, nullptr, 0, nullptr, 0, Ext, sizeof(Ext));
     for (int32 i = 0; i < _countof(Ext); ++i)
@@ -33,14 +38,7 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
         Ext[i] = std::tolower(Ext[i]);
     }
     if (strlen(Ext) <= 0)
-        return std::weak_ptr<jImageData>();
-
-    {
-        jScopedLock s(&CachedImageDataLock);
-        auto it_find = CachedImageDataMap.find(filename);
-        if (CachedImageDataMap.end() != it_find)
-            return it_find->second;
-    }
+        return {};
 
     const jName ExtName(Ext);
     static jName ExtDDS(".dds");
@@ -58,18 +56,18 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
         if (ExtName == ExtDDS)
         {
             if (FAILED(DirectX::LoadFromDDSFile(FilenameWChar.c_str(), DirectX::DDS_FLAGS_NONE, nullptr, image)))
-                return std::weak_ptr<jImageData>();
+                return {};
         }
         else if (ExtName == ExtHDR)
         {
             if (FAILED(DirectX::LoadFromHDRFile(FilenameWChar.c_str(), nullptr, image)))
-                return std::weak_ptr<jImageData>();
+                return {};
         }
         else
         {
             DirectX::ScratchImage imageOrigin;
             if (FAILED(DirectX::LoadFromWICFile(FilenameWChar.c_str(), DirectX::WIC_FLAGS_FORCE_RGB, nullptr, imageOrigin)))
-                return std::weak_ptr<jImageData>();
+                return {};
 
             if (UseBlockCompressionForWIC)
             {
@@ -129,7 +127,7 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
 
         const uint64 numSubResources = image.GetMetadata().mipLevels * image.GetMetadata().arraySize;
         NewImageDataPatr->ImageBulkData.SubresourceFootprints.resize(numSubResources);
-        if (IsUseVulkan())
+        // Canonical CPU representation, independent of the eventual GPU API.
         {
             for (int32 i = 0; i < numSubResources; ++i)
             {
@@ -175,71 +173,6 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
                 }
             }
         }
-        else
-        {
-            D3D12_PLACED_SUBRESOURCE_FOOTPRINT* layouts = (D3D12_PLACED_SUBRESOURCE_FOOTPRINT*)_alloca(sizeof(D3D12_PLACED_SUBRESOURCE_FOOTPRINT) * numSubResources);
-            uint32* numRows = (uint32*)_alloca(sizeof(uint32) * numSubResources);
-            uint64* rowSizes = (uint64*)_alloca(sizeof(uint64) * numSubResources);
-
-            uint64 textureMemSize = 0;
-            const bool is3D = image.GetMetadata().dimension == DirectX::TEX_DIMENSION_TEXTURE3D;
-
-            D3D12_RESOURCE_DESC textureDesc = { };
-            textureDesc.MipLevels = uint16(image.GetMetadata().mipLevels);
-            textureDesc.Format = image.GetMetadata().format;
-            textureDesc.Width = uint32(image.GetMetadata().width);
-            textureDesc.Height = uint32(image.GetMetadata().height);
-            textureDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-            textureDesc.DepthOrArraySize = is3D ? uint16(image.GetMetadata().depth) : uint16(image.GetMetadata().arraySize);
-            textureDesc.SampleDesc.Count = 1;
-            textureDesc.SampleDesc.Quality = 0;
-            textureDesc.Dimension = is3D ? D3D12_RESOURCE_DIMENSION_TEXTURE3D : D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-            textureDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-            textureDesc.Alignment = 0;
-            g_rhi_dx12->Device->GetCopyableFootprints(&textureDesc, 0, uint32(numSubResources), 0, layouts, numRows, rowSizes, &textureMemSize);
-
-            for (int32 i = 0; i < numSubResources; ++i)
-            {
-                NewImageDataPatr->ImageBulkData.SubresourceFootprints[i].Depth = layouts[i].Footprint.Depth;
-                NewImageDataPatr->ImageBulkData.SubresourceFootprints[i].Width = layouts[i].Footprint.Width;
-                NewImageDataPatr->ImageBulkData.SubresourceFootprints[i].Height = layouts[i].Footprint.Height;
-                NewImageDataPatr->ImageBulkData.SubresourceFootprints[i].RowPitch = layouts[i].Footprint.RowPitch;
-                NewImageDataPatr->ImageBulkData.SubresourceFootprints[i].Format = layouts[i].Footprint.Format;
-                NewImageDataPatr->ImageBulkData.SubresourceFootprints[i].Offset = layouts[i].Offset;
-            }
-
-            NewImageDataPatr->ImageBulkData.ImageData.resize(textureMemSize);
-            uint8* uploadMem = &NewImageDataPatr->ImageBulkData.ImageData[0];
-            for (uint64 arrayIdx = 0; arrayIdx < image.GetMetadata().arraySize; ++arrayIdx)
-            {
-                for (uint64 mipIdx = 0; mipIdx < image.GetMetadata().mipLevels; ++mipIdx)
-                {
-                    const uint64 subResourceIdx = mipIdx + (arrayIdx * image.GetMetadata().mipLevels);
-                    NewImageDataPatr->ImageBulkData.SubresourceFootprints[subResourceIdx].MipLevel = (uint32)mipIdx;
-
-                    const D3D12_PLACED_SUBRESOURCE_FOOTPRINT& subResourceLayout = layouts[subResourceIdx];
-                    const uint64 subResourceHeight = numRows[subResourceIdx];
-                    const uint64 subResourcePitch = subResourceLayout.Footprint.RowPitch;
-                    const uint64 subResourceDepth = subResourceLayout.Footprint.Depth;
-                    uint8* dstSubResourceMem = reinterpret_cast<uint8*>(uploadMem) + subResourceLayout.Offset;
-
-                    for (uint64 z = 0; z < subResourceDepth; ++z)
-                    {
-                        const DirectX::Image* subImage = image.GetImage(mipIdx, arrayIdx, z);
-                        check(subImage != nullptr);
-                        const uint8* srcSubResourceMem = subImage->pixels;
-
-                        for (uint64 y = 0; y < subResourceHeight; ++y)
-                        {
-                            memcpy(dstSubResourceMem, srcSubResourceMem, Min(subResourcePitch, subImage->rowPitch));
-                            dstSubResourceMem += subResourcePitch;
-                            srcSubResourceMem += subImage->rowPitch;
-                        }
-                    }
-                }
-            }
-        }
-
         NewImageDataPatr->MipLevel = (int32)image.GetMetadata().mipLevels;
         NewImageDataPatr->LayerCount = (int32)image.GetMetadata().arraySize;
         NewImageDataPatr->Width = (int32)image.GetMetadata().width;
@@ -253,28 +186,104 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
         }
     }
 
-    {
-        jScopedLock s(&CachedImageDataLock);
-        CachedImageDataMap[filename] = NewImageDataPatr;
-    }
     return NewImageDataPatr;
 }
 
 std::weak_ptr<jTexture> jImageFileLoader::LoadTextureFromFile(const jName& filename)
 {
-    jScopedLock lock(&CachedTextureLock);
-    auto it_find = CachedTextureMap.find(filename);
-    if (CachedTextureMap.end() != it_find)
-        return it_find->second;
+    {
+        std::lock_guard<std::mutex> lock(CachedTextureLock);
+        const auto cached = CachedTextureMap.find(filename);
+        if (cached != CachedTextureMap.end())
+            return cached->second;
+    }
+    return LoadTextureFromImageData(LoadImageDataFromFile(filename).lock());
+}
 
-    std::shared_ptr<jTexture> NewTexture;
-
-    const auto imageData = LoadImageDataFromFile(filename).lock();
+std::weak_ptr<jTexture> jImageFileLoader::LoadTextureFromImageData(const std::shared_ptr<jImageData>& imageData)
+{
     if (!imageData)
         return {};
-    NewTexture = g_rhi->CreateTextureFromData(imageData.get());
+    {
+        std::lock_guard<std::mutex> lock(CachedTextureLock);
+        const auto cached = CachedTextureMap.find(imageData->Filename);
+        if (cached != CachedTextureMap.end())
+            return cached->second;
+        const auto current = std::this_thread::get_id();
+        if (GMainThreadID != std::thread::id() && current != GMainThreadID)
+            return {};
+        if (TextureOwnerThread == std::thread::id())
+            TextureOwnerThread = current;
+        if (TextureOwnerThread != current)
+            return {};
+    }
+    if (!g_rhi)
+        return {};
 
-    if (NewTexture)
-        CachedTextureMap[filename] = NewTexture;
-    return NewTexture;
+    // Device-specific copy layouts belong to GPU finalization, never CPU decode.
+    std::unique_ptr<jImageData> upload;
+    const jImageData* textureData = imageData.get();
+    if (!IsUseVulkan())
+    {
+        if (!g_rhi_dx12 || !g_rhi_dx12->Device || imageData->ImageBulkData.SubresourceFootprints.empty())
+            return {};
+        const auto& source = imageData->ImageBulkData;
+        const uint32 count = static_cast<uint32>(source.SubresourceFootprints.size());
+        std::vector<D3D12_PLACED_SUBRESOURCE_FOOTPRINT> layouts(count);
+        std::vector<uint32> rows(count);
+        std::vector<uint64> rowSizes(count);
+        D3D12_RESOURCE_DESC desc{};
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        desc.Width = imageData->Width;
+        desc.Height = imageData->Height;
+        desc.DepthOrArraySize = static_cast<uint16>(imageData->LayerCount);
+        desc.MipLevels = static_cast<uint16>(imageData->MipLevel);
+        desc.Format = static_cast<DXGI_FORMAT>(source.SubresourceFootprints[0].Format);
+        desc.SampleDesc.Count = 1;
+        uint64 size = 0;
+        g_rhi_dx12->Device->GetCopyableFootprints(&desc, 0, count, 0,
+            layouts.data(), rows.data(), rowSizes.data(), &size);
+        if (size == UINT64_MAX || size > SIZE_MAX)
+            return {};
+        upload = std::make_unique<jImageData>();
+        upload->CreateMipmapIfPossible = imageData->CreateMipmapIfPossible;
+        upload->sRGB = imageData->sRGB;
+        upload->Width = imageData->Width;
+        upload->Height = imageData->Height;
+        upload->MipLevel = imageData->MipLevel;
+        upload->LayerCount = imageData->LayerCount;
+        upload->Filename = imageData->Filename;
+        upload->Format = imageData->Format;
+        upload->FormatType = imageData->FormatType;
+        upload->TextureType = imageData->TextureType;
+        upload->ImageBulkData.SubresourceFootprints = source.SubresourceFootprints;
+        upload->ImageBulkData.ImageData.assign(static_cast<size_t>(size), 0);
+        for (uint32 i = 0; i < count; ++i)
+        {
+            const auto& src = source.SubresourceFootprints[i];
+            if (src.Offset > source.ImageData.size() || !src.RowPitch
+                || rows[i] > (source.ImageData.size() - src.Offset) / src.RowPitch
+                || rowSizes[i] > src.RowPitch)
+                return {};
+            auto& dst = upload->ImageBulkData.SubresourceFootprints[i];
+            dst.Offset = layouts[i].Offset;
+            dst.Width = layouts[i].Footprint.Width;
+            dst.Height = layouts[i].Footprint.Height;
+            dst.Depth = layouts[i].Footprint.Depth;
+            dst.RowPitch = layouts[i].Footprint.RowPitch;
+            dst.Format = layouts[i].Footprint.Format;
+            for (uint32 row = 0; row < rows[i]; ++row)
+                memcpy(upload->ImageBulkData.ImageData.data() + dst.Offset + size_t(row) * dst.RowPitch,
+                    source.ImageData.data() + src.Offset + size_t(row) * src.RowPitch,
+                    static_cast<size_t>(rowSizes[i]));
+        }
+        textureData = upload.get();
+    }
+    auto texture = g_rhi->CreateTextureFromData(textureData);
+    if (texture)
+    {
+        std::lock_guard<std::mutex> lock(CachedTextureLock);
+        CachedTextureMap.emplace(imageData->Filename, texture);
+    }
+    return texture;
 }

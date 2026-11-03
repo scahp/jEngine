@@ -9,9 +9,11 @@ jImageFileLoader::jImageFileLoader() = default;
 jImageFileLoader::~jImageFileLoader() = default;
 std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& filename)
 {
-    jScopedLock lock(&CachedImageDataLock);
-    auto it = CachedImageDataMap.find(filename);
-    if (it != CachedImageDataMap.end()) return it->second;
+    return GetOrDecodeImage(filename);
+}
+
+std::shared_ptr<jImageData> jImageFileLoader::DecodeImageData(const jName& filename)
+{
     auto data = std::make_shared<jImageData>();
     data->Filename = filename;
     auto extension = std::filesystem::path(filename.ToStr()).extension().string();
@@ -60,7 +62,6 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
                 data->ImageBulkData.SubresourceFootprints.push_back(footprint);
             }
         }
-        CachedImageDataMap[filename] = data;
         return data;
     }
     int channels = 0;
@@ -78,24 +79,43 @@ std::weak_ptr<jImageData> jImageFileLoader::LoadImageDataFromFile(const jName& f
     auto& footprint = data->ImageBulkData.SubresourceFootprints[0];
     footprint.Width = data->Width; footprint.Height = data->Height;
     footprint.RowPitch = pitch; footprint.Offset = 0; footprint.Depth = 0; footprint.MipLevel = 0;
-    CachedImageDataMap[filename] = data;
     return data;
 }
 std::weak_ptr<jTexture> jImageFileLoader::LoadTextureFromFile(const jName& filename)
 {
-    jScopedLock lock(&CachedTextureLock);
-    auto it_find = CachedTextureMap.find(filename);
-    if (CachedTextureMap.end() != it_find)
-        return it_find->second;
+    {
+        std::lock_guard<std::mutex> lock(CachedTextureLock);
+        const auto cached = CachedTextureMap.find(filename);
+        if (cached != CachedTextureMap.end())
+            return cached->second;
+    }
+    return LoadTextureFromImageData(LoadImageDataFromFile(filename).lock());
+}
 
-    std::shared_ptr<jTexture> NewTexture;
-
-    const auto imageData = LoadImageDataFromFile(filename).lock();
+std::weak_ptr<jTexture> jImageFileLoader::LoadTextureFromImageData(const std::shared_ptr<jImageData>& imageData)
+{
     if (!imageData)
         return {};
-    NewTexture = g_rhi->CreateTextureFromData(imageData.get());
-
-    if (NewTexture)
-        CachedTextureMap[filename] = NewTexture;
-    return NewTexture;
+    {
+        std::lock_guard<std::mutex> lock(CachedTextureLock);
+        const auto cached = CachedTextureMap.find(imageData->Filename);
+        if (cached != CachedTextureMap.end())
+            return cached->second;
+        const auto current = std::this_thread::get_id();
+        if (GMainThreadID != std::thread::id() && current != GMainThreadID)
+            return {};
+        if (TextureOwnerThread == std::thread::id())
+            TextureOwnerThread = current;
+        if (TextureOwnerThread != current)
+            return {};
+    }
+    if (!g_rhi)
+        return {};
+    auto texture = g_rhi->CreateTextureFromData(imageData.get());
+    if (texture)
+    {
+        std::lock_guard<std::mutex> lock(CachedTextureLock);
+        CachedTextureMap.emplace(imageData->Filename, texture);
+    }
+    return texture;
 }

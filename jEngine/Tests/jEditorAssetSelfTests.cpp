@@ -118,6 +118,7 @@ int RunEditorAssetSelfTests()
         jEditor editor;
         g_Editor = &editor;
         auto& placement = editor.Placement;
+        placement.EnablePlacementMode = true;
         jCamera camera;
         jObject first, second;
         ResetAllKeyState();

@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "Core/jName.h"
 #include "Core/TInstantStruct.h"
+#include <atomic>
 
 // Shader Permutation Define
 #define DECLARE_DEFINE(Name, ...) \
@@ -191,7 +192,7 @@ struct jBilateralFilteringCSParameters;
 
 struct jShader : public std::enable_shared_from_this<jShader>
 {
-    static bool IsRunningCheckUpdateShaderThread;
+    static std::atomic_bool IsRunningCheckUpdateShaderThread;
     static std::thread CheckUpdateShaderThread;
     static std::vector<jShader*> WaitForUpdateShaders;
     static std::map<const jShader*, std::vector<size_t>> gConnectedPipelineStateHash;

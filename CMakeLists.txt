@@ -29,7 +29,7 @@ add_executable(jEngine ${ENGINE_SOURCES} ${EASTL_SOURCES}
   jEngine/External/PathTracingDataLoader/GLTFLoader.cpp
   jEngine/External/PathTracingDataLoader/jPathTracingData.cpp
   jEngine/External/PathTracingDataLoader/PathTracingDataLoader.cpp)
-target_include_directories(jEngine PRIVATE jEngine jEngine/External
+target_include_directories(jEngine PRIVATE jEngine/External/spdlog/include jEngine jEngine/External
   jEngine/External/IMGUI jEngine/External/EASTL/include jEngine/External/EABase/include/Common
   jEngine/External/stb jEngine/External/loadpng jEngine/External/TinyXml2
   jEngine/External/xxHash jEngine/External/tracy/public)

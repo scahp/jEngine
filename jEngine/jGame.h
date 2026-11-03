@@ -1,4 +1,7 @@
 #pragma once
+#include <memory>
+#include <string>
+#include <cstdint>
 
 #include <string>
 #include <vector>
@@ -17,6 +20,8 @@ struct IAtomicCounterBuffer;
 struct jTexture;
 struct jFrameBuffer;
 class jObject;
+class jMeshObject;
+class jAssetImportService;
 class jPipelineSet;
 class jCascadeDirectionalLight;
 
@@ -80,6 +85,10 @@ public:
 	void SetSelectedPathTracingSceneLoader(ESceneLoader InLoader);
 	void RequestLoadSelectedPathTracingScene();
 	bool CanLoadSelectedPathTracingScene() const;
+    bool IsSceneImportPending() const { return PendingImportId != 0; }
+    const std::string& GetSceneImportStatus() const { return SceneImportStatus; }
+    void CancelSceneImport();
+    bool WaitForSceneImportForTesting(uint32 timeoutMilliseconds = 30000);
 
 	jCamera* MainCamera = nullptr;
 
@@ -107,8 +116,13 @@ private:
 	void ClearSceneBrowserLoadedObjects();
 	void ClearSceneBrowserLoadedLights();
 	int32 FindPathTracingSceneIndexById(const std::string& InSceneId) const;
-	void LoadPathTracingSceneByIndex(int32 InIndex, bool InRebuildRaytracingScene);
+	void LoadPathTracingSceneByIndex(int32 InIndex, bool InRebuildRaytracingScene, jMeshObject* preparedModel = nullptr);
+    void ProcessSceneImports();
 
+    std::unique_ptr<jAssetImportService> AssetImports;
+    std::uint64_t PendingImportId = 0;
+    std::string PendingImportSceneId;
+    std::string SceneImportStatus;
 	jPathTracingSceneBrowserState PathTracingSceneBrowser;
 	std::vector<jObject*> SceneBrowserLoadedObjects;
 	std::vector<jLight*> SceneBrowserLoadedLights;

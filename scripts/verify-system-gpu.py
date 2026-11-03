@@ -31,8 +31,9 @@ def main():
             resource_dir = output / 'resources'
             subprocess.run([sys.executable, str(root / 'scripts/verify-surfel-gi.py'), '--engine', str(engine), '--icd', str(icd),
                             '--mode', 'on', '--output', str(resource_dir)], cwd=root,
-                           env={**env, 'JENGINE_TEST_VULKAN_RESOURCES': '1'}, check=True, timeout=360)
+                           env={**env, 'JENGINE_TEST_VULKAN_RESOURCES': '1', 'JENGINE_TEST_WAIT_FOR_SCENE': '1', 'JENGINE_BENCHMARK_SCENE_MARKERS': '1'}, check=True, timeout=360)
             resource_log = (resource_dir / 'on.log').read_text()
+            assert 'Scene import published:' in resource_log, 'new async Model import did not publish'
             assert 'readback_words=256 mismatches=0 submitted_fence_signaled=1' in resource_log
             updates = re.findall(r'tlas_update_frame=(\d+) advanced=(\d+)', resource_log)
             assert {31, 61, 91} <= {int(frame) for frame, advanced in updates if advanced == '1'}, updates
@@ -44,7 +45,7 @@ def main():
             log_path = output / f'effects-{mode}.log'
             effects_env = {**env, 'VK_DRIVER_FILES': str(icd), 'MVK_CONFIG_ENABLE_EXPERIMENTAL_RAY_TRACING': '1',
                            'MVK_CONFIG_LOG_LEVEL': '2', 'VK_INSTANCE_LAYERS': 'VK_LAYER_KHRONOS_validation', 'MTL_DEBUG_LAYER': '1',
-                           'JENGINE_TEST_EFFECTS': mode, 'JENGINE_MAX_FRAMES': '120', 'JENGINE_FIXED_TIMESTEP': '0.016666667',
+                           'JENGINE_TEST_EFFECTS': mode, 'JENGINE_MAX_FRAMES': '120', 'JENGINE_TEST_WAIT_FOR_SCENE': '1', 'JENGINE_FIXED_TIMESTEP': '0.016666667',
                            'JENGINE_CAPTURE_FRAME': str(capture)}
             with log_path.open('w') as log:
                 subprocess.run([str(engine), '-vulkan'], cwd=root / 'jEngine', env=effects_env,

@@ -41,6 +41,7 @@ full texts or establish the provenance of separately bundled binary builds.
 
 | Library | Notices in this repository |
 | --- | --- |
+| spdlog (with bundled fmt headers) | [MIT license](jEngine/External/spdlog/LICENSE), [source and pinned commit](jEngine/External/spdlog/UPSTREAM.md); bundled fmt headers retain their upstream notices |
 | tinyddsloader | [MIT license](jEngine/External/tinyddsloader/LICENCE), [source and pinned commit](jEngine/External/tinyddsloader/UPSTREAM.md) |
 | EABase | [License](jEngine/External/EABase/LICENSE) |
 | EASTL | [License](jEngine/External/EASTL/LICENSE), [third-party licenses](jEngine/External/EASTL/3RDPARTYLICENSES.TXT) |

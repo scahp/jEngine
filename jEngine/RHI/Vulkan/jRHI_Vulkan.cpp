@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "Core/jLog.h"
 
 #include "jRHI_Vulkan.h"
 
@@ -109,7 +110,11 @@ bool jRHI_Vulkan::InitRHI()
     }
 
 #endif
-    glfwSetErrorCallback([](int code, const char* description) { std::cerr << "GLFW " << code << ": " << description << std::endl; });
+    glfwSetErrorCallback([](int code, const char* description) {
+        const auto message = "GLFW " + std::to_string(code) + ": " + (description ? description : "unknown error");
+        jLog::Get().Write(EjLogLevel::Error, "Window", message);
+        std::cerr << message << std::endl;
+    });
     if (!glfwInit()) return false;
     std::cout << "GLFW initialized: " << glfwGetVersionString() << std::endl;
 
@@ -878,11 +883,6 @@ std::shared_ptr<jTexture> jRHI_Vulkan::CreateTextureFromData(const jImageData* I
     {
         MipLevel = jTexture::GetMipLevels(InImageData->Width, InImageData->Height);
     }
-
-	auto stagingBufferPtr = jBufferUtil_Vulkan::CreateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT
-        , InImageData->ImageBulkData.ImageData.size(), EResourceLayout::TRANSFER_SRC);
-
-	stagingBufferPtr->UpdateBuffer(&InImageData->ImageBulkData.ImageData[0], InImageData->ImageBulkData.ImageData.size());
 
 	std::shared_ptr<jTexture_Vulkan> TexturePtr;
 	if (InImageData->TextureType == ETextureType::TEXTURE_CUBE)

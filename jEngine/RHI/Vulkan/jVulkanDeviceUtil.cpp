@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "jVulkanDeviceUtil.h"
 #include "jOptions.h"
+#include "Core/jLog.h"
 
 namespace jVulkanDeviceUtil
 {
@@ -29,7 +30,11 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBits
     // pUserData
     // callback 설정시에 전달한 포인터 데이터
 
-    std::cerr << "validation layer : " << pCallbackData->pMessage << std::endl;
+    const char* message = pCallbackData && pCallbackData->pMessage ? pCallbackData->pMessage : "Missing Vulkan validation message";
+    const auto level = messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT ? EjLogLevel::Error
+        : messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT ? EjLogLevel::Warning : EjLogLevel::Debug;
+    jLog::Get().Write(level, "Vulkan.Validation", message);
+    std::cerr << "validation layer : " << message << std::endl;
 
     // VK_TRUE 리턴시 VK_ERROR_VALIDATION_FAILED_EXT 와 validation layer message 가 중단된다.
     // 이것은 보통 validation layer 를 위해 사용하므로, 사용자는 항상 VK_FALSE 사용.
