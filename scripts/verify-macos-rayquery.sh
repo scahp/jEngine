@@ -17,10 +17,10 @@ for mode in on off toggle stable; do
     JENGINE_SURFEL_DIAGNOSTICS=1 JENGINE_FIXED_TIMESTEP=0.016666667 JENGINE_MAX_FRAMES=120 \
     JENGINE_CAPTURE_FRAME="$out/surfel-$mode.png" \
     "$out/jEngine" -vulkan > "$out/surfel-$mode.log" 2>&1
-  if rg -q 'Validation (Error|Warning):|\[mvk-error\]|failed assertion|error:' "$out/surfel-$mode.log"; then
+  if grep -Eq 'Validation (Error|Warning):|\[mvk-error\]|failed assertion|error:' "$out/surfel-$mode.log"; then
     echo "Validation failed ($mode): $out/surfel-$mode.log" >&2; exit 1
   fi
-  rg -q 'jEngine clean shutdown; rendered frames: 120' "$out/surfel-$mode.log"
+  grep -Eq 'jEngine clean shutdown; rendered frames: 120' "$out/surfel-$mode.log"
   echo "Rendering/validation passed: $mode"
 done
 python3 - "$root" <<'PY'

@@ -143,7 +143,8 @@ DXC is pinned in `scripts/ci/dependencies.json`. macOS builds it once per cache
 key and shares its native executable/library between the build configurations;
 Windows verifies the official release ZIP's SHA-256. macOS object compilation
 uses a bounded 256 MB ccache per configuration. Workflow actions are pinned to
-commit SHAs, permissions are read-only, and superseded runs are cancelled.
+commit SHAs and permissions are read-only. Windows superseded runs are cancelled;
+macOS lets the active run finish so its first native-DXC build can populate the cache.
 
 Each configuration uploads build outputs and diagnostics even after a failure:
 compiler logs, CTest XML on macOS, MSBuild logs/binlog on Windows, generated HLSL,

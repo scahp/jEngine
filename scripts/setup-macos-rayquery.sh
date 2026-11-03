@@ -31,8 +31,8 @@ clang++ -std=c++17 -I"$brew_root/include" "$root/platform/macos/tests/ray-query-
 VK_DRIVER_FILES="$out/MoltenVK_icd.json" MVK_CONFIG_ENABLE_EXPERIMENTAL_RAY_TRACING=1 \
 VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation MTL_DEBUG_LAYER=1 MVK_CONFIG_LOG_LEVEL=2 \
   "$out/ray-query-probe" "$out/ray-query.spv" > "$out/ray-query-probe.log" 2>&1
-if ! rg -q 'rays=256 hits=32 mismatches=0' "$out/ray-query-probe.log" || \
-   rg -q 'Validation (Error|Warning):|\[mvk-error\]|failed assertion' "$out/ray-query-probe.log"; then
+if ! grep -Eq 'rays=256 hits=32 mismatches=0' "$out/ray-query-probe.log" || \
+   grep -Eq 'Validation (Error|Warning):|\[mvk-error\]|failed assertion' "$out/ray-query-probe.log"; then
   echo "Ray-query probe failed; inspect $out/ray-query-probe.log" >&2
   exit 1
 fi
