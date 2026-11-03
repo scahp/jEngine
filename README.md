@@ -90,6 +90,9 @@ code push and on PRs targeting `main`. Build artifacts and logs are kept for fiv
 [Workflows](https://github.com/scahp/jEngine/actions) · [Details](docs/platform-and-ci.md#github-actions-ci)
 
 ## Third party libraries
+
+See [third-party notices](THIRD_PARTY_NOTICES.md).
+
 1. ImGUI : https://github.com/ocornut/imgui
 2. assimp : https://github.com/assimp/assimp
 3. cityhash : https://github.com/google/cityhash

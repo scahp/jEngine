@@ -134,7 +134,8 @@ CMake 4.2+ for the Visual Studio 2026 generator, MSVC x64, and Python 3. Configu
 with `cmake --preset windows-vs2026`; build/test with `windows-debug` or
 `windows-release`. The generated solution lives in `build/windows-vs2026/`.
 The CMake target includes both DX12 and Vulkan, retains Tracy, uses the bundled
-Windows dependencies, and copies runtime DLLs beside the executable, preserving
+Windows dependencies and the selected DXC package's `dxcompiler.dll`/`dxil.dll`,
+and copies runtime DLLs beside the executable, preserving
 the Agility SDK's `D3D12/` subdirectory. The IDE working directory is `jEngine/`
 for existing asset paths. CPU and shader tests use the same CTest interface as
 macOS and do not require a GPU or a Vulkan driver on the runner.
@@ -152,3 +153,13 @@ SPIR-V/DXIL, and the shader-contract JSON report. Artifacts expire after five da
 The binaries are developer build artifacts, not self-contained installers: scene
 assets, runtime dependency bundling, signing, and release publication are a
 separate packaging step. No release or self-hosted runner is created by this CI.
+
+The preserved `jEngine.vcxproj` also requires `scripts/ci/setup-windows-dxc.ps1`
+before building; `JEngineDxcDirectory` can select an alternative matching package.
+Windows CI checks CMake and the native project in both configurations. Runtime
+shader smoke checks compile real generated resolve/gather source through the
+application wrapper and check the loaded compiler path/version. CMake builds also
+compare the deployed DLL bytes with the selected package.
+The CMake runtime dependency refreshes the DLL pair even when no source relink is needed.
+
+See [the full-system audit](system-audit.md) for repairs, regression coverage and limits.
