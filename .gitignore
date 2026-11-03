@@ -342,3 +342,8 @@ jEngine/imgui.ini
 # Local studio coordination and developer-specific presets
 /.jaeho-studio/
 /CMakeUserPresets.json
+
+# CI tool distributions and Python bytecode
+/.ci-tools/
+/.ci-cache/
+__pycache__/

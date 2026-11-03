@@ -1,0 +1,28 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {"major": 3, "minor": 25, "patch": 0},
+  "configurePresets": [
+    {
+      "name": "macos-base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {"BUILD_TESTING": "ON", "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"},
+      "condition": {"type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin"}
+    },
+    {"name": "macos-debug", "inherits": "macos-base", "cacheVariables": {"CMAKE_BUILD_TYPE": "Debug"}},
+    {"name": "macos-release", "inherits": "macos-base", "cacheVariables": {"CMAKE_BUILD_TYPE": "Release"}}
+  ],
+  "buildPresets": [
+    {"name": "macos-debug", "configurePreset": "macos-debug", "jobs": 2},
+    {"name": "macos-release", "configurePreset": "macos-release", "jobs": 2}
+  ],
+  "testPresets": [
+    {"name": "macos-debug", "configurePreset": "macos-debug", "output": {"outputOnFailure": true}, "execution": {"noTestsAction": "error"}},
+    {"name": "macos-release", "configurePreset": "macos-release", "output": {"outputOnFailure": true}, "execution": {"noTestsAction": "error"}}
+  ],
+  "workflowPresets": [
+    {"name": "macos-debug", "steps": [{"type": "configure", "name": "macos-debug"}, {"type": "build", "name": "macos-debug"}, {"type": "test", "name": "macos-debug"}]},
+    {"name": "macos-release", "steps": [{"type": "configure", "name": "macos-release"}, {"type": "build", "name": "macos-release"}, {"type": "test", "name": "macos-release"}]}
+  ]
+}

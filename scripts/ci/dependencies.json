@@ -1,0 +1,8 @@
+{
+  "dxc": {
+    "tag": "v1.9.2609",
+    "commit": "01b62ad47db7dee3dd33f90e7339cf9e860b3f93",
+    "windows_url": "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.9.2609/dxc_2026_09_29.zip",
+    "windows_sha256": "ad31b1fc8443175d204f77a611fdb3ef2ec42759bdc2f1167368de24a4a7e7f1"
+  }
+}

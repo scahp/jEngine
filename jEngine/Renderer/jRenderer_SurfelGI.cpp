@@ -2560,3 +2560,57 @@ void DumpSurfelGIDiagnostics()
               << " lit=" << lit << " invalid=" << invalid << " energy=" << energy << " history=" << history << std::endl;
 }
 #endif
+
+namespace
+{
+    template<typename T>
+    void WriteShaderTypeContract(std::ostream& out, bool& first)
+    {
+        if (!first) out << ",\n";
+        first = false;
+        out << "\"" << T::GetShaderUniformBufferTypeName() << "\":{\"size\":" << sizeof(T) << ",\"fields\":{";
+        bool firstField = true;
+        for (const auto& field : T::GetShaderUniformBufferFieldMembers()) {
+            if (!firstField) out << ",";
+            firstField = false;
+            out << "\"" << field.Name << "\":" << field.ByteOffset;
+        }
+        out << "}}";
+    }
+}
+
+// Export real generated declarations without initializing a window, device or GPU.
+int ExportSurfelGIShaderFixtures(const char* directory, bool vulkan)
+{
+    try {
+        gAPIType = vulkan ? EAPIType::Vulkan : EAPIType::DX12;
+        const std::filesystem::path target(directory);
+        std::filesystem::create_directories(target);
+        auto write = [&](const char* name, const std::string& declarations, const char* shader, const char* defines = "") {
+            std::ofstream file(target / (std::string(name) + ".hlsl"));
+            file.exceptions(std::ios::badbit | std::ios::failbit);
+            file << "#define COMPUTE_SHADER 1\n#define PIXEL_SHADER 0\n" << defines << declarations
+                 << "\n#include \"" << shader << "\"\n";
+        };
+        write("resolve", jShaderParameterSet::GenerateHLSL<jSurfelGIResolveCSParameters>(0), "SurfelGIResolve_cs.hlsl");
+        write("placement", jShaderParameterSet::GenerateHLSL<jSurfelGIPlaceCandidatesCSParameters>(0), "SurfelGIPlaceCandidates_cs.hlsl");
+        write("gather", jShaderParameterSet::GenerateHLSL<jSurfelGIHWRTDIGlobalParameters>(0)
+            + jShaderParameterSet::GenerateHLSL<jSurfelGIHWRTDIGatherParameters>(1)
+            + jShaderBindlessSet::GenerateHLSL<jSurfelGIHWRTDIBindlessParameters>(2), "HWRT_DI.hlsl",
+            "#define USE_SURFEL_GI 1\n#define USE_BINDLESS_RESOURCE 1\n");
+        std::ofstream contract(target / "cpu-layout.json");
+        contract.exceptions(std::ios::badbit | std::ios::failbit);
+        contract << "{\n"; bool first = true;
+        WriteShaderTypeContract<jSurfelGPU>(contract, first);
+        WriteShaderTypeContract<jSurfelIrradianceGPU>(contract, first);
+        WriteShaderTypeContract<jSurfelGIUniformBuffer>(contract, first);
+        WriteShaderTypeContract<jSurfelGIResolveUniformBuffer>(contract, first);
+        WriteShaderTypeContract<jSurfelGIInlineRayGatherUniformBuffer>(contract, first);
+        contract << "\n}\n";
+        std::cout << "Exported shader fixtures: " << target << std::endl;
+        return EXIT_SUCCESS;
+    } catch (const std::exception& error) {
+        std::cerr << "Shader fixture export failed: " << error.what() << std::endl;
+        return EXIT_FAILURE;
+    }
+}

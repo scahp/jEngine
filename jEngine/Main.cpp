@@ -32,11 +32,17 @@ void window_size_callback(GLFWwindow* window, int width, int height);
 #include "Math/Matrix.h"
 #include "Math/Vector.h"
 
+int RunCpuSelfTests();
+int ExportSurfelGIShaderFixtures(const char* directory, bool vulkan);
+
 int main(int argc, char** argv)
 {
     std::string commandLine;
     for (int i = 1; i < argc; ++i) { commandLine += argv[i]; commandLine += " "; }
     gCommandLineArgument.Init(commandLine.c_str());
+    if (argc >= 2 && std::strcmp(argv[1], "--ci-cpu") == 0) return RunCpuSelfTests();
+    if (argc >= 3 && std::strcmp(argv[1], "--ci-export-shaders") == 0)
+        return ExportSurfelGIShaderFixtures(argv[2], argc < 4 || std::strcmp(argv[3], "dx12") != 0);
 	GMainThreadID = std::this_thread::get_id();
 
 	g_Engine = new jEngine();

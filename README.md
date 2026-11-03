@@ -157,3 +157,49 @@ padding explicitly. This keeps scalar-layout SPIR-V compatible with aligned CPU
 uniforms and structured buffers. The previous mismatch produced valid surfel
 samples but a black GI resolve output. Bindless index buffers likewise use Vulkan
 storage-buffer declarations while retaining DX12 typed-buffer declarations.
+
+## GitHub Actions CI
+
+`Build and test` runs on pull requests targeting `main`, pushes to `main`, and
+manual dispatch. It uses standard public-repository GitHub-hosted runners:
+
+- Windows Server 2025 / Visual Studio 2026: the existing `jEngine.vcxproj`, x64
+  Debug and Release. The separate Tracy profiler application is not part of CI.
+- macOS 26 / Apple Silicon: CMake/Ninja Debug and Release.
+- Both platforms run `--ci-cpu` and compile actual engine-generated SurfelGI
+  placement, resolve, and inline-gather declarations to SPIR-V and DXIL. The
+  SPIR-V member offsets and structured-buffer strides are compared with C++
+  metadata. A deliberately unaligned control shader must be rejected.
+
+These tests return before window/device initialization. They validate builds,
+CPU math, shader generation, and layout contracts; they do not claim that a
+hosted runner rendered a frame or exercised M4 hardware ray tracing. Real GPU
+verification remains available through `scripts/verify-macos-rayquery.sh` on the
+M4 and is not automatically scheduled on this personal computer.
+
+Local CMake presets use the same configure/build/test commands as macOS CI:
+
+```sh
+cmake --preset macos-debug -DJENGINE_DXC_EXECUTABLE=/path/to/dxc
+cmake --build --preset macos-debug
+ctest --preset macos-debug
+# Or configure, build and test in one command after configuring DXC discovery:
+cmake --workflow --preset macos-release
+```
+
+`CMakeUserPresets.json` is ignored for machine-specific overrides. Windows CMake
+engine support is still pending; its CI intentionally exercises the existing
+Visual Studio project rather than pretending the macOS target is portable.
+
+DXC is pinned in `scripts/ci/dependencies.json`. macOS builds it once per cache
+key and shares its native executable/library between the build configurations;
+Windows verifies the official release ZIP's SHA-256. macOS object compilation
+uses a bounded 256 MB ccache per configuration. Workflow actions are pinned to
+commit SHAs, permissions are read-only, and superseded runs are cancelled.
+
+Each configuration uploads build outputs and diagnostics even after a failure:
+compiler logs, CTest XML on macOS, MSBuild logs/binlog on Windows, generated HLSL,
+SPIR-V/DXIL, and the shader-contract JSON report. Artifacts expire after five days.
+The binaries are developer build artifacts, not self-contained installers: scene
+assets, runtime dependency bundling, signing, and release publication are a
+separate packaging step. No release or self-hosted runner is created by this CI.
