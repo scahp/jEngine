@@ -12,5 +12,6 @@
   "decode_fixture": "24 distinct PNG paths, same 1024x1024 RGBA pixel data; cold engine cache each trial, OS page cache warm",
   "ui": "actual RenderUI, 100/1000/10000 null-payload registered rows; 30 warmup + 120 measured frames, no GPU",
   "console": "same production-console headless driver; before unbounded retention, after capped1024+clipping; file sink disabled for paired UI measurement",
-  "frames": "same saved model scene, new publication marker required before frame120; frames120to360 walltime average; alternating3runs; initialized time is not scene-ready time"
+  "frames": "Same saved Model scene ready before first draw in both engines; 120 full scene frames warmup, frames120to360 walltime average, alternating3runs; initialized markers have different preload semantics and are not compared.",
+  "background_trace": "Separate earlier 3 before/after normal asynchronous restore traces are retained for publication evidence only; differing pre-publication frame counts confound temporal histories."
 }

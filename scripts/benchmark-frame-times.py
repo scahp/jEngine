@@ -13,12 +13,13 @@ import threading
 import time
 
 
-def run(engine, icd, directory, label, trial, root, require_publication):
+def run(engine, icd, directory, label, trial, root, require_publication, wait_for_scene):
     env = {k: v for k, v in os.environ.items() if not k.startswith('JENGINE_')}
     env.update(VK_DRIVER_FILES=str(icd), MVK_CONFIG_ENABLE_EXPERIMENTAL_RAY_TRACING='1',
                MVK_CONFIG_LOG_LEVEL='1', JENGINE_MAX_FRAMES='360',
                JENGINE_FIXED_TIMESTEP='0.016666667', JENGINE_SURFEL_GI='1', JENGINE_INLINE_RAY='1',
-               JENGINE_LOG_FILE=str(directory / f'{label}-{trial}.jsonl'), JENGINE_BENCHMARK_SCENE_MARKERS='1')
+               JENGINE_LOG_FILE=str(directory / f'{label}-{trial}.jsonl'), JENGINE_BENCHMARK_SCENE_MARKERS='1',
+               JENGINE_TEST_WAIT_FOR_SCENE='1' if wait_for_scene else '0')
     env.pop('VK_INSTANCE_LAYERS', None)
     env.pop('MTL_DEBUG_LAYER', None)
     started = time.perf_counter()
@@ -59,13 +60,16 @@ def run(engine, icd, directory, label, trial, root, require_publication):
                     frames[int(match.group(1))] = stamp
                 clean |= 'jEngine clean shutdown; rendered frames: 360' in line
         code = process.wait(timeout=10)
-        if code or not clean or initialized is None or not {120, 360} <= frames.keys():
+        if code or not clean or initialized is None or not {1, 120, 360} <= frames.keys():
             raise RuntimeError(f'{label} failed: exit={code}, frames={list(frames)}')
         if require_publication and (published is None or published > frames[120]):
             raise RuntimeError('Saved scene was not published before the 120-frame measurement boundary')
+        if wait_for_scene and require_publication and published > frames[1]:
+            raise RuntimeError('Controlled benchmark requires publication before the first rendered frame')
         seconds = frames[360] - frames[120]
         return {'label': label, 'trial': trial, 'time_to_initialized_ms': (initialized - started) * 1000,
                 'scene_published_before_measurement': not require_publication or published <= frames[120],
+                'scene_published_before_first_frame': not require_publication or published <= frames[1],
                 'warmup_frames': 120, 'measured_frames': 240,
                 'loop_mean_ms': seconds * 1000 / 240, 'loop_fps': 240 / seconds}
     finally:
@@ -82,6 +86,8 @@ def main():
     parser.add_argument('--icd', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--runs', type=int, default=3)
+    parser.add_argument('--background-import', action='store_true',
+                        help='Trace normal async restore instead of equalizing scene history before frame one')
     args = parser.parse_args()
     if not 1 <= args.runs <= 10:
         parser.error('--runs must be between 1 and 10')
@@ -93,7 +99,8 @@ def main():
               'fixed simulation timestep, sequential alternating processes; no forced validation; '
               '120-frame warmup, 240-frame wall-clock loop average. Includes CPU/GPU/present waits; '
               'not per-frame p95, isolated GPU time or an unconstrained FPS measurement.',
-              'scene': 'Same saved model scene; baseline restores synchronously, new binary must emit a publication marker before frame120.',
+              'scene': 'Same saved Model scene; baseline restores before draw one, new CPU-worker/owner publication is awaited before draw one by default.',
+              'scene_load_mode': 'background' if args.background_import else 'ready-before-first-frame',
               'engine_sha256': {k: hashlib.sha256(v.read_bytes()).hexdigest() for k, v in engines.items()},
               'samples': []}
     settings = root / 'jEngine/jengine.ini'
@@ -107,7 +114,8 @@ def main():
                     settings.write_bytes(original)
                 elif settings.exists():
                     settings.unlink()
-                sample = run(engines[label], args.icd.resolve(), output, label, trial, root, label == 'after' and bool(saved_scene))
+                sample = run(engines[label], args.icd.resolve(), output, label, trial, root,
+                             label == 'after' and bool(saved_scene), not args.background_import)
                 report['samples'].append(sample)
                 print(json.dumps(sample), flush=True)
         report['summary'] = {label: {'median_loop_ms': statistics.median(

@@ -1,9 +1,9 @@
 # Editor foundation: changes and measurements
 
 Measured on 2026-11-04, Apple M4 / 10 logical CPUs / 16 GiB / macOS 26.6.2.
-Measurements compare `ecb49a12` with feature commit `edc270d1`, on
-`codex/editor-foundation`. Windows header/environment compatibility is corrected
-in `98adf5fc`; that follow-up does not change the measured macOS algorithms.
+CPU/UI/log measurements compare `ecb49a12` with feature commit `edc270d1`; the
+controlled render comparison uses `98adf5fc` on `codex/editor-foundation`. The
+latter Windows compatibility fix does not change the macOS algorithms.
 Release builds use `-O3 -DNDEBUG`.
 
 CPU decoding, hierarchy drawing and console contention improved. The largest
@@ -20,9 +20,11 @@ while finalizing a large import.
 | 10,000 scene-list entries, steady UI frame | 1.416583 ms | 0.006000 ms | Cached search plus visible-row clipping; this does not render 10,000 3D assets. |
 | Console draw after 50,000 input records | 13.459709 ms | 0.044083 ms | Old unlimited retention versus a 1,024-record recent view plus clipping. |
 | Concurrent console producer, p99 call latency at that workload | 13.013333 ms | 0.005166 ms | Removes the log producer's wait through UI drawing; file sink disabled in this paired test. |
-| Real rendered loop, median of three mean frame times | 21.034493 ms | 19.914468 ms | Observed 5.3% lower loop time, approximately 47.5 to 50.2 FPS for this scene/driver/display setup. |
+| Real rendered loop, median of three mean frame times | 20.863885 ms | 21.100447 ms | Observed 1.1% slower loop, approximately 47.9 to 47.4 FPS; no full-render gain demonstrated. |
 
-These are workload-specific observations, not an engine-wide speed multiplier.
+These are workload-specific observations. The controlled render measurement
+shows a small slowdown, despite large editor/decoding gains; there is no
+demonstrated engine-wide FPS improvement in this sample.
 The full-render measurement includes CPU work, the existing profiler, GPU work,
 presentation and waits; it is neither isolated GPU time nor per-frame p95.
 
@@ -108,8 +110,14 @@ Other ordinary OS activity was not disabled.
 - Rendering: original preserved baseline and final Release executable, same
   1280x720 scene/INI/driver and fixed simulation timestep. Three alternating
   before/after processes, 120-frame warmup and 240-frame wall-clock measurement.
-  The new async importer must emit its publication marker before the measurement
-  boundary. Time-to-initialized is recorded separately and is not scene-ready time.
+  For this controlled comparison the new importer still uses its CPU worker and
+  owner publication, but a test-only wait finishes it before the first rendered
+  frame. The baseline restores during its first update before the first draw.
+  This equalizes temporal scene history; both then warm up for 120 scene frames.
+  Time-to-initialized has different preload semantics and is not compared.
+  Earlier background-import traces are retained separately as async publication
+  evidence, not as a full-render performance claim. Use `--background-import` to
+  reproduce that distinct trace.
 
 ```sh
 python3 docs/reports/editor-foundation/prepare-fixtures.py
@@ -131,7 +139,8 @@ Versioned evidence: [protocol](editor-foundation/protocol.json),
 [console summary and source hashes](editor-foundation/logging-summary.json),
 [raw console before](editor-foundation/logging-before.jsonl) /
 [after](editor-foundation/logging-after.jsonl),
-[frame samples and executable hashes](editor-foundation/frame-times.json),
+[controlled frame samples and executable hashes](editor-foundation/frame-times.json),
+[background-import traces](editor-foundation/background-import-frame-times.json),
 [import phases](editor-foundation/import-phases.json).
 
 ## Verification
@@ -146,10 +155,11 @@ rotation, errors and draining.
 The M4 GPU test waits for the **new async Model path** to publish the scene, then
 checks 256-word readback with zero mismatches, moving TLAS updates and 120-frame
 SurfelGI/effects runs, including odd/tiny targets. Vulkan/Metal validation reports
-zero errors. Normal async operation is also exercised by the six frame benchmark
-processes, each requiring successful publication before timing.
+zero errors. Normal async operation is also exercised by the six separate background-trace
+processes, each requiring successful publication before its trace window. The
+controlled steady-render comparison uses its own six processes.
 
-Hosted Windows Debug/Release pass for `98adf5fc`, including both CMake and the native project. Hosted macOS Debug/Release pass for feature commit `edc270d1`; the compatibility follow-up is queued for its cached-toolchain run. Results are tracked in [Windows CI](https://github.com/scahp/jEngine/actions/runs/41696951732)
+Hosted Windows and macOS Debug/Release pass for engine commit `98adf5fc`. Windows checks both CMake and the preserved native project. The later measurement-protocol/report update changes no engine C++ code. Results are tracked in [Windows CI](https://github.com/scahp/jEngine/actions/runs/41696951732)
 and [macOS CI](https://github.com/scahp/jEngine/actions/runs/41696952175).
 Windows GPU rendering, prolonged soak/fuzzing and thousands of real concurrently
 resident 3D assets were not validated by these measurements.

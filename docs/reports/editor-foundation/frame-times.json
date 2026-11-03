@@ -1,81 +1,88 @@
 {
   "success": true,
   "conditions": "Release binaries, same working directory/ini/driver, fixed simulation timestep, sequential alternating processes; no forced validation; 120-frame warmup, 240-frame wall-clock loop average. Includes CPU/GPU/present waits; not per-frame p95, isolated GPU time or an unconstrained FPS measurement.",
-  "scene": "Same saved model scene; baseline restores synchronously, new binary must emit a publication marker before frame120.",
+  "scene": "Same saved Model scene; baseline restores before draw one, new CPU-worker/owner publication is awaited before draw one by default.",
+  "scene_load_mode": "ready-before-first-frame",
   "engine_sha256": {
     "before": "9f015f3fefe379d73c4211b199aa3a48eee8feaa732ec9f0f9fe40b62d9e06c8",
-    "after": "0d53ddf88b8e7c85177b1fe12d2d754b80fe954b11a3aa4eee2bd9d2d230bb39"
+    "after": "f03e95378f58cd1b2ddb349a3260e139d09ab053c6d28f67e4f6845a55458359"
   },
   "samples": [
     {
       "label": "before",
       "trial": 0,
-      "time_to_initialized_ms": 600.948833,
+      "time_to_initialized_ms": 168.1125,
       "scene_published_before_measurement": true,
+      "scene_published_before_first_frame": true,
       "warmup_frames": 120,
       "measured_frames": 240,
-      "loop_mean_ms": 20.619914412500002,
-      "loop_fps": 48.496806533483465
+      "loop_mean_ms": 20.82859097083333,
+      "loop_fps": 48.010928890980615
     },
     {
       "label": "after",
       "trial": 0,
-      "time_to_initialized_ms": 569.2767080000003,
+      "time_to_initialized_ms": 548.6434169999992,
       "scene_published_before_measurement": true,
+      "scene_published_before_first_frame": true,
       "warmup_frames": 120,
       "measured_frames": 240,
-      "loop_mean_ms": 19.673919270833334,
-      "loop_fps": 50.82871319302931
+      "loop_mean_ms": 21.100447045833338,
+      "loop_fps": 47.39236082666163
     },
     {
       "label": "after",
       "trial": 1,
-      "time_to_initialized_ms": 124.23104199999813,
+      "time_to_initialized_ms": 555.3725419999971,
       "scene_published_before_measurement": true,
+      "scene_published_before_first_frame": true,
       "warmup_frames": 120,
       "measured_frames": 240,
-      "loop_mean_ms": 19.923743575000003,
-      "loop_fps": 50.19137072486639
+      "loop_mean_ms": 21.091969445833328,
+      "loop_fps": 47.411409473549554
     },
     {
       "label": "before",
       "trial": 1,
-      "time_to_initialized_ms": 126.23424999999955,
+      "time_to_initialized_ms": 117.54900000000035,
       "scene_published_before_measurement": true,
+      "scene_published_before_first_frame": true,
       "warmup_frames": 120,
       "measured_frames": 240,
-      "loop_mean_ms": 21.19371336666666,
-      "loop_fps": 47.183803173104806
+      "loop_mean_ms": 20.863884550000005,
+      "loop_fps": 47.9297130696594
     },
     {
       "label": "before",
       "trial": 2,
-      "time_to_initialized_ms": 118.20983399999818,
+      "time_to_initialized_ms": 112.17874999999822,
       "scene_published_before_measurement": true,
+      "scene_published_before_first_frame": true,
       "warmup_frames": 120,
       "measured_frames": 240,
-      "loop_mean_ms": 21.03449253333333,
-      "loop_fps": 47.540961514298544
+      "loop_mean_ms": 21.01222794999999,
+      "loop_fps": 47.591335977297
     },
     {
       "label": "after",
       "trial": 2,
-      "time_to_initialized_ms": 127.35550000000018,
+      "time_to_initialized_ms": 538.3855420000003,
       "scene_published_before_measurement": true,
+      "scene_published_before_first_frame": true,
       "warmup_frames": 120,
       "measured_frames": 240,
-      "loop_mean_ms": 19.914467533333337,
-      "loop_fps": 50.2147495696872
+      "loop_mean_ms": 21.106797045833314,
+      "loop_fps": 47.37810278975557
     }
   ],
   "summary": {
     "before": {
-      "median_loop_ms": 21.03449253333333,
-      "median_time_to_initialized_ms": 126.23424999999955
+      "median_loop_ms": 20.863884550000005,
+      "median_time_to_initialized_ms": 117.54900000000035
     },
     "after": {
-      "median_loop_ms": 19.914467533333337,
-      "median_time_to_initialized_ms": 127.35550000000018
+      "median_loop_ms": 21.100447045833338,
+      "median_time_to_initialized_ms": 548.6434169999992
     }
   }
 }
