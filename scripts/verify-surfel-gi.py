@@ -57,7 +57,7 @@ def main():
             assert dispatches[0] == dispatches[1] and dispatches[2][0] > dispatches[1][0], dispatches
         if mode == 'reconfigure':
             resets = re.findall(r'Surfel clipmap reset: frame=(\d+) cascade=(\d+) page_size=(\d+)', text)
-            assert len({int(frame) for frame, _, _ in resets}) >= 3, resets
+            assert len({int(frame) for frame, _, _ in resets}) >= 4, resets
             assert {'2', '5'} <= {page for _, _, page in resets}, resets
             capacities = re.findall(r'max_surfels=(\d+)', text)
             assert capacities and len(set(capacities)) == 1, capacities

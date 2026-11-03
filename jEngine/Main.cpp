@@ -159,7 +159,8 @@ int main(int argc, char** argv)
 
             ++renderedFrames;
 #ifdef __APPLE__
-            if (std::getenv("JENGINE_TEST_SURFEL_RECONFIGURE") && (renderedFrames == 30 || renderedFrames == 60 || renderedFrames == 90))
+            if (std::getenv("JENGINE_TEST_SURFEL_RECONFIGURE") && renderedFrames == 100) UpdateSurfelGIAuditOptions(renderedFrames);
+            if (std::getenv("JENGINE_TEST_SURFEL_RECONFIGURE") && (renderedFrames == 30 || renderedFrames == 60 || renderedFrames == 90 || renderedFrames == 110))
             {
                 DumpSurfelGIDiagnostics();
                 UpdateSurfelGIAuditOptions(renderedFrames);

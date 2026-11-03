@@ -7,7 +7,7 @@ Baseline: `be8f707d` on `main`. Changes are isolated on `codex/surfel-gi-audit`.
 | P1: multi-bounce history race | Gather samples another surfel from the same irradiance UAV being written by concurrent threads. Results can depend on GPU scheduling. | Snapshot history after placement; all gather history reads use a separate SRV. |
 | P1: reservoir winner race | An atomic maximum is followed by a normal score store inside a spin lock. Another invocation can raise the score between the comparison and store, then lose that maximum or fail to publish its index. | Two dispatches: atomic maximum score, then atomic minimum candidate index among matching scores. |
 | P1: unsupported allocation/dispatch sizes | Large clipmap dimensions exceed the physical pool; a full-resolution candidate grid can exceed the 65,535-group linear dispatch limit. | Reject unsupported counts before allocating and skip resolve/apply for that frame. |
-| P2: stale layout/history | Changing page stride without changing the pool capacity reinterprets existing slots. Changing world cell size is absent from the clipmap reset condition. | Recreate primary storage on stride changes; clear a cascade on cell-size changes. |
+| P2: stale layout/history | Changing page stride without changing the pool capacity reinterprets existing slots. Changing world cell size is absent from the clipmap reset condition. | Recreate primary storage on stride changes; clear a cascade on cell-size or base-address changes. |
 | P2: lookup bounds | Resolve, visualization, and hover selection use requested slots even if the physical page was reduced by the budget. | Clamp to physical page size and check the final pool index. |
 | P2: hover coordinates | Windows Vulkan casts a GLFW window to HWND; macOS always rejects the cursor. | GLFW cursor lookup with framebuffer scaling on Vulkan; keep HWND handling for DX12. |
 | P2: zero-distance resolve | A pixel exactly at a surfel center normalizes a zero vector. This can produce invalid weights depending on shader/compiler behavior. | Guard the reciprocal length. |
@@ -30,7 +30,8 @@ Local Apple M4, pinned experimental MoltenVK runtime:
 - Runtime reconfiguration changes cell size at frame 30 and page size 2 to 5 at
   frame 60, with constant pool capacity. All cascades reset at frames 31 and 61.
   Setting 512-cubed dimensions at frame 90 is rejected before allocation and the
-  application completes normally.
+  application continues rendering. Returning to supported dimensions at frame
+  100 resets the clipmap at frame 101 and resumes valid GI.
 - Headless CTest compiles eight real shader fixtures for SPIR-V and DXIL (16
   compilations), checks CPU layout contracts and budget boundaries.
 

@@ -556,6 +556,7 @@ struct jSurfelClipmapCascadeRuntimeState
 {
     bool Initialized = false;
     float CellSize = 0.0f;
+    int32 CellBase = 0;
     int32 DimX = 0;
     int32 DimY = 0;
     int32 DimZ = 0;
@@ -1138,19 +1139,15 @@ bool EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
     {
         MaxSurfelSlotsPerCell = Max(MaxSurfelSlotsPerCell, Clamp(gOptions.SurfelGISurfelsPerCell[cascade], 1, SURFEL_GI_MAX_SLOTS_PER_CELL));
     }
-    GSurfelPageSize = Max(1, MaxSurfelSlotsPerCell);
+    const int32 RequestedPageSize = Max(1, MaxSurfelSlotsPerCell);
 
     int32 TotalCellCount = 0;
-    int32 RunningCellBase = 0;
     for (int32 cascade = 0; cascade < SURFEL_GI_CASCADE_COUNT; ++cascade)
     {
         const int32 DimX = Clamp(gOptions.SurfelGIClipmapGridDimX[cascade], 4, 512);
         const int32 DimY = Clamp(gOptions.SurfelGIClipmapGridDimY[cascade], 4, 512);
         const int32 DimZ = Clamp(gOptions.SurfelGIClipmapGridDimZ[cascade], 4, 512);
         const int32 CascadeCellCount = DimX * DimY * DimZ;
-        GSurfelCascadeCellBase[cascade] = RunningCellBase;
-        GSurfelCascadeCellCount[cascade] = Max(1, CascadeCellCount);
-        RunningCellBase += GSurfelCascadeCellCount[cascade];
         TotalCellCount += CascadeCellCount;
     }
     TotalCellCount = Max(1, TotalCellCount);
@@ -1165,10 +1162,10 @@ bool EnsureSurfelGIResources(const std::shared_ptr<jRenderFrameContext>& InRende
         return false;
     }
     const int32 RequestedMaxSurfels = Clamp(Max(1024, gOptions.SurfelGIMaxSurfels), 1024, SURFEL_GI_MAX_SURFELS_HARD_CAP);
-    const int32 MinRequiredForTargetSlots = Min(TotalCellCount * Max(1, GSurfelPageSize), SURFEL_GI_MAX_SURFELS_HARD_CAP);
+    const int32 MinRequiredForTargetSlots = Min(TotalCellCount * RequestedPageSize, SURFEL_GI_MAX_SURFELS_HARD_CAP);
     const int32 MaxSurfels = AlignSurfelGIMaxSurfelsToCascadeCount(Max(RequestedMaxSurfels, MinRequiredForTargetSlots));
     const int32 MaxSlotsPerCellByBudget = Max(1, MaxSurfels / Max(1, TotalCellCount));
-    GSurfelPageSize = Clamp(GSurfelPageSize, 1, MaxSlotsPerCellByBudget);
+    GSurfelPageSize = Clamp(RequestedPageSize, 1, MaxSlotsPerCellByBudget);
     const bool PageLayoutChanged = PreviousPageSize != GSurfelPageSize;
     bool RecreatedPrimaryStorage = PageLayoutChanged;
 
@@ -1633,7 +1630,7 @@ void jRenderer::SurfelGIPass()
         int32 DeltaZ = 0;
         bool CascadeClearAll = ForceClearAllThisFrame || !RuntimeState.Initialized
             || RuntimeState.DimX != DimX || RuntimeState.DimY != DimY || RuntimeState.DimZ != DimZ
-            || RuntimeState.CellSize != CellSize;
+            || RuntimeState.CellSize != CellSize || RuntimeState.CellBase != GSurfelCascadeCellBase[cascade];
 
         if (!CascadeClearAll)
         {
@@ -1668,6 +1665,7 @@ void jRenderer::SurfelGIPass()
         }
 
         RuntimeState.CellSize = CellSize;
+        RuntimeState.CellBase = GSurfelCascadeCellBase[cascade];
         RuntimeState.OriginX = DesiredOriginX;
         RuntimeState.OriginY = DesiredOriginY;
         RuntimeState.OriginZ = DesiredOriginZ;
@@ -2582,6 +2580,15 @@ void UpdateSurfelGIAuditOptions(uint32 frame)
         for (int32& dim : gOptions.SurfelGIClipmapGridDimX) dim = 512;
         for (int32& dim : gOptions.SurfelGIClipmapGridDimY) dim = 512;
         for (int32& dim : gOptions.SurfelGIClipmapGridDimZ) dim = 512;
+    }
+    if (frame == 100)
+    {
+        for (int32 i = 0; i < SURFEL_GI_CASCADE_COUNT; ++i)
+        {
+            gOptions.SurfelGIClipmapGridDimX[i] = 16;
+            gOptions.SurfelGIClipmapGridDimY[i] = 16;
+            gOptions.SurfelGIClipmapGridDimZ[i] = 8;
+        }
     }
 }
 
