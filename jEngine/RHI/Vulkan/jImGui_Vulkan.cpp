@@ -28,10 +28,10 @@ jImGUI_Vulkan::~jImGUI_Vulkan()
 void jImGUI_Vulkan::Initialize(float width, float height)
 {
 	// Handle Monitor DPI
-	float MonitorDPIScaleX = 0;
-	float MonitorDPIScaleY = 0;
+	float MonitorDPIScaleX = 1;
+	float MonitorDPIScaleY = 1;
 	GLFWmonitor* PrimaryMonitor = glfwGetPrimaryMonitor();
-	glfwGetMonitorContentScale(PrimaryMonitor, &MonitorDPIScaleX, &MonitorDPIScaleY);
+	if (PrimaryMonitor) glfwGetMonitorContentScale(PrimaryMonitor, &MonitorDPIScaleX, &MonitorDPIScaleY);
 	MonitorDPIScale = Max(MonitorDPIScaleX, MonitorDPIScaleY);
 
 	ImGui::GetStyle().ScaleAllSizes(MonitorDPIScale);

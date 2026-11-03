@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jSwapchain_Vulkan.h"
 #include "jVulkanDeviceUtil.h"
 #include "jRHIType_Vulkan.h"
@@ -62,7 +62,8 @@ bool jSwapchain_Vulkan::CreateInternal(VkSwapchainKHR InOldSwapchain)
     createInfo.imageArrayLayers = 1;			// Stereoscopic 3D application(VR)이 아니면 항상 1
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT     // 즉시 스왑체인에 그리기 위해서 이걸로 설정
         | VK_IMAGE_USAGE_SAMPLED_BIT
-        | VK_IMAGE_USAGE_STORAGE_BIT;
+        | VK_IMAGE_USAGE_STORAGE_BIT
+        | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     // 포스트 프로세스 같은 처리를 위해 별도의 이미지를 만드는 것이면
     // VK_IMAGE_USAGE_TRANSFER_DST_BIT 으로 하면됨.
 
@@ -144,6 +145,7 @@ bool jSwapchain_Vulkan::CreateInternal(VkSwapchainKHR InOldSwapchain)
             Images[i] = SwapchainImage;
         }
 
+        SwapchainImage->AvailableLastUseFence = VK_NULL_HANDLE;
         auto ImagetView = jBufferUtil_Vulkan::CreateTextureView(vkImages[i], surfaceFormat.format, VK_IMAGE_ASPECT_COLOR_BIT, 1);
         SwapchainImage->TexturePtr = std::shared_ptr<jTexture_Vulkan>(
             new jTexture_Vulkan(ETextureType::TEXTURE_2D, Format, Extent.x, Extent.y, 1, EMSAASamples::COUNT_1, 1, false, vkImages[i], ImagetView));
@@ -173,10 +175,15 @@ void jSwapchain_Vulkan::Release()
 
 void jSwapchain_Vulkan::ReleaseInternal()
 {
-    vkDestroySwapchainKHR(g_rhi_vk->Device, Swapchain, nullptr);
-
-    for (auto& iter : Images)
-    {
-        delete iter;
+    for (auto* image : Images) {
+        auto* texture = static_cast<jTexture_Vulkan*>(image->TexturePtr.get());
+        if (texture && texture->View) {
+            vkDestroyImageView(g_rhi_vk->Device, texture->View, nullptr);
+            texture->View = nullptr;
+        }
+        delete image;
     }
+    Images.clear();
+    if (Swapchain) vkDestroySwapchainKHR(g_rhi_vk->Device, Swapchain, nullptr);
+    Swapchain = nullptr;
 }

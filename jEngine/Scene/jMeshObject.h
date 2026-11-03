@@ -1,7 +1,7 @@
-﻿#pragma once
+#pragma once
 #include "jObject.h"
-#include "Math\Vector.h"
-#include "Material\jMaterial.h"
+#include "Math/Vector.h"
+#include "Material/jMaterial.h"
 #include "jRenderObject.h"
 
 struct jTexture;

@@ -10,6 +10,10 @@
 #include "Scene/jCamera.h"
 
 #include "stb_image.h"
+#ifdef __APPLE__
+#include "lodepng.h"
+#include <vulkan/vulkan_beta.h>
+#endif
 #include "jPrimitiveUtil.h"
 #include "Profiler/jPerformanceProfile.h"
 #include "jVertexBuffer_Vulkan.h"
@@ -30,7 +34,11 @@
 #include "jRenderFrameContext_Vulkan.h"
 #include "jImGui_Vulkan.h"
 #include "Scene/Light/jLight.h"
+#ifdef __APPLE__
+#include "Platform/jShaderCompiler_Mac.h"
+#else
 #include "../DX12/jShaderCompiler_DX12.h"
+#endif
 #include "jRaytracingScene_Vulkan.h"
 #include "jResourceBarrierBatcher_Vulkan.h"
 #include "../jResourceBarrierBatcher.h"
@@ -92,6 +100,7 @@ bool jRHI_Vulkan::InitRHI()
     g_rhi = this;
 
     // Initialize COM library for using DirectTex library
+#ifdef _WIN32
     HRESULT hr = CoInitializeEx(nullptr, COINITBASE_MULTITHREADED);
     if (FAILED(hr))
     {
@@ -99,13 +108,17 @@ bool jRHI_Vulkan::InitRHI()
 		check(0);
     }
 
-    glfwInit();
+#endif
+    glfwSetErrorCallback([](int code, const char* description) { std::cerr << "GLFW " << code << ": " << description << std::endl; });
+    if (!glfwInit()) return false;
+    std::cout << "GLFW initialized: " << glfwGetVersionString() << std::endl;
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 	glfwWindowHint(GLFW_SCALE_TO_MONITOR, TRUE);
 
     Window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Vulkan", nullptr, nullptr);
+    if (!Window) return false;
     glfwSetWindowUserPointer(Window, this);
 
     // Fitting screen resolution to monitor
@@ -127,6 +140,9 @@ bool jRHI_Vulkan::InitRHI()
 	// Must
 	VkInstanceCreateInfo createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+#ifdef __APPLE__
+    createInfo.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+#endif
 	createInfo.pApplicationInfo = &appInfo;
 
 	// add extension
@@ -211,6 +227,25 @@ bool jRHI_Vulkan::InitRHI()
 #if USE_RAYTRACING
 		GSupportRaytracing = jVulkanDeviceUtil::IsSupportRaytracing(availableExtensions);
 		GSupportInlineRaytracing = GSupportRaytracing;
+#ifdef __APPLE__
+        auto hasExtension = [&](const char* name) {
+            return std::any_of(availableExtensions.begin(), availableExtensions.end(),
+                [&](const auto& e) { return std::strcmp(e.extensionName, name) == 0; });
+        };
+        VkPhysicalDeviceAccelerationStructureFeaturesKHR asSupport{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR};
+        VkPhysicalDeviceRayQueryFeaturesKHR querySupport{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR};
+        VkPhysicalDeviceFeatures2 rtSupport{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
+        rtSupport.pNext = &asSupport; asSupport.pNext = &querySupport;
+        vkGetPhysicalDeviceFeatures2(PhysicalDevice, &rtSupport);
+        GSupportInlineRaytracing = hasExtension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME)
+            && hasExtension(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME)
+            && hasExtension(VK_KHR_RAY_QUERY_EXTENSION_NAME)
+            && asSupport.accelerationStructure && querySupport.rayQuery;
+        // Compute ray queries are validated independently from the RT pipeline path.
+        GSupportRaytracing = false;
+#endif
+        std::cout << "Ray query support: " << GSupportInlineRaytracing
+                  << "; RT pipeline support: " << GSupportRaytracing << std::endl;
 #else // USE_RAYTRACING
 		GSupportRaytracing = false;
 		GSupportInlineRaytracing = false;
@@ -247,7 +282,9 @@ bool jRHI_Vulkan::InitRHI()
 		check(bindless_supported);
 	}
 
+#ifndef __APPLE__
 	jSpirvHelper::Init(DeviceProperties);
+#endif
 
 	bool IsSupportDebugMarker = false;
 
@@ -369,6 +406,34 @@ bool jRHI_Vulkan::InitRHI()
 		// createInfo.pEnabledFeatures = &deviceFeatures;
 		createInfo.pEnabledFeatures = nullptr;
 
+#ifdef __APPLE__
+        vkGetPhysicalDeviceFeatures(PhysicalDevice, &physicalDeviceFeatures2.features);
+        VkPhysicalDeviceFeatures2 supported{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
+        VkPhysicalDeviceDescriptorIndexingFeatures indexing{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES};
+        supported.pNext = &indexing;
+        vkGetPhysicalDeviceFeatures2(PhysicalDevice, &supported);
+        physicalDeviceDescriptorIndexingFeatures = indexing;
+        physicalDeviceDescriptorIndexingFeatures.pNext = &physicalDeviceFeatures2;
+        VkPhysicalDeviceScalarBlockLayoutFeatures scalar{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES};
+        scalar.scalarBlockLayout = VK_TRUE;
+        VkPhysicalDevicePortabilitySubsetFeaturesKHR portability{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PORTABILITY_SUBSET_FEATURES_KHR};
+        supported.pNext = &portability;
+        vkGetPhysicalDeviceFeatures2(PhysicalDevice, &supported);
+        portability.pNext = &physicalDeviceDescriptorIndexingFeatures;
+        scalar.pNext = &portability;
+        enabledBufferDeviceAddresFeatures.pNext = &scalar;
+        timelineSemaphoreFeatures.pNext = &enabledBufferDeviceAddresFeatures;
+        if (GSupportInlineRaytracing) {
+            enabledAccelerationStructureFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+            enabledAccelerationStructureFeatures.accelerationStructure = VK_TRUE;
+            enabledAccelerationStructureFeatures.pNext = timelineSemaphoreFeatures.pNext;
+            enabledRayQueryFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
+            enabledRayQueryFeatures.rayQuery = VK_TRUE;
+            enabledRayQueryFeatures.pNext = &enabledAccelerationStructureFeatures;
+            timelineSemaphoreFeatures.pNext = &enabledRayQueryFeatures;
+        }
+        createInfo.pNext = &timelineSemaphoreFeatures;
+#endif
 		// extension
 		// Prepare extensions
 		std::vector<const char*> DeviceExtensions(jVulkanDeviceUtil::DeviceExtensions);
@@ -378,10 +443,21 @@ bool jRHI_Vulkan::InitRHI()
 			DeviceExtensions.insert(DeviceExtensions.end(), jVulkanDeviceUtil::RaytracingDeviceExtensions.begin(), jVulkanDeviceUtil::RaytracingDeviceExtensions.end());
 		}
 
-		// Add debug marker extension when it can be enabled
+		#ifdef __APPLE__
+        if (GSupportInlineRaytracing) {
+            DeviceExtensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+            DeviceExtensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+            DeviceExtensions.push_back(VK_KHR_RAY_QUERY_EXTENSION_NAME);
+        }
+#endif
+        // Add debug marker extension when it can be enabled
 		for (auto& extension : availableExtensions)
 		{
-			if (!strcmp(extension.extensionName, VK_EXT_DEBUG_MARKER_EXTENSION_NAME))
+			if (!strcmp(extension.extensionName, VK_EXT_DEBUG_MARKER_EXTENSION_NAME)
+#ifndef _WIN32
+                && false
+#endif
+            )
 			{
 				DeviceExtensions.push_back(VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
 				IsSupportDebugMarker = true;
@@ -450,7 +526,7 @@ bool jRHI_Vulkan::InitRHI()
         vkCmdDebugMarkerInsert = (PFN_vkCmdDebugMarkerInsertEXT)vkGetDeviceProcAddr(Device, "vkCmdDebugMarkerInsertEXT");
 	}
 
-	if (GSupportRaytracing)
+	if (IsRaytracingSceneSupported())
 	{
 		vkGetBufferDeviceAddressKHR = (PFN_vkGetBufferDeviceAddressKHR)vkGetDeviceProcAddr(Device, "vkGetBufferDeviceAddressKHR");
 		vkCmdBuildAccelerationStructuresKHR = (PFN_vkCmdBuildAccelerationStructuresKHR)vkGetDeviceProcAddr(Device, "vkCmdBuildAccelerationStructuresKHR");
@@ -459,6 +535,9 @@ bool jRHI_Vulkan::InitRHI()
 		vkDestroyAccelerationStructureKHR = (PFN_vkDestroyAccelerationStructureKHR)vkGetDeviceProcAddr(Device, "vkDestroyAccelerationStructureKHR");
 		vkGetAccelerationStructureBuildSizesKHR = (PFN_vkGetAccelerationStructureBuildSizesKHR)vkGetDeviceProcAddr(Device, "vkGetAccelerationStructureBuildSizesKHR");
 		vkGetAccelerationStructureDeviceAddressKHR = (PFN_vkGetAccelerationStructureDeviceAddressKHR)vkGetDeviceProcAddr(Device, "vkGetAccelerationStructureDeviceAddressKHR");
+	}
+	if (GSupportRaytracing)
+	{
 		vkCmdTraceRaysKHR = (PFN_vkCmdTraceRaysKHR)vkGetDeviceProcAddr(Device, "vkCmdTraceRaysKHR");
 		vkGetRayTracingShaderGroupHandlesKHR = (PFN_vkGetRayTracingShaderGroupHandlesKHR)vkGetDeviceProcAddr(Device, "vkGetRayTracingShaderGroupHandlesKHR");
 		vkCreateRayTracingPipelinesKHR = (PFN_vkCreateRayTracingPipelinesKHR)vkGetDeviceProcAddr(Device, "vkCreateRayTracingPipelinesKHR");
@@ -473,16 +552,16 @@ bool jRHI_Vulkan::InitRHI()
 		check(g_rhi_vk);
 		check(g_rhi_vk->Device);
 
-        if (InStandaloneResourcePtr->Memory)
-            vkFreeMemory(g_rhi_vk->Device, InStandaloneResourcePtr->Memory, nullptr);
 
+        if (InStandaloneResourcePtr->AccelerationStructure)
+            g_rhi_vk->vkDestroyAccelerationStructureKHR(g_rhi_vk->Device, InStandaloneResourcePtr->AccelerationStructure, nullptr);
 		std::set<VkImageView> t;
         for (VkImageView View : InStandaloneResourcePtr->Views)
         {
             check(View);
 			check(t.count(View) == 0);
 			t.insert(View);
-            //vkDestroyImageView(g_rhi_vk->Device, View, nullptr);
+            vkDestroyImageView(g_rhi_vk->Device, View, nullptr);
         }
 
 		if (InStandaloneResourcePtr->Buffer)
@@ -497,6 +576,8 @@ bool jRHI_Vulkan::InitRHI()
 		{
 			vkDestroyImage(g_rhi_vk->Device, InStandaloneResourcePtr->Image, nullptr);
 		}
+        if (InStandaloneResourcePtr->Memory)
+            vkFreeMemory(g_rhi_vk->Device, InStandaloneResourcePtr->Memory, nullptr);
 	};
 
 	DeallocatorMultiFrameRenderPass.FreeDelegate = [](jRenderPass_Vulkan* InRenderPass)
@@ -554,7 +635,9 @@ bool jRHI_Vulkan::InitRHI()
 	g_ImGUI = new jImGUI_Vulkan();
 	g_ImGUI->Initialize((float)SCR_WIDTH, (float)SCR_HEIGHT);
 
+#if USE_VARIABLE_SHADING_RATE_TIER2
 	CreateSampleVRSTexture();
+#endif
 
 	// Create InstanceVertexBuffer for cube map six face
 	// todo : It will be removed, when I have a system that can generate per instance data for visible faces
@@ -586,7 +669,7 @@ bool jRHI_Vulkan::InitRHI()
 		CubeMapInstanceDataForSixFace = g_rhi->CreateVertexBuffer(VertexStream_InstanceData);
 	}
 
-	if (GSupportRaytracing)
+	if (IsRaytracingSceneSupported())
 		RaytracingScene = CreateRaytracingScene();
 
 	return true;
@@ -658,7 +741,15 @@ void jRHI_Vulkan::ReleaseRHI()
 		delete iter;
 	DescriptorPools.clear();
 
+    CubeMapInstanceDataForSixFace.reset();
+    SampleVRSTexturePtr.reset();
+    delete RaytracingScene;
+    RaytracingScene = nullptr;
+    delete DescriptorPools2;
+    DescriptorPools2 = nullptr;
 	DeallocatorMultiFrameStandaloneResource.Release();
+    delete MemoryPool;
+    MemoryPool = nullptr;
 	DeallocatorMultiFrameRenderPass.Release();
 
 	vkDestroyPipelineCache(Device, PipelineCache, nullptr);
@@ -691,7 +782,9 @@ void jRHI_Vulkan::ReleaseRHI()
 		Instance = nullptr;
 	}
 
+#ifndef __APPLE__
     jSpirvHelper::Finalize();
+#endif
 }
 
 std::shared_ptr<jIndexBuffer> jRHI_Vulkan::CreateIndexBuffer(const std::shared_ptr<jIndexStreamData>& streamData) const
@@ -753,7 +846,9 @@ void jRHI_Vulkan::RecreateSwapChain()
 
     CurrentFrameIndex = 0;
 
+#if USE_VARIABLE_SHADING_RATE_TIER2
 	CreateSampleVRSTexture();
+#endif
 
 	Flush();
 }
@@ -808,6 +903,19 @@ std::shared_ptr<jTexture> jRHI_Vulkan::CreateTextureFromData(const jImageData* I
 			return nullptr;
 		}
 	}
+
+#ifdef __APPLE__
+    if (InImageData->MipLevel == 1 && MipLevel > 1) {
+        auto* command = BeginSingleTimeCommands();
+        TransitionLayout(command, TexturePtr.get(), EResourceLayout::TRANSFER_DST);
+        command->FlushBarrierBatch();
+        jBufferUtil_Vulkan::GenerateMipmaps(static_cast<jCommandBuffer_Vulkan*>(command), TexturePtr->Image,
+            GetVulkanTextureFormat(TexturePtr->Format), TexturePtr->Width, TexturePtr->Height, MipLevel,
+            TexturePtr->LayerCount, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        TexturePtr->Layout = EResourceLayout::SHADER_READ_ONLY;
+        EndSingleTimeCommands(command);
+    }
+#endif
 
 	return TexturePtr;
 }
@@ -1015,12 +1123,19 @@ bool jRHI_Vulkan::CreateShaderInternal(jShader* OutShader, const jShaderInfo& sh
             }
 
 			const std::wstring EntryPoint = ConvertToWchar(shaderInfo.GetEntryPoint());
-			auto ShaderBlob = jShaderCompiler_DX12::Get().Compile(ShaderText.c_str(), (uint32)ShaderText.length(), ShadingModel, EntryPoint.c_str(), false
+			auto ShaderBlob =
+#ifdef __APPLE__
+                jShaderCompiler_Mac::Get().Compile
+#else
+                jShaderCompiler_DX12::Get().Compile
+#endif
+                (ShaderText.c_str(), (uint32)ShaderText.length(), ShadingModel, EntryPoint.c_str(), false
 				, {TEXT("-spirv"), TEXT("-fspv-target-env=vulkan1.1spirv1.4"), TEXT("-fvk-use-scalar-layout")
 				, TEXT("-fspv-extension=SPV_EXT_descriptor_indexing"), TEXT("-fspv-extension=SPV_KHR_ray_tracing")
 				, TEXT("-fspv-extension=SPV_KHR_ray_query"), TEXT("-fspv-extension=SPV_EXT_shader_viewport_index_layer") });
 
 			std::vector<uint8> SpirvCode;
+			if (!ShaderBlob) throw std::runtime_error("Shader compilation failed: " + std::string(shaderInfo.GetShaderFilepath().ToStr()));
 			if (ShaderBlob->GetBufferSize() > 0)
 			{
 				SpirvCode.resize(ShaderBlob->GetBufferSize());
@@ -1149,7 +1264,7 @@ std::shared_ptr<jRenderTarget> jRHI_Vulkan::CreateRenderTarget(const jRenderTarg
 	std::map<int32, VkImageView> imageViewForMipMapUAV;
 	std::shared_ptr<jTexture_Vulkan> TexturePtr;
 
-	ETextureCreateFlag TextureCreateFlag{};
+	ETextureCreateFlag TextureCreateFlag = info.TextureCreateFlag & (ETextureCreateFlag::TransferSrc | ETextureCreateFlag::TransferDst);
 	if (hasDepthAttachment)
 		TextureCreateFlag |= ETextureCreateFlag::DSV;
 	else
@@ -1224,6 +1339,8 @@ std::shared_ptr<jRenderTarget> jRHI_Vulkan::CreateRenderTarget(const jRenderTarg
 	auto RenderTargetPtr = std::make_shared<jRenderTarget>();
 	RenderTargetPtr->Info = info;
 	RenderTargetPtr->TexturePtr = TexturePtr;
+
+
 
 	return RenderTargetPtr;
 }
@@ -1509,11 +1626,11 @@ std::shared_ptr<jTexture> jRHI_Vulkan::Create2DTexture(uint32 InWidth, uint32 In
 	VkImageCreateFlagBits ImageCreateFlags{};
 	const VkMemoryPropertyFlagBits PropertyFlagBits = GetMemoryPropertyFlagBits(InTextureCreateFlag);
 	const VkImageUsageFlags UsageFlag = GetImageUsageFlags(InTextureCreateFlag);
-	const VkImageLayout InitialImageLayout = (InImageBulkData.ImageData.size() > 0) ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_PREINITIALIZED;
+	const VkImageLayout InitialImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	check(!IsDepthFormat(InFormat) || (IsDepthFormat(InFormat) && (UsageFlag & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)));
 
 
-	// If there is Image or Depth bit, it should be initialized VK_IMAGE_LAYOUT_PREINITIALIZED, if not, VK_IMAGE_LAYOUT_UNDEFINED
+	// Optimal-tiled images start undefined; transition explicitly before use.
 	auto TexturePtr = jBufferUtil_Vulkan::Create2DTexture(InWidth, InHeight, InMipLevels, VK_SAMPLE_COUNT_1_BIT, GetVulkanTextureFormat(InFormat), VK_IMAGE_TILING_OPTIMAL
 		, UsageFlag, PropertyFlagBits, ImageCreateFlags, InitialImageLayout);
 
@@ -1546,6 +1663,11 @@ std::shared_ptr<jTexture> jRHI_Vulkan::Create2DTexture(uint32 InWidth, uint32 In
         TransitionLayout(commandBuffer, TexturePtr.get(), InImageLayout);
         EndSingleTimeCommands(commandBuffer);
 	}
+    else if (TexturePtr->GetLayout() != InImageLayout) {
+        auto* command = BeginSingleTimeCommands();
+        TransitionLayout(command, TexturePtr.get(), InImageLayout);
+        EndSingleTimeCommands(command);
+    }
 
 	return TexturePtr;
 }
@@ -1556,10 +1678,10 @@ std::shared_ptr<jTexture> jRHI_Vulkan::CreateCubeTexture(uint32 InWidth, uint32 
 	VkImageCreateFlagBits ImageCreateFlags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
     const VkMemoryPropertyFlagBits PropertyFlagBits = GetMemoryPropertyFlagBits(InTextureCreateFlag);
     const VkImageUsageFlags UsageFlag = GetImageUsageFlags(InTextureCreateFlag);
-	const VkImageLayout InitialImageLayout = (InImageBulkData.ImageData.size() > 0) ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_PREINITIALIZED;
+	const VkImageLayout InitialImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     check(!IsDepthFormat(InFormat) || (IsDepthFormat(InFormat) && (UsageFlag & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)));
 
-	// If there is Image or Depth bit, it should be initialized VK_IMAGE_LAYOUT_PREINITIALIZED, if not, VK_IMAGE_LAYOUT_UNDEFINED
+	// Optimal-tiled images start undefined; transition explicitly before use.
 	auto TexturePtr = jBufferUtil_Vulkan::CreateCubeTexture(InWidth, InHeight, InMipLevels, VK_SAMPLE_COUNT_1_BIT, GetVulkanTextureFormat(InFormat), VK_IMAGE_TILING_OPTIMAL
 		, UsageFlag, PropertyFlagBits, ImageCreateFlags, InitialImageLayout);
 
@@ -1636,13 +1758,15 @@ std::shared_ptr<jRenderFrameContext> jRHI_Vulkan::BeginRenderFrame()
 	SCOPE_CPU_PROFILE(BeginRenderFrame);
 
     // timeout 은 nanoseconds. UINT64_MAX 는 타임아웃 없음
+    auto* acquireSlot = Swapchain->Images[CurrentFrameIndex];
+    if (acquireSlot->AvailableLastUseFence)
+        vkWaitForFences(Device, 1, &acquireSlot->AvailableLastUseFence, VK_TRUE, UINT64_MAX);
+    auto* acquiredSemaphore = acquireSlot->Available;
     VkResult acquireNextImageResult = vkAcquireNextImageKHR(Device, (VkSwapchainKHR)Swapchain->GetHandle(), UINT64_MAX
-		, (VkSemaphore)Swapchain->Images[CurrentFrameIndex]->Available->GetHandle(), nullptr, &CurrentFrameIndex);
+		, (VkSemaphore)acquiredSemaphore->GetHandle(), nullptr, &CurrentFrameIndex);
 
     VkFence lastCommandBufferFence = Swapchain->Images[CurrentFrameIndex]->CommandBufferFence;
 
-    if (acquireNextImageResult != VK_SUCCESS)
-        return nullptr;
 
 	// 여기서는 VK_SUCCESS or VK_SUBOPTIMAL_KHR 은 성공했다고 보고 계속함.
 	// VK_ERROR_OUT_OF_DATE_KHR : 스왑체인이 더이상 서피스와 렌더링하는데 호환되지 않는 경우. (보통 윈도우 리사이즈 이후)
@@ -1676,7 +1800,7 @@ std::shared_ptr<jRenderFrameContext> jRHI_Vulkan::BeginRenderFrame()
 	renderFrameContextPtr->FrameIndex = CurrentFrameIndex;
 	renderFrameContextPtr->SceneRenderTargetPtr = std::make_shared<jSceneRenderTarget>();
 	renderFrameContextPtr->SceneRenderTargetPtr->Create(Swapchain->GetSwapchainImage(CurrentFrameIndex), &jLight::GetLights());
-	renderFrameContextPtr->CurrentWaitSemaphore = Swapchain->Images[CurrentFrameIndex]->Available;
+	renderFrameContextPtr->CurrentWaitSemaphore = acquiredSemaphore;
 	jProfileGPUBeginFrame(renderFrameContextPtr);
 
 	return renderFrameContextPtr;
@@ -1723,9 +1847,45 @@ void jRHI_Vulkan::EndRenderFrame(const std::shared_ptr<jRenderFrameContext>& ren
  //       return;
  //   }
 
+#ifdef __APPLE__
+    std::shared_ptr<jBuffer_Vulkan> captureBuffer;
+    const char* capturePath = std::getenv("JENGINE_CAPTURE_FRAME");
+    auto* captureTexture = Swapchain->Images[CurrentFrameIndex]->TexturePtr.get();
+    if (capturePath && GetCurrentFrameNumber() == 60) {
+        const uint64 bytes = uint64(captureTexture->Width) * captureTexture->Height * 4;
+        captureBuffer = jBufferUtil_Vulkan::CreateBuffer(EVulkanBufferBits::TRANSFER_DST,
+            EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT, bytes, EResourceLayout::TRANSFER_DST);
+        auto* command = renderFrameContextPtr->GetActiveCommandBuffer();
+        TransitionLayout(command, captureTexture, EResourceLayout::TRANSFER_SRC);
+        command->FlushBarrierBatch();
+        jTextureCopyRegion region{};
+        region.Width = captureTexture->Width; region.Height = captureTexture->Height;
+        CopyTextureRegionToBuffer(command, captureTexture, region, captureBuffer.get(), captureBuffer->Offset);
+        TransitionLayout(command, captureTexture, EResourceLayout::PRESENT_SRC);
+        command->FlushBarrierBatch();
+    }
+#endif
 	VkSemaphore signalSemaphore[] = { (VkSemaphore)Swapchain->Images[CurrentFrameIndex]->RenderFinished->GetHandle() };
 	jProfileGPUEndFrame(renderFrameContextPtr);
 	QueueSubmit(renderFrameContextPtr, Swapchain->Images[CurrentFrameIndex]->RenderFinished);
+#ifdef __APPLE__
+    if (captureBuffer) {
+        vkQueueWaitIdle(GraphicsQueue.Queue);
+        const size_t bytes = size_t(captureTexture->Width) * captureTexture->Height * 4;
+        auto* mapped = static_cast<uint8*>(captureBuffer->Map());
+        std::vector<uint8> rgba(mapped, mapped + bytes);
+        captureBuffer->Unmap();
+        if (captureTexture->Format == ETextureFormat::BGRA8)
+            for (size_t i = 0; i < bytes; i += 4) std::swap(rgba[i], rgba[i + 2]);
+        // The swapchain is presented with opaque composite alpha. Match that
+        // presentation in PNGs: postprocess alpha is not image transparency.
+        for (size_t i = 3; i < bytes; i += 4) rgba[i] = 255;
+        const unsigned error = LodePNG_encode32_file(capturePath, rgba.data(), captureTexture->Width, captureTexture->Height);
+        if (error) throw std::runtime_error("Frame capture PNG encoding failed");
+        std::cout << "Captured rendered frame: " << capturePath << std::endl;
+    }
+#endif
+
     
 	VkPresentInfoKHR presentInfo = {};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -1778,6 +1938,12 @@ std::shared_ptr<jSyncAcrossCommandQueue_Vulkan> jRHI_Vulkan::QueueSubmit(const s
 	std::shared_ptr<jSyncAcrossCommandQueue_Vulkan> Sync_Vulkan 
 		= CommandBufferManager->QueueSubmit((jCommandBuffer_Vulkan*)renderFrameContext->GetActiveCommandBuffer(), renderFrameContext->CurrentWaitSemaphore, InSignalSemaphore);
 
+    for (auto* image : Swapchain->Images) {
+        if (image->Available == CurrentWaitSemaphore)
+            image->AvailableLastUseFence = static_cast<VkFence>(renderFrameContext->GetActiveCommandBuffer()->GetFenceHandle());
+    }
+    if (InSignalSemaphore == Swapchain->Images[CurrentFrameIndex]->RenderFinished)
+        Swapchain->Images[CurrentFrameIndex]->CommandBufferFence = static_cast<VkFence>(renderFrameContext->GetActiveCommandBuffer()->GetFenceHandle());
 	renderFrameContext->CurrentWaitSemaphore = InSignalSemaphore;		// Update Next Wait Semaphore
 
 	return Sync_Vulkan;
@@ -2257,12 +2423,12 @@ std::shared_ptr<jBuffer> jRHI_Vulkan::CreateBufferInternal(uint64 InSize, uint64
         BufferBits = BufferBits | EVulkanBufferBits::STORAGE_BUFFER;
     }
 
-    if (!!(EBufferCreateFlag::AccelerationStructureBuildInput & InBufferCreateFlag))
+    if (IsRaytracingSceneSupported() && !!(EBufferCreateFlag::AccelerationStructureBuildInput & InBufferCreateFlag))
     {
         BufferBits = BufferBits | EVulkanBufferBits::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY;
     }
 
-    if (!!(EBufferCreateFlag::AccelerationStructure& InBufferCreateFlag))
+    if (IsRaytracingSceneSupported() && !!(EBufferCreateFlag::AccelerationStructure& InBufferCreateFlag))
     {
         BufferBits = BufferBits | EVulkanBufferBits::ACCELERATION_STRUCTURE_STORAGE;
     }
@@ -2282,7 +2448,7 @@ std::shared_ptr<jBuffer> jRHI_Vulkan::CreateBufferInternal(uint64 InSize, uint64
 		BufferBits = BufferBits | EVulkanBufferBits::INDIRECT_BUFFER;
 	}
 
-	if (!!(EBufferCreateFlag::ShaderBindingTable & InBufferCreateFlag))
+	if (GSupportRaytracing && !!(EBufferCreateFlag::ShaderBindingTable & InBufferCreateFlag))
 	{
 		BufferBits = BufferBits | EVulkanBufferBits::SHADER_BINDING_TABLE;
 	}

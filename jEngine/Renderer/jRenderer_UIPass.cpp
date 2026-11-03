@@ -1267,7 +1267,11 @@ void IRenderer::UIPass()
 
                     ImGui::Separator();
                     ImGui::TextColored(ImVec4(1, 1, 0, 1), "Inline Ray Gather (HWRT DI)");
+                    ImGui::BeginDisabled(!GSupportInlineRaytracing);
                     ImGui::Checkbox("Enable Inline Ray Gather", &gOptions.SurfelGIInlineRayEnable);
+                    ImGui::EndDisabled();
+                    if (!GSupportInlineRaytracing)
+                        ImGui::TextWrapped("Inline ray queries are unavailable on this GPU/driver.");
                     if (gOptions.SurfelGIInlineRayEnable)
                     {
                         ImGui::Checkbox("Enable Guiding", &gOptions.SurfelGIInlineRayGuideEnable);

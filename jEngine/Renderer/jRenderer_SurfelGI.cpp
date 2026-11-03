@@ -616,12 +616,15 @@ struct jSurfelGIHWRTDIBindlessUInt2
 {
 };
 
+}
 template <>
 struct TShaderParameterHLSLTypeInfo<jSurfelGIHWRTDIBindlessUInt2>
 {
     static constexpr const char* GetTypeName() { return "uint2"; }
     static void AppendTypeDeclaration(std::string&) {}
 };
+namespace
+{
 
 BEGIN_SHADER_BINDLESS_SET(jSurfelGIHWRTDIBindlessParameters)
     // Bindless tables are assigned consecutive spaces after the fixed SurfelGI sets.
@@ -701,6 +704,7 @@ std::shared_ptr<jBuffer> GSurfelGIWinnerScoreBuffer;
 std::shared_ptr<jBuffer> GSurfelGIWinnerIndexBuffer;
 std::shared_ptr<jBuffer> GSurfelGIWinnerLockBuffer;
 int32 GSurfelGIWinnerCapacity = 0;
+uint64 GSurfelGIInlineGatherDispatches = 0;
 std::shared_ptr<jBuffer> GSurfelGIStatsBuffer;
 std::shared_ptr<jBuffer> GSurfelGIActiveIndexBuffer;
 int32 GSurfelGIActiveIndexCapacity = 0;
@@ -1068,6 +1072,8 @@ bool DispatchSurfelGIHWRTDIGather(
     ShaderBindingGroup.Add(SurfelGatherBindingInstance);
     ShaderBindingGroup.Add(BindlessShaderBindingInstances);
 
+    g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(),
+        InRenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), EResourceLayout::UAV);
     jShaderSurfelGIGatherIrradianceHWRTCS::ShaderPermutation GatherPermutation;
     GatherPermutation.SetIndex<jShaderSurfelGIGatherIrradianceHWRTCS::USE_SURFEL_GI>(1);
     GatherPermutation.SetIndex<jShaderSurfelGIGatherIrradianceHWRTCS::USE_BINDLESS_RESOURCE>(1);
@@ -2114,7 +2120,8 @@ void jRenderer::SurfelGIPass()
         {
             DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "SurfelGI GatherIrradiance HWRTDI", Vector4(0.2f, 0.65f, 0.95f, 1.0f));
             SCOPE_GPU_PROFILE(RenderFrameContextPtr, SurfelGI_DispatchGatherIrradianceInlineRay);
-            DispatchSurfelGIHWRTDIGather(RenderFrameContextPtr, MainCamera, GatherUniformBuffer);
+            if (DispatchSurfelGIHWRTDIGather(RenderFrameContextPtr, MainCamera, GatherUniformBuffer))
+                ++GSurfelGIInlineGatherDispatches;
         }
 
         g_rhi->UAVBarrier(RenderFrameContextPtr->GetActiveCommandBuffer(), GSurfelIrradianceBuffer.get());
@@ -2327,7 +2334,7 @@ void jRenderer::SurfelGIResolvePass()
         .IsGenerateMipmap = false,
         .SampleCount = EMSAASamples::COUNT_1,
         .RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
-        .TextureCreateFlag = ETextureCreateFlag::UAV,
+        .TextureCreateFlag = ETextureCreateFlag::UAV | ETextureCreateFlag::TransferSrc,
         .ResourceName = jNameStatic("SurfelGI_Resolve_RT")
         });
     jSceneRenderTarget::SurfelGI_Resolve_RT = ResolveRT;
@@ -2481,3 +2488,75 @@ void jRenderer::ApplySurfelGI()
         , jNameStatic("Resource/Shaders/hlsl/ApplySurfelGI_cs.hlsl")
         , Parameters, NumGroupsX, NumGroupsY, 1);
 }
+
+#ifdef __APPLE__
+#include "RHI/Vulkan/jBufferUtil_Vulkan.h"
+// Explicit diagnostic readback, invoked only by the bounded validation runner.
+void DumpSurfelGIDiagnostics()
+{
+    if (!IsUseVulkan() || !GSurfelPoolBuffer || !GSurfelIrradianceBuffer) return;
+    g_rhi->Flush();
+    auto readBuffer = [](const std::shared_ptr<jBuffer>& source, size_t size) {
+        auto* src = static_cast<jBuffer_Vulkan*>(source.get());
+        auto dst = jBufferUtil_Vulkan::CreateBuffer(EVulkanBufferBits::TRANSFER_DST,
+            EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT, size, EResourceLayout::TRANSFER_DST);
+        auto* cmd = static_cast<jCommandBuffer_Vulkan*>(g_rhi->BeginSingleTimeCommands());
+        const auto previous = src->GetLayout();
+        g_rhi->TransitionLayout(cmd, src, EResourceLayout::TRANSFER_SRC);
+        jBufferUtil_Vulkan::CopyBuffer(cmd, *src, *dst, size);
+        g_rhi->TransitionLayout(cmd, src, previous);
+        cmd->FlushBarrierBatch();
+        VkMemoryBarrier host{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+        host.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT; host.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
+        vkCmdPipelineBarrier(cmd->GetRef(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT,
+            0, 1, &host, 0, nullptr, 0, nullptr);
+        g_rhi->EndSingleTimeCommands(cmd);
+        std::vector<uint8> bytes(size);
+        std::memcpy(bytes.data(), dst->Map(), size); dst->Unmap();
+        return bytes;
+    };
+    const auto pool = readBuffer(GSurfelPoolBuffer, size_t(GSurfelPoolMaxCount) * sizeof(jSurfelGPU));
+    const auto irradiance = readBuffer(GSurfelIrradianceBuffer, size_t(GSurfelPoolMaxCount) * sizeof(jSurfelIrradianceGPU));
+    uint32 placed = 0, lit = 0, sampled = 0, invalid = 0;
+    double energy = 0, history = 0;
+    float anchorHistory = -1;
+    for (int32 i = 0; i < GSurfelPoolMaxCount; ++i) {
+        jSurfelGPU surfel; jSurfelIrradianceGPU light;
+        std::memcpy(&surfel, pool.data() + size_t(i) * sizeof(surfel), sizeof(surfel));
+        std::memcpy(&light, irradiance.data() + size_t(i) * sizeof(light), sizeof(light));
+        if (surfel.PositionRadius.w > 0) {
+            if (placed < 3) std::cout << "Surfel point: " << surfel.PositionRadius.x << "," << surfel.PositionRadius.y << "," << surfel.PositionRadius.z
+                << " radius=" << surfel.PositionRadius.w << " active=" << surfel.IsActive << " cascade=" << surfel.CascadeIndex << std::endl;
+            ++placed;
+        }
+        const auto& value = light.IrradianceAndCount;
+        if (!std::isfinite(value.x) || !std::isfinite(value.y) || !std::isfinite(value.z)) { ++invalid; continue; }
+        if (value.w > 0) ++sampled;
+        history += value.w;
+        if (anchorHistory < 0 && surfel.PositionRadius.w > 0) anchorHistory = value.w;
+        if (value.x + value.y + value.z > 1e-6f) ++lit;
+        energy += value.x + value.y + value.z;
+    }
+    if (auto rt = jSceneRenderTarget::SurfelGI_Resolve_RT) {
+        auto* texture = rt->GetTexture();
+        const size_t bytes = size_t(texture->Width) * texture->Height * 4;
+        auto target = jBufferUtil_Vulkan::CreateBuffer(EVulkanBufferBits::TRANSFER_DST,
+            EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT, bytes, EResourceLayout::TRANSFER_DST);
+        auto* cmd = g_rhi->BeginSingleTimeCommands();
+        const auto previous = texture->GetLayout();
+        g_rhi->TransitionLayout(cmd, texture, EResourceLayout::TRANSFER_SRC); cmd->FlushBarrierBatch();
+        jTextureCopyRegion region{}; region.Width=texture->Width; region.Height=texture->Height;
+        g_rhi->CopyTextureRegionToBuffer(cmd, texture, region, target.get(), target->Offset);
+        g_rhi->TransitionLayout(cmd, texture, previous);
+        g_rhi->EndSingleTimeCommands(cmd);
+        const auto* values = static_cast<const uint32*>(target->Map());
+        size_t nonzero = 0;
+        for (size_t i=0; i<bytes/4; ++i) nonzero += values[i] != 0;
+        target->Unmap();
+        std::cout << "Surfel resolve nonzero pixels: " << nonzero << std::endl;
+    }
+    std::cout << "Inline gather dispatches: " << GSurfelGIInlineGatherDispatches << " anchor_history=" << anchorHistory << std::endl;
+    std::cout << "SurfelGI diagnostics: placed=" << placed << " sampled=" << sampled
+              << " lit=" << lit << " invalid=" << invalid << " energy=" << energy << " history=" << history << std::endl;
+}
+#endif

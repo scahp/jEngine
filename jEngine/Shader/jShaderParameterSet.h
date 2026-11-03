@@ -173,6 +173,8 @@ struct jShaderUniformBufferFieldMeta
     uint32 ArrayCount = 1;
     AppendTypeDeclarationFunc AppendTypeDeclaration = nullptr;
     bool IsArray = false;
+    size_t ByteOffset = 0;
+    size_t ByteSize = 0;
 };
 
 template <typename T>
@@ -403,10 +405,20 @@ struct TShaderParameterHLSLTypeInfo
                 jShaderParameterDetail::AppendLine(Out, "{");
                 for (const jShaderUniformBufferFieldMeta& Meta : T::GetShaderUniformBufferFieldMembers())
                 {
+                    // Scalar-layout SPIR-V must preserve the explicit alignment of the C++ fields.
+                    // DX12 keeps its existing HLSL packing; Vulkan receives exact byte offsets.
+                    if (IsUseVulkan())
+                        jShaderParameterDetail::AppendLine(Out, "    [[vk::offset(", Meta.ByteOffset, ")]]");
                     if (Meta.IsArray)
                         jShaderParameterDetail::AppendLine(Out, "    ", Meta.HLSLTypeName, " ", Meta.Name, "[", Meta.ArrayCount, "];");
                     else
                         jShaderParameterDetail::AppendLine(Out, "    ", Meta.HLSLTypeName, " ", Meta.Name, ";");
+                }
+                const auto& fields = T::GetShaderUniformBufferFieldMembers();
+                if (IsUseVulkan() && !fields.empty()) {
+                    const auto& last = fields.back();
+                    if (last.ByteOffset + last.ByteSize < sizeof(T))
+                        jShaderParameterDetail::AppendLine(Out, "    [[vk::offset(", sizeof(T) - 4, ")]] uint __jEngineTailPadding;");
                 }
                 jShaderParameterDetail::AppendLine(Out, "};");
                 jShaderParameterDetail::AppendLine(Out, "#endif");
@@ -1068,7 +1080,7 @@ namespace jShaderParameterDetail
 
         static void AppendHLSL(std::string& Out, const char* InName, uint32 InSpace)
         {
-            AppendLine(Out, "Buffer<", GetHLSLTypeName(), "> ", InName, "[] : register(t0, space", InSpace, ");");
+            AppendLine(Out, IsUseVulkan() ? "StructuredBuffer<" : "Buffer<", GetHLSLTypeName(), "> ", InName, "[] : register(t0, space", InSpace, ");");
         }
 
         static void BuildBinding(const jShaderParameterBindlessBuffer<T>& InParameter, EShaderAccessStageFlag InShaderAccessStageFlags
@@ -1390,9 +1402,10 @@ namespace jShaderParameterDetail
     template <typename BufferType, typename FieldType, FieldType BufferType::* MemberPtr, typename NameProvider>
     struct TShaderUniformBufferFieldEntry
     {
-        static constexpr jShaderUniformBufferFieldMeta GetMeta()
+        static constexpr jShaderUniformBufferFieldMeta GetMeta(size_t byteOffset)
         {
-            return { NameProvider::Get(), TShaderUniformBufferFieldHLSLTypeInfo<FieldType>::GetTypeName(), 1, &TShaderParameterHLSLTypeInfo<FieldType>::AppendTypeDeclaration };
+            return { NameProvider::Get(), TShaderUniformBufferFieldHLSLTypeInfo<FieldType>::GetTypeName(), 1,
+                &TShaderParameterHLSLTypeInfo<FieldType>::AppendTypeDeclaration, false, byteOffset, sizeof(FieldType) };
         }
     };
 
@@ -1605,7 +1618,7 @@ public: \
     static constexpr jShaderUniformBufferFieldMeta __jShaderUniformBufferFieldMeta(TShaderUniformBufferFieldTag<jShaderUniformBufferThisType, Line>) \
     { \
         using jShaderUniformBufferFieldEntry = jShaderParameterDetail::TShaderUniformBufferFieldEntry<jShaderUniformBufferThisType, FieldType, &jShaderUniformBufferThisType::Name, JSHADER_CONCAT(__jShaderUniformBufferFieldName_, Line)>; \
-        return jShaderUniformBufferFieldEntry::GetMeta(); \
+        return jShaderUniformBufferFieldEntry::GetMeta(offsetof(jShaderUniformBufferThisType, Name)); \
     } \
 public:
 
@@ -1622,7 +1635,7 @@ private: \
 public: \
     static constexpr jShaderUniformBufferFieldMeta __jShaderUniformBufferFieldMeta(TShaderUniformBufferFieldTag<jShaderUniformBufferThisType, Line>) \
     { \
-        return { JSHADER_CONCAT(__jShaderUniformBufferFieldArrayName_, Line)::Get(), TShaderUniformBufferFieldHLSLTypeInfo<FieldType>::GetTypeName(), ArrayCount, &TShaderParameterHLSLTypeInfo<FieldType>::AppendTypeDeclaration, true }; \
+        return { JSHADER_CONCAT(__jShaderUniformBufferFieldArrayName_, Line)::Get(), TShaderUniformBufferFieldHLSLTypeInfo<FieldType>::GetTypeName(), ArrayCount, &TShaderParameterHLSLTypeInfo<FieldType>::AppendTypeDeclaration, true, offsetof(jShaderUniformBufferThisType, Name), sizeof(FieldType) * ArrayCount }; \
     } \
 public:
 
@@ -1655,7 +1668,7 @@ public: \
     static constexpr jShaderUniformBufferFieldMeta __jShaderUniformBufferFieldMeta(TShaderUniformBufferFieldTag<jShaderUniformBufferThisType, Line>) \
     { \
         using jShaderUniformBufferFieldEntry = jShaderParameterDetail::TShaderUniformBufferFieldEntry<jShaderUniformBufferThisType, FieldType, &jShaderUniformBufferThisType::Name, JSHADER_CONCAT(__jShaderStructFieldName_, Line)>; \
-        return jShaderUniformBufferFieldEntry::GetMeta(); \
+        return jShaderUniformBufferFieldEntry::GetMeta(offsetof(jShaderUniformBufferThisType, Name)); \
     } \
 public:
 
@@ -1669,7 +1682,7 @@ private: \
 public: \
     static constexpr jShaderUniformBufferFieldMeta __jShaderUniformBufferFieldMeta(TShaderUniformBufferFieldTag<jShaderUniformBufferThisType, Line>) \
     { \
-        return { JSHADER_CONCAT(__jShaderStructFieldArrayName_, Line)::Get(), TShaderUniformBufferFieldHLSLTypeInfo<FieldType>::GetTypeName(), ArrayCount, &TShaderParameterHLSLTypeInfo<FieldType>::AppendTypeDeclaration, true }; \
+        return { JSHADER_CONCAT(__jShaderStructFieldArrayName_, Line)::Get(), TShaderUniformBufferFieldHLSLTypeInfo<FieldType>::GetTypeName(), ArrayCount, &TShaderParameterHLSLTypeInfo<FieldType>::AppendTypeDeclaration, true, offsetof(jShaderUniformBufferThisType, Name), sizeof(FieldType) * ArrayCount }; \
     } \
 public:
 

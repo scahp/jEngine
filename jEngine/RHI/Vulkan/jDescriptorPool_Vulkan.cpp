@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jDescriptorPool_Vulkan.h"
 #include "Math/MathUtility.h"
 
@@ -50,8 +50,12 @@ void jDescriptorPool_Vulkan::Create(uint32 InMaxDescriptorSets)
 
     VkDescriptorPoolCreateInfo PoolInfo{};
     PoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    PoolInfo.poolSizeCount = NumOfPoolSize;
-    PoolInfo.pPoolSizes = Types;
+    std::vector<VkDescriptorPoolSize> supportedTypes;
+    for (const auto& type : Types)
+        if (type.type != VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR || IsRaytracingSceneSupported())
+            supportedTypes.push_back(type);
+    PoolInfo.poolSizeCount = static_cast<uint32>(supportedTypes.size());
+    PoolInfo.pPoolSizes = supportedTypes.data();
     PoolInfo.maxSets = InMaxDescriptorSets;
     PoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;       // for bindless resources
 

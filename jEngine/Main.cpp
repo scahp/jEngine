@@ -1,15 +1,23 @@
-﻿// ConsoleApplication1.cpp : This file contains the 'main' function. Program execution begins and ends there.
+// ConsoleApplication1.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
 
 #include "pch.h"
 #include <iostream>
 #include "jEngine.h"
 #include "Profiler/jPerformanceProfile.h"
+#ifdef _WIN32
 #include "RHI/DX12/jRHI_DX12.h"
+#endif
 #include "jCommandlineArgument.h"
+#include "jOptions.h"
+#ifdef _WIN32
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
+#endif
 
+#ifdef __APPLE__
+void DumpSurfelGIDiagnostics();
+#endif
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
@@ -24,16 +32,18 @@ void window_size_callback(GLFWwindow* window, int width, int height);
 #include "Math/Matrix.h"
 #include "Math/Vector.h"
 
-int main()
+int main(int argc, char** argv)
 {
-    gCommandLineArgument.Init(GetCommandLineA());
+    std::string commandLine;
+    for (int i = 1; i < argc; ++i) { commandLine += argv[i]; commandLine += " "; }
+    gCommandLineArgument.Init(commandLine.c_str());
 	GMainThreadID = std::this_thread::get_id();
 
 	g_Engine = new jEngine();
 	g_Engine->PreInit();
 
 	if (!g_rhi->InitRHI())
-		return false;
+		return EXIT_FAILURE;
 
 	g_rhi->OnInitRHI();
 
@@ -57,10 +67,20 @@ int main()
 
 	// glfwSwapInterval(0);		// 0 is no limit fps
 
+    if (const char* value = std::getenv("JENGINE_SURFEL_GI")) gOptions.UseSurfelGI = std::atoi(value) != 0;
+    if (const char* value = std::getenv("JENGINE_INLINE_RAY")) gOptions.SurfelGIInlineRayEnable = std::atoi(value) != 0;
 	g_Engine->Init();
+    std::cout << "SurfelGI: " << gOptions.UseSurfelGI << "; inline ray option: " << gOptions.SurfelGIInlineRayEnable << std::endl;
+    uint32 renderedFrames = 0;
+    const char* frameLimitText = std::getenv("JENGINE_MAX_FRAMES");
+    const uint32 frameLimit = frameLimitText ? static_cast<uint32>(std::stoul(frameLimitText)) : 0;
+    const char* fixedStepText = std::getenv("JENGINE_FIXED_TIMESTEP");
+    const float fixedStep = fixedStepText ? std::stof(fixedStepText) : 0.0f;
+    std::cout << "jEngine initialized: " << g_rhi->GetRHIName().ToStr() << std::endl;
 
 	// render loop
 	// -----------
+	#ifdef _WIN32
 	if (IsUseDX12())
 	{
 		MSG msg = {};
@@ -87,6 +107,7 @@ int main()
 		}
 	}
 	else
+	#endif
 	{
 		while (!glfwWindowShouldClose(window))
 		{
@@ -95,6 +116,8 @@ int main()
 			std::chrono::duration<double> elapsed_seconds = currentTime - lastTime;
 			g_timeDeltaSecond = (float)elapsed_seconds.count();
 			lastTime = currentTime;
+
+            if (fixedStep > 0) g_timeDeltaSecond = fixedStep;
 
             // input
             // -----
@@ -107,6 +130,19 @@ int main()
 			g_Engine->Draw();
 			g_Engine->EndOfFrame();
 
+            ++renderedFrames;
+#ifdef __APPLE__
+            if (std::getenv("JENGINE_TEST_INLINE_TOGGLE") && std::atoi(std::getenv("JENGINE_TEST_INLINE_TOGGLE")) != 0 && (renderedFrames == 30 || renderedFrames == 60)) {
+                DumpSurfelGIDiagnostics();
+                gOptions.SurfelGIInlineRayEnable = renderedFrames == 60;
+                std::cout << "Inline ray option toggled: " << gOptions.SurfelGIInlineRayEnable
+                          << " after frame " << renderedFrames << std::endl;
+            }
+            if (renderedFrames == 90 && std::getenv("JENGINE_SURFEL_DIAGNOSTICS")) DumpSurfelGIDiagnostics();
+#endif
+            if (renderedFrames == 1 || renderedFrames % 120 == 0)
+                std::cout << "Rendered frames: " << renderedFrames << std::endl;
+            if (frameLimit && renderedFrames >= frameLimit) glfwSetWindowShouldClose(window, GLFW_TRUE);
 			glfwPollEvents();
 		}
 	}
@@ -118,6 +154,7 @@ int main()
 	// glfw: terminate, clearing all previously allocated GLFW resources.
 	// ------------------------------------------------------------------
 	glfwTerminate();
+    std::cout << "jEngine clean shutdown; rendered frames: " << renderedFrames << std::endl;
 	return 0;
 }
 
@@ -207,9 +244,11 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 		buttonState.SetDownState(!IsCapturedButtonInputOnUI, g_MousePosX, g_MousePosY, eventTimeMS);
 		if (!IsCapturedButtonInputOnUI)
 		{
+			#ifdef _WIN32
 			HWND hwnd = glfwGetWin32Window(window);
 			if (hwnd)
 				SetCapture(hwnd);
+			#endif
 		}
 	}
 	else if (GLFW_RELEASE == action)
@@ -219,8 +258,12 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 			g_MouseState[MouseButtonIndex(EMouseButtonType::LEFT)].Down ||
 			g_MouseState[MouseButtonIndex(EMouseButtonType::MIDDLE)].Down ||
 			g_MouseState[MouseButtonIndex(EMouseButtonType::RIGHT)].Down;
+		#ifdef _WIN32
 		if (!anyButtonDown)
-			ReleaseCapture();
+			#ifdef _WIN32
+		ReleaseCapture();
+		#endif
+		#endif
 	}
 	else
 	{
@@ -246,7 +289,9 @@ void window_focus_callback(GLFWwindow* window, int focused)
 	{
 		ResetAllKeyState();
 		ResetMouseAllState();
+		#ifdef _WIN32
 		ReleaseCapture();
+		#endif
 	}
 }
 

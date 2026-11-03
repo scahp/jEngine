@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "jVulkanFeatureSwitch.h"
 
@@ -36,7 +36,11 @@ const std::vector<const char*> DeviceExtensions = {
 #if USE_VARIABLE_SHADING_RATE_TIER2
     VK_NV_SHADING_RATE_IMAGE_EXTENSION_NAME,
 #endif
+#ifndef __APPLE__
     VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME,
+#else
+    "VK_KHR_portability_subset",
+#endif
     VK_EXT_SHADER_VIEWPORT_INDEX_LAYER_EXTENSION_NAME,
     VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME,
 

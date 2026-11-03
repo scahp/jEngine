@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jPipelineStateInfo_Vulkan.h"
 #include "jRHIType_Vulkan.h"
 #include "jVertexBuffer_Vulkan.h"
@@ -38,12 +38,17 @@ void jSamplerStateInfo_Vulkan::Initialize()
     SamplerStateInfo.minLod = MinLOD;		// Optional
     SamplerStateInfo.maxLod = MaxLOD;
 
+#ifdef __APPLE__
+    SamplerStateInfo.borderColor = BorderColor.w == 0 ? VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK :
+        (BorderColor.x == 1 ? VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE : VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK);
+#else
     SamplerStateInfo.borderColor = VK_BORDER_COLOR_FLOAT_CUSTOM_EXT;
 
     VkSamplerCustomBorderColorCreateInfoEXT CustomBorderColor{};
     CustomBorderColor.sType = VK_STRUCTURE_TYPE_SAMPLER_CUSTOM_BORDER_COLOR_CREATE_INFO_EXT;
     memcpy(CustomBorderColor.customBorderColor.float32, &BorderColor, sizeof(BorderColor));
     SamplerStateInfo.pNext = &CustomBorderColor;
+#endif
 
     ensure(vkCreateSampler(g_rhi_vk->Device, &SamplerStateInfo, nullptr, &SamplerState) == VK_SUCCESS);
 

@@ -1,5 +1,14 @@
-﻿#pragma once
+#pragma once
+#ifdef _WIN32
 #include <ppl.h>
+#else
+namespace concurrency {
+template<typename I, typename F> void parallel_for(I first, I last, F fn) {
+    // Portable baseline; preserve deterministic completion before returning.
+    for (I i = first; i < last; ++i) fn(i);
+}
+}
+#endif
 
 struct jParallelFor
 {
@@ -32,7 +41,7 @@ struct jParallelFor
             concurrency::parallel_for(size_t(0), InMaxThreadCount, [&](size_t InIndex)
             {
                 // 남은 작업이 있는 경우, 각 스레드에 하나씩 추가로 할당
-                const size_t StartIndex = InIndex * TaskPerThread + min(InIndex, RemainingTasks);
+                const size_t StartIndex = InIndex * TaskPerThread + std::min(InIndex, RemainingTasks);
                 const size_t EndIndex = StartIndex + TaskPerThread + (InIndex < RemainingTasks ? 1 : 0);
 
                 for (size_t k = StartIndex; k < EndIndex; ++k)

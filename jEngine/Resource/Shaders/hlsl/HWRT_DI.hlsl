@@ -1,3 +1,9 @@
+// Vulkan BUFFER_SRV descriptors are storage buffers; DX12 uses typed views.
+#ifdef __spirv__
+#define JENGINE_INDEX_BUFFER StructuredBuffer<uint>
+#else
+#define JENGINE_INDEX_BUFFER Buffer<uint>
+#endif
 #include "common.hlsl"
 #include "PBR.hlsl"
 #include "lightutil.hlsl"
@@ -145,7 +151,7 @@ float3 HitWorldPosition()
 void GetGeometryResources(
     in uint InstanceIdx,
     out StructuredBuffer<uint2> VertexIndexOffset,
-    out Buffer<uint> IndexBuffer,
+    out JENGINE_INDEX_BUFFER IndexBuffer,
     out StructuredBuffer<RenderObjectUniformBuffer> RenderObjParam,
     out ByteAddressBuffer VertexBuffer,
     out MaterialInstanceUniform MaterialInstance)
@@ -167,7 +173,7 @@ void GetTriangleVertices(
     out MaterialInstanceUniform MaterialInstance)
 {
     StructuredBuffer<uint2> VertexIndexOffset;
-    Buffer<uint> IndexBuffer;
+    JENGINE_INDEX_BUFFER IndexBuffer;
     StructuredBuffer<RenderObjectUniformBuffer> RenderObjParamBuffer;
     ByteAddressBuffer VertexBuffer;
     GetGeometryResources(InstanceIdx, VertexIndexOffset, IndexBuffer, RenderObjParamBuffer, VertexBuffer, MaterialInstance);

@@ -1,3 +1,9 @@
+// Vulkan BUFFER_SRV descriptors are storage buffers; DX12 uses typed views.
+#ifdef __spirv__
+#define JENGINE_INDEX_BUFFER StructuredBuffer<uint>
+#else
+#define JENGINE_INDEX_BUFFER Buffer<uint>
+#endif
 #include "common.hlsl"
 #include "PBR.hlsl"
 
@@ -94,7 +100,7 @@ void GetShaderBindingResources(
     inout TextureCube<float4> IrradianceMap,
     inout TextureCube<float4> PrefilteredEnvMap,
     inout StructuredBuffer<uint2> VertexIndexOffset,
-    inout Buffer<uint> IndexBindless,
+    inout JENGINE_INDEX_BUFFER IndexBindless,
     inout StructuredBuffer<RenderObjectUniformBuffer> RenderObjParam,
     inout ByteAddressBuffer VerticesBindless,
     inout Texture2D AlbedoTexture,

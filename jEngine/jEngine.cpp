@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jEngine.h"
 #include "Shader/jShader.h"
 #include "Profiler/jPerformanceProfile.h"
@@ -31,7 +31,11 @@ void jEngine::PreInit()
     }
     else
     {
-        gAPIType = EAPIType::DX12;		// Default API is DX12
+#ifdef __APPLE__
+        gAPIType = EAPIType::Vulkan;
+#else
+        gAPIType = EAPIType::DX12;
+#endif
     }
 
     if (IsUseVulkan())
@@ -40,7 +44,11 @@ void jEngine::PreInit()
     }
     else if (IsUseDX12())
     {
+#ifdef _WIN32
         g_rhi = new jRHI_DX12();
+#else
+        throw std::runtime_error("DX12 is available only on Windows; use -vulkan");
+#endif
     }
     else
     {

@@ -1,5 +1,7 @@
 #pragma once
+#ifdef _WIN32
 #include <sysinfoapi.h>
+#endif
 #include "Profiler/jProfilerBackend.h"
 
 #define ENABLE_PROFILE 1

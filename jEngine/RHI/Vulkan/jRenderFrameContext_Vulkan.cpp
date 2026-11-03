@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jRenderFrameContext_Vulkan.h"
 #include "Renderer/jSceneRenderTargets.h"
 #include "../jCommandBufferManager.h"
@@ -14,7 +14,7 @@ void jRenderFrameContext_Vulkan::Destroy()
         }
     }
 
-    __super::Destroy();
+    jRenderFrameContext::Destroy();
 }
 
 std::shared_ptr<jRenderFrameContext> jRenderFrameContext_Vulkan::CreateRenderFrameContextAsync(const std::shared_ptr<jSyncAcrossCommandQueue>& InSync) const

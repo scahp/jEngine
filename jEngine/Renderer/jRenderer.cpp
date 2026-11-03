@@ -14,7 +14,9 @@
 #include "Scene/jRenderObject.h"
 #include "Shader/jCommonShaderParameters.h"
 #include "Shader/jLightingShaderParameters.h"
+#ifdef _WIN32
 #include "dxcapi.h"
+#endif
 #include "jDirectionalLightDrawCommandGenerator.h"
 #include "jGame.h"
 #include "jOptions.h"
@@ -1105,6 +1107,8 @@ void jRenderer::Render()
 
             g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
 
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(),
+                RenderFrameContextPtr->SceneRenderTargetPtr->LinearDepthPtr->GetTexture(), EResourceLayout::UAV);
             jCalcLinearDepthCSParameters Parameters;
             Parameters.OutLinearDepthTexture = { RenderFrameContextPtr->SceneRenderTargetPtr->LinearDepthPtr->GetTexture() };
             Parameters.InDepthTexture = { RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), nullptr };

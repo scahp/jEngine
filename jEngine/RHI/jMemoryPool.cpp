@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jMemoryPool.h"
 
 void* jMemory::GetMappedPointer() const
@@ -93,7 +93,7 @@ jMemory jMemoryPool::Alloc(EVulkanBufferBits InUsages, EVulkanMemoryBits InPrope
 
     NewSubMemoryAllocator->Initialize(InUsages, InProperties, SubMemoryAllocatorSize);
     const jMemory& alloc = NewSubMemoryAllocator->Alloc(InSize);
-    check(alloc.IsValid());
+    if (!alloc.IsValid()) throw std::runtime_error("GPU memory pool allocation failed: " + std::to_string(InSize));
 
     return alloc;
 }

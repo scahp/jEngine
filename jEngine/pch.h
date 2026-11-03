@@ -3,7 +3,11 @@
 
 #define NOMINMAX
 
+#ifdef _WIN32
 #include <windows.h>
+#else
+#include "Platform/jPlatform.h"
+#endif
 
 #include "CoreDefines.h"
 
@@ -43,7 +47,9 @@
 #include <chrono>
 #include <fstream>
 #include <execution>
+#ifdef _WIN32
 #include <ppl.h>
+#endif
 #include <filesystem>
 #include <random>
 
@@ -71,10 +77,13 @@ FORCEINLINE uint64 XXH64(const T& InData, uint64 InSeed = 0)
 #define GLFW_INCLUDE_VULKAN
 #include "imgui_impl_vulkan.h"
 #include "RHI/Vulkan/jRHI_Vulkan.h"
+#ifndef __APPLE__
 #include "Shader/Spirv/jSpirvHelper.h"
+#endif
 #include "RHI/Vulkan/jVulkanFeatureSwitch.h"
 
 // DX12
+#ifdef _WIN32
 #include <d3d12.h>
 #include <D3DX12/d3dx12.h>
 #include <wrl.h>
@@ -85,6 +94,7 @@ FORCEINLINE uint64 XXH64(const T& InData, uint64 InSeed = 0)
 #include "IMGUI/imgui_impl_win32.h"
 #include "IMGUI/imgui_impl_dx12.h"
 #include "RHI/DX12/jRHI_DX12.h"
+#endif
 //////////////////////////////////////////////////////////////////////////
 
 // imgui
@@ -300,6 +310,7 @@ FORCEINLINE void ResetAllKeyState()
 	g_KeyState.fill(false);
 }
 
+#ifdef _WIN32
 FORCEINLINE EInputKey ToInputKeyFromWin32(int32 InVK)
 {
 	switch (InVK)
@@ -365,6 +376,8 @@ FORCEINLINE EInputKey ToInputKeyFromWin32(int32 InVK)
 	default: return EInputKey::UNKNOWN;
 	}
 }
+
+#endif
 
 FORCEINLINE EInputKey ToInputKeyFromGLFW(int32 InGlfwKey)
 {
@@ -512,7 +525,11 @@ FORCEINLINE std::wstring ConvertToWchar(jName InName)
 
 extern uint32 GetMaxThreadCount();
 
+#ifdef _WIN32
 #define USE_PIX 1
+#else
+#define USE_PIX 0
+#endif
 #if USE_PIX
 #include "pix3.h"
 #endif
@@ -540,6 +557,7 @@ extern class jEngine* g_Engine;
 extern bool GUseRealTimeShaderUpdate;
 extern bool GSupportRaytracing;
 extern bool GSupportInlineRaytracing;
+inline bool IsRaytracingSceneSupported() { return GSupportRaytracing || GSupportInlineRaytracing; }
 extern int32 GMaxCheckCountForRealTimeShaderUpdate;
 extern int32 GSleepMSForRealTimeShaderUpdate;
 

@@ -39,7 +39,7 @@ struct jResourceContainer
         else
         {
             for (int32 i = 0; i < InCount; ++i)
-                Data[NumOfData + i] = *((T*)InElementAddress[i]);
+                Data[NumOfData + i] = static_cast<T*>(InElementAddress)[i];
         }
         NumOfData += InCount;
     }

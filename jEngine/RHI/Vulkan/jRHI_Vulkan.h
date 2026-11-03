@@ -26,6 +26,7 @@ struct jStandaloneResourceVulkan
 	static void ReleaseBufferResource(VkBuffer InBuffer, VkDeviceMemory InMemory, const VkAllocationCallbacks* InAllocatorCallback = nullptr);
 	static void ReleaseImageResource(VkImage InImage, VkDeviceMemory InMemory, const std::vector<VkImageView>& InViews, const VkAllocationCallbacks* InAllocatorCallback = nullptr);
 
+	VkAccelerationStructureKHR AccelerationStructure = VK_NULL_HANDLE;
 	VkBuffer Buffer = nullptr;
 	VkDeviceMemory Memory = nullptr;
 

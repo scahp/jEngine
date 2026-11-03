@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <type_traits>
 #include "Core/jName.h"
@@ -58,8 +58,8 @@ template <typename T1, typename T2>
 using ConversionTypePair = std::pair<T1, T2>;
 
 // Parameter Packs 의 첫번째 타입을 얻어줌
-template<typename T, typename... T1>
-using PacksType = T;
+template<typename... T>
+using PacksType = std::tuple_element_t<0, std::tuple<T...>>;
 
 template <typename... T1>
 constexpr auto GenerateConversionTypeArray(T1... args)
@@ -124,7 +124,8 @@ constexpr auto GenerateInverseConversionTypeMap(T1... args)
 #define GENERATE_STATIC_INVERSECONVERSION_MAP(...) {static auto _TypeMap_ = GenerateInverseConversionTypeMap(__VA_ARGS__); return _TypeMap_[type];}
 
 // Variadic macro 의 첫번째 항목 얻는 매크로
-#define DEDUCE_FIRST(First, ...) First
+template<class First, class... Rest> First DeduceFirstType(First, Rest...);
+#define DEDUCE_FIRST(...) DeduceFirstType(__VA_ARGS__)
 
 // Engine type <-> API type 전환 함수 만들어주는 매크로
 #define GENERATE_CONVERSION_FUNCTION(FunctionName, ...) \

@@ -221,8 +221,6 @@ BEGIN_SHADER_PARAMETER_SET(jRTAOGlobalParameters)
     SHADER_SAMPLER(PBRSamplerState)
 END_SHADER_PARAMETER_SET()
 
-namespace
-{
     struct jRTAOBindlessUInt2
     {
     };
@@ -233,7 +231,6 @@ namespace
         static constexpr const char* GetTypeName() { return "uint2"; }
         static void AppendTypeDeclaration(std::string&) {}
     };
-}
 
 BEGIN_SHADER_BINDLESS_SET(jRTAOBindlessParameters)
     // Bindless tables are assigned consecutive spaces starting at the binder's current space.

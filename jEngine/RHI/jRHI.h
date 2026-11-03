@@ -1,7 +1,7 @@
-﻿#pragma once
-#include "Math\Matrix.h"
-#include "Core\jName.h"
-#include "Math\Vector.h"
+#pragma once
+#include "Math/Matrix.h"
+#include "Core/jName.h"
+#include "Math/Vector.h"
 #include "jPipelineStateInfo.h"
 #include "jFrameBuffer.h"
 #include "jRenderTarget.h"

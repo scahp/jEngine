@@ -1,7 +1,11 @@
 #pragma once
 #include "jLock.h"
+#ifndef _WIN32
+#include <codecvt>
+#include <locale>
+#endif
 
-#define jNameStatic(STRING) [&]() {static jName name(STRING); return name; }()
+#define jNameStatic(STRING) [](const auto& value) {static jName name(value); return name; }(STRING)
 
 struct jName
 {
@@ -16,6 +20,9 @@ private:
 		if (!wstr || wlen == 0)
 			return std::string();
 
+#ifndef _WIN32
+        return std::wstring_convert<std::codecvt_utf8<wchar_t>>{}.to_bytes(wstr, wstr + wlen);
+#else
 		// Calculate required buffer size
 		int utf8Size = WideCharToMultiByte(CP_UTF8, 0, wstr, static_cast<int>(wlen), nullptr, 0, nullptr, nullptr);
 		if (utf8Size <= 0)
@@ -25,6 +32,7 @@ private:
 		std::string result(utf8Size, '\0');
 		WideCharToMultiByte(CP_UTF8, 0, wstr, static_cast<int>(wlen), &result[0], utf8Size, nullptr, nullptr);
 		return result;
+#endif
 	}
 
 	// Helper function: Convert UTF-8 char* to wchar_t*
@@ -33,6 +41,9 @@ private:
 		if (!str || len == 0)
 			return std::wstring();
 
+#ifndef _WIN32
+        return std::wstring_convert<std::codecvt_utf8<wchar_t>>{}.from_bytes(str, str + len);
+#else
 		// Calculate required buffer size
 		int wideSize = MultiByteToWideChar(CP_UTF8, 0, str, static_cast<int>(len), nullptr, 0);
 		if (wideSize <= 0)
@@ -42,6 +53,7 @@ private:
 		std::wstring result(wideSize, L'\0');
 		MultiByteToWideChar(CP_UTF8, 0, str, static_cast<int>(len), &result[0], wideSize);
 		return result;
+#endif
 	}
 
 public:
