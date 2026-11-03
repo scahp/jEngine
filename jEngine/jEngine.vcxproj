@@ -50,6 +50,9 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
+  <PropertyGroup>
+    <JEngineDxcDirectory Condition="'$(JEngineDxcDirectory)' == ''">$(ProjectDir)..\.ci-tools\dxc\bin\x64</JEngineDxcDirectory>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <PrecompiledHeader>Use</PrecompiledHeader>
@@ -78,7 +81,9 @@
       <Command>xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"
 xcopy /s /y /d  "$(ProjectDir)External\ShaderConductor\Lib\Debug\*.dll" "$(OutDir)"
 xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"
-xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutDir)"</Command>
+xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutDir)"
+xcopy /y /i "$(JEngineDxcDirectory)\dxcompiler.dll" "$(OutDir)"
+xcopy /y /i "$(JEngineDxcDirectory)\dxil.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -110,7 +115,9 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
       <Command>xcopy /s /y /d  "$(ProjectDir)External\assimp\lib\*.dll" "$(OutDir)"
 xcopy /s /y /d  "$(ProjectDir)External\ShaderConductor\Lib\Debug\*.dll" "$(OutDir)"
 xcopy /s /y /d  "$(ProjectDir)External\DirectX12\lib\*.dll" "$(OutDir)"
-xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutDir)"</Command>
+xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutDir)"
+xcopy /y /i "$(JEngineDxcDirectory)\dxcompiler.dll" "$(OutDir)"
+xcopy /y /i "$(JEngineDxcDirectory)\dxil.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -903,4 +910,8 @@ xcopy /s /y /d  "$(ProjectDir)External\WinPixEventRuntime\lib\x64\*.dll" "$(OutD
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <Target Name="VerifyPinnedShaderCompiler" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('$(JEngineDxcDirectory)\dxcompiler.dll') Or !Exists('$(JEngineDxcDirectory)\dxil.dll')"
+      Text="Run powershell -File scripts/ci/setup-windows-dxc.ps1 from the repository root, or set JEngineDxcDirectory to the matching DXC bin/x64 directory." />
+  </Target>
 </Project>

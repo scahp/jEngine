@@ -3,6 +3,7 @@
 #ifdef _WIN32
 #include "RHI/DX12/jShaderCompiler_DX12.h"
 #include <cctype>
+#include <cstdint>
 #include <cstring>
 #include <iterator>
 #include <regex>
@@ -13,6 +14,35 @@ int ExportSurfelGIShaderFixtures(const char* directory, bool vulkan);
 
 namespace
 {
+    bool RuntimeShaderFilesMatch(const std::filesystem::path& actual, const std::filesystem::path& expected)
+    {
+        const auto actualSize = std::filesystem::file_size(actual);
+        if (!actualSize || actualSize != std::filesystem::file_size(expected)) return false;
+        std::ifstream actualFile(actual, std::ios::binary);
+        std::ifstream expectedFile(expected, std::ios::binary);
+        if (!actualFile || !expectedFile)
+            throw std::runtime_error("Cannot open runtime/package DLLs for comparison: "
+                + actual.string() + " / " + expected.string());
+        std::array<char, 65536> actualBytes{}, expectedBytes{};
+        std::uintmax_t compared = 0;
+        for (;;)
+        {
+            actualFile.read(actualBytes.data(), static_cast<std::streamsize>(actualBytes.size()));
+            expectedFile.read(expectedBytes.data(), static_cast<std::streamsize>(expectedBytes.size()));
+            if (actualFile.bad() || expectedFile.bad()
+                || (actualFile.fail() && !actualFile.eof()) || (expectedFile.fail() && !expectedFile.eof()))
+                throw std::runtime_error("Cannot read runtime/package DLLs for comparison: "
+                    + actual.string() + " / " + expected.string());
+            const auto actualCount = actualFile.gcount();
+            if (actualCount != expectedFile.gcount()
+                || std::memcmp(actualBytes.data(), expectedBytes.data(), static_cast<size_t>(actualCount)) != 0)
+                return false;
+            compared += static_cast<std::uintmax_t>(actualCount);
+            if (actualFile.eof() || expectedFile.eof())
+                return actualFile.eof() && expectedFile.eof() && compared == actualSize;
+        }
+    }
+
     std::string FlattenRuntimeShader(const std::filesystem::path& path,
         const std::filesystem::path& includeDirectory, std::set<std::string>& included)
     {
@@ -123,6 +153,35 @@ int RunRuntimeShaderAuditTests()
 #ifdef JENGINE_DXC_EXECUTABLE
     std::cout << "Separate CI shader compiler executable: " << JENGINE_DXC_EXECUTABLE << std::endl;
 #endif
+
+    wchar_t executablePath[32768] = {};
+    const DWORD executableLength = GetModuleFileNameW(nullptr, executablePath, 32768);
+    if (!expect(executableLength > 0 && executableLength < 32768, "runtime shader audit executable path"))
+        return failures;
+    try
+    {
+        const auto executableDirectory = std::filesystem::path(executablePath).parent_path();
+        const std::filesystem::path loadedCompiler(modulePath);
+        expect(std::filesystem::equivalent(loadedCompiler.parent_path(), executableDirectory),
+            "runtime DXC loaded beside engine executable");
+#ifdef JENGINE_DXC_EXECUTABLE
+        const auto packageDirectory = std::filesystem::path(JENGINE_DXC_EXECUTABLE).parent_path();
+        expect(RuntimeShaderFilesMatch(loadedCompiler, packageDirectory / "dxcompiler.dll"),
+            "loaded dxcompiler DLL bytes match selected DXC package");
+        // DXC 1.9 can use its internal validator. Check the deployed validator
+        // without requiring or forcing its automatic load into this process.
+        expect(RuntimeShaderFilesMatch(executableDirectory / "dxil.dll", packageDirectory / "dxil.dll"),
+            "deployed dxil DLL bytes match selected DXC package");
+#else
+        std::cout << "SKIP selected DXC package byte assertions: JENGINE_DXC_EXECUTABLE is undefined in this build"
+            << std::endl;
+#endif
+    }
+    catch (const std::exception& error)
+    {
+        std::cerr << "Runtime DXC deployment audit failed: " << error.what() << std::endl;
+        ++failures;
+    }
 
     const EAPIType previousApi = gAPIType;
     struct RestoreApi { EAPIType Value; ~RestoreApi() { gAPIType = Value; } } restoreApi{ previousApi };

@@ -33,6 +33,8 @@ target_include_directories(jEngine PRIVATE jEngine jEngine/External
   jEngine/External/IMGUI jEngine/External/EASTL/include jEngine/External/EABase/include/Common
   jEngine/External/stb jEngine/External/loadpng jEngine/External/TinyXml2
   jEngine/External/xxHash jEngine/External/tracy/public)
+find_program(JENGINE_DXC_EXECUTABLE NAMES dxc HINTS "${CMAKE_CURRENT_SOURCE_DIR}/.ci-tools/dxc/bin/x64"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../DirectXShaderCompiler/build/macos/bin" REQUIRED)
 if(WIN32)
   include(cmake/WindowsDependencies.cmake)
 else()
@@ -42,8 +44,7 @@ else()
   target_compile_options(jEngine PRIVATE -fms-extensions -Wno-deprecated-declarations -Wno-invalid-constexpr -Wno-switch -Wno-unused-value -ferror-limit=10)
 endif()
 target_precompile_headers(jEngine PRIVATE jEngine/pch.h)
-find_program(JENGINE_DXC_EXECUTABLE NAMES dxc HINTS "${CMAKE_CURRENT_SOURCE_DIR}/.ci-tools/dxc/bin/x64"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../DirectXShaderCompiler/build/macos/bin" REQUIRED)
+
 target_compile_definitions(jEngine PRIVATE JENGINE_DXC_EXECUTABLE="${JENGINE_DXC_EXECUTABLE}")
 set_source_files_properties(jEngine/External/xxHash/xxhash.c jEngine/Tests/jEffectsAuditTests.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 
