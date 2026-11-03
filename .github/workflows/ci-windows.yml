@@ -47,18 +47,11 @@ jobs:
       - name: Install pinned shader compiler
         shell: pwsh
         run: scripts/ci/setup-windows-dxc.ps1
-      - name: Build engine and run CPU checks
+      - name: Generate Visual Studio project, build, and test
         shell: pwsh
         env:
           CONFIGURATION: ${{ matrix.configuration }}
         run: scripts/ci/build-windows.ps1 -Configuration $env:CONFIGURATION
-      - name: Generated shader compilation and layout checks
-        shell: pwsh
-        env:
-          CONFIGURATION: ${{ matrix.configuration }}
-        run: |
-          python scripts/ci/check-shaders.py --engine "build/windows-$env:CONFIGURATION/bin/jEngine.exe" --dxc .ci-tools/dxc/bin/x64/dxc.exe --source jEngine --output "build/windows-$env:CONFIGURATION/shader-checks"
-          if ($LASTEXITCODE -ne 0) { throw 'Shader checks failed' }
       - name: Upload build and diagnostics
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -67,8 +60,10 @@ jobs:
           retention-days: 5
           if-no-files-found: warn
           path: |
-            build/windows-${{ matrix.configuration }}/*.log
-            build/windows-${{ matrix.configuration }}/*.binlog
-            build/windows-${{ matrix.configuration }}/bin/*.exe
-            build/windows-${{ matrix.configuration }}/bin/*.dll
-            build/windows-${{ matrix.configuration }}/shader-checks/**
+            build/windows-vs2026/*.log
+            build/windows-vs2026/*.binlog
+            build/windows-vs2026/*.xml
+            build/windows-vs2026/CMakeFiles/CMakeConfigureLog.yaml
+            build/windows-vs2026/${{ matrix.configuration }}/*.exe
+            build/windows-vs2026/${{ matrix.configuration }}/**/*.dll
+            build/windows-vs2026/shader-checks/**

@@ -3,7 +3,8 @@
 ## macOS (Apple Silicon / MoltenVK)
 
 The macOS CMake target runs the existing Vulkan renderer through MoltenVK. Windows
-continues to use `jEngine/jEngine.sln`. Install Xcode Command Line Tools and Homebrew,
+can generate a Visual Studio solution with the `windows-vs2026` preset; the
+handwritten `jEngine/jEngine.sln` remains available. Install Xcode Command Line Tools and Homebrew,
 then run from the repository root:
 
 ```sh
@@ -103,8 +104,8 @@ storage-buffer declarations while retaining DX12 typed-buffer declarations.
 `Windows` and `macOS` run independently on branch pushes, pull requests targeting
 `main`, and manual dispatch. README-only and `docs/`-only changes are skipped. It uses standard public-repository GitHub-hosted runners:
 
-- Windows Server 2025 / Visual Studio 2026: the existing `jEngine.vcxproj`, x64
-  Debug and Release. The separate Tracy profiler application is not part of CI.
+- Windows Server 2025 / Visual Studio 2026: CMake-generated Visual Studio projects,
+  x64 Debug and Release. The separate Tracy profiler application is not part of CI.
 - macOS 26 / Apple Silicon: CMake/Ninja Debug and Release.
 - Both platforms run `--ci-cpu` and compile actual engine-generated SurfelGI
   placement, resolve, and inline-gather declarations to SPIR-V and DXIL. The
@@ -127,9 +128,15 @@ ctest --preset macos-debug
 cmake --workflow --preset macos-release
 ```
 
-`CMakeUserPresets.json` is ignored for machine-specific overrides. Windows CMake
-engine support is still pending; its CI intentionally exercises the existing
-Visual Studio project rather than pretending the macOS target is portable.
+`CMakeUserPresets.json` is ignored for machine-specific overrides. Windows requires
+CMake 4.2+ for the Visual Studio 2026 generator, MSVC x64, and Python 3. Configure
+with `cmake --preset windows-vs2026`; build/test with `windows-debug` or
+`windows-release`. The generated solution lives in `build/windows-vs2026/`.
+The CMake target includes both DX12 and Vulkan, retains Tracy, uses the bundled
+Windows dependencies, and copies runtime DLLs beside the executable, preserving
+the Agility SDK's `D3D12/` subdirectory. The IDE working directory is `jEngine/`
+for existing asset paths. CPU and shader tests use the same CTest interface as
+macOS and do not require a GPU or a Vulkan driver on the runner.
 
 DXC is pinned in `scripts/ci/dependencies.json`. macOS builds it once per cache
 key and shares its native executable/library between the build configurations;

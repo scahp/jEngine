@@ -1,18 +1,15 @@
 param([ValidateSet('Debug','Release')][string]$Configuration = 'Release')
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path "$PSScriptRoot/../..").Path
-$out = Join-Path $root "build\windows-$Configuration"
-New-Item -ItemType Directory -Force "$out/bin", "$out/obj" | Out-Null
-$vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
-$vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
-if (!$vs) { throw 'Visual Studio C++ toolchain is unavailable' }
-$msbuild = Join-Path $vs 'MSBuild/Current/Bin/MSBuild.exe'
-Push-Location "$root/jEngine"
+$out = Join-Path $root 'build/windows-vs2026'
+$preset = "windows-$($Configuration.ToLowerInvariant())"
+New-Item -ItemType Directory -Force $out | Out-Null
+Push-Location $root
 try {
-    & $msbuild jEngine.vcxproj /m:2 /nologo /verbosity:minimal /nodeReuse:false `
-        "/p:Configuration=$Configuration" /p:Platform=x64 "/p:OutDir=$out\bin\" "/p:IntDir=$out\obj\" `
-        "/bl:$out/build.binlog" /fl "/flp:logfile=$out/build.log;verbosity=normal"
-    if ($LASTEXITCODE -ne 0) { throw "MSBuild failed ($LASTEXITCODE)" }
-    & "$out/bin/jEngine.exe" --ci-cpu 2>&1 | Tee-Object "$out/cpu-tests.log"
-    if ($LASTEXITCODE -ne 0) { throw 'CPU checks failed' }
+    & cmake --preset windows-vs2026 2>&1 | Tee-Object "$out/configure.log"
+    if ($LASTEXITCODE -ne 0) { throw 'CMake configuration failed' }
+    & cmake --build --preset $preset -- /nologo /verbosity:minimal /nodeReuse:false "/bl:$out/build.binlog" 2>&1 | Tee-Object "$out/build.log"
+    if ($LASTEXITCODE -ne 0) { throw 'CMake build failed' }
+    & ctest --preset $preset --output-junit "$out/tests.xml" 2>&1 | Tee-Object "$out/tests.log"
+    if ($LASTEXITCODE -ne 0) { throw 'CPU or shader checks failed' }
 } finally { Pop-Location }

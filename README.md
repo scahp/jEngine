@@ -2,7 +2,7 @@
 
 [![Windows](https://github.com/scahp/jEngine/actions/workflows/ci-windows.yml/badge.svg?branch=main)](https://github.com/scahp/jEngine/actions/workflows/ci-windows.yml)
 [![macOS](https://github.com/scahp/jEngine/actions/workflows/ci-macos.yml/badge.svg?branch=main)](https://github.com/scahp/jEngine/actions/workflows/ci-macos.yml)
-[![CMake (macOS)](https://img.shields.io/badge/CMake-macOS-064F8C?logo=cmake)](CMakePresets.json)
+[![CMake](https://img.shields.io/badge/CMake-Windows%20%7C%20macOS-064F8C?logo=cmake)](CMakePresets.json)
 
 Simple toy engine for implementing graphics feature with multiple api
  - Documentation : https://scahp.tistory.com/120
@@ -52,6 +52,20 @@ Simple toy engine for implementing graphics feature with multiple api
 <img src="https://github.com/user-attachments/assets/b09eb9d6-a610-44e0-b0c5-c4a276a4802a" width="45%" />
 
 <br/><br/>
+
+## Windows (CMake)
+
+Requires Visual Studio 2026 C++ tools, CMake 4.2+, and Python 3.
+
+```powershell
+./scripts/ci/setup-windows-dxc.ps1
+cmake --preset windows-vs2026
+cmake --build --preset windows-debug
+ctest --preset windows-debug
+```
+
+Open the generated solution in `build/windows-vs2026/`, or use `windows-release`
+for Release builds. The existing `jEngine/jEngine.sln` is also available.
 
 ## macOS (Apple Silicon)
 

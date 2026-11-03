@@ -1,28 +1,193 @@
 {
   "version": 6,
-  "cmakeMinimumRequired": {"major": 3, "minor": 25, "patch": 0},
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 25,
+    "patch": 0
+  },
   "configurePresets": [
     {
       "name": "macos-base",
       "hidden": true,
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/${presetName}",
-      "cacheVariables": {"BUILD_TESTING": "ON", "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"},
-      "condition": {"type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin"}
+      "cacheVariables": {
+        "BUILD_TESTING": "ON",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      }
     },
-    {"name": "macos-debug", "inherits": "macos-base", "cacheVariables": {"CMAKE_BUILD_TYPE": "Debug"}},
-    {"name": "macos-release", "inherits": "macos-base", "cacheVariables": {"CMAKE_BUILD_TYPE": "Release"}}
+    {
+      "name": "macos-debug",
+      "inherits": "macos-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "macos-release",
+      "inherits": "macos-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "windows-vs2026",
+      "displayName": "Windows x64 / Visual Studio 2026",
+      "generator": "Visual Studio 18 2026",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build/windows-vs2026",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "cacheVariables": {
+        "BUILD_TESTING": "ON",
+        "CMAKE_CONFIGURATION_TYPES": "Debug;Release"
+      }
+    }
   ],
   "buildPresets": [
-    {"name": "macos-debug", "configurePreset": "macos-debug", "jobs": 2},
-    {"name": "macos-release", "configurePreset": "macos-release", "jobs": 2}
+    {
+      "name": "macos-debug",
+      "configurePreset": "macos-debug",
+      "jobs": 2
+    },
+    {
+      "name": "macos-release",
+      "configurePreset": "macos-release",
+      "jobs": 2
+    },
+    {
+      "name": "windows-debug",
+      "configurePreset": "windows-vs2026",
+      "configuration": "Debug",
+      "jobs": 2
+    },
+    {
+      "name": "windows-release",
+      "configurePreset": "windows-vs2026",
+      "configuration": "Release",
+      "jobs": 2
+    }
   ],
   "testPresets": [
-    {"name": "macos-debug", "configurePreset": "macos-debug", "output": {"outputOnFailure": true}, "execution": {"noTestsAction": "error"}},
-    {"name": "macos-release", "configurePreset": "macos-release", "output": {"outputOnFailure": true}, "execution": {"noTestsAction": "error"}}
+    {
+      "name": "macos-debug",
+      "configurePreset": "macos-debug",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
+      }
+    },
+    {
+      "name": "macos-release",
+      "configurePreset": "macos-release",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
+      }
+    },
+    {
+      "name": "windows-debug",
+      "configurePreset": "windows-vs2026",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
+      }
+    },
+    {
+      "name": "windows-release",
+      "configurePreset": "windows-vs2026",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
+      }
+    }
   ],
   "workflowPresets": [
-    {"name": "macos-debug", "steps": [{"type": "configure", "name": "macos-debug"}, {"type": "build", "name": "macos-debug"}, {"type": "test", "name": "macos-debug"}]},
-    {"name": "macos-release", "steps": [{"type": "configure", "name": "macos-release"}, {"type": "build", "name": "macos-release"}, {"type": "test", "name": "macos-release"}]}
+    {
+      "name": "macos-debug",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "macos-debug"
+        },
+        {
+          "type": "build",
+          "name": "macos-debug"
+        },
+        {
+          "type": "test",
+          "name": "macos-debug"
+        }
+      ]
+    },
+    {
+      "name": "macos-release",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "macos-release"
+        },
+        {
+          "type": "build",
+          "name": "macos-release"
+        },
+        {
+          "type": "test",
+          "name": "macos-release"
+        }
+      ]
+    },
+    {
+      "name": "windows-debug",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "windows-vs2026"
+        },
+        {
+          "type": "build",
+          "name": "windows-debug"
+        },
+        {
+          "type": "test",
+          "name": "windows-debug"
+        }
+      ]
+    },
+    {
+      "name": "windows-release",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "windows-vs2026"
+        },
+        {
+          "type": "build",
+          "name": "windows-release"
+        },
+        {
+          "type": "test",
+          "name": "windows-release"
+        }
+      ]
+    }
   ]
 }
