@@ -359,8 +359,8 @@ int RunEditorDocumentTests()
         expect(copySource.SelectionJson({copyA,copyB}).empty() && !copySource.SelectionJson({copyParent,copyA,copyB}).empty(),
             "copy requires inherited animated ancestor to preserve root key pose ownership honestly");
 
-        Limits small; small.MaxEntities = 3; small.MaxHistoryEntries = 2; small.MaxFileBytes = 8192;
-        Document bounded(small);
+        Limits historyLimits; historyLimits.MaxEntities = 3; historyLimits.MaxHistoryEntries = 2; historyLimits.MaxFileBytes = 8192;
+        Document bounded(historyLimits);
         bounded.Create(EntityKind::Cube); bounded.Create(EntityKind::Sphere); bounded.Create(EntityKind::Empty);
         const auto capped = bounded.ToJson();
         expect(!bounded.Create(EntityKind::Cube) && bounded.ToJson() == capped, "entity admission limit rejects edit atomically");

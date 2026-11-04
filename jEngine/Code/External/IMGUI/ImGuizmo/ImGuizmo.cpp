@@ -765,7 +765,9 @@ namespace IMGUIZMO_NAMESPACE
       ImGuiWindow* mAlternativeWindow = nullptr;
       ImVector<ImGuiID> mIDStack;
       ImGuiID mEditingID = -1;
-      OPERATION mOperation = OPERATION(-1);
+      // jEngine: IsOver may run before the first Manipulate; -1 is outside
+      // this enum's valid range. An inactive operation keeps hit tests idle.
+      OPERATION mOperation = NONE;
 
       bool mAllowAxisFlip = true;
       float mGizmoSizeClipSpace = 0.1f;

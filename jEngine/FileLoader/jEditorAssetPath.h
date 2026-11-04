@@ -35,7 +35,8 @@ inline bool IsValidUtf8(std::string_view text)
 inline std::filesystem::path FromUtf8(std::string_view text)
 {
     if (!IsValidUtf8(text)) throw std::invalid_argument("Asset path must be valid UTF-8");
-    return std::filesystem::u8path(text.begin(), text.end());
+    if (text.empty()) return {};
+    return std::filesystem::path(std::u8string(reinterpret_cast<const char8_t*>(text.data()), text.size()));
 }
 inline std::string ToUtf8(const std::filesystem::path& path)
 {

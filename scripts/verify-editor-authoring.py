@@ -70,7 +70,8 @@ def main():
             if result.returncode or problems:
                 raise RuntimeError(f'{case} failed; inspect {log_path}')
             if case == 'uploads':
-                if 'UPLOAD_MEASUREMENT scenario=initial' not in text or entry['pass_lines'] < 20:
+                if ('UPLOAD_MEASUREMENT scenario=initial' not in text or entry['pass_lines'] < 18
+                        or 'editing one real particle color preserves the other emitter' not in text):
                     raise RuntimeError('Upload/particle GPU checks or actual measurements are missing')
                 entry['measurements'] = [line for line in text.splitlines() if line.startswith('UPLOAD_')]
             else:

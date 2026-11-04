@@ -14,9 +14,12 @@
 #include "RHI/Vulkan/jBufferUtil_Vulkan.h"
 #ifdef _WIN32
 #include "RHI/DX12/jBufferUtil_DX12.h"
+#include "RHI/DX12/jTexture_DX12.h"
 #endif
 #include "jEngine.h"
 #include "jOptions.h"
+#include "lodepng.h"
+#include <set>
 #include "External/PathTracingDataLoader/json.hpp"
 #include <chrono>
 #include <fstream>
@@ -62,6 +65,81 @@ jRenderObject* FirstMesh(jEditor& editor, EntityId id)
 {
     auto* object = editor.ObjectForEntity(id);
     return object && !object->RenderObjects.empty() ? object->RenderObjects.front() : nullptr;
+}
+Json ReadScenePixels(const std::shared_ptr<jTexture>& texture, const fs::path& png)
+{
+    Json result{{"available", bool(texture)}, {"readback", false}};
+    if (!texture || !texture->Width || !texture->Height || texture->Width > 4096 || texture->Height > 4096
+        || (texture->Format != ETextureFormat::RGBA8 && texture->Format != ETextureFormat::BGRA8)) return result;
+    const uint32 width = texture->Width, height = texture->Height;
+    uint32 rowPitch = width * 4;
+    uint64 size = uint64(rowPitch) * height;
+#ifdef _WIN32
+    D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint{};
+    if (!IsUseVulkan())
+    {
+        const auto description = static_cast<jTexture_DX12*>(texture.get())->Texture->Get()->GetDesc();
+        uint32 rows = 0; uint64 rowBytes = 0;
+        g_rhi_dx12->Device->GetCopyableFootprints(&description, 0, 1, 0, &footprint, &rows, &rowBytes, &size);
+        rowPitch = footprint.Footprint.RowPitch;
+    }
+#endif
+    g_rhi->Flush();
+    auto readback = g_rhi->CreateRawBuffer(size, 0, EBufferCreateFlag::Readback,
+        IsUseVulkan() ? EResourceLayout::UNDEFINED : EResourceLayout::TRANSFER_DST);
+    if (!readback || !readback->GetHandle()) return result;
+    auto* command = g_rhi->BeginSingleTimeCommands();
+    if (!command) return result;
+    const auto previous = texture->GetLayout();
+    g_rhi->TransitionLayout(command, texture.get(), EResourceLayout::TRANSFER_SRC);
+    g_rhi->TransitionLayout(command, readback.get(), EResourceLayout::TRANSFER_DST);
+    command->FlushBarrierBatch();
+    if (IsUseVulkan())
+    {
+        const auto native = static_cast<jCommandBuffer_Vulkan*>(command)->GetRef();
+        VkBufferImageCopy copy{}; copy.bufferOffset = readback->GetOffset();
+        copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1}; copy.imageExtent = {width,height,1};
+        vkCmdCopyImageToBuffer(native, static_cast<jTexture_Vulkan*>(texture.get())->Image,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, static_cast<jBuffer_Vulkan*>(readback.get())->Buffer, 1, &copy);
+        VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT; barrier.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
+        vkCmdPipelineBarrier(native,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_HOST_BIT,0,1,&barrier,0,nullptr,0,nullptr);
+    }
+#ifdef _WIN32
+    else
+    {
+        D3D12_TEXTURE_COPY_LOCATION source{}, destination{};
+        source.pResource = static_cast<ID3D12Resource*>(texture->GetHandle()); source.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+        destination.pResource = static_cast<ID3D12Resource*>(readback->GetHandle());
+        destination.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT; destination.PlacedFootprint = footprint;
+        static_cast<jCommandBuffer_DX12*>(command)->Get()->CopyTextureRegion(&destination,0,0,0,&source,nullptr);
+    }
+#endif
+    g_rhi->TransitionLayout(command,texture.get(),previous); command->FlushBarrierBatch();
+    g_rhi->EndSingleTimeCommands(command);
+    const auto* mapped = static_cast<const uint8*>(readback->Map());
+    if (!mapped) return result;
+    std::vector<uint8> rgba(size_t(width)*height*4);
+    std::set<uint32> colors;
+    size_t lit = 0, opaque = 0; int minimum = 255, maximum = 0;
+    for (uint32 y=0;y<height;++y) for (uint32 x=0;x<width;++x)
+    {
+        const auto* pixel = mapped+size_t(y)*rowPitch+x*4;
+        auto* output = rgba.data()+(size_t(y)*width+x)*4;
+        output[0]=pixel[texture->Format==ETextureFormat::BGRA8?2:0];output[1]=pixel[1];
+        output[2]=pixel[texture->Format==ETextureFormat::BGRA8?0:2];output[3]=pixel[3];
+        const int brightest=std::max({int(output[0]),int(output[1]),int(output[2])});
+        const int darkest=std::min({int(output[0]),int(output[1]),int(output[2])});
+        lit+=brightest>12; opaque+=output[3]>=254;
+        minimum=std::min(minimum,darkest);maximum=std::max(maximum,brightest);
+        if(colors.size()<1024)colors.insert(uint32(output[0])|(uint32(output[1])<<8)|(uint32(output[2])<<16));
+    }
+    readback->Unmap();
+    const auto pngError=LodePNG_encode32_file(png.string().c_str(),rgba.data(),width,height);
+    result.update({{"readback",true},{"width",width},{"height",height},{"litPixels",lit},{"opaquePixels",opaque},
+        {"distinctColorsAtMost1024",colors.size()},{"minimumRgb",minimum},{"maximumRgb",maximum},
+        {"pngSaved",pngError==0},{"png",png.generic_string()}});
+    return result;
 }
 bool BufferMatches(jBuffer* source, const IStreamParam& expected)
 {
@@ -202,7 +280,7 @@ int RunEditorAuthoringGpuTests(const char* outputDirectory)
     try
     {
         if (!outputDirectory || !*outputDirectory) throw std::runtime_error("An explicit owned output directory is required");
-        output = fs::absolute(fs::u8path(outputDirectory)); fs::create_directories(output);
+        output = fs::absolute(jEditorAssetPath::FromUtf8(outputDirectory)); fs::create_directories(output);
         SetAuthoringTestStateDirectory(output / "workspace-state");
         if (!g_Engine || !g_Editor || !g_rhi || !ImGui::GetCurrentContext()) throw std::runtime_error("Test must run after real engine/RHI/UI initialization");
         auto& editor = *g_Editor;
@@ -281,6 +359,23 @@ int RunEditorAuthoringGpuTests(const char* outputDirectory)
         expect(jEditorUiRenderer::SupportsPlatformWindows(), "real platform and renderer advertise detached-window support");
         frames(30);
         while ((!editor.ObjectForEntity(ids[7]) || !editor.ObjectForEntity(ids[8]) || editor.PendingImportCount()) && rendered < 90) frame();
+        const auto centerClip=camera->ViewProjection.Transform(Vector4(0,5000,0,1));
+        report["fixtureCamera"]={{"position",{camera->Pos.x,camera->Pos.y,camera->Pos.z}},
+            {"target",{camera->Target.x,camera->Target.y,camera->Target.z}},
+            {"centerClip",{centerClip.x,centerClip.y,centerClip.z,centerClip.w}}};
+        expect(centerClip.w>0 && std::abs(centerClip.x/centerClip.w)<1 && std::abs(centerClip.y/centerClip.w)<1
+            && centerClip.z/centerClip.w>=0 && centerClip.z/centerClip.w<=1,
+            "fixture camera projects authored grid center inside the actual view volume");
+        auto scenePixels=ReadScenePixels(jEditorUiRenderer::AcquireScenePreview(),output/"scene-preview-before-ui.png");
+        report["preUiScenePixels"]=scenePixels;
+        expect(scenePixels.value("available",false)&&scenePixels.value("readback",false),
+            "actual pre-UI scene preview texture exists and supports independent GPU readback");
+        const uint64 totalScenePixels=uint64(scenePixels.value("width",0u))*scenePixels.value("height",0u);
+        expect(totalScenePixels && scenePixels.value("litPixels",size_t(0))>std::max<size_t>(64,size_t(totalScenePixels/1000))
+            && scenePixels.value("distinctColorsAtMost1024",size_t(0))>=8,
+            "GPU scene pixels contain visible varied geometry before any UI gizmo or thumbnail overlays");
+        expect(totalScenePixels && scenePixels.value("opaquePixels",size_t(0))>=totalScenePixels*99/100,
+            "scene preview pixels are opaque so ImGui compositing cannot hide the rendered world");
         size_t objectBindings = 0, lightBindings = 0, gpuMeshes = 0;
         for (const auto& [id, entity] : document.Entities())
         {

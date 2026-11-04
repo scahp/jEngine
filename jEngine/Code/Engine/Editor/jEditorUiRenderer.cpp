@@ -56,9 +56,9 @@ void PrepareScenePreview(const std::shared_ptr<jRenderFrameContext>& frame)
         preview.Texture->Height != source->Height || preview.Texture->Format != source->Format)
     {
         if (preview.Id) { Unregister(preview.Id); preview.Id = nullptr; preview.Texture.reset(); }
-        // Backend registration retains older generations until drained shutdown.
+        // Old frame users have drained before replacing this generation.
         preview.Texture = g_rhi->Create2DTexture(source->Width, source->Height, 1, 1,
-            source->Format, ETextureCreateFlag::TransferDst, EResourceLayout::UNDEFINED);
+            source->Format, ETextureCreateFlag::TransferDst | ETextureCreateFlag::TransferSrc, EResourceLayout::UNDEFINED);
         preview.Id = preview.Texture ? Register(preview.Texture) : nullptr;
     }
     if (!preview.Id) return;

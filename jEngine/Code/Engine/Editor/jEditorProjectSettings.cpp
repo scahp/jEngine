@@ -152,10 +152,10 @@ bool ValidatePaths(const jEditorProjectConfig& config, const fs::path& root, std
         };
         if (config.AssetRoot.empty() || !portable(config.AssetRoot) || !portable(config.StartupScene))
         { error = "Project paths must use portable forward-slash text without controls"; return false; }
-        if (!jEditorProject::ResolveSafe(base, fs::u8path(config.AssetRoot), error)) return false;
+        if (!jEditorProject::ResolveSafe(base, jEditorAssetPath::FromUtf8(config.AssetRoot), error)) return false;
         if (config.StartupScene.empty()) return true;
         if (config.StartupScene.size() > 4096) { error = "Startup scene path exceeds 4096 bytes"; return false; }
-        const auto relative = fs::u8path(config.StartupScene);
+        const auto relative = jEditorAssetPath::FromUtf8(config.StartupScene);
         if (relative.extension() != ".jscene") { error = "Startup scene must be a project-relative .jscene file"; return false; }
         const auto resolved = jEditorProject::ResolveSafe(base, relative, error, !root.empty());
         if (!resolved) return false;

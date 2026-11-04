@@ -15,7 +15,7 @@ bool ConfigureEditorStartup(int argc, char** argv, std::string& error)
     try
     {
         StartupProject.clear(); StartupScene.clear(); Runtime = false;
-        if (argc && argv[0]) SetAuthoringExecutablePath(std::filesystem::absolute(argv[0]));
+        if (argc && argv[0]) SetAuthoringExecutablePath(std::filesystem::absolute(jEditorAssetPath::FromUtf8(argv[0])));
         std::filesystem::path manifest;
         for (int i = 1; i < argc; ++i)
         {
@@ -24,7 +24,7 @@ bool ConfigureEditorStartup(int argc, char** argv, std::string& error)
             if (++i == argc || !argv[i] || !argv[i][0]) { error = argument + " requires a file path"; return false; }
             auto& target = argument == "--project" ? StartupProject : argument == "--scene" ? StartupScene : manifest;
             if (!target.empty()) { error = "Duplicate " + argument; return false; }
-            target = std::filesystem::absolute(argv[i]);
+            target = std::filesystem::absolute(jEditorAssetPath::FromUtf8(argv[i]));
         }
         if (!manifest.empty())
         {

@@ -7,6 +7,7 @@
 #include "RHI/Vulkan/jBufferUtil_Vulkan.h"
 #ifdef _WIN32
 #include "RHI/DX12/jBufferUtil_DX12.h"
+#include "RHI/DX12/jTexture_DX12.h"
 #endif
 #include "lodepng.h"
 #include <fstream>

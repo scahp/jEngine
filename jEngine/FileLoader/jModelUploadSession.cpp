@@ -7,6 +7,7 @@
 #include "RHI/Vulkan/jIndexBuffer_Vulkan.h"
 #ifdef _WIN32
 #include "RHI/DX12/jBufferUtil_DX12.h"
+#include "RHI/DX12/jTexture_DX12.h"
 #include "RHI/DX12/jVertexBuffer_DX12.h"
 #include "RHI/DX12/jIndexBuffer_DX12.h"
 #endif

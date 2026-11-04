@@ -19,6 +19,7 @@
 #ifdef _WIN32
 #include <fcntl.h>
 #include <io.h>
+#include <share.h>
 #include <sys/stat.h>
 #else
 #include <fcntl.h>
@@ -584,7 +585,10 @@ bool AtomicWrite(const std::filesystem::path& path, const std::string& contents,
             temporary = path;
             temporary += ".tmp-" + std::to_string(processId) + "-" + std::to_string(counter.fetch_add(1));
 #ifdef _WIN32
-            descriptor = _wopen(temporary.c_str(), _O_WRONLY | _O_CREAT | _O_EXCL | _O_BINARY | _O_NOINHERIT, _S_IREAD | _S_IWRITE);
+            const errno_t opened = _wsopen_s(&descriptor, temporary.c_str(),
+                _O_WRONLY | _O_CREAT | _O_EXCL | _O_BINARY | _O_NOINHERIT,
+                _SH_DENYRW, _S_IREAD | _S_IWRITE);
+            if (opened != 0) { descriptor = -1; errno = opened; }
 #else
             descriptor = ::open(temporary.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
 #endif

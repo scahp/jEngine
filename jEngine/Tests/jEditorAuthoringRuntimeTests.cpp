@@ -57,6 +57,16 @@ int RunEditorAuthoringRuntimeTests()
             &&editor.GetDocument().Find(modelId)->MeshLocalTransforms.size()==2,"capture persists source references and every mesh-local transform");
         auto camera=std::unique_ptr<jCamera>(jCamera::CreateCamera(Vector(0,0,-100),Vector::ZeroVector,Vector(0,1,-100),DegreeToRadian(60),0.1f,10000,1280,720,true));
         camera->UpdateCamera();editor.Tick(0,camera.get());
+        {
+            auto& io=ImGui::GetIO();io.IniFilename=nullptr;io.DisplaySize=ImVec2(1280,720);io.DeltaTime=1.0f/60;
+            unsigned char* pixels=nullptr;int width=0,height=0;io.Fonts->GetTexDataAsRGBA32(&pixels,&width,&height);
+            editor.SetAuthoringEnabled(true);editor.SelectEntity(modelId);
+            const auto beforeDraw=editor.GetDocument().ToJson();
+            ImGui::NewFrame();ImGui::Begin("Actual authoring gizmo smoke");
+            editor.RenderViewportGizmo(camera.get(),0,0,1280,720);ImGui::End();ImGui::Render();
+            expect(editor.GetDocument().ToJson()==beforeDraw&&ImGui::GetDrawData()->TotalVtxCount>0,
+                "actual authoring gizmo draws without input or an invalid initial operation and preserves authored state");
+        }
         auto& document=editor.GetDocument();auto model=*document.Find(modelId);
         model.Local.Position={100,20,-5};model.Local.RotationDegrees={0,90,0};model.Local.Scale={2,2,2};
         expect(document.Update(model,"Move model"),"authored transform enters the real command history");editor.Tick(0,camera.get());

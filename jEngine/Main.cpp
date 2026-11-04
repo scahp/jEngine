@@ -15,7 +15,9 @@
 #include "Code/Engine/Editor/jEditorWorkspace.h"
 #include "Code/Engine/jEditor.h"
 #include "Tests/jEditorIntegrationTests.h"
+#include "FileLoader/jEditorAssetPath.h"
 #ifdef _WIN32
+#include <shellapi.h>
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
 #endif
@@ -84,6 +86,29 @@ int ExportEditorGraphicsShaderFixtures(const char* directory, bool vulkan);
 
 int main(int argc, char** argv)
 {
+#ifdef _WIN32
+    // Windows supplies native Unicode arguments independently of the CRT's
+    // current ANSI codepage. Keep every editor/path string boundary UTF-8.
+    int nativeCount = 0;
+    auto** nativeArguments = CommandLineToArgvW(GetCommandLineW(), &nativeCount);
+    if (!nativeArguments) { std::cerr << "Cannot read Unicode command line" << std::endl; return EXIT_FAILURE; }
+    std::vector<std::string> utf8Arguments; utf8Arguments.reserve(nativeCount);
+    bool validArguments = true;
+    for (int i = 0; i < nativeCount; ++i)
+    {
+        const int bytes = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, nativeArguments[i], -1, nullptr, 0, nullptr, nullptr);
+        if (!bytes) { validArguments = false; break; }
+        std::string text(static_cast<size_t>(bytes), '\0');
+        if (!WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, nativeArguments[i], -1, text.data(), bytes, nullptr, nullptr))
+        { validArguments = false; break; }
+        text.pop_back(); utf8Arguments.push_back(std::move(text));
+    }
+    LocalFree(nativeArguments);
+    if (!validArguments) { std::cerr << "Command line contains invalid Unicode" << std::endl; return EXIT_FAILURE; }
+    std::vector<char*> utf8Pointers; utf8Pointers.reserve(utf8Arguments.size() + 1);
+    for (auto& argument : utf8Arguments) utf8Pointers.push_back(argument.data());
+    utf8Pointers.push_back(nullptr); argc = nativeCount; argv = utf8Pointers.data();
+#endif
     gCommandLineArgument.Init(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "--ci-cpu") == 0) return RunCpuSelfTests();
     if (argc == 2 && std::strcmp(argv[1], "--ci-log-benchmark") == 0) return RunLogBenchmark();
@@ -119,11 +144,12 @@ int main(int argc, char** argv)
         if (std::strcmp(argv[i], "--ci-editor-flow") != 0) continue;
         if (!editorFlowDirectory.empty() || ++i == argc || !argv[i][0] || argv[i][0] == '-')
         { std::cerr << "Usage: --ci-editor-flow <owned-output-directory> [-vulkan|-dx12]" << std::endl; return EXIT_FAILURE; }
-        editorFlowDirectory = std::filesystem::absolute(argv[i]).string();
+        try { editorFlowDirectory = jEditorAssetPath::ToUtf8(std::filesystem::absolute(jEditorAssetPath::FromUtf8(argv[i]))); }
+        catch (const std::exception& error) { std::cerr << error.what() << std::endl; return EXIT_FAILURE; }
     }
     if (!editorFlowDirectory.empty() && gCommandLineArgument.HasArgument("--ci-editor-gpu"))
     { std::cerr << "Select only one editor GPU test" << std::endl; return EXIT_FAILURE; }
-    if (!editorFlowDirectory.empty()) SetAuthoringTestStateDirectory(std::filesystem::path(editorFlowDirectory) / "workspace-state");
+    if (!editorFlowDirectory.empty()) SetAuthoringTestStateDirectory(jEditorAssetPath::FromUtf8(editorFlowDirectory) / "workspace-state");
     std::string authoringError;
     if (!ConfigureEditorStartup(argc, argv, authoringError)) { std::cerr << authoringError << std::endl; return EXIT_FAILURE; }
     uint32 frameLimit = 0;

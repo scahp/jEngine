@@ -820,6 +820,12 @@ void PrepareAuthoringUiFrame()
 {
 #ifdef IMGUI_HAS_DOCK
     auto& s = State(); auto& io = ImGui::GetIO();
+    if (s.Runtime)
+    {
+        io.ConfigFlags &= ~(ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable);
+        io.IniFilename = nullptr;
+        return;
+    }
     if (IsAuthoringWorkspaceVisible() && s.Docking && jEditorUiRenderer::SupportsDocking()) io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     else io.ConfigFlags &= ~ImGuiConfigFlags_DockingEnable;
     // Dear ImGui disallows first enabling viewports on its second frame, while
