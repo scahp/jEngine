@@ -8,6 +8,7 @@
 #ifdef _WIN32
 #include "RHI/DX12/jBufferUtil_DX12.h"
 #include "RHI/DX12/jTexture_DX12.h"
+#include "RHI/DX12/jTextureUploadChunk_DX12.h"
 #include "RHI/DX12/jVertexBuffer_DX12.h"
 #include "RHI/DX12/jIndexBuffer_DX12.h"
 #endif
@@ -312,9 +313,9 @@ namespace
         g_rhi->TransitionLayout(ticket->Command, job.Texture.get(), EResourceLayout::TRANSFER_DST);
         ticket->Command->FlushBarrierBatch();
         const uint32 y = job.Row * job.Texel.Height;
-        const uint32 height = std::min(rows * job.Texel.Height, footprint.Source.Height - y);
         if (ticket->Vulkan)
         {
+            const uint32 height = std::min(rows * job.Texel.Height, footprint.Source.Height - y);
             VkBufferImageCopy region{};
             region.bufferOffset = ticket->Staging->GetOffset();
             region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, footprint.Source.MipLevel, footprint.Source.Depth, 1};
@@ -327,22 +328,12 @@ namespace
 #ifdef _WIN32
         else
         {
-            D3D12_TEXTURE_COPY_LOCATION destination{};
-            destination.pResource = static_cast<jTexture_DX12*>(job.Texture.get())->Texture->Get();
-            destination.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-            destination.SubresourceIndex = footprint.Source.MipLevel + footprint.Source.Depth * job.Image->MipLevel;
-            D3D12_TEXTURE_COPY_LOCATION sourceLocation{};
-            sourceLocation.pResource = static_cast<ID3D12Resource*>(ticket->Staging->GetHandle());
-            sourceLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-            sourceLocation.PlacedFootprint.Offset = 0;
-            sourceLocation.PlacedFootprint.Footprint.Format = GetDX12TextureFormat(job.Image->Format);
-            sourceLocation.PlacedFootprint.Footprint.Width = ((footprint.Source.Width + job.Texel.Width - 1) / job.Texel.Width) * job.Texel.Width;
-            sourceLocation.PlacedFootprint.Footprint.Height = rows * job.Texel.Height;
-            sourceLocation.PlacedFootprint.Footprint.Depth = 1;
-            sourceLocation.PlacedFootprint.Footprint.RowPitch = static_cast<uint32>(footprint.UploadPitch);
-            const D3D12_BOX sourceBox{0, 0, 0, footprint.Source.Width, height, 1};
-            static_cast<jCommandBuffer_DX12*>(ticket->Command)->Get()->CopyTextureRegion(
-                &destination, 0, y, 0, &sourceLocation, &sourceBox);
+            CopyTextureUploadChunk_DX12(static_cast<jCommandBuffer_DX12*>(ticket->Command)->Get(),
+                static_cast<jTexture_DX12*>(job.Texture.get())->Texture->Get(),
+                footprint.Source.MipLevel + footprint.Source.Depth * job.Image->MipLevel, y,
+                static_cast<ID3D12Resource*>(ticket->Staging->GetHandle()), GetDX12TextureFormat(job.Image->Format),
+                footprint.Source.Width, job.Texel.Width, job.Texel.Height, rows,
+                static_cast<UINT>(footprint.UploadPitch));
         }
 #endif
         if (finalCopy)

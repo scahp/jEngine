@@ -51,6 +51,11 @@ jobs:
         run: |
           $entryPoint = if ($env:CONFIGURATION -eq 'Debug') { 'Native' } else { 'CMake' }
           scripts/ci/check-windows-dxc-bootstrap.ps1 -EntryPoint $entryPoint -Configuration $env:CONFIGURATION
+      - name: Verify DX12 texture copies on WARP with the debug layer
+        shell: pwsh
+        env:
+          CONFIGURATION: ${{ matrix.configuration }}
+        run: scripts/ci/check-dx12-texture-upload.ps1 -Configuration $env:CONFIGURATION
       - name: Check DXC cache recovery and concurrent installation
         shell: pwsh
         env:
@@ -85,3 +90,4 @@ jobs:
             build/windows-native-${{ matrix.configuration }}/*.binlog
             build/windows-dxc-bootstrap-${{ matrix.configuration }}/**
             build/windows-dxc-tests-${{ matrix.configuration }}/**
+            build/windows-dx12-texture-${{ matrix.configuration }}/**

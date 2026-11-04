@@ -75,6 +75,21 @@ if(BUILD_TESTING)
       --output "${CMAKE_BINARY_DIR}/shader-checks")
   set_tests_properties(cpu-math shader-contracts PROPERTIES
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/jEngine" TIMEOUT 180)
+  if(WIN32)
+    add_executable(jEngineDX12TextureUploadTests tests/dx12-texture-upload.cpp)
+    target_include_directories(jEngineDX12TextureUploadTests PRIVATE
+      "${PROJECT_SOURCE_DIR}/jEngine" "${PROJECT_SOURCE_DIR}/jEngine/External/DirectX12/Include")
+    target_compile_definitions(jEngineDX12TextureUploadTests PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+    target_compile_options(jEngineDX12TextureUploadTests PRIVATE /W4 /utf-8)
+    target_link_libraries(jEngineDX12TextureUploadTests PRIVATE d3d12 dxgi dxguid)
+    add_custom_command(TARGET jEngineDX12TextureUploadTests POST_BUILD
+      COMMAND "${CMAKE_COMMAND}" -E copy_directory
+        "${PROJECT_SOURCE_DIR}/jEngine/External/DirectX12/lib/D3D12"
+        "$<TARGET_FILE_DIR:jEngineDX12TextureUploadTests>/D3D12"
+      VERBATIM)
+    add_test(NAME dx12-texture-upload COMMAND jEngineDX12TextureUploadTests)
+    set_tests_properties(dx12-texture-upload PROPERTIES LABELS "gpu;dx12;warp" TIMEOUT 120)
+  endif()
   if(APPLE)
     add_test(NAME vulkan-sync-contracts
       COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/ci/check-vulkan-sync.py"

@@ -192,6 +192,7 @@ xcopy /y /i "$(JEngineDxcDirectory)\dxil.dll" "$(OutDir)"</Command>
     <ClInclude Include="Renderer\jSceneRenderTargets.h" />
     <ClInclude Include="Renderer\jSpotLightDrawCommandGenerator.h" />
     <ClInclude Include="RHI\DX12\jBufferUtil_DX12.h" />
+    <ClInclude Include="RHI\DX12\jTextureUploadChunk_DX12.h" />
     <ClInclude Include="RHI\DX12\jBuffer_DX12.h" />
     <ClInclude Include="RHI\DX12\jCommandBufferManager_DX12.h" />
     <ClInclude Include="RHI\DX12\jDescriptorHeap_DX12.h" />

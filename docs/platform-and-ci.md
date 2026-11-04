@@ -141,7 +141,10 @@ Windows dependencies and the selected DXC package's `dxcompiler.dll`/`dxil.dll`,
 and copies runtime DLLs beside the executable, preserving
 the Agility SDK's `D3D12/` subdirectory. The IDE working directory is `jEngine/`
 for existing asset paths. CPU and shader tests use the same CTest interface as
-macOS and do not require a GPU or a Vulkan driver on the runner.
+macOS. Windows also runs `dx12-texture-upload` on the WARP software adapter with
+the D3D12 debug layer. It uses the production upload helper, checks compressed
+mip tails and chunk/array copies, and compares readback bytes. This does not
+require a physical GPU/display or test hardware rendering and ray tracing.
 
 DXC is pinned in `scripts/ci/dependencies.json`. macOS builds it once per cache
 key and shares its native executable/library between the build configurations;
