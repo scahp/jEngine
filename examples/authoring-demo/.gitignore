@@ -1,0 +1,4 @@
+.jeditor/
+*.jscene.bak
+*.jproject.bak
+*.tmp-*

@@ -145,7 +145,15 @@ std::shared_ptr<jRenderObjectGeometryData> UploadMesh(const Mesh& mesh)
         auto* indexData = new jStreamParam<uint32>();
         indexData->Stride = 12; indexData->Name = jNameStatic("Index");
         indexData->Attributes = {{jNameStatic("INDEX"), EBufferElementType::UINT32, 12}};
-        indexData->Data = mesh.Indices; indices->Param = indexData;
+        indexData->Data = mesh.Indices;
+#if LEFT_HANDED
+        // CPU terrain/Recast triangles use mathematical +Y winding. The engine's
+        // LH raster front-face convention matches CreateQuad's opposite winding;
+        // convert only the uploaded indices, retaining CPU/navigation topology.
+        for (size_t triangle = 0; triangle + 2 < indexData->Data.size(); triangle += 3)
+            std::swap(indexData->Data[triangle + 1], indexData->Data[triangle + 2]);
+#endif
+        indices->Param = indexData;
         indices->ElementCount = uint32(mesh.Indices.size());
     }
     return std::make_shared<jRenderObjectGeometryData>(stream, positions, indices);

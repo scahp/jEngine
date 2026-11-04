@@ -1,0 +1,19 @@
+{
+  "dependencies": [
+    "a900b014-6ffa-4781-83fe-2f983648674b",
+    "d6045e44-3348-4422-8882-e6f99d7a50a4"
+  ],
+  "dependencyPaths": [
+    "Assets/Models/CheckerPyramid.obj",
+    "Assets/Textures/StudioChecker.png"
+  ],
+  "fingerprint": {
+    "hash": "fnv1a64:2698d77bbedaad2d",
+    "modified": 1793758646064383743,
+    "size": 32495
+  },
+  "id": "3b09e9ca-3f07-4aba-94bd-7971ecff3005",
+  "importSettings": {},
+  "revision": 2,
+  "schemaVersion": 1
+}

@@ -1,0 +1,17 @@
+{
+  "dependencies": [
+    "d6045e44-3348-4422-8882-e6f99d7a50a4"
+  ],
+  "dependencyPaths": [
+    "Assets/Textures/StudioChecker.png"
+  ],
+  "fingerprint": {
+    "hash": "fnv1a64:314ee07bba8fea7e",
+    "modified": 1793757248669605961,
+    "size": 109
+  },
+  "id": "6a54929c-0fa9-4580-a886-89efd779d33c",
+  "importSettings": {},
+  "revision": 1,
+  "schemaVersion": 1
+}

@@ -66,7 +66,7 @@ jRenderObject* FirstMesh(jEditor& editor, EntityId id)
     auto* object = editor.ObjectForEntity(id);
     return object && !object->RenderObjects.empty() ? object->RenderObjects.front() : nullptr;
 }
-Json ReadScenePixels(const std::shared_ptr<jTexture>& texture, const fs::path& png)
+Json ReadScenePixels(const std::shared_ptr<jTexture>& texture, const fs::path& png, const jCamera* camera, const Vector& floorPoint)
 {
     Json result{{"available", bool(texture)}, {"readback", false}};
     if (!texture || !texture->Width || !texture->Height || texture->Width > 4096 || texture->Height > 4096
@@ -133,6 +133,27 @@ Json ReadScenePixels(const std::shared_ptr<jTexture>& texture, const fs::path& p
         lit+=brightest>12; opaque+=output[3]>=254;
         minimum=std::min(minimum,darkest);maximum=std::max(maximum,brightest);
         if(colors.size()<1024)colors.insert(uint32(output[0])|(uint32(output[1])<<8)|(uint32(output[2])<<16));
+    }
+    if (camera)
+    {
+        const auto clip=camera->ViewProjection.Transform(Vector4(floorPoint,1));
+        const bool inside=clip.w>0 && std::abs(clip.x/clip.w)<1 && std::abs(clip.y/clip.w)<1;
+        size_t floorLit=0,floorSamples=0;
+        int px=-1,py=-1;
+        if (inside)
+        {
+            px=int((clip.x/clip.w*.5f+.5f)*width);
+            py=int((.5f-clip.y/clip.w*.5f)*height);
+            for(int dy=-3;dy<=3;++dy)for(int dx=-3;dx<=3;++dx)
+            {
+                const int x=px+dx,y=py+dy;
+                if(x<0||y<0||x>=int(width)||y>=int(height))continue;
+                const auto* pixel=rgba.data()+(size_t(y)*width+size_t(x))*4;
+                ++floorSamples;floorLit+=std::max({pixel[0],pixel[1],pixel[2]})>20;
+            }
+        }
+        result["floorProbe"]={{"inside",inside},{"pixelX",px},{"pixelY",py},
+            {"world",{floorPoint.x,floorPoint.y,floorPoint.z}},{"samples",floorSamples},{"litPixels",floorLit}};
     }
     readback->Unmap();
     const auto pngError=LodePNG_encode32_file(png.string().c_str(),rgba.data(),width,height);
@@ -339,7 +360,7 @@ int RunEditorAuthoringGpuTests(const char* outputDirectory)
             if (kind == EntityKind::PointLight || kind == EntityKind::SpotLight)
             { entity.Local.Position.Y = 180; entity.Light.Range = 1200; entity.Light.Intensity = 5; entity.Light.CastShadows = true; }
             if (kind == EntityKind::Terrain)
-            { entity.Terrain.Resolution = 9; entity.Terrain.SizeX = entity.Terrain.SizeZ = 800; entity.Local.Position = {0, -10, 0}; entity.Local.RotationDegrees = {}; entity.Material.BaseColor = {.3f,.4f,.2f}; }
+            { entity.Terrain.Resolution = 9; entity.Terrain.SizeX = entity.Terrain.SizeZ = 800; entity.Local.Position = {0, -10, 0}; entity.Local.RotationDegrees = {}; entity.Material.BaseColor = {.3f,.4f,.2f}; entity.Material.Emissive = {.04f,.08f,.03f}; }
             if (kind == EntityKind::ParticleEmitter)
             { entity.Particles.MaxParticles = 64; entity.Particles.SpawnRate = 30; entity.Particles.Lifetime = 2; entity.Particles.Color = {1,.35f,.1f}; entity.Material.OverrideEnabled = true; }
             if (i == 9)
@@ -366,7 +387,7 @@ int RunEditorAuthoringGpuTests(const char* outputDirectory)
         expect(centerClip.w>0 && std::abs(centerClip.x/centerClip.w)<1 && std::abs(centerClip.y/centerClip.w)<1
             && centerClip.z/centerClip.w>=0 && centerClip.z/centerClip.w<=1,
             "fixture camera projects authored grid center inside the actual view volume");
-        auto scenePixels=ReadScenePixels(jEditorUiRenderer::AcquireScenePreview(),output/"scene-preview-before-ui.png");
+        auto scenePixels=ReadScenePixels(jEditorUiRenderer::AcquireScenePreview(),output/"scene-preview-before-ui.png",camera,Vector(380,4990,-380));
         report["preUiScenePixels"]=scenePixels;
         expect(scenePixels.value("available",false)&&scenePixels.value("readback",false),
             "actual pre-UI scene preview texture exists and supports independent GPU readback");
@@ -376,6 +397,10 @@ int RunEditorAuthoringGpuTests(const char* outputDirectory)
             "GPU scene pixels contain visible varied geometry before any UI gizmo or thumbnail overlays");
         expect(totalScenePixels && scenePixels.value("opaquePixels",size_t(0))>=totalScenePixels*99/100,
             "scene preview pixels are opaque so ImGui compositing cannot hide the rendered world");
+        const auto floorProbe=scenePixels.value("floorProbe",Json::object());
+        expect(floorProbe.value("inside",false)&&floorProbe.value("samples",size_t(0))>=40
+            &&floorProbe.value("litPixels",size_t(0))*4>=floorProbe.value("samples",size_t(0))*3,
+            "terrain floor is actually rasterized from above at an unoccluded pre-UI pixel patch");
         size_t objectBindings = 0, lightBindings = 0, gpuMeshes = 0;
         for (const auto& [id, entity] : document.Entities())
         {

@@ -1,0 +1,17 @@
+{
+  "dependencies": [
+    "6a54929c-0fa9-4580-a886-89efd779d33c"
+  ],
+  "dependencyPaths": [
+    "Assets/Models/CheckerPyramid.mtl"
+  ],
+  "fingerprint": {
+    "hash": "fnv1a64:e14ccc9d331082a1",
+    "modified": 1793757248669627461,
+    "size": 287
+  },
+  "id": "a900b014-6ffa-4781-83fe-2f983648674b",
+  "importSettings": {},
+  "revision": 1,
+  "schemaVersion": 1
+}

@@ -62,8 +62,11 @@ int RunEditorAuthoringRuntimeTests()
             unsigned char* pixels=nullptr;int width=0,height=0;io.Fonts->GetTexDataAsRGBA32(&pixels,&width,&height);
             editor.SetAuthoringEnabled(true);editor.SelectEntity(modelId);
             const auto beforeDraw=editor.GetDocument().ToJson();
-            ImGui::NewFrame();ImGui::Begin("Actual authoring gizmo smoke");
-            editor.RenderViewportGizmo(camera.get(),0,0,1280,720);ImGui::End();ImGui::Render();
+            for(int frame=0;frame<2;++frame){
+                ImGui::NewFrame();ImGui::SetNextWindowPos(ImVec2(0,0));ImGui::SetNextWindowSize(ImVec2(1280,720));
+                ImGui::Begin("Actual authoring gizmo smoke");
+                editor.RenderViewportGizmo(camera.get(),0,0,1280,720);ImGui::End();ImGui::Render();
+            }
             expect(editor.GetDocument().ToJson()==beforeDraw&&ImGui::GetDrawData()->TotalVtxCount>0,
                 "actual authoring gizmo draws without input or an invalid initial operation and preserves authored state");
         }

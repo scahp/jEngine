@@ -1,0 +1,15 @@
+{
+  "assetRoot": "Assets",
+  "name": "Studio sample",
+  "projectId": "a72627ed-b8df-45e4-87b5-424310f485e2",
+  "schemaVersion": 1,
+  "settings": {
+    "render.bloom": "false",
+    "render.deferred": "true",
+    "render.ssgi": "false",
+    "render.surfelgi": "false",
+    "render.surfelgi.inline": "false",
+    "render.vsync": "false"
+  },
+  "startupScene": "Scenes/Studio.jscene"
+}
