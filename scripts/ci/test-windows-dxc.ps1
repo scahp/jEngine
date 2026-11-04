@@ -39,6 +39,19 @@ $sourceVersion = ''
 $sourcePreserved = $false
 $requests = 0
 
+function Get-Sha256([string]$Path) {
+    $algorithm = [Security.Cryptography.SHA256]::Create()
+    $stream = $null
+    try {
+        $stream = [IO.File]::OpenRead($Path)
+        return [BitConverter]::ToString($algorithm.ComputeHash($stream)).Replace('-', '').ToLowerInvariant()
+    }
+    finally {
+        if ($stream) { $stream.Dispose() }
+        $algorithm.Dispose()
+    }
+}
+
 function Assert-Check([bool]$Condition, [string]$Name) {
     $checks.Add([ordered]@{ name = $Name; passed = $Condition })
     if ($Condition) { Write-Host "PASS $Name" }
@@ -50,7 +63,7 @@ function Get-Snapshot([string]$Directory) {
         foreach ($file in (Get-ChildItem -LiteralPath $Directory -File -Recurse | Sort-Object FullName)) {
             $relative = $file.FullName.Substring($Directory.TrimEnd([char[]]'\/').Length).TrimStart([char[]]'\/')
             $files[$relative] = [ordered]@{ length = $file.Length; modifiedUtcTicks = $file.LastWriteTimeUtc.Ticks;
-                sha256 = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash }
+                sha256 = (Get-Sha256 $file.FullName) }
         }
     }
     return ($files | ConvertTo-Json -Depth 4 -Compress)
@@ -93,8 +106,8 @@ function Has-RealPayload([string]$Cache) {
     foreach ($relative in $requiredFiles) {
         $path = Join-Path $Cache $relative
         if (!(Test-Path -LiteralPath $path -PathType Leaf) -or
-            (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ne
-            (Get-FileHash -LiteralPath (Join-Path $DxcDirectory $relative) -Algorithm SHA256).Hash) { return $false }
+            (Get-Sha256 $path) -ne
+            (Get-Sha256 (Join-Path $DxcDirectory $relative))) { return $false }
     }
     return ([IO.File]::ReadAllText((Join-Path $Cache 'revision'))).Trim() -eq $pinned.commit
 }
@@ -109,7 +122,7 @@ try {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $archive = Join-Path $fixtureRoot 'fixture.zip'
     [IO.Compression.ZipFile]::CreateFromDirectory($payload, $archive, [IO.Compression.CompressionLevel]::Fastest, $false)
-    $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+    $hash = (Get-Sha256 $archive)
     $server = Start-Job -ArgumentList $archive, $fixtureRoot -ScriptBlock {
         param($Archive, $Directory)
         $ErrorActionPreference = 'Stop'

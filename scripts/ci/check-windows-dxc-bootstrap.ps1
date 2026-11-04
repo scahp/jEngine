@@ -3,6 +3,12 @@
     [ValidateSet('Debug', 'Release')][string]$Configuration = 'Debug'
 )
 $ErrorActionPreference = 'Stop'
+function Get-FileSha256([string]$Path) {
+    $stream = [IO.File]::OpenRead($Path)
+    $algorithm = [Security.Cryptography.SHA256]::Create()
+    try { return ([BitConverter]::ToString($algorithm.ComputeHash($stream))).Replace('-', '').ToLowerInvariant() }
+    finally { $algorithm.Dispose(); $stream.Dispose() }
+}
 $root = (Resolve-Path "$PSScriptRoot/../..").Path
 $managed = Join-Path $root '.ci-tools/dxc'
 $backup = Join-Path $root ('.ci-tools/dxc-before-bootstrap-' + [Guid]::NewGuid().ToString('N'))
@@ -40,14 +46,14 @@ try {
     $before = @{}
     foreach ($name in $files) {
         $file = Get-Item "$managed/bin/x64/$name"
-        $before[$name] = @($file.LastWriteTimeUtc.Ticks, (Get-FileHash $file.FullName -Algorithm SHA256).Hash)
+        $before[$name] = @($file.LastWriteTimeUtc.Ticks, (Get-FileSha256 $file.FullName))
     }
     & $command @arguments 2>&1 | Tee-Object "$output/warm.log"
     if ($LASTEXITCODE -ne 0) { throw "$EntryPoint warm bootstrap failed" }
     foreach ($name in $files) {
         $file = Get-Item "$managed/bin/x64/$name"
         if ($file.LastWriteTimeUtc.Ticks -ne $before[$name][0] -or
-            (Get-FileHash $file.FullName -Algorithm SHA256).Hash -ne $before[$name][1]) {
+            (Get-FileSha256 $file.FullName) -ne $before[$name][1]) {
             throw "Warm $EntryPoint setup unexpectedly replaced $name"
         }
     }

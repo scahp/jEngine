@@ -22,6 +22,19 @@ $requiredFiles = @('bin/x64/dxc.exe', 'bin/x64/dxcompiler.dll', 'bin/x64/dxil.dl
 $lockTimeoutSeconds = 300
 $utf8 = [Text.UTF8Encoding]::new($false)
 
+function Get-Sha256([string]$Path) {
+    $algorithm = [Security.Cryptography.SHA256]::Create()
+    $stream = $null
+    try {
+        $stream = [IO.File]::OpenRead($Path)
+        return [BitConverter]::ToString($algorithm.ComputeHash($stream)).Replace('-', '').ToLowerInvariant()
+    }
+    finally {
+        if ($stream) { $stream.Dispose() }
+        $algorithm.Dispose()
+    }
+}
+
 function Get-DxcVersion([string]$Directory) {
     $process = New-Object Diagnostics.Process
     $process.StartInfo = New-Object Diagnostics.ProcessStartInfo
@@ -69,7 +82,7 @@ function Test-DxcCache([string]$Directory, [string]$Commit, [string]$ArchiveHash
             }
             foreach ($relative in $requiredFiles) {
                 $property = $receipt.files.PSObject.Properties[$relative]
-                if (!$property -or $property.Value -ne (Get-FileHash -LiteralPath (Join-Path $Directory $relative) -Algorithm SHA256).Hash.ToLowerInvariant()) {
+                if (!$property -or $property.Value -ne (Get-Sha256 (Join-Path $Directory $relative))) {
                     return @{ Valid = $false; Reason = "Cached bytes differ for $relative" }
                 }
             }
@@ -132,7 +145,7 @@ try {
         Invoke-WebRequest -UseBasicParsing -Uri $uri.AbsoluteUri -OutFile $archive -TimeoutSec 120
     }
     finally { [Net.ServicePointManager]::SecurityProtocol = $oldProtocol }
-    $digest = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+    $digest = (Get-Sha256 $archive)
     if ($digest -ne $archiveHash) { throw "DXC archive SHA-256 mismatch: expected $archiveHash, received $digest" }
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $zip = [IO.Compression.ZipFile]::OpenRead($archive)
@@ -153,7 +166,7 @@ try {
     $version = Get-DxcVersion $staging
     $fileHashes = [ordered]@{}
     foreach ($relative in $requiredFiles) {
-        $fileHashes[$relative] = (Get-FileHash -LiteralPath (Join-Path $staging $relative) -Algorithm SHA256).Hash.ToLowerInvariant()
+        $fileHashes[$relative] = (Get-Sha256 (Join-Path $staging $relative))
     }
     [IO.File]::WriteAllText((Join-Path $staging 'revision'), $commit + "`n", $utf8)
     $receipt = [ordered]@{ commit = $commit; archive_sha256 = $archiveHash; files = $fileHashes }
