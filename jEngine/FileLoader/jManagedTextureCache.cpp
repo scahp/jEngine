@@ -27,7 +27,7 @@ std::shared_ptr<jTexture> jImageFileLoader::LoadTextureOwned(const jName& filena
     if (!image) return {};
     if (auto cached = FindTextureForImage(image)) return cached;
     if (!g_rhi || (GMainThreadID != std::thread::id() && GMainThreadID != std::this_thread::get_id())) return {};
-    auto texture = g_rhi->CreateTextureFromData(image.get());
+    auto texture = UploadImageData(image.get());
     StoreTextureForImage(image, texture);
     return texture;
 }

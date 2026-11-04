@@ -99,6 +99,7 @@ private:
     std::map<jName, uint64_t> ImageGenerations;
 
     std::shared_ptr<jImageData> DecodeImageData(const jName& filename);
+    std::shared_ptr<jTexture> UploadImageData(const jImageData* imageData);
     std::weak_ptr<jImageData> GetOrDecodeImage(const jName& filename)
     {
         if (!filename.IsValid())

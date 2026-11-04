@@ -109,13 +109,16 @@ std::weak_ptr<jTexture> jImageFileLoader::LoadTextureFromImageData(const std::sh
         if (TextureOwnerThread != current)
             return {};
     }
-    if (!g_rhi)
-        return {};
-    auto texture = g_rhi->CreateTextureFromData(imageData.get());
+    auto texture = UploadImageData(imageData.get());
     if (texture)
     {
         std::lock_guard<std::mutex> lock(CachedTextureLock);
         CachedTextureMap.emplace(imageData->Filename, texture);
     }
     return texture;
+}
+
+std::shared_ptr<jTexture> jImageFileLoader::UploadImageData(const jImageData* imageData)
+{
+    return g_rhi ? g_rhi->CreateTextureFromData(imageData) : nullptr;
 }

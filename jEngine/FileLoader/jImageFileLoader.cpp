@@ -218,12 +218,22 @@ std::weak_ptr<jTexture> jImageFileLoader::LoadTextureFromImageData(const std::sh
         if (TextureOwnerThread != current)
             return {};
     }
-    if (!g_rhi)
-        return {};
+    auto texture = UploadImageData(imageData.get());
+    if (texture)
+    {
+        std::lock_guard<std::mutex> lock(CachedTextureLock);
+        CachedTextureMap.emplace(imageData->Filename, texture);
+    }
+    return texture;
+}
+
+std::shared_ptr<jTexture> jImageFileLoader::UploadImageData(const jImageData* imageData)
+{
+    if (!g_rhi) return {};
 
     // Device-specific copy layouts belong to GPU finalization, never CPU decode.
     std::unique_ptr<jImageData> upload;
-    const jImageData* textureData = imageData.get();
+    const jImageData* textureData = imageData;
     if (!IsUseVulkan())
     {
         if (!g_rhi_dx12 || !g_rhi_dx12->Device || imageData->ImageBulkData.SubresourceFootprints.empty())
@@ -280,11 +290,5 @@ std::weak_ptr<jTexture> jImageFileLoader::LoadTextureFromImageData(const std::sh
         }
         textureData = upload.get();
     }
-    auto texture = g_rhi->CreateTextureFromData(textureData);
-    if (texture)
-    {
-        std::lock_guard<std::mutex> lock(CachedTextureLock);
-        CachedTextureMap.emplace(imageData->Filename, texture);
-    }
-    return texture;
+    return g_rhi->CreateTextureFromData(textureData);
 }
