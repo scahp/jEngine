@@ -2,6 +2,7 @@
 #ifdef ENABLE_EDITOR_FEATURES
 #include "Code/Engine/jEditor.h"
 #include "Code/Engine/Editor/jEditorProcedural.h"
+#include "Code/Engine/Editor/jEditorTools.h"
 #include "Scene/jObject.h"
 #include "Scene/jMeshObject.h"
 #include "Scene/jRenderObject.h"
@@ -250,6 +251,65 @@ int RunEditorAuthoringRuntimeTests()
             &&editor.LastError().find("not captured")!=std::string::npos&&MatrixNear(mesh->World,shear),
             "non-TRS source capture rejects the authored record and preserves the real external matrix");
         editor.ShutdownWorld();jObject::RemoveObject(&sheared);g_Editor=oldEditor;
+    }
+    {
+        jEditor editor;
+        auto& document = editor.GetDocument();
+        const auto parent = document.Create(EntityKind::Empty, "Terrain parent");
+        auto group = *document.Find(parent);
+        group.Local.Position = {40, 10, 30};
+        group.Local.RotationDegrees.Y = 27;
+        group.Local.Scale = {1.5f, .5f, 2};
+        document.Update(group);
+        const auto terrain = document.Create(EntityKind::Terrain, "Viewport terrain", parent);
+        editor.SelectEntity(terrain);
+        const Vector center(40, 10, 30), eye = center + Vector(0, 330, -500);
+        std::unique_ptr<jCamera> camera(jCamera::CreateCamera(eye, center, eye + Vector::UpVector,
+            DegreeToRadian(60), .1f, 2000, 1280, 720, true));
+        camera->UpdateCamera();
+        Matrix world;
+        document.GetWorldMatrix(terrain, world.mm);
+        const auto localToClip = camera->GetViewProjectionMatrix() * world;
+        const auto screen = [&](float x)
+        {
+            const auto ndc = localToClip.TransformPoint(Vector(x, 0, 0));
+            return ImVec2(640 * (ndc.x + 1), 360 * (1 - ndc.y));
+        };
+        const auto draw = [&](const ImVec2& mouse, bool down)
+        {
+            auto& io = ImGui::GetIO();
+            io.AddMousePosEvent(mouse.x, mouse.y);
+            io.AddMouseButtonEvent(ImGuiMouseButton_Left, down);
+            ImGui::NewFrame();
+            ImGui::SetNextWindowPos(ImVec2(0, 0));
+            ImGui::SetNextWindowSize(ImVec2(1280, 720));
+            ImGui::Begin("Terrain brush smoke");
+            if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) jEditorTools::FinishTerrainStroke(editor);
+            auto* list = ImGui::GetWindowDrawList();
+            const int before = list->VtxBuffer.Size;
+            const bool active = jEditorTools::RenderTerrainBrush(editor, *camera, ImVec2(0, 0), ImVec2(1280, 720), true);
+            const bool drewPreview = active && list->VtxBuffer.Size > before;
+            ImGui::End();
+            ImGui::Render();
+            return drewPreview;
+        };
+        const auto start = screen(0), end = screen(187.5f);
+        expect(draw(start, false) && document.Find(terrain)->Terrain.Heights.empty(),
+            "terrain brush hover draws a preview on a transformed terrain without editing");
+        draw(start, true);
+        const auto clickHeights = document.Find(terrain)->Terrain.Heights;
+        // ImGui rounds pointer positions to whole pixels; allow the resulting brush falloff.
+        const float centerHeight = clickHeights.size() == 289 ? clickHeights[8 * 17 + 8] : 0;
+        expect(centerHeight > 19.5f && centerHeight <= 20,
+            "viewport brush click edits the mesh hit in terrain-local coordinates");
+        draw(end, true);
+        draw(end, false);
+        const auto dragHeights = document.Find(terrain)->Terrain.Heights;
+        expect(dragHeights.size() == 289 && dragHeights[8 * 17 + 11] > 0 && dragHeights != clickHeights,
+            "viewport brush drag paints beyond the initial click");
+        expect(document.UndoLabel() == "Paint terrain stroke" && document.Undo() &&
+            document.Find(terrain)->Terrain.Heights.empty(), "one undo restores the terrain before the whole viewport stroke");
+        jEditorTools::Shutdown();
     }
     g_Editor=oldEditor;g_KeyState=oldKeys;g_MouseState=oldMouse;ImGui::DestroyContext(context);ImGui::SetCurrentContext(previousContext);
     std::error_code error;std::filesystem::remove_all(directory,error);

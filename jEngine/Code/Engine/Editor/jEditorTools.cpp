@@ -5,6 +5,7 @@
 #include "Core/jLog.h"
 #include "FileLoader/jEditorAssets.h"
 #include "FileLoader/jEditorAssetPath.h"
+#include "Scene/jCamera.h"
 #include "External/PathTracingDataLoader/json.hpp"
 #include "Recast.h"
 #include "DetourNavMesh.h"
@@ -138,6 +139,35 @@ Mesh BuildTerrain(const TerrainProperties& terrain)
     for (const auto& v : source.Vertices) { result.Positions.push_back(v.Position); result.Normals.push_back(v.Normal); }
     result.Indices = std::move(source.Indices); return result;
 }
+bool FindTerrainHit(const Mesh& mesh, const Vector& origin, const Vector& direction, Vector& hit)
+{
+    float closest = std::numeric_limits<float>::infinity();
+    const auto vertex = [&](uint32_t index)
+    {
+        const auto& p = mesh.Positions[index];
+        return Vector(p.X, p.Y, p.Z);
+    };
+    for (size_t i = 0; i < mesh.Indices.size(); i += 3)
+    {
+        const Vector a = vertex(mesh.Indices[i]);
+        const Vector ab = vertex(mesh.Indices[i + 1]) - a;
+        const Vector ac = vertex(mesh.Indices[i + 2]) - a;
+        const Vector p = direction.CrossProduct(ac);
+        const float det = ab.DotProduct(p);
+        if (det == 0) continue;
+        const Vector offset = origin - a;
+        const float u = offset.DotProduct(p) / det;
+        if (u < 0 || u > 1) continue;
+        const Vector q = offset.CrossProduct(ab);
+        const float v = direction.DotProduct(q) / det;
+        if (v < 0 || u + v > 1) continue;
+        const float distance = ac.DotProduct(q) / det;
+        if (distance >= 0 && distance < closest) closest = distance;
+    }
+    if (!std::isfinite(closest)) return false;
+    hit = origin + direction * closest;
+    return true;
+}
 bool PaintTerrain(TerrainProperties& terrain, float x, float z, float radius, float strength, int mode)
 {
     if (terrain.Resolution < 2 || terrain.Resolution > 129 || !Finite(x) || !Finite(z) || !Finite(radius) || radius <= 0 || !Finite(strength) || !Finite(terrain.SizeX) || !Finite(terrain.SizeZ) || terrain.SizeX <= 0 || terrain.SizeZ <= 0 || mode < 0 || mode > 3) return false;
@@ -234,6 +264,7 @@ bool BakeNavigation(const Mesh& mesh, const NavigationProperties& settings, cons
 
 namespace
 {
+constexpr const char* BrushModes[] = {"Raise", "Lower", "Flatten", "Smooth"};
 struct ToolState
 {
     EntityId Selected = 0; MaterialGraph Graph; uint32_t SelectedNode = 0, NextNode = 4;
@@ -241,10 +272,119 @@ struct ToolState
     std::string Error; char GraphPath[512] = "Assets/Materials/Material.jmaterial";
     float Time = 0, BrushX = 0, BrushZ = 0, BrushRadius = 100, BrushStrength = 20;
     int BrushMode = 0; bool Preview = false;
+    bool PaintInScene = false;
+    EntityId StrokeEntity = 0;
+    std::optional<Vector> LastDab;
+    TerrainProperties BrushTerrain;
+    Mesh BrushMesh;
     bool PreviewStarted = false;
     Vec3 NavFrom{-200, 0, -200}, NavTo{200, 0, 200}; NavigationBake Nav;
 };
 ToolState& Tools() { static ToolState state; return state; }
+
+float TerrainHeight(const TerrainProperties& terrain, float x, float z)
+{
+    if (terrain.Heights.empty()) return 0;
+    const auto n = terrain.Resolution;
+    const float gridX = (x / terrain.SizeX + .5f) * float(n - 1);
+    const float gridZ = (z / terrain.SizeZ + .5f) * float(n - 1);
+    const auto col = std::min(uint32_t(gridX), n - 2);
+    const auto row = std::min(uint32_t(gridZ), n - 2);
+    const float u = gridX - float(col), v = gridZ - float(row);
+    const auto i = size_t(row) * n + col;
+    const float a = terrain.Heights[i], b = terrain.Heights[i + 1];
+    const float c = terrain.Heights[i + n], d = terrain.Heights[i + n + 1];
+    // Match the diagonal used by BuildTerrainMesh.
+    if (u + v <= 1) return a + (b - a) * u + (c - a) * v;
+    return d + (c - d) * (1 - u) + (b - d) * (1 - v);
+}
+
+void DrawTerrainBrush(const TerrainProperties& terrain, const Vector& hit, const Matrix& localToClip,
+    const ImVec2& position, const ImVec2& size)
+{
+    const auto& s = Tools();
+    const auto project = [&](const Vector& point, ImVec2& pixel)
+    {
+        const auto clip = localToClip.Transform(Vector4(point, 1));
+        if (!(clip.w > 0 && clip.z >= 0 && clip.z <= clip.w)) return false;
+        pixel = ImVec2(position.x + (.5f + .5f * clip.x / clip.w) * size.x,
+            position.y + (.5f - .5f * clip.y / clip.w) * size.y);
+        return std::isfinite(pixel.x) && std::isfinite(pixel.y);
+    };
+    auto* draw = ImGui::GetWindowDrawList();
+    constexpr ImU32 outline = IM_COL32(89, 227, 255, 255);
+    constexpr int segments = 64;
+    ImVec2 previous{};
+    bool previousVisible = false;
+    for (int i = 0; i <= segments; ++i)
+    {
+        const float angle = 2 * PI * float(i) / segments;
+        const float x = std::clamp(hit.x + std::cos(angle) * s.BrushRadius, -terrain.SizeX / 2, terrain.SizeX / 2);
+        const float z = std::clamp(hit.z + std::sin(angle) * s.BrushRadius, -terrain.SizeZ / 2, terrain.SizeZ / 2);
+        ImVec2 pixel{};
+        const bool visible = project(Vector(x, TerrainHeight(terrain, x, z), z), pixel);
+        if (visible && previousVisible)
+        {
+            draw->AddLine(previous, pixel, IM_COL32(0, 0, 0, 220), 4);
+            draw->AddLine(previous, pixel, outline, 2);
+        }
+        previous = pixel;
+        previousVisible = visible;
+    }
+    ImVec2 center;
+    if (!project(hit, center)) return;
+    draw->AddCircleFilled(center, 4, IM_COL32(0, 0, 0, 220));
+    draw->AddCircleFilled(center, 2, outline);
+
+    char label[128];
+    if (s.BrushMode == 3)
+        std::snprintf(label, sizeof(label), "Smooth  |  Radius %.1f  |  Strength 100%%", s.BrushRadius);
+    else
+        std::snprintf(label, sizeof(label), "%s  |  Radius %.1f  |  %s %.1f", BrushModes[s.BrushMode], s.BrushRadius,
+            s.BrushMode == 2 ? "Target height" : "Strength", s.BrushMode == 2 ? s.BrushStrength : std::abs(s.BrushStrength));
+    const auto textSize = ImGui::CalcTextSize(label);
+    const ImVec2 textPosition(
+        std::clamp(center.x + 12, position.x + 6, position.x + std::max(6.0f, size.x - textSize.x - 6)),
+        std::clamp(center.y + 14, position.y + 6, position.y + std::max(6.0f, size.y - textSize.y - 6)));
+    draw->AddRectFilled(ImVec2(textPosition.x - 4, textPosition.y - 3),
+        ImVec2(textPosition.x + textSize.x + 4, textPosition.y + textSize.y + 3), IM_COL32(15, 22, 28, 230), 4);
+    draw->AddText(textPosition, IM_COL32_WHITE, label);
+}
+
+void ApplyTerrainDabs(Document& doc, const Entity& terrain, const Vector& hit)
+{
+    auto& s = Tools();
+    if (!s.StrokeEntity)
+    {
+        if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left) || doc.HasTransaction() ||
+            !doc.BeginTransaction("Paint terrain stroke")) return;
+        s.StrokeEntity = terrain.Id;
+    }
+    const auto delta = ImGui::GetIO().MouseDelta;
+    if (s.LastDab && delta.x == 0 && delta.y == 0) return;
+
+    const Vector from = s.LastDab.value_or(hit);
+    const float distance = std::hypot(hit.x - from.x, hit.z - from.z);
+    const float spacing = std::max(s.BrushRadius * .25f, .00001f);
+    if (s.LastDab && distance < spacing) return;
+    const int count = s.LastDab ? int(std::min(32.0f, std::floor(distance / spacing))) : 1;
+    const float step = std::max(spacing, distance / count);
+    auto edited = terrain;
+    Vector lastDab = hit;
+    for (int i = 1; i <= count; ++i)
+    {
+        const Vector dab = distance > 0 ? from + (hit - from) * std::min(1.0f, step * i / distance) : hit;
+        if (!PaintTerrain(edited.Terrain, dab.x, dab.z, s.BrushRadius, s.BrushStrength, s.BrushMode))
+        {
+            s.Error = "Terrain brush exceeds the supported height range.";
+            return;
+        }
+        lastDab = dab;
+    }
+    if (!doc.Update(edited, "Paint terrain stroke")) s.Error = doc.LastError();
+    else s.LastDab = lastDab;
+}
+
 void GraphHistory()
 {
     auto& s = Tools(); s.Undo.push_back(s.Graph); if (s.Undo.size() > 64) s.Undo.erase(s.Undo.begin()); s.Redo.clear();
@@ -329,11 +469,75 @@ void GraphUI(jEditor& editor, Entity e)
     }
 }
 }
-void Render(jEditor& editor)
+void FinishTerrainStroke(jEditor& editor)
+{
+    auto& s = Tools();
+    if (!s.StrokeEntity) return;
+    s.StrokeEntity = 0;
+    s.LastDab.reset();
+    auto& doc = editor.GetDocument();
+    if (doc.HasTransaction() && !doc.CommitTransaction())
+    {
+        s.Error = doc.LastError();
+        doc.CancelTransaction();
+    }
+}
+
+bool RenderTerrainBrush(jEditor& editor, const jCamera& camera, const ImVec2& position, const ImVec2& size, bool hovered)
+{
+    auto& s = Tools();
+    auto& doc = editor.GetDocument();
+    const auto* entity = doc.Find(editor.GetSelectedEntityId());
+    if (!entity || entity->Kind != EntityKind::Terrain || doc.IsPlaying() ||
+        doc.IsEffectivelyLocked(entity->Id) || !doc.IsEffectivelyVisible(entity->Id))
+    {
+        FinishTerrainStroke(editor);
+        return false;
+    }
+
+    const auto& io = ImGui::GetIO();
+    const bool navigating = io.KeyAlt || io.MouseDown[ImGuiMouseButton_Right];
+    if (s.StrokeEntity && (s.StrokeEntity != entity->Id || navigating)) FinishTerrainStroke(editor);
+    if (!hovered || navigating || !Finite(s.BrushRadius) || s.BrushRadius <= 0 || !Finite(s.BrushStrength))
+    {
+        s.LastDab.reset();
+        return true;
+    }
+
+    Matrix world, inverseWorld;
+    if (!doc.GetWorldMatrix(entity->Id, world.mm, inverseWorld.mm)) return true;
+    if (s.BrushMesh.Indices.empty() || s.BrushTerrain != entity->Terrain)
+    {
+        s.BrushTerrain = entity->Terrain;
+        s.BrushMesh = BuildTerrain(s.BrushTerrain);
+    }
+    const float x = 2 * (io.MousePos.x - position.x) / size.x - 1;
+    const float y = 1 - 2 * (io.MousePos.y - position.y) / size.y;
+    const Matrix clipToWorld = camera.GetInverseViewProjectionMatrix();
+    const Vector nearPoint = clipToWorld.TransformPoint(Vector(x, y, 0));
+    const Vector rayPoint = clipToWorld.TransformPoint(Vector(x, y, .9f));
+    const Vector origin = inverseWorld.TransformPoint(nearPoint);
+    const Vector direction = inverseWorld.TransformDirection(rayPoint - nearPoint);
+    Vector hit;
+    const Matrix localToClip = camera.GetViewProjectionMatrix() * world;
+    if (!FindTerrainHit(s.BrushMesh, origin, direction, hit) ||
+        !(localToClip.TransformPoint(hit).z <= 1))
+    {
+        s.LastDab.reset();
+        return true;
+    }
+
+    DrawTerrainBrush(entity->Terrain, hit, localToClip, position, size);
+    if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) ApplyTerrainDabs(doc, *entity, hit);
+    return true;
+}
+
+bool Render(jEditor& editor)
 {
     auto& s = Tools(); auto& doc = editor.GetDocument(); const auto* selected = doc.Find(editor.GetSelectedEntityId());
-    if (!selected) { ImGui::TextUnformatted("Select an object to edit its material, animation or procedural components."); return; }
+    if (!selected) { ImGui::TextUnformatted("Select an object to edit its material, animation or procedural components."); return false; }
     Entity e = *selected;
+    bool paintInScene = false;
     if (s.Selected != e.Id)
     {
         s.Selected = e.Id; s.Graph = {}; s.Undo.clear(); s.Redo.clear();
@@ -392,9 +596,16 @@ void Render(jEditor& editor)
                 if (ImGui::SliderInt("Grid resolution", &resolution, 3, 129)) { e.Terrain.Resolution = uint32_t(resolution); e.Terrain.Heights.clear(); changed = true; }
                 changed |= ImGui::DragFloat("Width", &e.Terrain.SizeX, 1, 1, 100000);
                 changed |= ImGui::DragFloat("Depth", &e.Terrain.SizeZ, 1, 1, 100000);
-                ImGui::Combo("Brush", &s.BrushMode, "Raise\0Lower\0Flatten\0Smooth\0");
+                ImGui::Combo("Brush", &s.BrushMode, BrushModes, IM_ARRAYSIZE(BrushModes));
+                ImGui::DragFloat("Radius", &s.BrushRadius, 1, 1, 100000, "%.3f", ImGuiSliderFlags_AlwaysClamp);
+                if (s.BrushMode == 3) ImGui::TextUnformatted("Strength: 100% with falloff");
+                else ImGui::DragFloat(s.BrushMode == 2 ? "Target height" : "Strength", &s.BrushStrength, 1);
+                ImGui::BeginDisabled(doc.IsPlaying() || doc.IsEffectivelyLocked(e.Id) || !doc.IsEffectivelyVisible(e.Id));
+                ImGui::Checkbox("Paint in Scene", &s.PaintInScene);
+                ImGui::EndDisabled();
+                paintInScene = s.PaintInScene;
+                if (paintInScene) ImGui::TextWrapped("Left-click or drag on the selected terrain. Right-drag or Alt+drag to move the camera.");
                 ImGui::SliderFloat("Brush X", &s.BrushX, -e.Terrain.SizeX / 2, e.Terrain.SizeX / 2); ImGui::SliderFloat("Brush Z", &s.BrushZ, -e.Terrain.SizeZ / 2, e.Terrain.SizeZ / 2);
-                ImGui::DragFloat("Radius", &s.BrushRadius, 1, 1, 100000); ImGui::DragFloat("Strength / flatten height", &s.BrushStrength, 1);
                 if (ImGui::Button("Apply brush")) changed |= PaintTerrain(e.Terrain, s.BrushX, s.BrushZ, s.BrushRadius, s.BrushStrength, s.BrushMode);
                 changed |= ImGui::Checkbox("Navigation enabled", &e.Navigation.Enabled);
                 changed |= ImGui::DragFloat("Cell size", &e.Navigation.CellSize, 1, 1, 1000);
@@ -419,6 +630,7 @@ void Render(jEditor& editor)
         ImGui::EndTabBar();
     }
     if (!s.Error.empty()) ImGui::TextColored(ImVec4(1, .4f, .25f, 1), "%s", s.Error.c_str());
+    return paintInScene;
 }
 void Tick(jEditor& editor, float dt)
 {

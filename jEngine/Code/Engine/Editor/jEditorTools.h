@@ -4,6 +4,9 @@
 #include <vector>
 #include <memory>
 class jEditor;
+class jCamera;
+struct ImVec2;
+struct Vector;
 namespace jEditorTools
 {
 struct Mesh
@@ -39,7 +42,11 @@ bool BakeNavigation(const Mesh& mesh, const jEditorAuthoring::NavigationProperti
     const jEditorAuthoring::Vec3& start, const jEditorAuthoring::Vec3& end, NavigationBake& bake, std::string& error);
 bool PaintTerrain(jEditorAuthoring::TerrainProperties& terrain, float x, float z,
     float radius, float strength, int mode); // raise, lower, flatten, smooth
-void Render(jEditor& editor);
+// Mesh must come from BuildTerrain. Origin, direction and hit are terrain-local.
+bool FindTerrainHit(const Mesh& mesh, const Vector& origin, const Vector& direction, Vector& hit);
+bool Render(jEditor& editor);
+bool RenderTerrainBrush(jEditor& editor, const jCamera& camera, const ImVec2& position, const ImVec2& size, bool hovered);
+void FinishTerrainStroke(jEditor& editor);
 void Tick(jEditor& editor, float deltaTime);
 void Shutdown();
 }

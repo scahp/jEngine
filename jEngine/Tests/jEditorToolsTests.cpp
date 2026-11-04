@@ -30,6 +30,12 @@ int RunEditorToolsTests()
     auto flat = BuildTerrain(terrain);
     expect(flat.Positions.size() == 289 && flat.Indices.size() == 16 * 16 * 6, "terrain mesh has complete grid topology");
     expect(PaintTerrain(terrain, 0, 0, 100, 25, 0) && terrain.Heights[8 * 17 + 8] == 25, "raise brush modifies center height");
+    const auto raised = BuildTerrain(terrain);
+    Vector hit;
+    expect(FindTerrainHit(raised, Vector(0, 50, -25), Vector(0, -1, 1), hit) &&
+        hit.IsNearlyEqual(Vector(0, 25, 0), .001f), "viewport brush ray hits the sculpted mesh instead of the flat grid");
+    expect(!FindTerrainHit(raised, Vector(501, 50, 0), Vector(0, -1, 0), hit) &&
+        !FindTerrainHit(raised, Vector(0, 50, 0), Vector(0, 1, 0), hit), "viewport brush ray misses outside or behind the terrain");
     expect(PaintTerrain(terrain, 0, 0, 100, 10, 1) && terrain.Heights[8 * 17 + 8] == 15, "lower brush modifies actual heightfield");
     expect(PaintTerrain(terrain, 0, 0, 100, 5, 2) && terrain.Heights[8 * 17 + 8] == 5, "flatten brush reaches requested height");
     const auto unchanged = terrain.Heights;

@@ -36,6 +36,7 @@ struct Workspace
 {
     bool Visible = true, Runtime = false, ViewHovered = false, ViewFocused = false;
     bool FixedLayout = true, ShowAssets = true, ShowLogs = true, ShowProfiler = false, ShowTools = false;
+    bool PaintTerrainInScene = false;
     bool Docking = true, PlatformWindows = false, DocksInitialized = false;
     std::optional<bool> TestPlatformWindows;
     std::function<void()> IntegrationDraw;
@@ -89,15 +90,20 @@ void FinishInspectorEdit(jEditor& editor)
     if (s.OwnPropertyTransaction && editor.GetDocument().HasTransaction()) editor.GetDocument().CommitTransaction();
     s.OwnPropertyTransaction = false; s.PropertyOwner = 0;
 }
-void GuardUnsaved(jEditor& editor, std::function<void()> action)
+void FinishWorkspaceEdit(jEditor& editor)
 {
     FinishInspectorEdit(editor);
+    jEditorTools::FinishTerrainStroke(editor);
+}
+void GuardUnsaved(jEditor& editor, std::function<void()> action)
+{
+    FinishWorkspaceEdit(editor);
     if (editor.GetDocument().IsDirty()) { State().Pending = std::move(action); State().UnsavedPrompt = true; }
     else action();
 }
 void CopySelection(jEditor& editor)
 {
-    FinishInspectorEdit(editor);
+    FinishWorkspaceEdit(editor);
     const auto text = editor.GetDocument().SelectionJson(editor.GetSelectedEntities());
     if (text.empty()) Message(editor.GetDocument().LastError(), true);
     else ImGui::SetClipboardText(text.c_str());
@@ -108,7 +114,7 @@ void PasteSelection(jEditor& editor)
     if (!text) return;
     const size_t length = strnlen(text, 16 * 1024 * 1024 + 1);
     if (length > 16 * 1024 * 1024) { Message("Clipboard selection exceeds 16 MiB", true); return; }
-    FinishInspectorEdit(editor);
+    FinishWorkspaceEdit(editor);
     const auto roots = editor.GetDocument().PasteSelectionJson(std::string(text, length));
     if (roots.empty()) Message(editor.GetDocument().LastError(), true);
     else editor.SetSelectedEntities(roots);
@@ -120,7 +126,7 @@ fs::path SceneDefault(jEditor& editor)
 }
 bool SaveScene(jEditor& editor, const fs::path& path)
 {
-    FinishInspectorEdit(editor);
+    FinishWorkspaceEdit(editor);
     try { if (path.has_parent_path()) fs::create_directories(path.parent_path()); }
     catch (const std::exception& error) { Message(error.what(), true); return false; }
     if (!editor.GetDocument().Save(path)) { Message(editor.GetDocument().LastError(), true); return false; }
@@ -497,7 +503,7 @@ void Dialogs(jEditor& editor)
 }
 
 bool IsAuthoringWorkspaceVisible() { return State().Visible && !State().Runtime; }
-void SetAuthoringWorkspaceVisible(bool visible) { if (!visible && g_Editor) FinishInspectorEdit(*g_Editor); State().Visible = visible; }
+void SetAuthoringWorkspaceVisible(bool visible) { if (!visible && g_Editor) FinishWorkspaceEdit(*g_Editor); State().Visible = visible; }
 void SetAuthoringRuntimeMode(bool runtime) { State().Runtime = runtime; State().Visible = !runtime; }
 void SetTestPlatformWindows(bool enabled) { if (enabled) State().TestPlatformWindows = true; else State().TestPlatformWindows.reset(); }
 void SetAuthoringIntegrationDrawHook(std::function<void()> draw) { State().IntegrationDraw = std::move(draw); }
@@ -515,7 +521,7 @@ bool RequestAuthoringWindowClose()
 {
     auto& s = State();
     if (s.Runtime || s.CloseApproved || !g_Editor) return true;
-    FinishInspectorEdit(*g_Editor);
+    FinishWorkspaceEdit(*g_Editor);
     if (g_Editor->GetDocument().IsPlaying()) g_Editor->StopPlay();
     if (!g_Editor->GetDocument().IsDirty()) return true;
     s.Visible = true;
@@ -631,6 +637,7 @@ void RenderAuthoringWorkspace(jEditor& editor)
 {
     auto& s = State(); auto& document = editor.GetDocument();
     editor.SetViewportInputState(false, false); editor.SetShortcutInputState(false);
+    if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) jEditorTools::FinishTerrainStroke(editor);
     if (s.OwnPropertyTransaction && (s.PropertyOwner != editor.GetSelectedEntityId() || !ImGui::IsAnyItemActive())) FinishInspectorEdit(editor);
     editor.SetAuthoringEnabled(true); editor.Placement.EnablePlacementMode = true;
     auto& io = ImGui::GetIO();
@@ -761,11 +768,14 @@ void RenderAuthoringWorkspace(jEditor& editor)
         }
         auto* sceneDraw = ImGui::GetWindowDrawList();
         sceneDraw->PushClipRect(position, ImVec2(position.x + size.x, position.y + size.y), true);
-        editor.RenderViewportGizmo(Camera(), position.x, position.y, size.x, size.y);
+        auto* camera = Camera();
+        const bool terrainBrush = s.ShowTools && s.PaintTerrainInScene && camera &&
+            jEditorTools::RenderTerrainBrush(editor, *camera, position, size, s.ViewHovered);
+        if (!terrainBrush) editor.RenderViewportGizmo(camera, position.x, position.y, size.x, size.y);
         sceneDraw->PopClipRect();
-        if (s.ViewHovered && !ImGuizmo::IsUsing() && !ImGuizmo::IsOver())
+        if (s.ViewHovered && (terrainBrush || (!ImGuizmo::IsUsing() && !ImGuizmo::IsOver())))
         {
-            if (ImGui::IsMouseClicked(0) && !io.KeyAlt)
+            if (!terrainBrush && ImGui::IsMouseClicked(0) && !io.KeyAlt)
             {
                 double x = io.MousePos.x, y = io.MousePos.y;
                 if (MapAuthoringViewportPoint(x, y)) { editor.Placement.bPickRequested = true; editor.Placement.PickMouseX = int32(x); editor.Placement.PickMouseY = int32(y); }
@@ -810,7 +820,14 @@ void RenderAuthoringWorkspace(jEditor& editor)
         } ImGui::End();
     }
     if (s.ShowProfiler) { if (ImGui::Begin("Editor diagnostics", &s.ShowProfiler)) Profiler(editor); ImGui::End(); }
-    if (s.ShowTools) { if (ImGui::Begin("Authoring tools", &s.ShowTools)) jEditorTools::Render(editor); ImGui::End(); }
+    s.PaintTerrainInScene = false;
+    if (s.ShowTools)
+    {
+        if (ImGui::Begin("Authoring tools", &s.ShowTools))
+            s.PaintTerrainInScene = jEditorTools::Render(editor);
+        ImGui::End();
+    }
+    if (!s.PaintTerrainInScene || !s.ShowTools) jEditorTools::FinishTerrainStroke(editor);
     s.ResetLayout = false;
     Dialogs(editor);
     jEditorExtensions::Render(editor);

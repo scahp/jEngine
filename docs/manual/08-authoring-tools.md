@@ -72,10 +72,12 @@ GPU 파티클·충돌·RT/PathTracing 입자·입자 그림자를 제공하는 �
 2. `Authoring tools → Terrain / Navigation`을 엽니다.
 3. `Grid resolution`, `Width`, `Depth`를 정합니다. 해상도를 바꾸면 기존 높이 샘플이 초기화되므로 먼저 저장하거나 Undo를 준비하세요.
 4. `Brush`에서 `Raise`, `Lower`, `Flatten`, `Smooth`를 고릅니다.
-5. `Brush X`, `Brush Z`, `Radius`, `Strength / flatten height`를 정하고 `Apply brush`를 누릅니다.
-6. Scene의 실제 지형 변화를 보고 `File → Save`로 높이 데이터를 저장합니다.
+5. `Radius`와 `Strength`를 정합니다. `Flatten`에서는 `Target height`를 지정하고, `Smooth`는 반경에 따른 감쇠를 사용합니다.
+6. `Paint in Scene`을 켜고 Scene에서 선택한 지형에 커서를 올립니다. 지형 표면에 적용 범위의 윤곽과 반경·강도 또는 목표 높이가 표시됩니다.
+7. 왼쪽 클릭으로 한 번 적용하거나 드래그로 이어서 편집합니다. `Ctrl+Z`는 드래그 한 번을 되돌립니다. 카메라를 움직이려면 오른쪽 드래그 또는 `Alt`+왼쪽 드래그를 사용하세요.
+8. `File → Save`로 높이 데이터를 저장합니다.
 
-이 브러시는 패널의 로컬 좌표와 버튼으로 적용합니다. 뷰포트 표면에 마우스로 직접 칠하는 브러시로 안내하지 않습니다. 지형 수정은 실제 메시를 다시 만들므로 큰 격자나 반복 적용은 반영 비용이 들 수 있습니다.
+숫자로 위치를 지정하려면 패널의 로컬 좌표 `Brush X`, `Brush Z`를 입력하고 `Apply brush`를 누릅니다. 지형을 수정하면 메시를 다시 만들므로 큰 격자에서는 반영 시간이 길어질 수 있습니다.
 
 ## 선택한 Terrain에서 Navigation 계산하기
 
