@@ -83,4 +83,11 @@ add_custom_target(jEngineDXCRuntime
   COMMAND "${CMAKE_COMMAND}" -E copy_if_different
     "${dxc_bin}/dxcompiler.dll" "${dxc_bin}/dxil.dll" "$<TARGET_FILE_DIR:jEngine>"
   VERBATIM)
+if(JENGINE_DXC_BOOTSTRAP_COMMAND)
+  add_custom_target(jEnginePrepareDXC
+    COMMAND ${JENGINE_DXC_BOOTSTRAP_COMMAND}
+    COMMENT "Checking the managed DXC cache"
+    VERBATIM)
+  add_dependencies(jEngineDXCRuntime jEnginePrepareDXC)
+endif()
 add_dependencies(jEngine jEngineDXCRuntime)

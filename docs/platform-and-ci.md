@@ -157,9 +157,22 @@ The binaries are developer build artifacts, not self-contained installers: scene
 assets, runtime dependency bundling, signing, and release publication are a
 separate packaging step. No release or self-hosted runner is created by this CI.
 
-The preserved `jEngine.vcxproj` also requires `scripts/ci/setup-windows-dxc.ps1`
-before building; `JEngineDxcDirectory` can select an alternative matching package.
-Windows CI checks CMake and the native project in both configurations. Runtime
+The preserved `jEngine/jEngine.sln` prepares the pinned DXC package automatically
+before the first x64 build. CMake prepares it at first configure and checks it
+again before copying runtime DLLs. Both use `scripts/ci/setup-windows-dxc.ps1`,
+verify the download SHA-256, reuse a valid cache without network requests and
+repair missing package files. Concurrent builds serialize installation; failed
+downloads leave the previous package in place. First use requires Internet access.
+
+Explicit `JEngineDxcDirectory` (native) or `JENGINE_DXC_EXECUTABLE` (CMake) paths to
+another package are preserved and skip managed installation. Offline builds can
+use a complete cache or those overrides. To disable managed setup, set
+`JEngineAutoSetupDxc=false` in MSBuild or `-DJENGINE_AUTO_SETUP_DXC=OFF` in CMake.
+The manual setup script remains available for prefetching the package.
+
+Windows CI verifies cold native and CMake entry points without a prepared cache,
+then checks recovery, failed downloads, warm reuse and concurrent installation.
+It checks CMake and the native project in both configurations. Runtime
 shader smoke checks compile real generated resolve/gather source through the
 application wrapper and check the loaded compiler path/version. CMake builds also
 compare the deployed DLL bytes with the selected package.

@@ -51,7 +51,9 @@
     <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
   <PropertyGroup>
-    <JEngineDxcDirectory Condition="'$(JEngineDxcDirectory)' == ''">$(ProjectDir)..\.ci-tools\dxc\bin\x64</JEngineDxcDirectory>
+    <_JEngineManagedDxcDirectory>$(ProjectDir)..\.ci-tools\dxc\bin\x64</_JEngineManagedDxcDirectory>
+    <JEngineDxcDirectory Condition="'$(JEngineDxcDirectory)' == ''">$(_JEngineManagedDxcDirectory)</JEngineDxcDirectory>
+    <JEngineAutoSetupDxc Condition="'$(JEngineAutoSetupDxc)' == ''">true</JEngineAutoSetupDxc>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -961,8 +963,11 @@ xcopy /y /i "$(JEngineDxcDirectory)\dxil.dll" "$(OutDir)"</Command>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
-  <Target Name="VerifyPinnedShaderCompiler" BeforeTargets="PrepareForBuild">
+  <Target Name="VerifyPinnedShaderCompiler" BeforeTargets="PrepareForBuild" Condition="'$(DesignTimeBuild)' != 'true'">
+    <Exec Condition="'$(JEngineAutoSetupDxc)' == 'true' And '$(JEngineDxcDirectory)' == '$(_JEngineManagedDxcDirectory)'"
+      Command="powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(ProjectDir)..\scripts\ci\setup-windows-dxc.ps1&quot;"
+      WorkingDirectory="$(ProjectDir).." Timeout="600000" UseUtf8Encoding="Always" />
     <Error Condition="!Exists('$(JEngineDxcDirectory)\dxcompiler.dll') Or !Exists('$(JEngineDxcDirectory)\dxil.dll')"
-      Text="Run powershell -File scripts/ci/setup-windows-dxc.ps1 from the repository root, or set JEngineDxcDirectory to the matching DXC bin/x64 directory." />
+      Text="DXC runtime DLLs are missing from $(JEngineDxcDirectory). Automatic setup applies to the default cache; for a custom path or disabled setup, provide the matching DXC bin/x64 package." />
   </Target>
 </Project>

@@ -61,19 +61,21 @@ projects, scene editing, assets, authoring tools, and packaging.
 
 <br/><br/>
 
-## Windows (CMake)
+## Windows
 
-Requires Visual Studio 2026 C++ tools, CMake 4.2+, and Python 3.
+Open `jEngine/jEngine.sln` in Visual Studio 2026 and build **x64**.
+DXC downloads automatically on first use and is reused afterward.
+
+For CMake, install CMake 4.2+ and Python 3, then run:
 
 ```powershell
-./scripts/ci/setup-windows-dxc.ps1
 cmake --preset windows-vs2026
 cmake --build --preset windows-debug
 ctest --preset windows-debug
 ```
 
 Open the generated solution in `build/windows-vs2026/`, or use `windows-release`
-for Release builds. The existing `jEngine/jEngine.sln` is also available.
+for Release builds. The Visual Studio C++ tools are required in both cases.
 
 ## macOS (Apple Silicon)
 

@@ -33,6 +33,9 @@ target_include_directories(jEngine PRIVATE jEngine/External/spdlog/include jEngi
   jEngine/External/IMGUI jEngine/External/EASTL/include jEngine/External/EABase/include/Common
   jEngine/External/stb jEngine/External/loadpng jEngine/External/TinyXml2
   jEngine/External/xxHash jEngine/External/tracy/public)
+if(WIN32)
+  include(cmake/WindowsDxc.cmake)
+endif()
 find_program(JENGINE_DXC_EXECUTABLE NAMES dxc HINTS "${CMAKE_CURRENT_SOURCE_DIR}/.ci-tools/dxc/bin/x64"
     "${CMAKE_CURRENT_SOURCE_DIR}/../DirectXShaderCompiler/build/macos/bin" REQUIRED)
 if(WIN32)

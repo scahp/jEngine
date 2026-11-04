@@ -44,9 +44,18 @@ jobs:
         with:
           path: .ci-tools/dxc
           key: dxc-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/ci/dependencies.json', 'scripts/ci/setup-windows-dxc.ps1') }}
-      - name: Install pinned shader compiler
+      - name: Verify automatic DXC setup without a prepared cache
         shell: pwsh
-        run: scripts/ci/setup-windows-dxc.ps1
+        env:
+          CONFIGURATION: ${{ matrix.configuration }}
+        run: |
+          $entryPoint = if ($env:CONFIGURATION -eq 'Debug') { 'Native' } else { 'CMake' }
+          scripts/ci/check-windows-dxc-bootstrap.ps1 -EntryPoint $entryPoint -Configuration $env:CONFIGURATION
+      - name: Check DXC cache recovery and concurrent installation
+        shell: pwsh
+        env:
+          CONFIGURATION: ${{ matrix.configuration }}
+        run: powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts/ci/test-windows-dxc.ps1 -DxcDirectory .ci-tools/dxc -OutputDirectory "build/windows-dxc-tests-$env:CONFIGURATION"
       - name: Generate Visual Studio project, build, and test
         shell: pwsh
         env:
@@ -74,3 +83,5 @@ jobs:
             build/windows-vs2026/shader-checks/**
             build/windows-native-${{ matrix.configuration }}/*.log
             build/windows-native-${{ matrix.configuration }}/*.binlog
+            build/windows-dxc-bootstrap-${{ matrix.configuration }}/**
+            build/windows-dxc-tests-${{ matrix.configuration }}/**

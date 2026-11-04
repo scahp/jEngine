@@ -30,10 +30,11 @@ JENGINE_RUNTIME=stable ./scripts/run-macos.sh
 
 ## Windows에서 실행
 
-Visual Studio 2026 C++ 도구, CMake 4.2 이상, Python 3이 준비된 PowerShell에서 실행합니다.
+Visual Studio 2026에서 `jEngine/jEngine.sln`을 열고 **x64**로 빌드하면 DXC가 처음 한 번 자동으로 준비됩니다. 이후에는 설치된 파일을 재사용합니다. 첫 다운로드에는 인터넷 연결이 필요합니다.
+
+CMake로 프로젝트를 생성하려면 Visual Studio C++ 도구, CMake 4.2 이상, Python 3이 준비된 PowerShell에서 실행합니다. 이 경로도 DXC를 자동으로 준비합니다.
 
 ```powershell
-./scripts/ci/setup-windows-dxc.ps1
 cmake --preset windows-vs2026
 cmake --build --preset windows-debug
 Set-Location jEngine
