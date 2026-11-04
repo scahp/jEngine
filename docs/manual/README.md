@@ -45,6 +45,6 @@ jEngine의 기본 **저작 화면**에서 프로젝트를 만들고, 물체를 �
 
 기존 캡처는 Apple M4의 검증된 실험 MoltenVK 환경과 글자 배율 1.15를 사용했습니다. 이 캡처 기록을 모든 GPU나 새 기능 전체의 검증 결과로 일반화하지 마세요.
 
-구현 범위와 기술 계약은 [Editor authoring technical guide](../editor-authoring.md), 빌드와 드라이버 준비는 [플랫폼 안내](../platform-and-ci.md), 측정 조건은 [성능 보고서](../reports/editor-foundation-performance.md)를 참고하세요.
+구현 범위와 기술 계약은 [Editor authoring technical guide](../editor-authoring.md), 빌드와 드라이버 준비는 [플랫폼 안내](../platform-and-ci.md), 측정 조건은 [성능 보고서](../reports/editor-authoring.md)를 참고하세요.
 
 [첫 장으로: 시작하기 →](01-getting-started.md)

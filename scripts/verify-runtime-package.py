@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -90,6 +91,8 @@ def main():
         parser.error('This executable-relink and launch probe currently targets macOS')
     root = Path(__file__).resolve().parents[1]
     build, project, output = args.build.resolve(), args.project.resolve(), args.output.resolve()
+    if output == project.parent or project.parent in output.parents:
+        parser.error('Verification output must be outside the source project')
     output.mkdir(parents=True, exist_ok=True)
     before = hashes(project.parent)
     probe = build_probe(root, build, output)
@@ -101,11 +104,16 @@ def main():
               'engine_sha256': hashlib.sha256(engine.read_bytes()).hexdigest(),
               'scope': 'Production staged export, actual relocated runtime, same host OS/architecture.'}
     try:
+        # Scanning may refresh sidecar fingerprints after a fresh checkout.
+        # Keep that expected registry mutation inside the owned source copy.
+        copied_project = output / 'source-project'
+        shutil.copytree(project.parent, copied_project, symlinks=True,
+                        ignore=shutil.ignore_patterns('.git', '.jeditor', 'build', '__pycache__'))
         staged = output / 'staged'
         env = {**os.environ, 'VK_DRIVER_FILES': str(args.icd.resolve()),
                'MVK_CONFIG_ENABLE_EXPERIMENTAL_RAY_TRACING': '1'}
         with (output / 'package-build.log').open('w') as log:
-            subprocess.run([str(probe), '--ci-package-probe', str(project), str(engine),
+            subprocess.run([str(probe), '--ci-package-probe', str(copied_project / project.name), str(engine),
                             str(root / 'jEngine/Resource'), str(staged)], cwd=root / 'jEngine',
                            env=env, stdout=log, stderr=subprocess.STDOUT, check=True, timeout=240)
         relocated = output / 'moved package 한글 $literal [x]'

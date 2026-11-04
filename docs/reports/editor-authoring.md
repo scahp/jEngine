@@ -134,12 +134,14 @@ Windows GPU rendering was not exercised on this Mac.
 
 ## Portable runtime result
 
-The production packager exported **109 files, four assets and 78,860,054 bytes**,
+The production packager exported **109 files, four assets and 78,877,078 bytes**,
 collected runtime dependencies, adjusted staged library paths and signed the
 staged Mach-O copies. The folder was moved to a path containing **Korean text,
 spaces, a literal `$` and brackets**, then launched from an unrelated temporary
-working directory without developer SDK/loader/DXC path overrides. It rendered
-120 frames, captured frame 60, shut down cleanly and preserved the source project.
+working directory without external developer SDK/loader/DXC path overrides. It
+rendered 120 frames, captured frame 60, shut down cleanly and preserved the source
+project. The verifier scans an isolated project copy and also passed with fresh
+checkout timestamps, which can otherwise refresh asset sidecars.
 
 The screenshot below is the actual packaged runtime with editor panels hidden.
 Packaging targets the input binary's host OS/architecture; it is not an installer,

@@ -14,6 +14,35 @@ namespace
     }
     void JsonFile(const fs::path& path, const Json& value) { Text(path, value.dump(2)); }
     Json Load(const fs::path& path) { std::ifstream file(path); Json value; file >> value; return value; }
+    fs::path StudioExampleDirectory()
+    {
+        const auto search = [](fs::path directory) -> fs::path {
+            if (directory.empty()) return {};
+            std::error_code error;
+            directory = fs::absolute(directory, error).lexically_normal();
+            if (error) return {};
+            for (unsigned depth = 0; depth < 16; ++depth)
+            {
+                const auto example = directory / "examples/authoring-demo";
+                if (fs::is_regular_file(example / "project.jproject", error)) return example;
+                error.clear();
+                const auto parent = directory.parent_path();
+                if (parent.empty() || parent == directory) break;
+                directory = parent;
+            }
+            return {};
+        };
+        // CTest/native CI run in the source tree. ccache and prefix-map flags
+        // may rewrite __FILE__ relative to the compile directory, so prefer a
+        // bounded runtime ancestor search before the source-location fallback.
+        std::error_code error;
+        const auto current = fs::current_path(error);
+        if (!error)
+            if (const auto found = search(current); !found.empty()) return found;
+        if (const auto found = search(jEditorAssetPath::FromUtf8(__FILE__).parent_path()); !found.empty()) return found;
+        throw std::runtime_error("Cannot locate shipped Studio example within 16 ancestors; runtime cwd="
+            + jEditorAssetPath::ToUtf8(current) + "; test source=" + __FILE__);
+    }
     void Pixel(const fs::path& path, bool green = false)
     {
         const std::vector<unsigned char> red{137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,0,1,0,0,0,1,8,6,0,0,0,31,21,196,137,0,0,0,13,73,68,65,84,120,156,99,248,207,192,240,31,0,5,0,1,255,137,153,61,29,0,0,0,0,73,69,78,68,174,66,96,130};
@@ -77,8 +106,7 @@ int RunEditorProjectTests()
 
     {
         using jEditorAssetPath::FromUtf8;
-        const auto example = fs::absolute(FromUtf8(__FILE__)).parent_path().parent_path().parent_path()
-            / "examples/authoring-demo";
+        fs::path example;
         const auto copy = fixture / "ShippedStudio";
         const std::vector<std::string> shippedFiles = {
             "project.jproject", "Scenes/Studio.jscene", "Assets/Models/CheckerPyramid.obj",
@@ -87,15 +115,16 @@ int RunEditorProjectTests()
             "Assets/Models/CheckerPyramid.mtl.jasset", "Assets/Textures/StudioChecker.png.jasset"};
         const auto readBytes = [](const fs::path& path) {
             std::ifstream file(path, std::ios::binary);
-            if (!file) throw std::runtime_error("Cannot open shipped Studio fixture input");
+            if (!file) throw std::runtime_error("Cannot open shipped Studio fixture input: " + jEditorAssetPath::ToUtf8(path));
             std::string bytes(std::istreambuf_iterator<char>(file), {});
-            if (file.bad() || bytes.empty()) throw std::runtime_error("Cannot read nonempty Studio fixture input");
+            if (file.bad() || bytes.empty()) throw std::runtime_error("Cannot read nonempty Studio fixture input: " + jEditorAssetPath::ToUtf8(path));
             return bytes;
         };
         std::map<std::string, std::string> sourceBytes;
         bool copied = true;
         try
         {
+            example = StudioExampleDirectory();
             // Never scan the checkout example: scans may update .jasset files.
             // Copy shipped source and metadata byte-for-byte into our own fixture.
             for (const auto& relative : shippedFiles)

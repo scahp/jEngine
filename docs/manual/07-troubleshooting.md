@@ -55,6 +55,6 @@
 
 저작 문서, 계층·그룹 변형, 모델 인스턴스, Undo/Redo·Prefab·저장/복구, 프로젝트 자산, 제한된 PBR 그래프, 로컬 변형 애니메이션, CPU 파티클·지형·선택 지형의 Recast 경로, 네이티브 에디터 확장과 런타임 패키지를 제공합니다.
 
-실시간 공동 편집, 범용 게임플레이·물리·군중 시스템, 임의 셰이더 언어, GPU 파티클, 모든 작업의 프레임 시간 보장이나 모든 GPU의 Inline 지원을 뜻하지 않습니다. 정확한 구현·런타임 경계는 [기술 지원 표](../editor-authoring.md)에 정리합니다. 검증 범위와 수치는 최종 [성능 보고서](../reports/editor-foundation-performance.md)를 기준으로 확인하세요.
+실시간 공동 편집, 범용 게임플레이·물리·군중 시스템, 임의 셰이더 언어, GPU 파티클, 모든 작업의 프레임 시간 보장이나 모든 GPU의 Inline 지원을 뜻하지 않습니다. 정확한 구현·런타임 경계는 [기술 지원 표](../editor-authoring.md)에 정리합니다. 검증 범위와 수치는 최종 [성능 보고서](../reports/editor-authoring.md)를 기준으로 확인하세요.
 
 [← 이전: 콘솔과 로그](06-console-logs.md) · [목차](README.md) · [다음: 저작 도구 →](08-authoring-tools.md)
