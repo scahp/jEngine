@@ -127,16 +127,16 @@ or the polling-harness wall time, so no improvement percentage is calculated.
   transitive dependencies. The original files remain unchanged.
 
 Hosted Windows Debug/Release checks both CMake and the preserved native project;
-macOS Debug/Release also passes. Verified production revision `6fa96001`:
-[Windows](https://github.com/scahp/jEngine/actions/runs/41760765225) ·
-[macOS](https://github.com/scahp/jEngine/actions/runs/41760765241).
+macOS Debug/Release also passes. Verified code/test revision `5d60ce66`:
+[Windows](https://github.com/scahp/jEngine/actions/runs/41765886682) ·
+[macOS](https://github.com/scahp/jEngine/actions/runs/41765886631).
 Windows GPU rendering was not exercised on this Mac.
 
 ## Portable runtime result
 
 The production packager exported **109 files, four assets and 78,877,078 bytes**,
-collected runtime dependencies, adjusted staged library paths and signed the
-staged Mach-O copies. The folder was moved to a path containing **Korean text,
+collected runtime dependencies, adjusted staged library paths and applied ad-hoc
+signatures to staged Mach-O copies. The folder was moved to a path containing **Korean text,
 spaces, a literal `$` and brackets**, then launched from an unrelated temporary
 working directory without external developer SDK/loader/DXC path overrides. It
 rendered 120 frames, captured frame 60, shut down cleanly and preserved the source

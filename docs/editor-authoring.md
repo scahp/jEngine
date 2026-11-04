@@ -23,7 +23,7 @@ The default editor workspace authors a versioned `.jscene` document and publishe
 | Navigation | Recast/Detour bake and path query from the selected Terrain; local endpoints; polygon/path counts, coordinate preview and `.jnav` output | Selected terrain only; no whole-level geometry gathering, crowd/agent controller or automatic movement. Preview is a panel coordinate list. |
 | Particles | Deterministic seeded CPU simulation and camera-facing raster billboard geometry; editable bounded emission/lifetime/gravity/size | Raster-only, no RT/PathTracing participation or particle shadows; no GPU simulation/collision system. Settings persist, live particles do not. |
 | Extensions | Real `.dll`/`.dylib` loading, versioned C ABI, owner-thread Tick/Draw, explicit load/unload/reload, stable-file watcher and bounded state migration | Manual external CMake compilation. Trusted native code in-process, no sandbox/background callbacks/ImGui ABI. Editor extensions are not automatically packaged gameplay modules. |
-| Packaging | File → Build package; staged dependency closure, fingerprints, runtime/library/shader/resource inputs, generated launcher; `--runtime` manifest startup | Windows/macOS, same OS and architecture as the input binary. No installer, signing/notarization, cross compilation or implicit source-tree deployment. Missing dependencies/tools/collisions fail publication. |
+| Packaging | File → Build package; staged dependency closure, fingerprints, runtime/library/shader/resource inputs, generated launcher; `--runtime` manifest startup | Windows/macOS, same OS and architecture as the input binary. macOS staged Mach-O copies receive ad-hoc signatures. No installer, distribution signing/notarization, cross compilation or implicit source-tree deployment. Missing dependencies/tools/collisions fail publication. |
 | Diagnostics | Project Console filters/commands, classic console completion/history, file JSON logs, editor profiler/import/cache counters | Bounded recent records and rotating files. Counters/UI timings are not an engine-wide FPS or frame-time guarantee. |
 
 ## Entry points and controls
@@ -92,7 +92,7 @@ Run the generated `run-jEngine.command` on macOS or `run-jEngine.cmd` on Windows
 ./runtime/jEngine --runtime /absolute/path/Package/jengine-runtime.json
 ```
 
-Use `runtime/jEngine.exe` on Windows. The macOS launcher additionally establishes its packaged DXC/driver environment. `--runtime` cannot be combined with `--project`/`--scene`; it verifies fingerprints, resolves paths relative to the manifest, starts the scene in Play and hides authoring UI. There is no `--package` build command in the current CLI. Packaging is same-platform staging, not a cross compiler, installer or signing system; loaded editor extensions are not automatically included or launched as gameplay plugins.
+Use `runtime/jEngine.exe` on Windows. The macOS launcher additionally establishes its packaged DXC/driver environment. `--runtime` cannot be combined with `--project`/`--scene`; it verifies fingerprints, resolves paths relative to the manifest, starts the scene in Play and hides authoring UI. There is no `--package` build command in the current CLI. Packaging stages for the same platform and gives macOS Mach-O copies ad-hoc signatures. Cross compilation, installers, Developer ID/distribution signing and notarization are unsupported. Loaded editor extensions are not automatically included or launched as gameplay plugins.
 
 ## Validation evidence
 
