@@ -1,23 +1,88 @@
-﻿#pragma once
-
-// Editor-specific features that can be excluded from runtime builds
-// Define ENABLE_EDITOR_FEATURES to include editor functionality
+#pragma once
 
 #ifdef ENABLE_EDITOR_FEATURES
 
 #include "PlacementTool/jPlacementTool.h"
+#include "Editor/jEditorDocument.h"
+#include <functional>
+#include <memory>
 
+class jEditorRuntime;
+
+// Authoring commands and world publication run on the creating/scene owner thread.
+// Document edits are cheap CPU data edits. Tick publishes them before rendering;
+// workspace drawing should never call GPU publication itself.
 class jEditor
 {
 public:
-	jEditor();
-	~jEditor();
+    using EntityId = jEditorAuthoring::EntityId;
+    using EntityKind = jEditorAuthoring::EntityKind;
+    using AssetResolver = std::function<std::filesystem::path(const std::string& assetId, const std::string& source)>;
+    using ProceduralFactory = std::function<std::shared_ptr<jObject>(const jEditorAuthoring::Entity&, std::string& error)>;
+    using ProceduralUpdater = std::function<void(const jEditorAuthoring::Entity&, jObject&, float deltaTime, float playTime)>;
+    using MaterialApplier = std::function<void(const jEditorAuthoring::MaterialProperties&, jObject&)>;
 
-	// Object/Light Placement Tool
-	jPlacementTool Placement;
+    jEditor();
+    ~jEditor();
+    jEditor(const jEditor&) = delete;
+    jEditor& operator=(const jEditor&) = delete;
 
-	// Add more editor features here in the future
-	// e.g., TerrainEditor, MaterialEditor, etc.
+    jEditorAuthoring::Document& GetDocument();
+    const jEditorAuthoring::Document& GetDocument() const;
+    void SetProjectRoot(const std::filesystem::path& root);
+    const std::filesystem::path& GetProjectRoot() const;
+    void SetAssetResolver(AssetResolver resolver);
+    void SetProceduralFactory(ProceduralFactory factory, ProceduralUpdater update = {});
+    void SetMaterialApplier(MaterialApplier apply);
+
+    // Call after existing import publication; paths are relative to project root.
+    void TrackWorldObjectSource(jObject* object, const std::string& source,
+        const std::string& assetId = {}, uint64_t revision = 0);
+    bool CaptureWorldToDocument();
+    bool SyncDocumentToWorld();
+    void Tick(float deltaTime, jCamera* camera);
+    // Before an external scene owner destroys/replaces its objects. Owned editor
+    // instances are unregistered; borrowed originals remain with their old owner.
+    void ResetWorldBindings(bool newDocument = true);
+    void ShutdownWorld(); // Idempotent; call before Game/RHI teardown.
+
+    void SetAuthoringEnabled(bool enabled);
+    bool IsAuthoringEnabled() const;
+    void ProcessInput(float deltaTime, jCamera* camera);
+    void SetViewportInputState(bool hovered, bool focused);
+    void SetShortcutInputState(bool editorWindowFocused);
+    bool HandleCameraInput(float deltaTime, jCamera* camera);
+    bool HandleCameraMouseMove(int32 xOffset, int32 yOffset, jCamera* camera);
+    void RenderViewportGizmo(jCamera* camera, float x = 0, float y = 0, float width = 0, float height = 0);
+
+    EntityId GetSelectedEntityId() const;
+    const std::vector<EntityId>& GetSelectedEntities() const;
+    bool SelectEntity(EntityId id, bool additive = false);
+    void SetSelectedEntities(const std::vector<EntityId>& ids);
+    EntityId EntityForObject(const jObject* object) const;
+    jObject* ObjectForEntity(EntityId id) const;
+    jLight* LightForEntity(EntityId id) const;
+    EntityId CreateEntity(EntityKind kind, const std::string& name = {}, EntityId parent = 0);
+    EntityId AddModel(const std::string& source, const std::string& assetId = {}, uint64_t revision = 0);
+    EntityId DuplicateSelected();
+    bool DeleteSelected();
+    bool FocusSelected(jCamera* camera);
+    bool BeginPlay();
+    bool StopPlay();
+    // Preview-only timeline seek. Does not change document history or dirty state.
+    bool SetPlayTime(float seconds);
+    void ReimportAsset(const std::string& source, uint64_t revision = 0);
+    const std::string& LastError() const;
+    const std::string& ImportStatus() const;
+    size_t PendingImportCount() const;
+    void CancelPendingImports();
+    float PlayTime() const;
+
+    // Compatibility adapter for existing scene registration and GPU picking.
+    jPlacementTool Placement;
+
+private:
+    std::unique_ptr<jEditorRuntime> Runtime;
 };
 
 extern jEditor* g_Editor;

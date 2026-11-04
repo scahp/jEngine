@@ -2,6 +2,7 @@
 #include "jImGui_DX12.h"
 #include "jRHI_DX12.h"
 #include "jOptions.h"
+#include "jTexture_DX12.h"
 
 jImGUI_DX12::jImGUI_DX12()
 {
@@ -22,7 +23,7 @@ void jImGUI_DX12::Initialize(float width, float height)
 
     D3D12_DESCRIPTOR_HEAP_DESC desc = {};
     desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-    desc.NumDescriptors = 1;
+    desc.NumDescriptors = 4096;
     desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
     if (JFAIL(g_rhi_dx12->Device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_imgui_SrvDescHeap))))
         return;
@@ -32,12 +33,17 @@ void jImGUI_DX12::Initialize(float width, float height)
 
     // Setup Platform/Renderer backends
     check(g_rhi_dx12->m_hWnd);
+    auto& io = ImGui::GetIO();
+    const ImGuiConfigFlags saved = io.ConfigFlags;
+    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
     ImGui_ImplWin32_Init(g_rhi_dx12->m_hWnd);
 
     ImGui_ImplDX12_Init(g_rhi_dx12->Device.Get(), g_rhi_dx12->MaxFrameCount,
         DXGI_FORMAT_R8G8B8A8_UNORM, m_imgui_SrvDescHeap.Get(),
         m_imgui_SrvDescHeap->GetCPUDescriptorHandleForHeapStart(),
         m_imgui_SrvDescHeap->GetGPUDescriptorHandleForHeapStart());
+    ImGui_ImplDX12_SetPlatformCommandQueue(g_rhi_dx12->GraphicsCommandBufferManager->GetCommandQueue().Get());
+    io.ConfigFlags = saved;
 
     IsInitialized = true;
 }
@@ -52,7 +58,41 @@ void jImGUI_DX12::Release()
         ImGui::DestroyContext();
 
         m_imgui_SrvDescHeap.Reset();
+        RegisteredTextures.clear();
+        NextTextureDescriptor = 1;
+        FreeTextureDescriptors.clear();
+        IsInitialized = false;
     }
+}
+
+void* jImGUI_DX12::RegisterTexture(const std::shared_ptr<jTexture>& texture)
+{
+    if (!IsInitialized || !texture || (FreeTextureDescriptors.empty() && NextTextureDescriptor >= 4096)) return nullptr;
+    auto* native = static_cast<jTexture_DX12*>(texture.get());
+    if (!native->SRV.IsValid()) return nullptr;
+    const UINT stride = g_rhi_dx12->Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    auto cpu = m_imgui_SrvDescHeap->GetCPUDescriptorHandleForHeapStart();
+    auto gpu = m_imgui_SrvDescHeap->GetGPUDescriptorHandleForHeapStart();
+    const uint32 slot = FreeTextureDescriptors.empty() ? NextTextureDescriptor++ : FreeTextureDescriptors.back();
+    if (!FreeTextureDescriptors.empty()) FreeTextureDescriptors.pop_back();
+    cpu.ptr += SIZE_T(slot) * stride;
+    gpu.ptr += UINT64(slot) * stride;
+    g_rhi_dx12->Device->CopyDescriptorsSimple(1, cpu, native->SRV.CPUHandle,
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    if (RegisteredTextures.size() <= slot) RegisteredTextures.resize(slot + 1);
+    RegisteredTextures[slot] = texture;
+    return reinterpret_cast<void*>(gpu.ptr);
+}
+void jImGUI_DX12::UnregisterTexture(void* id)
+{
+    if (!m_imgui_SrvDescHeap || !id) return;
+    const auto start = m_imgui_SrvDescHeap->GetGPUDescriptorHandleForHeapStart().ptr;
+    const auto handle = reinterpret_cast<uintptr_t>(id);
+    const UINT stride = g_rhi_dx12->Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    if (handle < start || (handle - start) % stride) return;
+    const uint64 slot = (handle - start) / stride;
+    if (!slot || slot >= RegisteredTextures.size() || !RegisteredTextures[slot]) return;
+    RegisteredTextures[slot].reset(); FreeTextureDescriptors.push_back(uint32(slot));
 }
 
 void jImGUI_DX12::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)

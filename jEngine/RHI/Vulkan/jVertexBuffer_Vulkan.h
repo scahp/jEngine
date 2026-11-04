@@ -144,6 +144,11 @@ struct jVertexBuffer_Vulkan : public jVertexBuffer
     virtual void Bind(const jShader* shader) const override {}
     virtual void Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const override;
     virtual bool Initialize(const std::shared_ptr<jVertexStreamData>& InStreamData) override;
+    // Attaches completed upload buffers while reusing the existing CPU binding layout.
+    bool InitializeWithBuffers(const std::shared_ptr<jVertexStreamData>& streamData,
+        const std::vector<std::shared_ptr<jBuffer_Vulkan>>& buffers);
+    bool InitializeInternal(const std::shared_ptr<jVertexStreamData>& streamData,
+        const std::vector<std::shared_ptr<jBuffer_Vulkan>>* uploadedBuffers);
     virtual bool IsSupportRaytracing() const override;
     virtual jBuffer* GetBuffer(int32 InStreamIndex) const override;
 };

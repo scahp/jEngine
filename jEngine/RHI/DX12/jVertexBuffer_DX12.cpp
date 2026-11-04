@@ -5,10 +5,24 @@
 
 bool jVertexBuffer_DX12::Initialize(const std::shared_ptr<jVertexStreamData>& InStreamData)
 {
+    return InitializeInternal(InStreamData, nullptr);
+}
+
+bool jVertexBuffer_DX12::InitializeWithBuffers(const std::shared_ptr<jVertexStreamData>& streamData,
+    const std::vector<std::shared_ptr<jBuffer_DX12>>& buffers)
+{
+    if (!streamData || buffers.size() != streamData->Params.size()) return false;
+    return InitializeInternal(streamData, &buffers);
+}
+
+bool jVertexBuffer_DX12::InitializeInternal(const std::shared_ptr<jVertexStreamData>& InStreamData,
+    const std::vector<std::shared_ptr<jBuffer_DX12>>* uploadedBuffers)
+{
     if (!InStreamData)
         return false;
 
     VertexStreamData = InStreamData;
+    Hash = 0;
     BindInfos.Reset();
     BindInfos.StartBindingIndex = InStreamData->BindingIndex;
 
@@ -21,6 +35,7 @@ bool jVertexBuffer_DX12::Initialize(const std::shared_ptr<jVertexStreamData>& In
     std::list<uint32> buffers;
     int32 locationIndex = InStreamData->StartLocation;
     int32 bindingIndex = InStreamData->BindingIndex;
+    size_t uploadedIndex = 0;
     for (const auto& iter : InStreamData->Params)
     {
         if (iter->Stride <= 0)
@@ -34,8 +49,15 @@ bool jVertexBuffer_DX12::Initialize(const std::shared_ptr<jVertexStreamData>& In
         stream.InstanceDivisor = iter->InstanceDivisor;
 
         // Create vertex buffer
-        stream.BufferPtr = g_rhi->CreateRawBuffer<jBuffer_DX12>(iter->GetBufferSize(), 0, EBufferCreateFlag::UAV, EResourceLayout::GENERAL
-            , iter->GetBufferData(), iter->GetBufferSize(), jNameStatic("VertexBuffer"));
+        if (uploadedBuffers)
+        {
+            if (uploadedIndex >= uploadedBuffers->size()) return false;
+            stream.BufferPtr = (*uploadedBuffers)[uploadedIndex++];
+            if (!stream.BufferPtr || !stream.BufferPtr->GetHandle() || stream.BufferPtr->GetBufferSize() < iter->GetBufferSize()) return false;
+        }
+        else
+            stream.BufferPtr = g_rhi->CreateRawBuffer<jBuffer_DX12>(iter->GetBufferSize(), 0, EBufferCreateFlag::UAV, EResourceLayout::GENERAL
+                , iter->GetBufferData(), iter->GetBufferSize(), jNameStatic("VertexBuffer"));
 
         jBuffer_DX12* Buffer_DX12 = stream.GetBuffer<jBuffer_DX12>();
 

@@ -31,5 +31,6 @@ float4 main(VSOutput input) : SV_TARGET
     float4 BloomColor = BloomTexture.Sample(BloomTextureSampler, input.TexCoord);
     float4 color = SceneColor + BloomColor * BloomMagnitude;
 
-    return float4(pow(color.rgb, 1.0 / 2.2), 0.0);
+    // The finished scene is opaque when sampled by the editor viewport.
+    return float4(pow(color.rgb, 1.0 / 2.2), 1.0);
 }

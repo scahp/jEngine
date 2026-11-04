@@ -21,7 +21,12 @@ public:
     virtual void NewFrameInternal() override;
 
     bool IsInitialized = false;
+    void* RegisterTexture(const std::shared_ptr<jTexture>& texture);
+    void UnregisterTexture(void* id); // Caller has drained all UI users.
 
 private:
     ComPtr<ID3D12DescriptorHeap> m_imgui_SrvDescHeap;
+    uint32 NextTextureDescriptor = 1; // Zero belongs to the font atlas.
+    std::vector<uint32> FreeTextureDescriptors;
+    std::vector<std::shared_ptr<jTexture>> RegisteredTextures;
 };

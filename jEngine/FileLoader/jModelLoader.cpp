@@ -12,6 +12,11 @@
 #include "Scene/jRenderObject.h"
 #include "jImageFileLoader.h"
 #include "jModelLoaderUtils.h"
+#include "jPreparedModelData.h"
+#include "jModelUploadSession.h"
+#include "jEditorAssetPath.h"
+#include "jAssimpUtf8IO.h"
+#include "External/PathTracingDataLoader/json.hpp"
 #include "Core/jLog.h"
 #include <filesystem>
 #include <utility>
@@ -24,6 +29,63 @@
 
 namespace
 {
+    using jEditorAssetPath::FromUtf8;
+    using jEditorAssetPath::ToUtf8;
+    struct ModelImportSettings
+    {
+        float Scale = 1.0f;
+        bool FlipUVs = true;
+        bool GenerateNormals = true;
+    };
+
+    bool ReadImportSettings(const char* filename, ModelImportSettings& settings, std::string& error)
+    {
+        namespace fs = std::filesystem;
+        const auto metadata = FromUtf8(std::string(filename) + ".jasset");
+        std::error_code ec;
+        const auto status = fs::symlink_status(metadata, ec);
+        if (ec == std::errc::no_such_file_or_directory || status.type() == fs::file_type::not_found) return true;
+        if (ec || fs::is_symlink(status) || !fs::is_regular_file(status))
+        { error = "Cannot read regular model metadata: " + ToUtf8(metadata); return false; }
+        const auto size = fs::file_size(metadata, ec);
+        if (ec || size > 16 * 1024 * 1024) { error = "Model metadata missing or exceeds 16 MiB: " + ToUtf8(metadata); return false; }
+        std::ifstream file(metadata, std::ios::binary);
+        std::string text(static_cast<size_t>(size), '\0');
+        file.read(text.data(), static_cast<std::streamsize>(text.size()));
+        if (!file || static_cast<size_t>(file.gcount()) != text.size())
+        { error = "Cannot read model metadata: " + ToUtf8(metadata); return false; }
+        using Json = nlohmann::json;
+        try
+        {
+            const auto json = Json::parse(text, [](int depth, Json::parse_event_t, Json&) {
+                if (depth > 128) throw std::runtime_error("Model metadata nesting exceeds 128");
+                return true;
+            }, false);
+            if (json.is_discarded() || !json.is_object() || json.value("schemaVersion", 0) != 1)
+                throw std::runtime_error("Unsupported or invalid model metadata schema");
+            const auto options = json.value("importSettings", Json::object());
+            if (!options.is_object()) throw std::runtime_error("Model importSettings must be an object");
+            for (auto it = options.begin(); it != options.end(); ++it)
+                if (it.key() != "scale" && it.key() != "flipUVs" && it.key() != "generateNormals")
+                    throw std::runtime_error("Unknown model import setting: " + it.key());
+            if (options.contains("scale"))
+            {
+                if (!options["scale"].is_number()) throw std::runtime_error("Model import scale must be a finite positive number");
+                const double scale = options["scale"].get<double>();
+                if (!std::isfinite(scale) || scale <= 0 || scale > std::numeric_limits<float>::max()
+                    || static_cast<float>(scale) <= 0) throw std::runtime_error("Model import scale must be a finite positive float");
+                settings.Scale = static_cast<float>(scale);
+            }
+            for (const char* key : {"flipUVs", "generateNormals"})
+                if (options.contains(key) && !options[key].is_boolean())
+                    throw std::runtime_error(std::string("Model import ") + key + " must be boolean");
+            settings.FlipUVs = options.value("flipUVs", true);
+            settings.GenerateNormals = options.value("generateNormals", true);
+            return true;
+        }
+        catch (const std::exception& exception) { error = ToUtf8(metadata) + ": " + exception.what(); return false; }
+    }
+
     bool IsCancelled(const jAssetCancellation& cancellation)
     {
         return cancellation && cancellation->load();
@@ -43,29 +105,28 @@ namespace
     };
 }
 
-struct jPreparedModel::Data
-{
-    struct Image
-    {
-        jName Filename;
-        std::shared_ptr<jImageData> Decoded;
-    };
-    std::unique_ptr<jMeshData> MeshData = std::make_unique<jMeshData>();
-    std::vector<jSubMesh> SubMeshes;
-    std::vector<std::unique_ptr<jMeshNode>> Nodes;
-    jMeshNode* RootNode = nullptr;
-    std::shared_ptr<jVertexStreamData> VertexStream;
-    std::shared_ptr<jVertexStreamData> PositionStream;
-    std::shared_ptr<jIndexStreamData> IndexStream;
-    std::vector<std::shared_ptr<Image>> Images;
-    jModelPreparationStats Stats;
-};
-
 jPreparedModel::jPreparedModel() : Payload(std::make_unique<Data>()) {}
 jPreparedModel::~jPreparedModel() = default;
 jPreparedModel::jPreparedModel(jPreparedModel&&) noexcept = default;
 jPreparedModel& jPreparedModel::operator=(jPreparedModel&&) noexcept = default;
 const jModelPreparationStats& jPreparedModel::GetStats() const { return Payload->Stats; }
+bool jPreparedModel::GetVertexPosition(size_t index, float position[3]) const
+{
+    if (!position || !Payload || !Payload->MeshData || index >= Payload->MeshData->Vertices.size()) return false;
+    const auto& value = Payload->MeshData->Vertices[index];
+    position[0] = value.x; position[1] = value.y; position[2] = value.z; return true;
+}
+bool jPreparedModel::GetVertexTexCoord(size_t index, float uv[2]) const
+{
+    if (!uv || !Payload || !Payload->MeshData || index >= Payload->MeshData->TexCoord.size()) return false;
+    const auto& value = Payload->MeshData->TexCoord[index]; uv[0] = value.x; uv[1] = value.y; return true;
+}
+bool jPreparedModel::GetVertexNormal(size_t index, float normal[3]) const
+{
+    if (!normal || !Payload || !Payload->MeshData || index >= Payload->MeshData->Normals.size()) return false;
+    const auto& value = Payload->MeshData->Normals[index];
+    normal[0] = value.x; normal[1] = value.y; normal[2] = value.z; return true;
+}
 
 jModelLoader& jModelLoader::GetInstance()
 {
@@ -89,6 +150,7 @@ bool jModelLoader::IsOwnerThread() const
 void jModelLoader::Shutdown()
 {
     ThreadPool.Shutdown();
+    jModelUploadSession::DrainRetired();
 }
 
 std::unique_ptr<jPreparedModel> jModelLoader::PrepareModel(const char* filename,
@@ -109,10 +171,16 @@ std::unique_ptr<jPreparedModel> jModelLoader::PrepareModel(const char* filename,
     try
     {
     jPreparationFutures pending;
+	ModelImportSettings settings;
+    std::string settingsError;
+    if (!ReadImportSettings(filename, settings, settingsError)) return fail(settingsError);
+    if (IsCancelled(cancellation)) return fail("Cancelled");
 	Assimp::Importer importer;
-	const aiScene* scene = importer.ReadFile(filename, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_CalcTangentSpace
-		| aiProcess_MakeLeftHanded | aiProcess_GenSmoothNormals
-	);
+    importer.SetIOHandler(new jAssimpUtf8IO());
+    unsigned flags = aiProcess_Triangulate | aiProcess_CalcTangentSpace | aiProcess_MakeLeftHanded;
+    if (settings.FlipUVs) flags |= aiProcess_FlipUVs;
+    if (settings.GenerateNormals) flags |= aiProcess_GenSmoothNormals;
+	const aiScene* scene = importer.ReadFile(filename, flags);
 
 	if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
 	{
@@ -140,6 +208,13 @@ std::unique_ptr<jPreparedModel> jModelLoader::PrepareModel(const char* filename,
 		}
 		data.SubMeshes.emplace_back(subMesh);
 	}
+
+    for (auto& position : meshData->Vertices)
+    {
+        position = position * settings.Scale;
+        if (!std::isfinite(position.x) || !std::isfinite(position.y) || !std::isfinite(position.z))
+            return fail("Model import scale produces nonfinite vertex positions");
+    }
 
 	for (uint32 i = 0; i < scene->mNumMaterials; ++i)
 	{
@@ -239,16 +314,19 @@ std::unique_ptr<jPreparedModel> jModelLoader::PrepareModel(const char* filename,
 
 			curTexData.Name = jName(str.C_Str());
 
-			const std::string texturePath = str.C_Str();
+			std::string texturePath = str.C_Str();
 			const bool isEmbeddedTexture = (!texturePath.empty() && texturePath[0] == '*');
 			const bool isDataUri = (texturePath.rfind("data:", 0) == 0);
 			if (!isEmbeddedTexture && !isDataUri && !texturePath.empty())
 			{
-				const auto resolvedPath = jModelLoaderUtils::ResolveTexturePath(texturePath, materialRootDir);
+                std::replace(texturePath.begin(), texturePath.end(), '\\', '/');
+                auto resolvedPath = FromUtf8(texturePath);
+                if (!resolvedPath.is_absolute() && materialRootDir) resolvedPath = FromUtf8(materialRootDir) / resolvedPath;
+                resolvedPath = resolvedPath.lexically_normal();
 				std::error_code errorCode;
 				if (std::filesystem::exists(resolvedPath, errorCode) && !errorCode)
 				{
-					const std::string filePath = resolvedPath.generic_string();
+					const std::string filePath = ToUtf8(resolvedPath);
 					jName FilePathName = jName(filePath);
 					curTexData.FilePath = FilePathName;
 
@@ -267,10 +345,10 @@ std::unique_ptr<jPreparedModel> jModelLoader::PrepareModel(const char* filename,
                         }));
                     }
 				}
-                else if (!IsCancelled(cancellation) && warnedPaths.insert(resolvedPath.generic_string()).second)
+                else if (!IsCancelled(cancellation) && warnedPaths.insert(ToUtf8(resolvedPath)).second)
                 {
                     jLog::Get().Write(EjLogLevel::Warning, "Assets",
-                        std::string("Optional texture fallback: ") + resolvedPath.generic_string() + ": "
+                        std::string("Optional texture fallback: ") + ToUtf8(resolvedPath) + ": "
                         + (errorCode ? errorCode.message() : "file not found"));
                 }
 			}
@@ -492,83 +570,43 @@ std::unique_ptr<jPreparedModel> jModelLoader::PrepareModel(const char* filename,
     }
 }
 
-jMeshObject* jModelLoader::FinalizeModel(std::unique_ptr<jPreparedModel> prepared, std::string* error)
+std::unique_ptr<jModelUploadSession> jModelLoader::BeginFinalize(std::unique_ptr<jPreparedModel> prepared, std::string* error)
 {
-    if (error)
-        error->clear();
-    const auto fail = [&](const char* message) -> jMeshObject* {
-        if (error)
-            *error = message;
-        return nullptr;
+    if (error) error->clear();
+    const auto fail = [&](const char* message) -> std::unique_ptr<jModelUploadSession> {
+        if (error) *error = message;
+        return {};
     };
-    if (!IsOwnerThread())
-        return fail("Model finalization requires the model loader owner thread");
+    if (!IsOwnerThread()) return fail("Model finalization requires the model loader owner thread");
     if (!prepared || !prepared->Payload || !prepared->Payload->VertexStream)
         return fail("No prepared model data");
-    if (!g_rhi)
-        return fail("Model finalization requires an initialized RHI");
+    if (!g_rhi) return fail("Model finalization requires an initialized RHI");
     try
     {
-        auto& data = *prepared->Payload;
-        // No cache lock spans RHI creation. Failed GPU resources leave the
-        // caller's existing scene intact; publication is the caller's decision.
-        for (auto& material : data.MeshData->Materials)
-        {
-            for (auto& texture : material.second->TexData)
-            {
-                if (!texture.FilePath.IsValid())
-                    continue;
-                const auto decoded = std::find_if(data.Images.begin(), data.Images.end(), [&](const auto& image) {
-                    return image->Filename == texture.FilePath;
-                });
-                if (decoded != data.Images.end() && (*decoded)->Decoded)
-                {
-                    auto gpuTexture = jImageFileLoader::GetInstance().LoadTextureFromImageData((*decoded)->Decoded).lock();
-                    if (!gpuTexture)
-                        return fail("Texture upload failed");
-                    texture.Texture = gpuTexture.get(); // Cache retains ownership, as existing materials require.
-                }
-            }
-        }
-        auto object = std::make_unique<jMeshObject>();
-        object->MeshData = data.MeshData.release();
-        object->SubMeshes = std::move(data.SubMeshes);
-        object->RootNode = data.RootNode;
-        for (auto& node : data.Nodes)
-            node.release(); // jMeshObject now owns the node tree.
-        object->RenderObjectGeometryDataPtr = std::make_shared<jRenderObjectGeometryData>();
-        object->RenderObjectGeometryDataPtr->CreateNew_ForRaytracing(
-            data.VertexStream, data.PositionStream, data.IndexStream, false, true);
-        const auto& geometry = *object->RenderObjectGeometryDataPtr;
-        if (!geometry.VertexBufferPtr || !geometry.VertexBuffer_PositionOnlyPtr || !geometry.IndexBufferPtr)
-            return fail("Geometry upload failed");
-        const auto validBuffer = [](const jBuffer* buffer) {
-            return buffer && buffer->GetHandle() && buffer->GetAllocatedSize() && buffer->GetBufferSize();
-        };
-        if (!validBuffer(geometry.VertexBufferPtr->GetBuffer(0))
-            || !validBuffer(geometry.VertexBuffer_PositionOnlyPtr->GetBuffer(0))
-            || !validBuffer(geometry.IndexBufferPtr->GetBuffer()))
-            return fail("Geometry upload did not produce usable buffers");
-        for (const auto& subMesh : object->SubMeshes)
-        {
-            auto renderObject = std::make_unique<jRenderObjectElement>();
-            renderObject->SubMesh = subMesh;
-            const auto material = object->MeshData->Materials.find(subMesh.MaterialIndex);
-            if (material != object->MeshData->Materials.end())
-                renderObject->MaterialPtr = material->second;
-            renderObject->CreateRenderObject(object->RenderObjectGeometryDataPtr);
-            object->AddRenderObject(renderObject.get());
-            renderObject.release();
-        }
-        return object.release();
+        return std::unique_ptr<jModelUploadSession>(new jModelUploadSession(std::move(prepared)));
     }
-    catch (const std::exception& exception)
+    catch (const std::exception& exception) { return fail(exception.what()); }
+    catch (...) { return fail("Unknown model upload initialization failure"); }
+}
+
+jMeshObject* jModelLoader::FinalizeModel(std::unique_ptr<jPreparedModel> prepared, std::string* error)
+{
+    auto upload = BeginFinalize(std::move(prepared), error);
+    if (!upload) return nullptr;
+    jModelUploadSession::Budget budget;
+    budget.MaxBytes = 128 * 1024 * 1024;
+    budget.MaxAdmissionMilliseconds = 60000;
+    budget.MaxPendingChunks = 4;
+    for (;;)
     {
-        return fail(exception.what());
-    }
-    catch (...)
-    {
-        return fail("Unknown model finalization failure");
+        const auto progress = upload->Step(budget);
+        if (progress.Current == jModelUploadSession::State::Ready) return upload->TakeModel().release();
+        if (progress.Current == jModelUploadSession::State::Failed || progress.Current == jModelUploadSession::State::Cancelled)
+        {
+            if (error) *error = progress.Error;
+            return nullptr;
+        }
+        upload->WaitSubmitted();
     }
 }
 

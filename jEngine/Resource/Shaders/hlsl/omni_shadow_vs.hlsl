@@ -11,6 +11,7 @@ struct VSOutput
 {
     float4 Pos : SV_POSITION;
     float4 WorldPos : TEXCOORD0;
+    float Opacity : TEXCOORD1;
     //min16uint LayerIndex : SV_RenderTargetArrayIndex;
     uint LayerIndex : SV_RenderTargetArrayIndex;
 };
@@ -20,6 +21,7 @@ VSOutput main(VSInput input)
     VSOutput output = (VSOutput)0;
 
     output.LayerIndex = input.LayerIndex;
+    output.Opacity = RenderObjectParam.BaseColorOpacity.a;
     output.WorldPos = mul(RenderObjectParam.M, float4(input.Position, 1.0));
     output.Pos = mul(PointLight.ShadowVP[input.LayerIndex], output.WorldPos);
     return output;

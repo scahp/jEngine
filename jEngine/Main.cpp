@@ -11,6 +11,10 @@
 #include "jCommandlineArgument.h"
 #include "jOptions.h"
 #include "Core/jLog.h"
+#include "Code/Engine/Editor/jEditorStartup.h"
+#include "Code/Engine/Editor/jEditorWorkspace.h"
+#include "Code/Engine/jEditor.h"
+#include "Tests/jEditorIntegrationTests.h"
 #ifdef _WIN32
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
@@ -68,12 +72,15 @@ namespace
 }
 
 int RunCpuSelfTests();
+int RunModelUploadGpuTests();
+int RunEditorParticleMaterialGpuTests();
 int RunLogBenchmark();
 int RunAssetDecodeBenchmarks(const char* fixtureDirectory, const char* outputPath);
 int RunEditorWorkflowBenchmarks(const char* outputPath);
 int ExportSurfelGIShaderFixtures(const char* directory, bool vulkan);
 int ExportPostProcessShaderFixtures(const char* directory, bool vulkan);
 int ExportAOEffectShaderFixtures(const char* directory, bool vulkan);
+int ExportEditorGraphicsShaderFixtures(const char* directory, bool vulkan);
 
 int main(int argc, char** argv)
 {
@@ -101,10 +108,24 @@ int main(int argc, char** argv)
         const bool vulkan = argc < 4 || std::strcmp(argv[3], "dx12") != 0;
         if (ExportSurfelGIShaderFixtures(argv[2], vulkan) != EXIT_SUCCESS) return EXIT_FAILURE;
         if (ExportPostProcessShaderFixtures(argv[2], vulkan) != EXIT_SUCCESS) return EXIT_FAILURE;
-        return ExportAOEffectShaderFixtures(argv[2], vulkan);
+        if (ExportAOEffectShaderFixtures(argv[2], vulkan) != EXIT_SUCCESS) return EXIT_FAILURE;
+        return ExportEditorGraphicsShaderFixtures(argv[2], vulkan);
     }
 
     // Validate external input before creating a window, GPU resources or worker threads.
+    std::string editorFlowDirectory;
+    for (int i = 1; i < argc; ++i)
+    {
+        if (std::strcmp(argv[i], "--ci-editor-flow") != 0) continue;
+        if (!editorFlowDirectory.empty() || ++i == argc || !argv[i][0] || argv[i][0] == '-')
+        { std::cerr << "Usage: --ci-editor-flow <owned-output-directory> [-vulkan|-dx12]" << std::endl; return EXIT_FAILURE; }
+        editorFlowDirectory = std::filesystem::absolute(argv[i]).string();
+    }
+    if (!editorFlowDirectory.empty() && gCommandLineArgument.HasArgument("--ci-editor-gpu"))
+    { std::cerr << "Select only one editor GPU test" << std::endl; return EXIT_FAILURE; }
+    if (!editorFlowDirectory.empty()) SetAuthoringTestStateDirectory(std::filesystem::path(editorFlowDirectory) / "workspace-state");
+    std::string authoringError;
+    if (!ConfigureEditorStartup(argc, argv, authoringError)) { std::cerr << authoringError << std::endl; return EXIT_FAILURE; }
     uint32 frameLimit = 0;
     const auto frameLimitText = ReadEngineEnvironment("JENGINE_MAX_FRAMES");
     if (!frameLimitText.empty() && !jCommandLineArgument::TryParseUInt32(frameLimitText, frameLimit))
@@ -121,6 +142,7 @@ int main(int argc, char** argv)
     }
     bool waitForTestScene = false;
     if (!ReadEngineBoolean("JENGINE_TEST_WAIT_FOR_SCENE", waitForTestScene)) return EXIT_FAILURE;
+    if (gCommandLineArgument.HasArgument("--ci-editor-gpu") || !editorFlowDirectory.empty()) waitForTestScene = true;
     if (!ReadEngineBoolean("JENGINE_SURFEL_GI", gOptions.UseSurfelGI)
         || !ReadEngineBoolean("JENGINE_INLINE_RAY", gOptions.SurfelGIInlineRayEnable))
         return EXIT_FAILURE;
@@ -201,6 +223,9 @@ int main(int argc, char** argv)
 		glfwSetScrollCallback(window, scroll_callback);
 		glfwSetWindowFocusCallback(window, window_focus_callback);
 		glfwSetWindowSizeCallback(window, window_size_callback);
+        glfwSetWindowCloseCallback(window, [](GLFWwindow* requested) {
+            if (!RequestAuthoringWindowClose()) glfwSetWindowShouldClose(requested, GLFW_FALSE);
+        });
 	}
 
 	//int major, minor, rev;
@@ -213,6 +238,13 @@ int main(int argc, char** argv)
     if (std::getenv("JENGINE_TEST_SURFEL_RECONFIGURE")) UpdateSurfelGIAuditOptions(0);
 #endif
 	g_Engine->Init();
+#ifdef ENABLE_EDITOR_FEATURES
+    if (g_Editor && !InitializeEditorStartup(*g_Editor, authoringError))
+    {
+        std::cerr << "Editor startup: " << authoringError << std::endl;
+        g_Engine->Release(); g_rhi->ReleaseRHI(); glfwTerminate(); return EXIT_FAILURE;
+    }
+#endif
     if (waitForTestScene && !g_Engine->Game.WaitForSceneImportForTesting())
     {
         jLog::Get().Write(EjLogLevel::Error, "Assets", "GPU test scene import did not complete successfully");
@@ -220,6 +252,25 @@ int main(int argc, char** argv)
         g_rhi->ReleaseRHI();
         glfwTerminate();
         return EXIT_FAILURE;
+    }
+#ifdef ENABLE_EDITOR_FEATURES
+    if (waitForTestScene && g_Editor && !WaitForEditorImports(*g_Editor, 60000, authoringError))
+    {
+        std::cerr << authoringError << std::endl;
+        g_Engine->Release(); g_rhi->ReleaseRHI(); glfwTerminate(); return EXIT_FAILURE;
+    }
+#endif
+    if (!editorFlowDirectory.empty())
+    {
+        const int failures = RunEditorAuthoringGpuTests(editorFlowDirectory.c_str());
+        g_Engine->Release(); g_rhi->ReleaseRHI(); glfwTerminate();
+        return failures ? EXIT_FAILURE : EXIT_SUCCESS;
+    }
+    if (gCommandLineArgument.HasArgument("--ci-editor-gpu"))
+    {
+        const int failures = RunModelUploadGpuTests() + RunEditorParticleMaterialGpuTests();
+        g_Engine->Release(); g_rhi->ReleaseRHI(); glfwTerminate();
+        return failures ? EXIT_FAILURE : EXIT_SUCCESS;
     }
     std::cout << "SurfelGI: " << gOptions.UseSurfelGI << "; inline ray option: " << gOptions.SurfelGIInlineRayEnable << std::endl;
     uint32 renderedFrames = 0;

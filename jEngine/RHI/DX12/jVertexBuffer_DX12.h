@@ -112,6 +112,10 @@ struct jVertexBuffer_DX12 : public jVertexBuffer
     mutable size_t Hash = 0;
 
     virtual bool Initialize(const std::shared_ptr<jVertexStreamData>& InStreamData) override;
+    bool InitializeWithBuffers(const std::shared_ptr<jVertexStreamData>& streamData,
+        const std::vector<std::shared_ptr<jBuffer_DX12>>& buffers);
+    bool InitializeInternal(const std::shared_ptr<jVertexStreamData>& streamData,
+        const std::vector<std::shared_ptr<jBuffer_DX12>>* uploadedBuffers);
     virtual void Bind(const jShader* shader) const override {}
     virtual void Bind(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext) const override;
     virtual void Bind(jCommandBuffer_DX12* InCommandList) const;

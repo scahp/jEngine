@@ -62,6 +62,8 @@ public:
 	void SpawnGraphTestFunc();	// Test
 
 	void Update(float deltaTime);
+    void SyncRaytracingScene();
+    void ClearImportedSceneForAuthoring();
 	void Draw();
 
 	void OnMouseButton();
@@ -127,5 +129,3 @@ private:
 	std::vector<jObject*> SceneBrowserLoadedObjects;
 	std::vector<jLight*> SceneBrowserLoadedLights;
 };
-
-

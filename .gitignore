@@ -350,3 +350,5 @@ __pycache__/
 
 # Per-process rotating engine diagnostics
 logs/
+.jeditor/
+jEngine/.jeditor/

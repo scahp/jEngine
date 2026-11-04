@@ -11,6 +11,15 @@ int RunIoAuditTests();
 int RunEffectsAuditTests();
 int RunRuntimeShaderAuditTests();
 int RunGraphicsAuditTests();
+int RunEditorDocumentTests();
+int RunEditorProjectTests();
+int RunEditorGraphicsTests();
+int RunEditorAuthoringRuntimeTests();
+int RunEditorToolsTests();
+int RunModelUploadCpuTests();
+int RunEditorExtensionTests();
+int RunEditorProjectSettingsTests();
+int RunModelImportSettingsTests();
 
 int RunCpuSelfTests()
 {
@@ -47,6 +56,15 @@ int RunCpuSelfTests()
     failures += RunEffectsAuditTests();
     failures += RunGraphicsAuditTests();
     failures += RunRuntimeShaderAuditTests();
+    failures += RunEditorDocumentTests();
+    failures += RunEditorProjectTests();
+    failures += RunEditorGraphicsTests();
+    failures += RunEditorAuthoringRuntimeTests();
+    failures += RunEditorToolsTests();
+    failures += RunModelUploadCpuTests();
+    failures += RunEditorExtensionTests();
+    failures += RunEditorProjectSettingsTests();
+    failures += RunModelImportSettingsTests();
     std::cout << "CPU checks: " << (failures ? "FAILED" : "PASSED") << std::endl;
     return failures ? EXIT_FAILURE : EXIT_SUCCESS;
 }

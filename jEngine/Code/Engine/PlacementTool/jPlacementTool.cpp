@@ -3,6 +3,7 @@
 #ifdef ENABLE_EDITOR_FEATURES
 
 #include "jPlacementTool.h"
+#include "Code/Engine/jEditor.h"
 #include "Scene/jCamera.h"
 #include "Scene/Light/jLight.h"
 #include "Scene/Light/jDirectionalLight.h"
@@ -120,6 +121,11 @@ void jPlacementTool::ProcessInput(float deltaTime, jCamera* mainCamera, float li
 		PressedKeys[i] = down && !PreviousKeys[i];
 		PreviousKeys[i] = down;
 	}
+	if (g_Editor && &g_Editor->Placement == this && g_Editor->IsAuthoringEnabled())
+	{
+		g_Editor->ProcessInput(deltaTime, mainCamera);
+		return;
+	}
 	const auto& io = ImGui::GetIO();
 	if (!EnablePlacementMode || io.WantTextInput || ImGui::IsAnyItemActive()
 		|| (io.WantCaptureKeyboard && !SceneListHasFocus) || ImGuizmo::IsUsing())
@@ -181,6 +187,16 @@ void jPlacementTool::PlaceSelectedObject(jCamera* mainCamera, float lightColorSc
 	if (!mainCamera)
 		return;
 
+	if (g_Editor && &g_Editor->Placement == this && g_Editor->IsAuthoringEnabled())
+	{
+		using jEditorAuthoring::EntityKind;
+		const auto kind = CurrentTab == EPlacementTab::SHAPE
+			? (SelectedShapeType == EPlacementShapeType::SPHERE ? EntityKind::Sphere : EntityKind::Cube)
+			: (SelectedLightType == EPlacementLightType::SPOT ? EntityKind::SpotLight
+				: SelectedLightType == EPlacementLightType::DIRECTIONAL ? EntityKind::DirectionalLight : EntityKind::PointLight);
+		g_Editor->CreateEntity(kind);
+		return;
+	}
 	const size_t previousCount = PlacedObjects.size();
 	if (CurrentTab == EPlacementTab::LIGHT)
 	{
@@ -381,6 +397,11 @@ void jPlacementTool::DeletePlacedObject(int32 index)
 	if (index < 0 || index >= static_cast<int32>(PlacedObjects.size()))
 		return;
 
+	if (g_Editor && &g_Editor->Placement == this && g_Editor->IsAuthoringEnabled())
+	{
+		const auto id = g_Editor->EntityForObject(PlacedObjects[index].Object);
+		if (id) { g_Editor->SelectEntity(id); g_Editor->DeleteSelected(); return; }
+	}
 	// Scene removal calls back into UnregisterStaticObject. Remove our entry
 	// first and keep a value copy so that callback cannot invalidate a reference
 	// or make us erase the next object (or end()) a second time.
@@ -769,73 +790,12 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 			}
 			else if (selectedObjectInfo.Type == EPlacedObjectType::SHAPE)
 			{
-				// Get shape transform (position, rotation, scale)
-				if (selectedObjectInfo.Object && !selectedObjectInfo.Object->RenderObjects.empty())
-				{
-					jRenderObject* targetRenderObj = nullptr;
-					Vector objectRot = Vector::ZeroVector;
-					Vector objectScale = Vector::OneVector;
-
-					// Determine which RenderObjects to use for gizmo position
-					if (SelectedRenderObjectIndex >= 0 && SelectedRenderObjectIndex < (int)selectedObjectInfo.Object->RenderObjects.size())
-					{
-						// Single selection: use that RenderObject
-						targetRenderObj = selectedObjectInfo.Object->RenderObjects[SelectedRenderObjectIndex];
-						objectPos = targetRenderObj->GetPos();
-						objectRot = targetRenderObj->GetRot();
-						objectScale = targetRenderObj->GetScale();
-					}
-					else if (!SelectedRenderObjectIndices.empty())
-					{
-						// Multi-selection: use average position of selected RenderObjects
-						Vector avgPos = Vector::ZeroVector;
-						int validCount = 0;
-
-						for (int idx : SelectedRenderObjectIndices)
-						{
-							if (idx >= 0 && idx < (int)selectedObjectInfo.Object->RenderObjects.size())
-							{
-								avgPos += selectedObjectInfo.Object->RenderObjects[idx]->GetPos();
-								validCount++;
-							}
-						}
-
-						if (validCount > 0)
-						{
-							objectPos = avgPos / (float)validCount;
-							// Use first selected object's rotation and scale for reference
-							int firstIdx = SelectedRenderObjectIndices[0];
-							if (firstIdx >= 0 && firstIdx < (int)selectedObjectInfo.Object->RenderObjects.size())
-							{
-								objectRot = selectedObjectInfo.Object->RenderObjects[firstIdx]->GetRot();
-								objectScale = selectedObjectInfo.Object->RenderObjects[firstIdx]->GetScale();
-							}
-						}
-					}
-					else
-					{
-						// No selection: use average position of ALL RenderObjects
-						Vector avgPos = Vector::ZeroVector;
-						for (auto* renderObj : selectedObjectInfo.Object->RenderObjects)
-						{
-							avgPos += renderObj->GetPos();
-						}
-						objectPos = avgPos / (float)selectedObjectInfo.Object->RenderObjects.size();
-
-						// Use first RenderObject's rotation and scale for reference
-						objectRot = selectedObjectInfo.Object->RenderObjects[0]->GetRot();
-						objectScale = selectedObjectInfo.Object->RenderObjects[0]->GetScale();
-					}
-
-					// Build transform matrix
-					auto posMatrix = Matrix::MakeTranslate(objectPos);
-					auto rotMatrix = Matrix::MakeRotate(objectRot);
-					auto scaleMatrix = Matrix::MakeScale(objectScale);
-					objectTransform = posMatrix * rotMatrix * scaleMatrix;
-				}
+				if (!GetSelectionWorldMatrix(objectTransform))
+					return;
 			}
 
 			// Apply Gizmo manipulation
+			const Matrix previousGizmoTransform = objectTransform;
 			float* matrixPtr = &objectTransform.m[0][0];
 			float* snapPtr = UseSnap ? (GizmoOperation == ImGuizmo::TRANSLATE ? TranslationSnap :
 										GizmoOperation == ImGuizmo::ROTATE ? &RotationSnap :
@@ -937,39 +897,7 @@ void jPlacementTool::RenderSelectedObjectProperties(jCamera* mainCamera)
 				}
 				else if (selectedObjectInfo.Type == EPlacedObjectType::SHAPE)
 				{
-					// Update shape transform (position, rotation, scale)
-					if (selectedObjectInfo.Object)
-					{
-						// Single selection: only update that one RenderObject
-						if (ApplySelectedTransform(newPos, rotationDegrees, newScale))
-						{
-							// The same validated degrees-to-radians path serves the inspector.
-						}
-						// Multi-selection: update all selected RenderObjects
-						else if (!SelectedRenderObjectIndices.empty())
-						{
-							for (int idx : SelectedRenderObjectIndices)
-							{
-								if (idx >= 0 && idx < (int)selectedObjectInfo.Object->RenderObjects.size())
-								{
-									jRenderObject* renderObj = selectedObjectInfo.Object->RenderObjects[idx];
-									renderObj->SetPos(newPos);
-									renderObj->SetRot(newRot);
-									renderObj->SetScale(newScale);
-								}
-							}
-						}
-						// No selection: apply to ALL RenderObjects
-						else
-						{
-							for (auto* renderObj : selectedObjectInfo.Object->RenderObjects)
-							{
-								renderObj->SetPos(newPos);
-								renderObj->SetRot(newRot);
-								renderObj->SetScale(newScale);
-							}
-						}
-					}
+					ApplySelectedWorldMatrix(previousGizmoTransform, objectTransform);
 				}
 			}
 		}
@@ -1321,6 +1249,11 @@ void jPlacementTool::SelectPlacedObject(int32 index)
 	if (SelectedPlacedObjectIndex >= 0)
 		PickedObject = PlacedObjects[SelectedPlacedObjectIndex].Object;
 	RevealSceneSelection = SelectedPlacedObjectIndex >= 0;
+	if (PickedObject && g_Editor && &g_Editor->Placement == this && g_Editor->IsAuthoringEnabled())
+	{
+		const auto entity = g_Editor->EntityForObject(PickedObject);
+		g_Editor->GetDocument().Select(entity);
+	}
 }
 
 void jPlacementTool::SelectObject(jObject* obj)
@@ -1328,11 +1261,69 @@ void jPlacementTool::SelectObject(jObject* obj)
 	if (!obj)
 	{
 		SelectPlacedObject(-1);
+		if (g_Editor && &g_Editor->Placement == this && g_Editor->IsAuthoringEnabled()) g_Editor->GetDocument().Select(0);
 		return;
 	}
 	const auto it = std::find_if(PlacedObjects.begin(), PlacedObjects.end(),
 		[obj](const PlacedObjectInfo& info) { return info.Object == obj; });
 	SelectPlacedObject(it != PlacedObjects.end() ? static_cast<int32>(std::distance(PlacedObjects.begin(), it)) : -1);
+}
+
+namespace
+{
+	std::vector<jRenderObject*> SelectedMeshes(const jPlacementTool& placement)
+	{
+		std::vector<jRenderObject*> result;
+		const auto index = placement.SelectedPlacedObjectIndex;
+		if (index < 0 || index >= static_cast<int32>(placement.PlacedObjects.size())) return result;
+		const auto& info = placement.PlacedObjects[index];
+		if (info.Type != EPlacedObjectType::SHAPE || !info.Object) return result;
+		const auto& meshes = info.Object->RenderObjects;
+		const auto add = [&](int32 i) { if (i >= 0 && i < static_cast<int32>(meshes.size()) && meshes[i]
+			&& std::find(result.begin(),result.end(),meshes[i]) == result.end()) result.push_back(meshes[i]); };
+		if (placement.SelectedRenderObjectIndex >= 0) add(placement.SelectedRenderObjectIndex);
+		else if (!placement.SelectedRenderObjectIndices.empty()) for (auto i : placement.SelectedRenderObjectIndices) add(i);
+		else for (int32 i = 0; i < static_cast<int32>(meshes.size()); ++i) add(i);
+		return result;
+	}
+}
+
+bool jPlacementTool::GetSelectionWorldMatrix(Matrix& matrix) const
+{
+	const auto meshes = SelectedMeshes(*this);
+	if (meshes.empty()) return false;
+	Vector center = Vector::ZeroVector;
+	for (auto* mesh : meshes) { mesh->UpdateWorldMatrix(); center += Vector(mesh->World.m30,mesh->World.m31,mesh->World.m32); }
+	matrix = meshes.front()->World;
+	if (meshes.size() > 1)
+	{
+		center /= static_cast<float>(meshes.size());
+		Vector right(matrix.m00,matrix.m01,matrix.m02), up(matrix.m10,matrix.m11,matrix.m12);
+		if (right.IsNearlyZero() || up.IsNearlyZero()) return false;
+		right.SetNormalize(); up = (up-right*right.DotProduct(up)).GetNormalize();
+		const auto forward = right.CrossProduct(up).GetNormalize();
+		matrix = Matrix(right.x,right.y,right.z,0,up.x,up.y,up.z,0,forward.x,forward.y,forward.z,0,center.x,center.y,center.z,1);
+	}
+	return true;
+}
+
+bool jPlacementTool::ApplySelectedWorldMatrix(const Matrix& before, const Matrix& after)
+{
+	for (int i = 0; i < 16; ++i) if (!IsValidFloat(before.mm[i]) || !IsValidFloat(after.mm[i])) return false;
+	if (std::abs(before.GetDeterminant()) < 0.000000000001f || std::abs(after.GetDeterminant()) < 0.000000000001f) return false;
+	const auto meshes = SelectedMeshes(*this);
+	if (meshes.empty()) return false;
+	const Matrix delta = after * before.GetInverse();
+	std::vector<Matrix> transformed;
+	for (auto* mesh : meshes)
+	{
+		mesh->UpdateWorldMatrix();
+		const Matrix world = delta * mesh->World;
+		for (float value : world.mm) if (!IsValidFloat(value)) return false;
+		transformed.push_back(world);
+	}
+	for (size_t i = 0; i < meshes.size(); ++i) { meshes[i]->SetWorldMatrixOverride(transformed[i]); meshes[i]->UpdateWorldMatrix(); }
+	return true;
 }
 
 bool jPlacementTool::ApplySelectedTransform(const Vector& position, const Vector& rotationDegrees, const Vector& scale)

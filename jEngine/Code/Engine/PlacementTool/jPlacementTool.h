@@ -87,6 +87,10 @@ public:
 	// Single mesh/primitives: UI/gizmo angles are degrees; runtime setters use radians.
 	// Returns false without changing the scene for invalid values or a group selection.
 	bool ApplySelectedTransform(const Vector& position, const Vector& rotationDegrees, const Vector& scale);
+	// Shared by actual gizmo manipulation and regression checks. Delta matrices
+	// preserve each mesh's relative position, orientation and scale around a pivot.
+	bool GetSelectionWorldMatrix(Matrix& matrix) const;
+	bool ApplySelectedWorldMatrix(const Matrix& before, const Matrix& after);
 
 	// Register a static object (called from jObject::AddObject)
 	void RegisterStaticObject(jObject* obj);

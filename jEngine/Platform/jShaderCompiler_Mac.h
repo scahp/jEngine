@@ -20,7 +20,8 @@ public:
         auto input = cleanup.Path / "shader.hlsl", output = cleanup.Path / "shader.spv";
         { std::ofstream file(input); file.write(source, length); }
         auto narrow = [](const wchar_t* s) { std::string out; while (s && *s) out += char(*s++); return out; };
-        std::vector<std::string> args{JENGINE_DXC_EXECUTABLE, "-T", narrow(model), "-E", narrow(entry), "-Fo", output.string()};
+        const char* overrideCompiler = std::getenv("JENGINE_DXC_EXECUTABLE");
+        std::vector<std::string> args{overrideCompiler && *overrideCompiler ? overrideCompiler : JENGINE_DXC_EXECUTABLE, "-T", narrow(model), "-E", narrow(entry), "-Fo", output.string()};
         for (const auto* opt : options) args.push_back(narrow(opt));
         args.push_back("-fspv-use-unknown-image-format");
         if (rowMajor) args.push_back("-Zpr");

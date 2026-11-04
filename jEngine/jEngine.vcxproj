@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -63,7 +63,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;_ITERATOR_DEBUG_LEVEL=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>./External/spdlog/include;./;./glad/include;./External/assimp/include;./External;./External/vulkan/1.3.239.0/Include;./External/glslang;./External/IMGUI;./External/EASTL/include;./External/EABase/include/Common;./External/glad/include;./External/stb;./External/loadpng;./External/TinyXml2;./External/ShaderConductor/include;./External/DirectX12/include;./External/WinPixEventRuntime/Include;./External/DirectXTex/include;./External/xxHash;./External/tracy/public</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./External/spdlog/include;./;./glad/include;./External/assimp/include;./External;./External/vulkan/1.3.239.0/Include;./External/glslang;./External/IMGUI;./External/EASTL/include;./External/EABase/include/Common;./External/glad/include;./External/stb;./External/loadpng;./External/TinyXml2;./External/ShaderConductor/include;./External/DirectX12/include;./External/WinPixEventRuntime/Include;./External/DirectXTex/include;./External/xxHash;./External/tracy/public;$(ProjectDir)External\recastnavigation\Recast\Include;$(ProjectDir)External\recastnavigation\Detour\Include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>
@@ -97,7 +97,7 @@ xcopy /y /i "$(JEngineDxcDirectory)\dxil.dll" "$(OutDir)"</Command>
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>./External/spdlog/include;./;./glad/include;./External/assimp/include;./External;./External/vulkan/1.3.239.0/Include;./External/glslang;./External/IMGUI;./External/EASTL/include;./External/EABase/include/Common;./External/glad/include;./External/stb;./External/loadpng;./External/TinyXml2;./External/ShaderConductor/include;./External/DirectX12/include;./External/WinPixEventRuntime/Include;./External/DirectXTex/include;./External/xxHash;./External/tracy/public</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./External/spdlog/include;./;./glad/include;./External/assimp/include;./External;./External/vulkan/1.3.239.0/Include;./External/glslang;./External/IMGUI;./External/EASTL/include;./External/EABase/include/Common;./External/glad/include;./External/stb;./External/loadpng;./External/TinyXml2;./External/ShaderConductor/include;./External/DirectX12/include;./External/WinPixEventRuntime/Include;./External/DirectXTex/include;./External/xxHash;./External/tracy/public;$(ProjectDir)External\recastnavigation\Recast\Include;$(ProjectDir)External\recastnavigation\Detour\Include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>
@@ -394,6 +394,48 @@ xcopy /y /i "$(JEngineDxcDirectory)\dxil.dll" "$(OutDir)"</Command>
     <ClCompile Include="jGame.cpp" />
     <ClCompile Include="jOptions.cpp" />
     <ClCompile Include="jPrimitiveUtil.cpp" />
+    <ClCompile Include="Code\Engine\Editor\jEditorProcedural.cpp"></ClCompile>
+    <ClCompile Include="Code\Engine\Editor\jEditorWorkspace.cpp"></ClCompile>
+    <ClCompile Include="Code\Engine\Editor\jEditorTools.cpp"></ClCompile>
+    <ClCompile Include="Code\Engine\Editor\jEditorRuntime.cpp"></ClCompile>
+    <ClCompile Include="Code\Engine\Editor\jEditorUiRenderer.cpp"></ClCompile>
+    <ClCompile Include="Code\Engine\Editor\jEditorStartup.cpp"></ClCompile>
+    <ClCompile Include="Code\Engine\Editor\jEditorDocument.cpp"></ClCompile>
+    <ClCompile Include="FileLoader\jManagedTextureCache.cpp"></ClCompile>
+    <ClCompile Include="FileLoader\jEditorAssets.cpp"></ClCompile>
+    <ClCompile Include="FileLoader\jModelUploadSession.cpp"></ClCompile>
+    <ClCompile Include="Tests\jEditorToolsTests.cpp"></ClCompile>
+    <ClCompile Include="Tests\jEditorProjectTests.cpp"></ClCompile>
+    <ClCompile Include="Tests\jEditorDocumentTests.cpp"></ClCompile>
+    <ClCompile Include="Tests\jEditorAuthoringRuntimeTests.cpp"></ClCompile>
+    <ClCompile Include="Tests\jEditorGraphicsTests.cpp"></ClCompile>
+    <ClCompile Include="External\recastnavigation\Recast\Source\RecastMeshDetail.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="External\recastnavigation\Recast\Source\Recast.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="External\recastnavigation\Recast\Source\RecastArea.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="External\recastnavigation\Recast\Source\RecastLayers.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="External\recastnavigation\Recast\Source\RecastRegion.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="External\recastnavigation\Recast\Source\RecastMesh.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="External\recastnavigation\Recast\Source\RecastContour.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="External\recastnavigation\Recast\Source\RecastAssert.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="External\recastnavigation\Recast\Source\RecastAlloc.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="External\recastnavigation\Recast\Source\RecastRasterization.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="External\recastnavigation\Recast\Source\RecastFilter.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="External\recastnavigation\Detour\Source\DetourNavMesh.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="External\recastnavigation\Detour\Source\DetourCommon.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="External\recastnavigation\Detour\Source\DetourNavMeshBuilder.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="External\recastnavigation\Detour\Source\DetourNavMeshQuery.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="External\recastnavigation\Detour\Source\DetourAssert.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="External\recastnavigation\Detour\Source\DetourNode.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="External\recastnavigation\Detour\Source\DetourAlloc.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="Code\Engine\Editor\jEditorAssetPanel.cpp"></ClCompile>
+    <ClCompile Include="Code\Engine\Editor\jEditorExtensions.cpp"></ClCompile>
+    <ClCompile Include="Code\Engine\Editor\jEditorPackaging.cpp"></ClCompile>
+    <ClCompile Include="Code\Engine\Editor\jEditorProjectSettings.cpp"></ClCompile>
+    <ClCompile Include="Tests\jEditorExtensionTests.cpp"></ClCompile>
+    <ClCompile Include="Tests\jEditorIntegrationTests.cpp"></ClCompile>
+    <ClCompile Include="Tests\jEditorProjectSettingsTests.cpp"></ClCompile>
+    <ClCompile Include="Tests\jModelImportSettingsTests.cpp"></ClCompile>
+    <ClCompile Include="Tests\jModelUploadTests.cpp"></ClCompile>
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Material\jMaterial.cpp" />
     <ClCompile Include="Math\Matrix.cpp" />

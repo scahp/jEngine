@@ -17,15 +17,20 @@ public:
 	jObject* Owner = nullptr;
 
 	// Transform accessors
-	FORCEINLINE void SetPos(const Vector& InPos) { if (Pos.IsNearlyEqual(InPos)) return; Pos = InPos; SetDirtyFlags(EDirty::POS); }
-	FORCEINLINE void SetRot(const Vector& InRot) { if (Rot.IsNearlyEqual(InRot)) return; Rot = InRot; SetDirtyFlags(EDirty::ROT); }
-	FORCEINLINE void SetScale(const Vector& InScale) { if (Scale.IsNearlyEqual(InScale)) return; Scale = InScale; SetDirtyFlags(EDirty::SCALE); }
+	FORCEINLINE void SetPos(const Vector& InPos) { ClearWorldMatrixOverride(); if (Pos.IsNearlyEqual(InPos)) return; Pos = InPos; SetDirtyFlags(EDirty::POS); }
+	FORCEINLINE void SetRot(const Vector& InRot) { ClearWorldMatrixOverride(); if (Rot.IsNearlyEqual(InRot)) return; Rot = InRot; SetDirtyFlags(EDirty::ROT); }
+	FORCEINLINE void SetScale(const Vector& InScale) { ClearWorldMatrixOverride(); if (Scale.IsNearlyEqual(InScale)) return; Scale = InScale; SetDirtyFlags(EDirty::SCALE); }
 	FORCEINLINE const Vector& GetPos() const { return Pos; }
 	FORCEINLINE const Vector& GetRot() const { return Rot; }
 	FORCEINLINE const Vector& GetScale() const { return Scale; }
 
 	// World matrix management
 	virtual void UpdateWorldMatrix();
+	// Authoring hierarchies can introduce affine shear. Preserve the exact matrix
+	// until an explicit legacy TRS setter takes ownership again.
+	void SetWorldMatrixOverride(const Matrix& matrix);
+	void ClearWorldMatrixOverride();
+	bool HasWorldMatrixOverride() const { return WorldMatrixOverride; }
 	Matrix World;
 
 protected:
@@ -40,6 +45,7 @@ protected:
 	};
 
 	EDirty DirtyFlags = EDirty::POS_ROT_SCALE;
+	bool WorldMatrixOverride = false;
 
 	void SetDirtyFlags(EDirty InEnum)
 	{

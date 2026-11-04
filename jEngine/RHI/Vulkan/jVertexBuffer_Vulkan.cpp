@@ -12,16 +12,32 @@ void jVertexBuffer_Vulkan::Bind(const std::shared_ptr<jRenderFrameContext>& InRe
 
 bool jVertexBuffer_Vulkan::Initialize(const std::shared_ptr<jVertexStreamData>& InStreamData)
 {
+    return InitializeInternal(InStreamData, nullptr);
+}
+
+bool jVertexBuffer_Vulkan::InitializeWithBuffers(const std::shared_ptr<jVertexStreamData>& streamData,
+    const std::vector<std::shared_ptr<jBuffer_Vulkan>>& buffers)
+{
+    if (!streamData || buffers.size() != streamData->Params.size()) return false;
+    return InitializeInternal(streamData, &buffers);
+}
+
+bool jVertexBuffer_Vulkan::InitializeInternal(const std::shared_ptr<jVertexStreamData>& InStreamData,
+    const std::vector<std::shared_ptr<jBuffer_Vulkan>>* uploadedBuffers)
+{
     if (!InStreamData)
         return false;
 
     VertexStreamData = InStreamData;
+    Streams.clear();
+    Hash = 0;
     BindInfos.Reset();
     BindInfos.StartBindingIndex = InStreamData->BindingIndex;
 
     std::list<uint32> buffers;
     int32 locationIndex = InStreamData->StartLocation;
     int32 bindingIndex = InStreamData->BindingIndex;
+    size_t uploadedIndex = 0;
     for (const auto& iter : InStreamData->Params)
     {
         if (iter->Stride <= 0)
@@ -37,9 +53,16 @@ bool jVertexBuffer_Vulkan::Initialize(const std::shared_ptr<jVertexStreamData>& 
         if (iter->GetBufferSize() > 0)
         {
             VkDeviceSize bufferSize = iter->GetBufferSize();
-            stream.BufferPtr = g_rhi->CreateStructuredBuffer<jBuffer_Vulkan>(bufferSize, stream.Stride, stream.Stride
-                , EBufferCreateFlag::VertexBuffer | EBufferCreateFlag::AccelerationStructureBuildInput | EBufferCreateFlag::UAV
-                , EResourceLayout::TRANSFER_DST, iter->GetBufferData(), bufferSize);
+            if (uploadedBuffers)
+            {
+                if (uploadedIndex >= uploadedBuffers->size()) return false;
+                stream.BufferPtr = (*uploadedBuffers)[uploadedIndex++];
+                if (!stream.BufferPtr || !stream.BufferPtr->GetHandle() || stream.BufferPtr->GetBufferSize() < bufferSize) return false;
+            }
+            else
+                stream.BufferPtr = g_rhi->CreateStructuredBuffer<jBuffer_Vulkan>(bufferSize, stream.Stride, stream.Stride
+                    , EBufferCreateFlag::VertexBuffer | EBufferCreateFlag::AccelerationStructureBuildInput | EBufferCreateFlag::UAV
+                    , EResourceLayout::TRANSFER_DST, iter->GetBufferData(), bufferSize);
 
             BindInfos.Buffers.push_back(stream.BufferPtr->Buffer);
             BindInfos.Offsets.push_back(stream.Offset + stream.BufferPtr->Offset);

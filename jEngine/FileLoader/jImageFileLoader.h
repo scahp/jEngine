@@ -56,6 +56,12 @@ public:
 	// GPU creation is owner-thread only; CPU preparation uses the method above.
 	std::weak_ptr<jTexture> LoadTextureFromFile(const jName& filename);
 	std::weak_ptr<jTexture> LoadTextureFromImageData(const std::shared_ptr<jImageData>& imageData);
+    // Managed editor/model resources retain a strong material lease. Their cache
+    // keys include decoded-object identity, so a reimport never returns stale pixels.
+    std::shared_ptr<jTexture> FindTextureForImage(const std::shared_ptr<jImageData>& imageData);
+    void StoreTextureForImage(const std::shared_ptr<jImageData>& imageData, const std::shared_ptr<jTexture>& texture);
+    std::shared_ptr<jTexture> LoadTextureOwned(const jName& filename);
+    void InvalidateImageData(const jName& filename);
     struct Stats
     {
         size_t DecodeAttempts = 0;
@@ -85,8 +91,12 @@ private:
         bool Done = false;
         std::shared_ptr<jImageData> Image;
         std::exception_ptr Error;
+        uint64_t Generation = 0;
     };
     std::map<jName, std::shared_ptr<DecodeState>> InFlightImages;
+    struct ManagedTexture { std::weak_ptr<jImageData> Image; std::weak_ptr<jTexture> Texture; };
+    std::map<const jImageData*, ManagedTexture> ManagedTextures;
+    std::map<jName, uint64_t> ImageGenerations;
 
     std::shared_ptr<jImageData> DecodeImageData(const jName& filename);
     std::weak_ptr<jImageData> GetOrDecodeImage(const jName& filename)
@@ -113,6 +123,7 @@ private:
                 return state->Image;
             }
             state = std::make_shared<DecodeState>();
+            state->Generation = ImageGenerations[filename];
             InFlightImages.emplace(filename, state);
             ++DecodeAttempts;
         }
@@ -125,7 +136,8 @@ private:
             if (image)
             {
                 std::lock_guard<std::mutex> lock(CachedImageDataLock);
-                CachedImageDataMap.emplace(filename, image);
+                if (ImageGenerations[filename] == state->Generation)
+                    CachedImageDataMap.emplace(filename, image);
             }
         }
         catch (...)
@@ -137,7 +149,9 @@ private:
             state->Image = std::move(image);
             state->Error = error;
             state->Done = true;
-            InFlightImages.erase(filename); // Failures are retryable on the next call.
+            const auto pending = InFlightImages.find(filename);
+            if (pending != InFlightImages.end() && pending->second == state)
+                InFlightImages.erase(pending); // Never erase a newer reimport flight.
         }
         state->Completed.notify_all(); // Success, decoder failure, and exception all publish.
         if (error)

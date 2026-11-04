@@ -45,11 +45,20 @@ else()
 endif()
 target_precompile_headers(jEngine PRIVATE jEngine/pch.h)
 
+file(GLOB RECAST_SOURCES jEngine/External/recastnavigation/Recast/Source/*.cpp jEngine/External/recastnavigation/Detour/Source/*.cpp)
+target_sources(jEngine PRIVATE ${RECAST_SOURCES})
+target_include_directories(jEngine PRIVATE jEngine/External/recastnavigation/Recast/Include jEngine/External/recastnavigation/Detour/Include)
+set_source_files_properties(${RECAST_SOURCES} PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+
 target_compile_definitions(jEngine PRIVATE JENGINE_DXC_EXECUTABLE="${JENGINE_DXC_EXECUTABLE}")
 set_source_files_properties(jEngine/External/xxHash/xxhash.c jEngine/Tests/jEffectsAuditTests.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 
 include(CTest)
 if(BUILD_TESTING)
+  set(JENGINE_BUILD_PLUGIN_FIXTURES ON CACHE BOOL "Build editor plugin ABI fixtures" FORCE)
+  add_subdirectory(examples/editor-plugin)
+  add_dependencies(jEngine jengine_plugin_fixture_v1 jengine_plugin_fixture_v2 jengine_plugin_fixture_badabi jengine_plugin_fixture_failload jengine_plugin_fixture_failrestore jengine_plugin_fixture_oversized jengine_plugin_fixture_missingexport)
+  target_compile_definitions(jEngine PRIVATE JENGINE_PLUGIN_FIXTURE_DIRECTORY="$<TARGET_FILE_DIR:jengine_plugin_fixture_v1>")
   find_package(Python3 COMPONENTS Interpreter REQUIRED)
   add_test(NAME cpu-math COMMAND jEngine --ci-cpu)
   add_test(NAME cli-input
@@ -72,3 +81,5 @@ if(BUILD_TESTING)
   set_tests_properties(cpu-math PROPERTIES LABELS "cpu")
   set_tests_properties(shader-contracts PROPERTIES LABELS "cpu;shader")
 endif()
+
+target_link_libraries(jEngine PRIVATE ${CMAKE_DL_LIBS})

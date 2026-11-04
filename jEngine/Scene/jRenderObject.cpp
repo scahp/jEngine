@@ -205,6 +205,7 @@ void jRenderObject::UpdateWorldMatrix()
 
 void jRenderObject::OnTransformDirty()
 {
+    NeedToUpdateRenderObjectUniformParameters = true;
     if (g_rhi && g_rhi->RaytracingScene && IsSupportRaytracing())
         g_rhi->RaytracingScene->MarkTransformDirty(this);
 }
@@ -221,7 +222,9 @@ const std::vector<float>& jRenderObject::GetVertices() const
 const std::shared_ptr<jShaderBindingInstance>& jRenderObject::CreateShaderBindingInstance()
 {
     // Special code for PBR test
-    if (LastMetallic != gOptions.Metallic || LastRoughness != gOptions.Roughness)
+    if (LastMetallic != gOptions.Metallic || LastRoughness != gOptions.Roughness ||
+        LastMaterial != MaterialPtr.get() ||
+        (MaterialPtr && LastMaterialRevision != MaterialPtr->Revision) || !RenderObjectUniformParametersPtr)
         NeedToUpdateRenderObjectUniformParameters = true;
 
     // Update uniform buffer if it need to.
@@ -234,6 +237,15 @@ const std::shared_ptr<jShaderBindingInstance>& jRenderObject::CreateShaderBindin
         ubo.InvM = ubo.M.GetInverse();
         ubo.Metallic = gOptions.Metallic;
         ubo.Roughness = gOptions.Roughness;
+        ubo.BaseColorOpacity = Vector4(1.0f);
+        ubo.EmissiveOverride = Vector4(0.0f);
+        if (MaterialPtr && MaterialPtr->UseMaterialProperties)
+        {
+            ubo.BaseColorOpacity = MaterialPtr->BaseColorOpacity;
+            ubo.EmissiveOverride = Vector4(MaterialPtr->Emissive, 1.0f);
+            ubo.Metallic = MaterialPtr->MetallicFactor;
+            ubo.Roughness = MaterialPtr->RoughnessFactor;
+        }
         ubo.ObjectID = Owner ? Owner->ObjectID : 0;
         ubo.RenderObjectID = RenderObjectID;
 
@@ -246,6 +258,8 @@ const std::shared_ptr<jShaderBindingInstance>& jRenderObject::CreateShaderBindin
 
         LastMetallic = gOptions.Metallic;
         LastRoughness = gOptions.Roughness;
+        LastMaterial = MaterialPtr.get();
+        LastMaterialRevision = MaterialPtr ? MaterialPtr->Revision : 0;
 
         if (RenderObjectShaderBindingInstance)
             RenderObjectShaderBindingInstance->Free();

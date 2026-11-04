@@ -247,11 +247,11 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
     }
 
     wchar_t TempStr[256] = { 0, };
-    ETextureFormat GBufferTexFormat[_countof(GBuffer)] = { ETextureFormat::R11G11B10F, ETextureFormat::R11G11B10F, ETextureFormat::RGBA16F };
+    ETextureFormat GBufferTexFormat[_countof(GBuffer)] = { ETextureFormat::R11G11B10F, ETextureFormat::R11G11B10F, ETextureFormat::RGBA16F, ETextureFormat::R11G11B10F };
     for (int32 i = 0; i < _countof(GBuffer); ++i)
     {
         const bool UseAsSubpassInput = gOptions.UseSubpass;
-        const bool IsMemoryless = gOptions.UseMemoryless && gOptions.UseSubpass;
+        const bool IsMemoryless = gOptions.UseMemoryless && gOptions.UseSubpass && i != int32(EGBufferType::EMISSIVE);
 
         wsprintf(TempStr, TEXT("GBuffer[%d]"), i);
         jRenderTargetInfo Info = {
@@ -367,6 +367,7 @@ std::shared_ptr<jShaderBindingInstance> jSceneRenderTarget::PrepareGBufferShader
         Parameters.GBuffer0 = { GBuffer[0]->GetTexture() };
         Parameters.GBuffer1 = { GBuffer[1]->GetTexture() };
         Parameters.GBuffer2 = { GBuffer[2]->GetTexture() };
+        Parameters.GBuffer3 = { GBuffer[3]->GetTexture() };
         Parameters.DepthTexture = { DepthPtr->GetTexture() };
         return jShaderParameterSet::CreateShaderBindingInstance(Parameters, EShaderAccessStageFlag::FRAGMENT, jShaderBindingInstanceType::SingleFrame);
     }
@@ -379,6 +380,7 @@ std::shared_ptr<jShaderBindingInstance> jSceneRenderTarget::PrepareGBufferShader
         Parameters.GBuffer0 = { GBuffer[0]->GetTexture(), GBufferSamplerStateInfo };
         Parameters.GBuffer1 = { GBuffer[1]->GetTexture(), GBufferSamplerStateInfo };
         Parameters.GBuffer2 = { GBuffer[2]->GetTexture(), GBufferSamplerStateInfo };
+        Parameters.GBuffer3 = { GBuffer[3]->GetTexture(), GBufferSamplerStateInfo };
         Parameters.DepthTexture = { DepthPtr->GetTexture(), GBufferSamplerStateInfo };
         return jShaderParameterSet::CreateShaderBindingInstance(Parameters, EShaderAccessStageFlag::ALL_GRAPHICS, jShaderBindingInstanceType::SingleFrame);
     }

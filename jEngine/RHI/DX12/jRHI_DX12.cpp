@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "Code/Engine/Editor/jEditorWorkspace.h"
 #include "jRHI_DX12.h"
 #include "jShaderCompiler_DX12.h"
 #include <iomanip>
@@ -238,6 +239,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     return 0;
     case WM_PAINT:
 		break;
+    case WM_CLOSE:
+        if (!RequestAuthoringWindowClose()) return 0;
+        break;
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		return 0;

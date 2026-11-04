@@ -14,6 +14,7 @@
 #include <vector>
 
 class jMeshObject;
+class jModelUploadSession;
 
 struct jTask
 {
@@ -78,11 +79,16 @@ public:
     jPreparedModel(const jPreparedModel&) = delete;
     jPreparedModel& operator=(const jPreparedModel&) = delete;
     const jModelPreparationStats& GetStats() const;
+    // Read-only CPU inspection; false for invalid indices or consumed data.
+    bool GetVertexPosition(size_t index, float position[3]) const;
+    bool GetVertexTexCoord(size_t index, float uv[2]) const;
+    bool GetVertexNormal(size_t index, float normal[3]) const;
 
 private:
     struct Data;
     std::unique_ptr<Data> Payload;
     friend class jModelLoader;
+    friend class jModelUploadSession;
 };
 
 class jModelLoader
@@ -99,6 +105,8 @@ public:
     // Consumes the CPU payload. Rejected before RHI access on any other thread.
     // The caller adds the returned object to the scene only after success.
     jMeshObject* FinalizeModel(std::unique_ptr<jPreparedModel> prepared, std::string* error = nullptr);
+    std::unique_ptr<jModelUploadSession> BeginFinalize(std::unique_ptr<jPreparedModel> prepared,
+        std::string* error = nullptr);
     bool IsOwnerThread() const;
     void Shutdown(); // Call after import service Shutdown and before RHI teardown.
 

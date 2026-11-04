@@ -172,6 +172,9 @@ float4 main(VSOutput input
     float3 DiffuseColor = DiffuseTexture.Sample(DiffuseTextureSampler, input.TexCoord.xy).xyz;// *input.Color.xyz;
 
     float4 color = (1.0 / 3.14) * float4(pushConsts.Color.rgb * DiffuseColor * (PointLightLit + DirectionalLightLit + SpotLightLit), 1.0);
+    color.rgb = color.rgb * RenderObjectParam.BaseColorOpacity.rgb + RenderObjectParam.EmissiveOverride.xyz;
+    color.a = RenderObjectParam.BaseColorOpacity.a;
+    if (color.a <= frac(dot(input.Pos.xy, float2(0.754877666, 0.569840296)))) discard;
 
 #if USE_VARIABLE_SHADING_RATE
     if (pushConsts.ShowVRSArea)

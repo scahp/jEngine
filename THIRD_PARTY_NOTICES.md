@@ -6,15 +6,15 @@ inventory of the repository's legacy libraries, binaries, or scene assets.
 
 ## Dear ImGui
 
-The bundled `jEngine/External/IMGUI/imgui.h` reports `1.88 WIP`;
-`imgui.cpp` refers to a `LICENSE.txt` that was missing from this checkout.
-The following notice is restored from the official
-[Dear ImGui v1.88 license](https://github.com/ocornut/imgui/blob/v1.88/LICENSE.txt).
-The exact upstream commit of the bundled WIP snapshot has not been identified.
+The editor bundles **v1.89.9-docking**, pinned at
+`b4c31b3a904127518ea41f7f42e0087b731040b9`. The complete
+[MIT license](jEngine/External/IMGUI/LICENSE.txt) and
+[upstream provenance and local backend changes](jEngine/External/IMGUI/UPSTREAM.md)
+are preserved beside the source.
 
 The MIT License (MIT)
 
-Copyright (c) 2014-2022 Omar Cornut
+Copyright (c) 2014-2023 Omar Cornut
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -33,6 +33,13 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## Recast Navigation
+
+The editor navigation tools bundle Recast and Detour at commit
+`9f4ce64458dfae86e1239c525ddc219c4e9e06f1`. See the complete
+[zlib license](jEngine/External/recastnavigation/License.txt) and
+[source provenance](jEngine/External/recastnavigation/UPSTREAM.md).
 
 ## Existing library-local notices
 

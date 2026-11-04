@@ -1,0 +1,172 @@
+#include "pch.h"
+#include "Code/Engine/Editor/jEditorProjectSettings.h"
+#include "Code/Engine/Editor/jEditorDocument.h"
+#include "Code/Engine/jEditor.h"
+#include "FileLoader/jEditorAssets.h"
+#include "jOptions.h"
+#include <chrono>
+#include <fstream>
+#include <iostream>
+#include <limits>
+#include <thread>
+
+int RunEditorProjectSettingsTests()
+{
+#ifdef ENABLE_EDITOR_FEATURES
+    namespace fs = std::filesystem;
+    namespace Settings = jEditorProjectSettings;
+    int failures = 0, checks = 0;
+    const auto expect = [&](bool condition, const char* name) {
+        std::cout << (condition ? "PASS " : "FAIL ") << "project settings: " << name << '\n';
+        ++checks; failures += !condition;
+    };
+    const auto fixture = fs::temp_directory_path() / ("jengine-settings-" + std::to_string(
+        std::chrono::steady_clock::now().time_since_epoch().count()));
+    const auto oldKeys = g_KeyState;
+    const jOptions oldOptions = gOptions;
+    const bool oldInline = GSupportInlineRaytracing, oldVsyncSupport = GRHISupportVsync, oldVsync = GUseVsync;
+    const bool oldVisible = Settings::IsVisible();
+    auto* oldContext = ImGui::GetCurrentContext();
+    constexpr const char* actions[] = {"camera.forward", "camera.back", "camera.left", "camera.right", "camera.up", "camera.down"};
+    constexpr EInputKey defaults[] = {EInputKey::W, EInputKey::S, EInputKey::A, EInputKey::D, EInputKey::E, EInputKey::Q};
+    std::array<EInputKey, 6> oldBindings{};
+    for (size_t i = 0; i < oldBindings.size(); ++i) oldBindings[i] = Settings::Binding(actions[i], defaults[i]);
+    jEditor editor;
+    jEditorProject project;
+    std::string error;
+    const auto text = [](const fs::path& path) {
+        std::ifstream input(path, std::ios::binary);
+        return std::string(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
+    };
+    try
+    {
+        expect(project.Create(fixture, "Settings fixture", error), "create real project manifest");
+        jEditorAuthoring::Document scene;
+        scene.Create(jEditorAuthoring::EntityKind::Cube, "Startup cube");
+        expect(scene.Save(fixture / "Scenes/start.jscene"), "write actual authored startup scene");
+        auto candidate = project.GetConfig();
+        candidate.StartupScene = "Scenes/start.jscene";
+        candidate.Settings = {{"render.deferred", "false"}, {"render.surfelgi", "false"}, {"render.surfelgi.inline", "true"},
+            {"render.ssgi", "true"}, {"render.bloom", "true"}, {"render.vsync", "true"},
+            {"render.surfelgi.intensity", "2.5"}, {"render.surfelgi.inline.rays", "8"},
+            {"input.camera.forward", "I"}, {"input.camera.back", "K"}, {"input.camera.left", "J"},
+            {"input.camera.right", "L"}, {"input.camera.up", "U"}, {"input.camera.down", "O"},
+            {"custom.future.option", "preserve this value"}};
+        GSupportInlineRaytracing = false; GRHISupportVsync = false;
+        expect(Settings::Validate(candidate, error, fixture), "validated typed renderer defaults and portable camera bindings");
+        expect(Settings::Save(project, editor, candidate, error), "save candidate manifest then apply actual settings");
+        expect(!gOptions.UseDeferredRenderer && !gOptions.UseSurfelGI && gOptions.UseSSGI && gOptions.BloomEyeAdaptation
+            && gOptions.SurfelGIIntensity == 2.5f && gOptions.SurfelGIInlineRayCount == 8,
+            "renderer options reflect persisted values rather than a UI-only copy");
+        expect(!gOptions.SurfelGIInlineRayEnable && !GUseVsync
+            && project.GetConfig().Settings.at("render.surfelgi.inline") == "true"
+            && project.GetConfig().Settings.at("render.vsync") == "true", "unsupported requested features retained while effective states remain disabled");
+        jEditorProject reopened;
+        expect(reopened.Open(project.GetProjectFile(), error) && Settings::Validate(reopened, error)
+            && reopened.GetConfig().Settings == candidate.Settings && reopened.GetConfig().StartupScene == candidate.StartupScene,
+            "saved renderer/input/startup settings survive a real project reopen");
+        GSupportInlineRaytracing = true; GRHISupportVsync = true;
+        expect(Settings::Apply(reopened, editor, error) && gOptions.SurfelGIInlineRayEnable && GUseVsync,
+            "same request enables actual inline/VSync options when capabilities are present");
+        expect(Settings::ConsumePresentModeChange() && !Settings::ConsumePresentModeChange(), "VSync queues exactly one safe-boundary swapchain refresh request");
+        ResetAllKeyState(); SetKeyDownState(EInputKey::I, true);
+        expect(Settings::ActionDown("camera.forward", EInputKey::W) && !Settings::ActionDown("camera.back", EInputKey::S),
+            "ActionDown reads configured real engine key state");
+        SetKeyDownState(EInputKey::I, false); SetKeyDownState(EInputKey::W, true);
+        expect(!Settings::ActionDown("camera.forward", EInputKey::W), "configured action stops using its old default key");
+        SetKeyDownState(EInputKey::I, true);
+        bool modifiersBlock = true;
+        for (auto modifier : {EInputKey::CTRL, EInputKey::ALT, EInputKey::SHIFT})
+        {
+            SetKeyDownState(modifier, true); modifiersBlock &= !Settings::ActionDown("camera.forward", EInputKey::W);
+            SetKeyDownState(modifier, false);
+        }
+        expect(modifiersBlock, "Ctrl Alt and Shift chords never move the camera");
+        expect(!Settings::ActionDown("camera.unknown", EInputKey::MAX) && !Settings::ActionDown(nullptr, EInputKey::UNKNOWN),
+            "invalid fallbacks never index outside engine key storage");
+        EInputKey parsed = EInputKey::UNKNOWN;
+        expect(Settings::ParseKey("up", parsed) && parsed == EInputKey::UP && std::string(Settings::KeyName(parsed)) == "UP",
+            "portable key parser accepts canonical case-insensitive names");
+        expect(Settings::ParseKey("7", parsed) && parsed == EInputKey::NUM7 && !Settings::ParseKey("CTRL", parsed)
+            && !Settings::ParseKey("CMD+W", parsed) && !Settings::ParseKey("F24", parsed), "modifier chords and unsupported names are rejected as camera keys");
+        const auto validConfig = project.GetConfig();
+        const auto validDisk = text(project.GetProjectFile());
+        const auto reject = [&](const jEditorProjectConfig& bad, const char* name) {
+            const bool deferred = gOptions.UseDeferredRenderer, surfel = gOptions.UseSurfelGI;
+            const auto binding = Settings::Binding("camera.forward", EInputKey::W);
+            expect(!Settings::Save(project, editor, bad, error) && !error.empty()
+                && project.GetConfig().Settings == validConfig.Settings && project.GetConfig().Name == validConfig.Name
+                && project.GetConfig().StartupScene == validConfig.StartupScene && text(project.GetProjectFile()) == validDisk
+                && gOptions.UseDeferredRenderer == deferred && gOptions.UseSurfelGI == surfel
+                && Settings::Binding("camera.forward", EInputKey::W) == binding, name);
+        };
+        for (const std::string invalid : {"NaN", "inf", "-1", "8.1", "2garbage", "", " 1", "1 "})
+        { auto bad = validConfig; bad.Settings["render.surfelgi.intensity"] = invalid; reject(bad, "invalid numeric setting preserves current config/disk/runtime"); }
+        for (const std::string invalid : {"0", "17", "1.5", "3x", "-1"})
+        { auto bad = validConfig; bad.Settings["render.surfelgi.inline.rays"] = invalid; reject(bad, "invalid integer/ray count rejected transactionally"); }
+        { auto bad = validConfig; bad.Settings["render.ssgi"] = "yes"; reject(bad, "ambiguous boolean cannot silently enable renderer settings"); }
+        { auto bad = validConfig; bad.Settings["input.camera.forward"] = "CTRL+I"; reject(bad, "invalid camera key cannot replace active bindings"); }
+        { auto bad = validConfig; bad.Settings["input.camera.forward"] = "K"; reject(bad, "conflicting camera bindings rejected with diagnostic"); }
+        for (const std::string invalid : {"../escape.jscene", "/tmp/external.jscene", "Scenes/missing.jscene", "Scenes/start.txt", "C:/scene.jscene", "Scenes\\start.jscene"})
+        { auto bad = validConfig; bad.StartupScene = invalid; reject(bad, "unsafe missing or wrong-type startup scene cannot mutate project"); }
+        { auto bad = validConfig; bad.StartupScene = std::string("Scenes/start.jscene\0ignored", 26); reject(bad, "startup path containing NUL rejected before filesystem access"); }
+        { auto bad = validConfig; bad.Name.clear(); reject(bad, "empty project name rejected transactionally"); }
+        { auto bad = validConfig; bad.Name = std::string("\xc0\xaf", 2); reject(bad, "invalid UTF-8 project name rejected before JSON or filesystem publication"); }
+        { auto bad = validConfig; bad.Settings["custom.invalid"] = std::string("\xff", 1); reject(bad, "invalid UTF-8 unknown settings cannot throw from JSON save"); }
+        { auto bad = validConfig; bad.Id = "other"; reject(bad, "settings save cannot replace persistent project identity"); }
+        { auto bad = validConfig; bad.AssetRoot = "OtherAssets"; reject(bad, "settings save cannot silently relocate project assets"); }
+        auto preserve = validConfig;
+        preserve.Settings.erase("custom.future.option"); preserve.Settings["render.ssgi"] = "false";
+        expect(Settings::Save(project, editor, preserve, error) && project.GetConfig().Settings.at("custom.future.option") == "preserve this value",
+            "unknown project settings survive an older editor candidate omitting them");
+        auto defaultsConfig = project.GetConfig();
+        defaultsConfig.Settings = {{"custom.future.option", "preserve this value"}};
+        const jOptions defaults;
+        expect(Settings::Save(project, editor, defaultsConfig, error) && gOptions.UseDeferredRenderer == defaults.UseDeferredRenderer
+            && gOptions.UseSurfelGI == defaults.UseSurfelGI && gOptions.UseSSGI == defaults.UseSSGI
+            && gOptions.BloomEyeAdaptation == defaults.BloomEyeAdaptation && gOptions.SurfelGIIntensity == defaults.SurfelGIIntensity
+            && gOptions.SurfelGIInlineRayCount == defaults.SurfelGIInlineRayCount && !GUseVsync
+            && Settings::Binding("camera.forward", EInputKey::I) == EInputKey::W, "omitted known settings restore engine defaults rather than previous project values");
+        expect(Settings::ConsumePresentModeChange(), "resetting VSync defaults also schedules frame-boundary refresh");
+        const auto savedSettings = project.GetConfig();
+        fs::rename(project.GetProjectFile(), fixture / "saved-manifest.jproject");
+        fs::create_directory(project.GetProjectFile());
+        auto failedIo = savedSettings; failedIo.Settings["render.bloom"] = "true";
+        expect(!Settings::Save(project, editor, failedIo, error) && project.GetConfig().Settings == savedSettings.Settings
+            && gOptions.BloomEyeAdaptation == defaults.BloomEyeAdaptation, "real manifest write failure preserves last valid config and renderer state");
+        fs::remove(project.GetProjectFile()); fs::rename(fixture / "saved-manifest.jproject", project.GetProjectFile());
+        auto* context = ImGui::CreateContext();
+        auto& io = ImGui::GetIO(); io.IniFilename = nullptr; io.LogFilename = nullptr; io.DisplaySize = ImVec2(900, 900); io.DeltaTime = 1.0f / 60;
+        unsigned char* pixels = nullptr; int width = 0, height = 0;
+        io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+        Settings::SetVisible(true);
+        for (int frame = 0; frame < 3; ++frame) { ImGui::NewFrame(); Settings::Render(editor, &project); ImGui::Render(); }
+        expect(Settings::IsVisible() && ImGui::GetDrawData() && ImGui::GetDrawData()->TotalVtxCount > 0,
+            "real ImGui project settings panel renders controls without GPU publication");
+        ImGui::DestroyContext(context); ImGui::SetCurrentContext(oldContext);
+        const auto beforeForeign = gOptions.UseDeferredRenderer;
+        bool foreignAccepted = true;
+        std::thread foreign([&] { std::string local; foreignAccepted = Settings::Apply(project, editor, local); }); foreign.join();
+        expect(!foreignAccepted && gOptions.UseDeferredRenderer == beforeForeign, "foreign thread cannot apply renderer or camera input settings");
+        // Restore the process's previous camera bindings before the fixture is removed.
+        auto restore = project.GetConfig();
+        for (size_t i = 0; i < oldBindings.size(); ++i)
+            if (const char* key = Settings::KeyName(oldBindings[i])) restore.Settings[std::string("input.") + actions[i]] = key;
+        project.EditConfig() = restore;
+        Settings::Apply(project, editor, error);
+    }
+    catch (const std::exception& exception) { std::cout << "FAIL project settings: " << exception.what() << '\n'; ++failures; }
+    ImGui::SetCurrentContext(oldContext);
+    GSupportInlineRaytracing = oldInline; GRHISupportVsync = oldVsyncSupport; GUseVsync = oldVsync;
+    gOptions.UseDeferredRenderer = oldOptions.UseDeferredRenderer; gOptions.UseSurfelGI = oldOptions.UseSurfelGI;
+    gOptions.SurfelGIInlineRayEnable = oldOptions.SurfelGIInlineRayEnable; gOptions.UseSSGI = oldOptions.UseSSGI;
+    gOptions.BloomEyeAdaptation = oldOptions.BloomEyeAdaptation; gOptions.SurfelGIIntensity = oldOptions.SurfelGIIntensity;
+    gOptions.SurfelGIInlineRayCount = oldOptions.SurfelGIInlineRayCount;
+    Settings::ConsumePresentModeChange(); Settings::SetVisible(oldVisible); g_KeyState = oldKeys;
+    std::error_code ignored; fs::remove_all(fixture, ignored);
+    std::cout << "Project settings tests: " << checks << " checks, " << failures << " failures\n";
+    return failures;
+#else
+    return 0;
+#endif
+}

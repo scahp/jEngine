@@ -68,6 +68,15 @@ public:
     // Raw material payload used by RT/path tracing paths that manage their own uniform buffers.
     std::shared_ptr<jMaterialData> MaterialDataPtr;
 
+    // Authored instances clone before editing; imported prototypes stay shared.
+    bool UseMaterialProperties = false;
+    Vector4 BaseColorOpacity = Vector4(1.0f);
+    Vector Emissive = Vector(0.0f);
+    float MetallicFactor = 0.0f;
+    float RoughnessFactor = 0.5f;
+    uint64 Revision = 0;
+    std::vector<std::shared_ptr<jTexture>> OwnedTextures;
+
     bool bUseSphericalMap = false;
     bool bRaytracingAlphaTest = false;
     float RaytracingAlphaCutoff = 0.5f;

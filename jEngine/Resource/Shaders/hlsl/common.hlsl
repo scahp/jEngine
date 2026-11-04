@@ -12,6 +12,8 @@ struct RenderObjectUniformBuffer
     float Roughness;
     uint ObjectID;
     uint RenderObjectID;
+    float4 BaseColorOpacity;
+    float4 EmissiveOverride;
 };
 #endif
 

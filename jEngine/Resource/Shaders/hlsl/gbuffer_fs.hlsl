@@ -36,6 +36,7 @@ struct FSOutput
     float3 GBuffer0 : SV_TARGET0;       // OctaNormal.xy
     float3 GBuffer1 : SV_TARGET1;       // Albedo.xyz
     float4 GBuffer2 : SV_TARGET2;       // Velocity.xy, Metallic, Roughness
+    float3 GBuffer3 : SV_TARGET3;       // Linear emissive radiance, added once after lighting.
 };
 
 FSOutput main(VSOutput input
@@ -71,6 +72,14 @@ FSOutput main(VSOutput input
 #else // USE_ALBEDO_TEXTURE
     float3 WorldNormal = normalize(input.Normal);
 #endif // USE_ALBEDO_TEXTURE
+
+    color *= RenderObjectParam.BaseColorOpacity;
+    // Deferred surfaces use deterministic coverage for fractional opacity.
+    // This keeps depth, shadows and the opaque GBuffer coherent without pretending
+    // that the deferred pass provides sorted transparent blending.
+    const uint2 pixel = uint2(input.Pos.xy);
+    const float coverage = frac(dot(float2(pixel), float2(0.754877666, 0.569840296)));
+    if (color.a < coverage || color.a <= 0.0) discard;
 
 #if USE_VARIABLE_SHADING_RATE
     if (pushConsts.ShowVRSArea)
@@ -133,6 +142,11 @@ FSOutput main(VSOutput input
     Roughness = RenderObjectParam.Roughness;
 #endif
 #endif
+    if (RenderObjectParam.EmissiveOverride.w > 0.5)
+    {
+        Metallic = RenderObjectParam.Metallic;
+        Roughness = RenderObjectParam.Roughness;
+    }
     
     //output.GBuffer0.xy = EncodeOctNormal(WorldNormal * 0.5 + 0.5);
     output.GBuffer0.xyz = WorldNormal * 0.5 + 0.5;
@@ -153,6 +167,7 @@ FSOutput main(VSOutput input
     // Velcoity.xy : [0, 1]
     // Metallic, Roughness : [0, 1]
     output.GBuffer2 = float4(Velocity, Metallic, Roughness);
+    output.GBuffer3 = max(RenderObjectParam.EmissiveOverride.xyz, 0.0);
 
     return output;
 }

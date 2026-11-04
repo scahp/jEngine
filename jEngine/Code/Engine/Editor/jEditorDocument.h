@@ -1,0 +1,187 @@
+#pragma once
+
+#include <cstdint>
+#include <filesystem>
+#include <map>
+#include <memory>
+#include <string>
+#include <thread>
+#include <vector>
+
+// Authoring data has no runtime pointers and is edited only by its creating thread.
+// Angles are degrees; transforms use T * Rz * Ry * Rx * S, column vectors.
+namespace jEditorAuthoring
+{
+using EntityId = uint64_t;
+constexpr EntityId InvalidEntity = 0;
+
+enum class EntityKind { Empty, Cube, Sphere, Model, PointLight, SpotLight, DirectionalLight, Camera, ParticleEmitter, Terrain };
+struct Vec3
+{
+    float X = 0, Y = 0, Z = 0;
+    bool operator==(const Vec3&) const = default;
+};
+struct Transform
+{
+    Vec3 Position{}, RotationDegrees{}, Scale{1, 1, 1};
+    bool operator==(const Transform&) const = default;
+};
+struct MaterialProperties
+{
+    bool OverrideEnabled = false;
+    Vec3 BaseColor{1, 1, 1}, Emissive{};
+    float Metallic = 0, Roughness = 0.5f, Opacity = 1;
+    std::string BaseColorTexture, NormalTexture, GraphAsset;
+    bool operator==(const MaterialProperties&) const = default;
+};
+struct LightProperties
+{
+    Vec3 Color{1, 1, 1};
+    float Intensity = 1, Range = 1000, InnerConeDegrees = 20, OuterConeDegrees = 35;
+    bool CastShadows = true;
+    bool operator==(const LightProperties&) const = default;
+};
+struct CameraProperties
+{
+    float VerticalFovDegrees = 60, NearPlane = 0.1f, FarPlane = 10000;
+    bool Primary = false;
+    bool operator==(const CameraProperties&) const = default;
+};
+struct AnimationKeyframe
+{
+    float Time = 0;
+    Transform Local{};
+    bool operator==(const AnimationKeyframe&) const = default;
+};
+struct AnimationProperties
+{
+    float Duration = 1;
+    bool Enabled = false, Loop = true;
+    std::vector<AnimationKeyframe> Keys;
+    bool operator==(const AnimationProperties&) const = default;
+};
+struct ParticleProperties
+{
+    bool Enabled = true;
+    uint32_t MaxParticles = 1024, Seed = 1;
+    float SpawnRate = 30, Lifetime = 2, Speed = 100, Size = 5;
+    Vec3 Gravity{0, -98, 0}, Color{1, 1, 1};
+    bool operator==(const ParticleProperties&) const = default;
+};
+struct TerrainProperties
+{
+    uint32_t Resolution = 17;
+    float SizeX = 1000, SizeZ = 1000;
+    // Empty is a flat grid. Otherwise exactly Resolution * Resolution samples.
+    std::vector<float> Heights;
+    bool operator==(const TerrainProperties&) const = default;
+};
+struct NavigationProperties
+{
+    bool Enabled = false;
+    float CellSize = 50, AgentRadius = 25, AgentHeight = 180, MaxSlopeDegrees = 45;
+    bool operator==(const NavigationProperties&) const = default;
+};
+struct Entity
+{
+    EntityId Id = InvalidEntity, Parent = InvalidEntity;
+    EntityKind Kind = EntityKind::Empty;
+    std::string Name = "Entity";
+    bool Visible = true, Locked = false;
+    Transform Local{};
+    // Project-relative, forward-slash paths. Empty means a procedural/no asset entity.
+    std::string SourceAsset, AssetId;
+    // Mesh-local TRS overrides survive model save/reload; empty uses source defaults.
+    std::vector<Transform> MeshLocalTransforms;
+    MaterialProperties Material{};
+    LightProperties Light{};
+    CameraProperties Camera{};
+    AnimationProperties Animation{};
+    ParticleProperties Particles{};
+    TerrainProperties Terrain{};
+    NavigationProperties Navigation{};
+    bool operator==(const Entity&) const = default;
+};
+struct Limits
+{
+    size_t MaxEntities = 10000;
+    size_t MaxFileBytes = 16 * 1024 * 1024;
+    size_t MaxHistoryBytes = 32 * 1024 * 1024;
+    size_t MaxHistoryEntries = 128;
+    size_t MaxHierarchyDepth = 256;
+};
+
+class Document
+{
+public:
+    explicit Document(Limits limits = {});
+    ~Document();
+    Document(const Document&) = delete;
+    Document& operator=(const Document&) = delete;
+
+    const std::map<EntityId, Entity>& Entities() const;
+    // Returned entity pointers/references expire on the next content mutation. Store IDs.
+    const Entity* Find(EntityId id) const;
+    const std::string& Name() const;
+    const std::string& LastError() const;
+    const std::filesystem::path& Path() const;
+    // Monotonically increases on content changes, including Undo/Redo/StopPlay.
+    uint64_t Revision() const;
+    bool IsDirty() const;
+    bool IsPlaying() const;
+    bool HasTransaction() const;
+    bool CanUndo() const;
+    bool CanRedo() const;
+    std::string UndoLabel() const;
+    std::string RedoLabel() const;
+
+    bool NewScene(const std::string& name = "Untitled");
+    bool RenameScene(const std::string& name);
+    EntityId Create(EntityKind kind, const std::string& name = {}, EntityId parent = InvalidEntity);
+    bool Update(const Entity& entity, const std::string& label = "Edit properties");
+    // A locked entity/subtree cannot be edited, moved, duplicated or deleted.
+    bool Reparent(EntityId id, EntityId parent, bool preserveWorld = true);
+    EntityId Duplicate(EntityId root);
+    bool Delete(EntityId root);
+    bool GetWorldTransform(EntityId id, Transform& transform) const;
+    // Samples typed linear keyframes without mutating dirty/history/revision state.
+    bool EvaluateLocal(EntityId id, float seconds, Transform& transform) const;
+    // Column-major 4x4 affine matrix; preserves shear when ancestors introduce it.
+    bool GetWorldMatrix(EntityId id, float matrix[16]) const;
+    std::vector<EntityId> Children(EntityId parent = InvalidEntity) const;
+    bool IsEffectivelyVisible(EntityId id) const;
+    bool IsEffectivelyLocked(EntityId id) const;
+
+    EntityId SelectedId() const;
+    bool Select(EntityId id);
+    bool BeginTransaction(const std::string& label);
+    bool CommitTransaction();
+    bool CancelTransaction();
+    bool Undo();
+    bool Redo();
+
+    // Strict version 1 JSON. Failed loads leave scene/history/path/dirty state intact.
+    std::string ToJson() const;
+    bool LoadJson(const std::string& text);
+    bool LoadJson(const std::string& text, const std::filesystem::path& sourcePath);
+    // Clipboard forest: deduplicates selected descendants, preserves copied root
+    // world TRS/key poses, remaps every ID, and pastes atomically as one command.
+    // Nonrepresentable shear or omitted animated ancestors fail explicitly.
+    std::string SelectionJson(const std::vector<EntityId>& selection) const;
+    std::vector<EntityId> PasteSelectionJson(const std::string& text, EntityId parent = InvalidEntity);
+    std::string PrefabJson(EntityId root) const;
+    EntityId InstantiatePrefabJson(const std::string& text, EntityId parent = InvalidEntity);
+    bool Save(const std::filesystem::path& path, bool backup = true);
+    bool Load(const std::filesystem::path& path);
+    bool SavePrefab(EntityId root, const std::filesystem::path& path);
+    EntityId InstantiatePrefab(const std::filesystem::path& path, EntityId parent = InvalidEntity);
+    // Play edits are discarded and the original history/selection/dirty state restored.
+    bool BeginPlay();
+    bool StopPlay();
+
+private:
+    struct Impl;
+    std::unique_ptr<Impl> Data;
+};
+const char* KindName(EntityKind kind);
+} // namespace jEditorAuthoring

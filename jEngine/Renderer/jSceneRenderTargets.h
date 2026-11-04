@@ -8,6 +8,7 @@ enum class EGBufferType : uint8
     NORMAL = 0,
     ALBEDO = 1,
     VELOCITY = 2,
+    EMISSIVE = 3,
     MAX,
 };
 
@@ -48,7 +49,7 @@ struct jSceneRenderTarget : public std::enable_shared_from_this<jSceneRenderTarg
     std::shared_ptr<jRenderTarget> LinearDepthPtr;
     std::shared_ptr<jRenderTarget> ResolvePtr;
     
-    std::shared_ptr<jRenderTarget> GBuffer[3];
+    std::shared_ptr<jRenderTarget> GBuffer[4];
 
     const std::shared_ptr<jRenderTarget>& GetGBuffer(EGBufferType InType)
     {

@@ -94,6 +94,8 @@ BEGIN_SHADER_BINDLESS_SET(jPathTracingBindlessParameters)
     SHADER_BINDLESS_UNIFORM_BUFFER(MaterialUniformBuffer, MaterialBindlessArray)
     SHADER_BINDLESS_UNIFORM_BUFFER(LightUniformBuffer, LightBindlessArray)
     SHADER_BINDLESS_TEXTURE2D(TextureBindlessArray)
+    SHADER_BINDLESS_TEXTURE2D(AuthoredAlbedoArray)
+    SHADER_BINDLESS_TEXTURE2D(AuthoredNormalArray)
 END_SHADER_BINDLESS_SET()
 
 namespace
@@ -365,10 +367,11 @@ void jRenderer_PathTracing::PathTracing()
 		std::vector<const IUniformBufferBlock*> MaterialBuffers;
 		std::vector<const IUniformBufferBlock*> LightBuffers;
 		std::vector<jTextureResourceBindless::jTextureBindData> Textures;
+		std::vector<jTextureResourceBindless::jTextureBindData> AuthoredAlbedo, AuthoredNormal;
 		std::vector<std::shared_ptr<IUniformBufferBlock>> RefCountMaintainer;
 
 		{
-			const int32 NumOfStaticRenderObjects = (int32)jObject::GetStaticRenderObject().size();
+			const int32 NumOfStaticRenderObjects = (int32)g_rhi->RaytracingScene->InstanceList.size();
 			VertexAndInexOffsetBuffers.reserve(NumOfStaticRenderObjects);
 			IndexBuffers.reserve(NumOfStaticRenderObjects);
 			TestUniformBuffers.reserve(NumOfStaticRenderObjects);
@@ -377,7 +380,7 @@ void jRenderer_PathTracing::PathTracing()
 
 			for (int32 i = 0; i < NumOfStaticRenderObjects; ++i)
 			{
-				jRenderObject* RObj = jObject::GetStaticRenderObject()[i];
+				jRenderObject* RObj = g_rhi->RaytracingScene->InstanceList[i];
 				RObj->CreateShaderBindingInstance();
 
 				VertexAndInexOffsetBuffers.push_back(RObj->VertexAndIndexOffsetBuffer.get());
@@ -388,8 +391,16 @@ void jRenderer_PathTracing::PathTracing()
 				check(RObj->MaterialPtr);
 
 
-				auto MaterialUniformParametersPtr = g_rhi->CreateUniformBufferBlock(jNameStatic("jMaterialUniformBuffer"), jLifeTimeType::OneFrame, RObj->MaterialPtr->MaterialDataPtr->GetDataSizeInBytes());
-				MaterialUniformParametersPtr->UpdateBufferData(RObj->MaterialPtr->MaterialDataPtr->GetData(), RObj->MaterialPtr->MaterialDataPtr->GetDataSizeInBytes());
+				MaterialUniformBuffer fallback{};
+                fallback.baseColor = Vector(1.0f); fallback.roughness = 0.5f; fallback.ior = 1.5f;
+                fallback.lightId = -1; fallback.baseColorTexId = fallback.metallicRoughnessTexID = -1;
+                fallback.normalmapTexID = fallback.emissionmapTexID = -1; fallback.opacity = 1.0f;
+                const auto& payload = RObj->MaterialPtr->MaterialDataPtr;
+                const bool validPayload = payload && payload->GetDataSizeInBytes() == sizeof(MaterialUniformBuffer);
+                auto MaterialUniformParametersPtr = g_rhi->CreateUniformBufferBlock(jNameStatic("jMaterialUniformBuffer"), jLifeTimeType::OneFrame, sizeof(MaterialUniformBuffer));
+                MaterialUniformParametersPtr->UpdateBufferData(validPayload ? payload->GetData() : &fallback, sizeof(MaterialUniformBuffer));
+                AuthoredAlbedo.push_back({ RObj->MaterialPtr->GetTexture(jMaterial::EMaterialTextureType::Albedo), nullptr, 0 });
+                AuthoredNormal.push_back({ RObj->MaterialPtr->GetTexture(jMaterial::EMaterialTextureType::Normal), nullptr, 0 });
 				MaterialBuffers.push_back(MaterialUniformParametersPtr.get());
 				RefCountMaintainer.push_back(MaterialUniformParametersPtr);
 			}
@@ -414,8 +425,7 @@ void jRenderer_PathTracing::PathTracing()
 				RefCountMaintainer.push_back(LightUniformParametersPtr);
 			}
 
-			check(gPathTracingScene);
-			if (gPathTracingScene->textures.empty())
+			if (!gPathTracingScene || gPathTracingScene->textures.empty())
 			{
 				Textures.resize(1);
 				Textures[0].Texture = GWhiteTexture.get();
@@ -438,6 +448,8 @@ void jRenderer_PathTracing::PathTracing()
         BindlessParameters.MaterialBindlessArray.Buffers = MaterialBuffers;
         BindlessParameters.LightBindlessArray.Buffers = LightBuffers;
         BindlessParameters.TextureBindlessArray.Textures = Textures;
+        BindlessParameters.AuthoredAlbedoArray.Textures = AuthoredAlbedo;
+        BindlessParameters.AuthoredNormalArray.Textures = AuthoredNormal;
         std::vector<std::shared_ptr<jShaderBindingInstance>> BindlessShaderBindingInstances =
             jShaderBindlessSet::CreateShaderBindingInstances(BindlessParameters, EShaderAccessStageFlag::ALL_RAYTRACING, jShaderBindingInstanceType::SingleFrame);
 		ShaderBindingGroup.Add(BindlessShaderBindingInstances);
@@ -498,4 +510,27 @@ void jRenderer_PathTracing::PathTracing()
 					return g_rhi->CreateShader(shaderInfo);
 				});
 	}
+}
+
+
+// Real generated RT declarations, exported without opening a window or device.
+int ExportEditorPathTracingShaderFixtures(const char* directory, bool vulkan)
+{
+    try
+    {
+        gAPIType = vulkan ? EAPIType::Vulkan : EAPIType::DX12;
+        std::ofstream file(std::filesystem::path(directory) / "editor-path-mesh.hlsl");
+        file.exceptions(std::ios::badbit | std::ios::failbit);
+        file << "#define COMPUTE_SHADER 0\n#define PIXEL_SHADER 0\n#define RAY_TRACING 1\n"
+            "#define MAX_RECURSION_DEPTH 8\n#define MAX_RAY_PER_PIXEL 1\n#define USE_BINDLESS_RESOURCE 1\n"
+            << jShaderParameterSet::GenerateHLSL<jPathTracingGlobalParameters>(0)
+            << jShaderBindlessSet::GenerateHLSL<jPathTracingBindlessParameters>(1)
+            << "\n#include \"PathTracing.hlsl\"\n";
+        return EXIT_SUCCESS;
+    }
+    catch (const std::exception& error)
+    {
+        std::cerr << "Editor path tracing shader export failed: " << error.what() << '\n';
+        return EXIT_FAILURE;
+    }
 }

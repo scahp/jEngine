@@ -8,11 +8,13 @@ struct VSInput
 struct VSOutput
 {
     float4 Pos : SV_POSITION;
+    float Opacity : TEXCOORD0;
 };
 
 VSOutput main(VSInput input)
 {
     VSOutput output = (VSOutput) 0;
     output.Pos = mul(DirectionalLight.ShadowVP, mul(RenderObjectParam.M, float4(input.Position, 1.0)));
+    output.Opacity = RenderObjectParam.BaseColorOpacity.a;
     return output;
 }

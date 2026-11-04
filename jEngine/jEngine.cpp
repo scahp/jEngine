@@ -8,6 +8,10 @@
 
 #ifdef ENABLE_EDITOR_FEATURES
 #include "Code/Engine/jEditor.h"
+#include "Code/Engine/Editor/jEditorWorkspace.h"
+#include "Code/Engine/Editor/jEditorProcedural.h"
+#include "Code/Engine/Editor/jEditorUiRenderer.h"
+#include "Code/Engine/Editor/jEditorProjectSettings.h"
 #endif
 
 jEngine::jEngine()
@@ -61,9 +65,14 @@ void jEngine::Init()
 #ifdef ENABLE_EDITOR_FEATURES
 	// Initialize editor features
 	g_Editor = new jEditor();
+    g_Editor->SetAuthoringEnabled(true);
+    jEditorProcedural::Install(*g_Editor);
 #endif
 
 	Game.Setup();
+#ifdef ENABLE_EDITOR_FEATURES
+    if (g_Editor && !Game.IsSceneImportPending()) g_Editor->CaptureWorldToDocument();
+#endif
 }
 
 void jEngine::Release()
@@ -71,6 +80,10 @@ void jEngine::Release()
 	if (g_rhi_vk)
 		g_rhi_vk->Flush();
 
+#ifdef ENABLE_EDITOR_FEATURES
+    ShutdownAuthoringWorkspace();
+    if (g_Editor) g_Editor->ShutdownWorld();
+#endif
 	Game.Release();
     jRenderTargetPool::Release();
 
@@ -86,6 +99,7 @@ void jEngine::Release()
 
 void jEngine::ProcessInput(float deltaTime)
 {
+    if (jEditorProjectSettings::ConsumePresentModeChange() && g_rhi) g_rhi->RecreateSwapChain();
 	Game.ProcessInput(deltaTime);
 }
 
@@ -96,6 +110,14 @@ void jEngine::Update(float deltaTime)
 
 	g_timeDeltaSecond = deltaTime;
 	Game.Update(deltaTime);
+#ifdef ENABLE_EDITOR_FEATURES
+    if (g_Editor)
+    {
+        TickAuthoringWorkspace(*g_Editor, deltaTime);
+        g_Editor->Tick(deltaTime, Game.MainCamera);
+    }
+#endif
+    Game.SyncRaytracingScene();
 
 	jShader::StartAndRunCheckUpdateShaderThread();
 }
@@ -129,6 +151,9 @@ void jEngine::OnMouseMove(int32 xOffset, int32 yOffset)
 
 void jEngine::EndOfFrame()
 {
+#ifdef ENABLE_EDITOR_FEATURES
+    jEditorUiRenderer::RenderPlatformWindows();
+#endif
 	jProfileFrameMark();
 	jPerformanceProfile::GetInstance().Update(g_timeDeltaSecond);
 	jRenderTargetPool::ReturnAllOneFrameRTs();

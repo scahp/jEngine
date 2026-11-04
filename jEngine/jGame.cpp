@@ -1,5 +1,9 @@
 #include "pch.h"
 #include "jGame.h"
+#include "Code/Engine/Editor/jEditorWorkspace.h"
+#include "Code/Engine/Editor/jEditorStartup.h"
+#include "Code/Engine/Editor/jEditorExtensions.h"
+#include "Code/Engine/Editor/jEditorTools.h"
 #include "Math/Vector.h"
 #include "Scene/jCamera.h"
 #include "Scene/jObject.h"
@@ -709,7 +713,10 @@ void jGame::SetSelectedPathTracingSceneLoader(ESceneLoader InLoader)
 void jGame::RequestLoadSelectedPathTracingScene()
 {
 	if (CanLoadSelectedPathTracingScene())
-		PathTracingSceneBrowser.PendingLoadIndex = PathTracingSceneBrowser.SelectedIndex;
+    {
+        const int32 selected = PathTracingSceneBrowser.SelectedIndex;
+        RequestAuthoringSceneReplacement([this, selected] { PathTracingSceneBrowser.PendingLoadIndex = selected; });
+    }
 }
 
 bool jGame::CanLoadSelectedPathTracingScene() const
@@ -1302,6 +1309,9 @@ void jGame::LoadPathTracingSceneByIndex(int32 InIndex, bool InRebuildRaytracingS
         }
     }
     // Retain the previous scene until a replacement model is fully prepared.
+#ifdef ENABLE_EDITOR_FEATURES
+    if (g_Editor) { jEditorExtensions::Shutdown(*g_Editor); jEditorTools::Shutdown(); g_Editor->ResetWorldBindings(true); }
+#endif
     g_rhi->Flush();
 
 	if (gPathTracingScene)
@@ -1328,6 +1338,9 @@ void jGame::LoadPathTracingSceneByIndex(int32 InIndex, bool InRebuildRaytracingS
 
 		jObject::AddObject(loadedScene);
 		SceneBrowserLoadedObjects.push_back(loadedScene);
+#ifdef ENABLE_EDITOR_FEATURES
+        if (g_Editor) g_Editor->TrackWorldObjectSource(loadedScene, sceneDesc.FilePath);
+#endif
 	}
 
 	PathTracingSceneBrowser.ActiveIndex = InIndex;
@@ -1352,6 +1365,9 @@ void jGame::LoadPathTracingSceneByIndex(int32 InIndex, bool InRebuildRaytracingS
 	}
 
 	ApplyScenePlacementPreset(InIndex);
+#ifdef ENABLE_EDITOR_FEATURES
+    if (g_Editor) g_Editor->CaptureWorldToDocument();
+#endif
 
 	if (InRebuildRaytracingScene && IsRaytracingSceneSupported() && g_rhi && g_rhi->RaytracingScene)
 	{
@@ -1386,7 +1402,11 @@ void jGame::ProcessInput(float deltaTime)
 	//static float MoveDistancePerSecond = 10.0f;
 	const float CurrentDistance = MoveDistancePerSecond * deltaTime;
 
-	if (!captureKeyboard && MainCamera)
+    bool authoringCamera = false;
+#ifdef ENABLE_EDITOR_FEATURES
+    if (g_Editor && g_Editor->IsAuthoringEnabled()) authoringCamera = g_Editor->HandleCameraInput(deltaTime, MainCamera);
+#endif
+	if (!captureKeyboard && !authoringCamera && MainCamera && !IsKeyDown(EInputKey::CTRL) && !IsKeyDown(EInputKey::ALT) && !IsKeyDown(EInputKey::SHIFT))
 	{
 	// Process Key Event
 	if (IsKeyDown(EInputKey::A)) MainCamera->MoveShift(-CurrentDistance);
@@ -1467,7 +1487,7 @@ static jConsoleVariableInt* cvar_SurfelGIInlineRayCount = new jConsoleVariableIn
     MainCamera = jCamera::CreateCamera(mainCameraPos, mainCameraTarget, mainCameraPos + Vector(0.0, 1.0, 0.0), DegreeToRadian(45.0f), 10.0f, 1500.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, true);
     jCamera::AddCamera(0, MainCamera);
 	
-	InitializePathTracingSceneBrowser();
+	if (!HasEditorStartupScene()) InitializePathTracingSceneBrowser();
 
 	g_rhi->Finish(); // todo : Instead of this, it needs UAV barrier here
 	if (IsRaytracingSceneSupported())
@@ -1538,22 +1558,6 @@ void jGame::Update(float deltaTime)
 	// Update object which have dirty flag
 	jObject::FlushDirtyState();
 
-    // Sync raytracing scene with placement/editor changes
-    if (IsRaytracingSceneSupported() && g_rhi && g_rhi->RaytracingScene && g_rhi->RaytracingScene->ShouldUpdate())
-    {
-        jRatracingInitializer Initializer;
-        Initializer.RenderObjects = jObject::GetStaticRenderObject();
-
-        Initializer.CommandBuffer = g_rhi->BeginSingleTimeCommands();
-        g_rhi->RaytracingScene->CreateOrUpdateBLAS(Initializer);
-        g_rhi->EndSingleTimeCommands(Initializer.CommandBuffer);
-        g_rhi->Finish(); // todo : replace with proper UAV barrier
-
-        Initializer.CommandBuffer = g_rhi->BeginSingleTimeCommands();
-        g_rhi->RaytracingScene->CreateOrUpdateTLAS(Initializer);
-        g_rhi->EndSingleTimeCommands(Initializer.CommandBuffer);
-        g_rhi->Finish(); // todo : replace with proper UAV barrier
-    }
 
 	//// Render all objects by using selected renderer
 	//Renderer->Render(MainCamera);
@@ -1578,6 +1582,38 @@ void jGame::Update(float deltaTime)
 	{
 		light->Update(deltaTime);
 	}
+}
+
+void jGame::SyncRaytracingScene()
+{
+    // Sync raytracing scene with placement/editor changes
+    if (IsRaytracingSceneSupported() && g_rhi && g_rhi->RaytracingScene && g_rhi->RaytracingScene->ShouldUpdate())
+    {
+        jRatracingInitializer Initializer;
+        Initializer.RenderObjects = jObject::GetStaticRenderObject();
+
+        Initializer.CommandBuffer = g_rhi->BeginSingleTimeCommands();
+        g_rhi->RaytracingScene->CreateOrUpdateBLAS(Initializer);
+        g_rhi->EndSingleTimeCommands(Initializer.CommandBuffer);
+        g_rhi->Finish(); // todo : replace with proper UAV barrier
+
+        Initializer.CommandBuffer = g_rhi->BeginSingleTimeCommands();
+        g_rhi->RaytracingScene->CreateOrUpdateTLAS(Initializer);
+        g_rhi->EndSingleTimeCommands(Initializer.CommandBuffer);
+        g_rhi->Finish(); // todo : replace with proper UAV barrier
+    }
+
+}
+void jGame::ClearImportedSceneForAuthoring()
+{
+    CancelSceneImport();
+    if (g_rhi) g_rhi->Flush();
+    if (gPathTracingScene) { gPathTracingScene->ClearSceneFor_jEngine(this); delete gPathTracingScene; gPathTracingScene = nullptr; }
+    ClearSceneBrowserLoadedLights(); ClearSceneBrowserLoadedObjects();
+    PathTracingSceneBrowser.ActiveIndex = -1;
+    PathTracingSceneBrowser.ActiveRenderPipeline = ESceneRenderPipeline::Deferred;
+    gOptions.UseDeferredRenderer = true;
+    if (g_rhi && g_rhi->RaytracingScene) g_rhi->RaytracingScene->Clear();
 }
 
 void jGame::Draw()
@@ -1617,6 +1653,7 @@ void jGame::Draw()
 void jGame::OnMouseButton()
 {
 #ifdef ENABLE_EDITOR_FEATURES
+    if (IsAuthoringWorkspaceVisible()) return; // Dedicated image handles all platform-window coordinates.
 	// Handle object picking on left mouse button click
 	if (g_Editor && g_Editor->Placement.EnablePlacementMode && g_MouseState[MouseButtonIndex(EMouseButtonType::LEFT)].Clicked)
 	{
@@ -1651,6 +1688,7 @@ void jGame::OnMouseButton()
 		#endif
 
 		// Request object picking
+        if (!MapAuthoringViewportPoint(xpos, ypos)) return;
 		g_Editor->Placement.bPickRequested = true;
 		g_Editor->Placement.PickMouseX = (int32)xpos;
 		g_Editor->Placement.PickMouseY = (int32)ypos;
@@ -1660,6 +1698,14 @@ void jGame::OnMouseButton()
 
 void jGame::OnMouseMove(int32 xOffset, int32 yOffset)
 {
+#ifdef ENABLE_EDITOR_FEATURES
+    if (IsAuthoringWorkspaceVisible()) return;
+    if (g_Editor && g_Editor->IsAuthoringEnabled())
+    {
+        g_Editor->HandleCameraMouseMove(xOffset, yOffset, MainCamera);
+        return;
+    }
+#endif
 	if (g_MouseState[MouseButtonIndex(EMouseButtonType::LEFT)].Down)
 	{
 #ifdef ENABLE_EDITOR_FEATURES
@@ -1769,6 +1815,3 @@ void jGame::SpawnGraphTestFunc()
 	auto graphObj2 = jPrimitiveUtil::CreateGraph2D({ 360, 700 }, { 360, 300 }, graph2);
 	jObject::AddUIDebugObject(graphObj2);
 }
-
-
-

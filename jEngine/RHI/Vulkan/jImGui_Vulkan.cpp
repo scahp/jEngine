@@ -1,382 +1,158 @@
 #include "pch.h"
 #include "jImGui_Vulkan.h"
-#include "Profiler/jPerformanceProfile.h"
+#include "RHI/Vulkan/jRHI_Vulkan.h"
 #include "RHI/Vulkan/jTexture_Vulkan.h"
-#include "RHI/Vulkan/jBufferUtil_Vulkan.h"
-#include "jOptions.h"
-#include "RHI/jRenderFrameContext.h"
-#include "Renderer/jSceneRenderTargets.h"
-#include "RHI/jPipelineStateInfo.h"
 #include "RHI/jRHI.h"
-#include "imgui_internal.h"
+#include "Renderer/jSceneRenderTargets.h"
+#include "imgui_impl_vulkan.h"
+#include "imgui_impl_glfw.h"
+
+namespace
+{
+jRenderPass* UIRenderPass(const std::shared_ptr<jRenderTarget>& target)
+{
+    jAttachment color = {
+        .RenderTargetPtr = target,
+        .LoadStoreOp = EAttachmentLoadStoreOp::LOAD_STORE,
+        .StencilLoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_DONTCARE,
+        .RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
+        // Initialization creates a compatible pipeline pass before the first
+        // swapchain transition. LOAD can never declare UNDEFINED, even when
+        // this compatibility-only pass is not submitted.
+        .InitialLayout = target->GetLayout() == EResourceLayout::UNDEFINED ? EResourceLayout::COLOR_ATTACHMENT : target->GetLayout(),
+        .FinalLayout = EResourceLayout::PRESENT_SRC
+    };
+    return g_rhi->GetOrCreateRenderPass({ color }, {0, 0}, {target->Info.Width, target->Info.Height});
+}
+}
 
 jImGUI_Vulkan::jImGUI_Vulkan()
 {
-    check(g_rhi_vk);
-    check(g_rhi_vk->Window);
+    check(g_rhi_vk && g_rhi_vk->Window);
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGui_ImplGlfw_InitForVulkan(g_rhi_vk->Window, true);
+    auto& io = ImGui::GetIO();
+    const ImGuiConfigFlags saved = io.ConfigFlags;
+    // Install real callbacks even when the user starts with detached windows off.
+    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+    PlatformInitialized = ImGui_ImplGlfw_InitForVulkan(g_rhi_vk->Window, true);
+    io.ConfigFlags = saved;
 }
-
 jImGUI_Vulkan::~jImGUI_Vulkan()
 {
     Release();
-    ImGui::DestroyContext();
+    RegisteredTextures.clear();
+    if (DescriptorPool) vkDestroyDescriptorPool(g_rhi_vk->Device, DescriptorPool, nullptr);
+    DescriptorPool = VK_NULL_HANDLE;
+    if (PlatformInitialized) ImGui_ImplGlfw_Shutdown();
+    PlatformInitialized = false;
+    if (ImGui::GetCurrentContext()) ImGui::DestroyContext();
 }
-
 void jImGUI_Vulkan::Initialize(float width, float height)
 {
-	// Handle Monitor DPI
-	float MonitorDPIScaleX = 1;
-	float MonitorDPIScaleY = 1;
-	GLFWmonitor* PrimaryMonitor = glfwGetPrimaryMonitor();
-	if (PrimaryMonitor) glfwGetMonitorContentScale(PrimaryMonitor, &MonitorDPIScaleX, &MonitorDPIScaleY);
-	MonitorDPIScale = Max(MonitorDPIScaleX, MonitorDPIScaleY);
-
-	ImGui::GetStyle().ScaleAllSizes(MonitorDPIScale);
-	ImGui::GetIO().FontGlobalScale = MonitorDPIScale;
-	//////////////////////////////////////////////////////////////////////////
-
-    // Color scheme
-    ImGuiStyle& style = ImGui::GetStyle();
-    style.Colors[ImGuiCol_TitleBg] = ImVec4(1.0f, 0.0f, 0.0f, 0.6f);
-    style.Colors[ImGuiCol_TitleBgActive] = ImVec4(1.0f, 0.0f, 0.0f, 0.8f);
-    style.Colors[ImGuiCol_MenuBarBg] = ImVec4(1.0f, 0.0f, 0.0f, 0.4f);
-    style.Colors[ImGuiCol_Header] = ImVec4(1.0f, 0.0f, 0.0f, 0.4f);
-    style.Colors[ImGuiCol_CheckMark] = ImVec4(0.0f, 1.0f, 0.0f, 1.0f);
-    // Dimensions
-    ImGuiIO& io = ImGui::GetIO();
+    if (IsInitialized) return;
+    if (!PlatformInitialized)
+    {
+        auto& platformIO = ImGui::GetIO();
+        const ImGuiConfigFlags saved = platformIO.ConfigFlags;
+        platformIO.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+        PlatformInitialized = ImGui_ImplGlfw_InitForVulkan(g_rhi_vk->Window, true);
+        platformIO.ConfigFlags = saved;
+        if (!PlatformInitialized) return;
+    }
+    float x = 1, y = 1;
+    if (auto* monitor = glfwGetPrimaryMonitor()) glfwGetMonitorContentScale(monitor, &x, &y);
+    MonitorDPIScale = Max(x, y);
+    if (!DescriptorPool)
+    {
+        ImGui::StyleColorsDark();
+        ImGui::GetStyle().ScaleAllSizes(MonitorDPIScale);
+    }
+    auto& io = ImGui::GetIO();
+    io.FontGlobalScale = MonitorDPIScale;
     io.DisplaySize = ImVec2(width, height);
-    io.DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
-    
-    //////////////////////////////////////////////////////////////////////////
-    // Descriptor pool
-    std::vector<VkDescriptorPoolSize> poolSizes;
-    poolSizes.resize(1);
-    poolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[0].descriptorCount = 1;
-
-    VkDescriptorPoolCreateInfo descriptorPoolInfo = {};
-    descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    descriptorPoolInfo.poolSizeCount = static_cast<uint32>(poolSizes.size());
-    descriptorPoolInfo.pPoolSizes = poolSizes.data();
-    descriptorPoolInfo.maxSets = 2;
-    descriptorPoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
-    verify(VK_SUCCESS == vkCreateDescriptorPool(g_rhi_vk->Device, &descriptorPoolInfo, nullptr, &DescriptorPool));
-
-    // Descriptor set layout
-    {
-        int32 BindingPoint = 0;
-        jShaderBindingArray ShaderBindingArray;
-        jShaderBindingResourceInlineAllocator ResourceInlineAllactor;
-
-        ShaderBindingArray.Add(jShaderBinding::Create(BindingPoint++, 1, EShaderBindingType::TEXTURE_SAMPLER_SRV, EShaderAccessStageFlag::FRAGMENT
-            , ResourceInlineAllactor.Alloc<jTextureResource>(nullptr, nullptr)));
-
-        EmptyShaderBindingLayout = g_rhi->CreateShaderBindings(ShaderBindingArray);
-    }
-
-    VkDescriptorSetLayout DescriptorSetLayout = (VkDescriptorSetLayout)EmptyShaderBindingLayout->GetHandle();
-
-    // Descriptor set
-    VkDescriptorSetAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = DescriptorPool;
-    allocInfo.pSetLayouts = &DescriptorSetLayout;
-    allocInfo.descriptorSetCount = 1;
-    verify(VK_SUCCESS == vkAllocateDescriptorSets(g_rhi_vk->Device, &allocInfo, &DescriptorSet));
-
-    PushConstBlockPtr = std::make_shared<jPushConstant>(PushConstBlock(), EShaderAccessStageFlag::VERTEX);
-    //////////////////////////////////////////////////////////////////////////
-    // 
-    //////////////////////////////////////////////////////////////////////////
-    // Create font texture
-    unsigned char* fontData;
-    int texWidth, texHeight;
-    io.Fonts->GetTexDataAsRGBA32(&fontData, &texWidth, &texHeight);
-    VkDeviceSize uploadSize = texWidth * texHeight * 4 * sizeof(char);
-
-    // Create target image for copy
-    FontImagePtr = g_rhi->Create2DTexture<jTexture_Vulkan>(texWidth, texHeight, 1, 1, ETextureFormat::RGBA8, ETextureCreateFlag::TransferDst);
-    check(FontImagePtr);
-
-    jSamplerStateInfo* samplerStateInfo = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR>::Create();
-    check(samplerStateInfo);
-
-    VkDescriptorImageInfo fontDescriptor{};
-    fontDescriptor.sampler = ((jSamplerStateInfo_Vulkan*)samplerStateInfo)->SamplerState;
-    fontDescriptor.imageView = FontImagePtr->View;
-    fontDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-    std::vector<VkWriteDescriptorSet> writeDescriptorSets;
-    writeDescriptorSets.resize(1);
-    writeDescriptorSets[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    writeDescriptorSets[0].dstSet = DescriptorSet;
-    writeDescriptorSets[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    writeDescriptorSets[0].dstBinding = 0;
-    writeDescriptorSets[0].pImageInfo = &fontDescriptor;
-    writeDescriptorSets[0].descriptorCount = 1;
-    vkUpdateDescriptorSets(g_rhi_vk->Device, static_cast<uint32>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
-    //////////////////////////////////////////////////////////////////////////
-    // 
-    //////////////////////////////////////////////////////////////////////////
-    // Staging buffers for font data upload
-    std::shared_ptr<jBuffer_Vulkan> stagingBuffer = jBufferUtil_Vulkan::CreateBuffer(EVulkanBufferBits::TRANSFER_SRC, EVulkanMemoryBits::HOST_VISIBLE | EVulkanMemoryBits::HOST_COHERENT, uploadSize, EResourceLayout::TRANSFER_SRC);
-    stagingBuffer->UpdateBuffer(fontData, uploadSize);
-
-    // Copy buffer data to font image
-    g_rhi_vk->TransitionLayout(FontImagePtr.get(), EResourceLayout::TRANSFER_DST);
-    jBufferUtil_Vulkan::CopyBufferToTexture(stagingBuffer->Buffer, stagingBuffer->Offset, FontImagePtr->Image, texWidth, texHeight, GetVulkanTextureFormat(FontImagePtr->Format));
-    g_rhi_vk->TransitionLayout(FontImagePtr.get(), EResourceLayout::SHADER_READ_ONLY);
-    //////////////////////////////////////////////////////////////////////////
-
-    DynamicBufferData.resize(g_rhi_vk->Swapchain->GetNumOfSwapchain());
-    for (auto& iter : DynamicBufferData)
-    {
-        iter.Initialize();
-    }
-
-    // CreateEmptyVertexBuffer to store vertex stream type
-    {
-        auto vertexStreamData = std::make_shared<jVertexStreamData>();
-        {
-            auto streamParam = std::make_shared<jStreamParam<float>>();
-            streamParam->BufferType = EBufferType::STATIC;
-            streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 2});
-            streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::FLOAT, .Stride=sizeof(float) * 2});
-            streamParam->Attributes.push_back({.UnderlyingType=EBufferElementType::BYTE_UNORM, .Stride=sizeof(unsigned char) * 4});
-            streamParam->Stride = (sizeof(float) * 2) + (sizeof(float) * 2) + (sizeof(unsigned char) * 4);
-            streamParam->Name = jName("Position_UV_Color");
-            vertexStreamData->Params.push_back(streamParam);
-        }
-
-        vertexStreamData->PrimitiveType = EPrimitiveType::TRIANGLES;
-        vertexStreamData->ElementCount = 0;
-
-        EmptyVertexBufferPtr = g_rhi->CreateVertexBuffer(vertexStreamData);
-    }
-
-    IsInitialized = true;
+    VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4096};
+    VkDescriptorPoolCreateInfo pool{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+    pool.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    pool.maxSets = 4096; pool.poolSizeCount = 1; pool.pPoolSizes = &size;
+    if (!DescriptorPool && vkCreateDescriptorPool(g_rhi_vk->Device, &pool, nullptr, &DescriptorPool) != VK_SUCCESS) return;
+    auto* image = g_rhi_vk->Swapchain->GetSwapchainImage(0);
+    auto target = std::make_shared<jRenderTarget>(image->TexturePtr);
+    auto* pass = UIRenderPass(target);
+    if (!pass) return;
+    ImGui_ImplVulkan_InitInfo init{};
+    init.Instance = g_rhi_vk->Instance; init.PhysicalDevice = g_rhi_vk->PhysicalDevice;
+    init.Device = g_rhi_vk->Device; init.QueueFamily = g_rhi_vk->GraphicsQueue.QueueIndex;
+    init.Queue = g_rhi_vk->GraphicsQueue.Queue; init.PipelineCache = g_rhi_vk->PipelineCache;
+    init.DescriptorPool = DescriptorPool;
+    init.MinImageCount = 2; init.ImageCount = uint32(g_rhi_vk->Swapchain->GetNumOfSwapchain());
+    init.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+    init.CheckVkResultFn = [](VkResult result) { if (result < VK_SUCCESS) std::cerr << "ImGui Vulkan error: " << result << '\n'; };
+    const ImGuiConfigFlags saved = io.ConfigFlags;
+    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+    IsInitialized = ImGui_ImplVulkan_Init(&init, (VkRenderPass)pass->GetRenderPass());
+    io.ConfigFlags = saved;
+    if (!IsInitialized) return;
+    auto* command = g_rhi_vk->BeginSingleTimeCommands();
+    ImGui_ImplVulkan_CreateFontsTexture((VkCommandBuffer)command->GetHandle());
+    g_rhi_vk->EndSingleTimeCommands(command);
+    ImGui_ImplVulkan_DestroyFontUploadObjects();
 }
-
 void jImGUI_Vulkan::Release()
 {
-    DynamicBufferData.clear();
-
-    DescriptorSet = nullptr;        // DescriptorPool �� ���� �ϸ�ǹǷ� ���� �Ҹ��Ű�� ����
-    if (DescriptorPool)
+    // Swapchain recreation calls Release followed by Initialize on this same
+    // context. Renderer shutdown destroys platform-window metadata too, so
+    // Initialize must reinstall GLFW callbacks and main-viewport metadata.
+    // Keep registered texture descriptor leases/pool alive until the destructor.
+    if (IsInitialized)
     {
-        vkDestroyDescriptorPool(g_rhi_vk->Device, DescriptorPool, nullptr);
-        DescriptorPool = nullptr;
+        ImGui_ImplVulkan_Shutdown();
+        IsInitialized = false;
     }
- 
-    PushConstBlockPtr.reset();
+    if (PlatformInitialized)
+    {
+        ImGui_ImplGlfw_Shutdown();
+        PlatformInitialized = false;
+    }
 }
-
-jPipelineStateInfo* jImGUI_Vulkan::CreatePipelineState(jRenderPass* renderPass, VkQueue copyQueue)
+void* jImGUI_Vulkan::RegisterTexture(const std::shared_ptr<jTexture>& texture)
 {
-    jRasterizationStateInfo* rasterizationInfo = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::NONE, EFrontFace::CCW>::Create();
-    check(rasterizationInfo);
-
-    // Enable blending
-    jBlendingStateInfo* blendStateInfo = TBlendingStateInfo<true, EBlendFactor::SRC_ALPHA, EBlendFactor::ONE_MINUS_SRC_ALPHA, EBlendOp::ADD
-        , EBlendFactor::ONE_MINUS_SRC_ALPHA, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
-    check(blendStateInfo);
-
-    jStencilOpStateInfo* stencilStateBack = TStencilOpStateInfo<EStencilOp::KEEP, EStencilOp::KEEP, EStencilOp::KEEP, ECompareOp::ALWAYS>::Create();
-    check(stencilStateBack);
-
-    jDepthStencilStateInfo* depthStencilInfo = TDepthStencilStateInfo<>::Create(nullptr, stencilStateBack);
-    check(depthStencilInfo);
-
-    //jMultisampleStateInfo* multisamplesStateInfo = TMultisampleStateInfo<>::Create(EMSAASamples::COUNT_1);
-    //check(multisamplesStateInfo);
-
-    static std::vector<EPipelineDynamicState> PipelineDynamicStates = { EPipelineDynamicState::VIEWPORT, EPipelineDynamicState::SCISSOR };
-    jPipelineStateFixedInfo PipelineStateFixed(rasterizationInfo, depthStencilInfo, blendStateInfo, PipelineDynamicStates, false);
-
-    jVertexBufferArray VertexBufferArray;
-    VertexBufferArray.Add(EmptyVertexBufferPtr.get());
-
-    jShaderBindingLayoutArray ShaderBindingsLayoutArray;
-    ShaderBindingsLayoutArray.Add(EmptyShaderBindingLayout);
-
-    jGraphicsPipelineShader Shader;
-    {
-        jShaderInfo shaderInfo;
-        shaderInfo.SetName(jNameStatic("imgui_VS"));
-        shaderInfo.SetShaderFilepath(jNameStatic("External/IMGUI/ui.vert.spv"));
-        shaderInfo.SetShaderType(EShaderAccessStageFlag::VERTEX);
-        Shader.VertexShader = g_rhi->CreateShader(shaderInfo);
-    }
-    {
-        jShaderInfo shaderInfo;
-        shaderInfo.SetName(jNameStatic("imgui_PS"));
-        shaderInfo.SetShaderFilepath(jNameStatic("External/IMGUI/ui.frag.spv"));
-        shaderInfo.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
-        Shader.PixelShader = g_rhi->CreateShader(shaderInfo);
-    }
-
-    return g_rhi->CreatePipelineStateInfo(&PipelineStateFixed, Shader
-        , VertexBufferArray, renderPass, ShaderBindingsLayoutArray, PushConstBlockPtr.get(), 0);
+    if (!IsInitialized || !texture || !texture->GetHandle() || RegisteredTextures.size() >= 4095) return nullptr;
+    auto* sampler = (jSamplerStateInfo_Vulkan*)TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR>::Create();
+    const auto set = ImGui_ImplVulkan_AddTexture(sampler->SamplerState,
+        static_cast<jTexture_Vulkan*>(texture.get())->View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    if (!set) return nullptr;
+    RegisteredTextures.emplace_back(set, texture);
+    return reinterpret_cast<void*>(set);
 }
-
+void jImGUI_Vulkan::Draw(const std::shared_ptr<jRenderFrameContext>& frame)
+{
+    if (!IsInitialized || !frame || !frame->SceneRenderTargetPtr || !ImGui::GetDrawData()) return;
+    auto target = frame->SceneRenderTargetPtr->FinalColorPtr;
+    g_rhi->TransitionLayout(frame->GetActiveCommandBuffer(), target->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
+    auto* pass = UIRenderPass(target);
+    if (pass && pass->BeginRenderPass(frame->GetActiveCommandBuffer()))
+    {
+        ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), (VkCommandBuffer)frame->GetActiveCommandBuffer()->GetHandle());
+        pass->EndRenderPass();
+    }
+}
+void jImGUI_Vulkan::UnregisterTexture(void* id)
+{
+    const auto descriptor = reinterpret_cast<VkDescriptorSet>(id);
+    const auto found = std::find_if(RegisteredTextures.begin(), RegisteredTextures.end(), [descriptor](const auto& entry) { return entry.first == descriptor; });
+    if (found == RegisteredTextures.end()) return;
+    ImGui_ImplVulkan_RemoveTexture(descriptor);
+    RegisteredTextures.erase(found);
+}
 void jImGUI_Vulkan::NewFrameInternal()
 {
-    if (!IsInitialized)
-        return;
-
+    ImGui_ImplVulkan_NewFrame();
+    // GLFW may enumerate no active monitors while macOS displays sleep. Retry
+    // its real platform query instead of manufacturing monitor geometry; the
+    // official backend normally refreshes only after a monitor event.
+    if (ImGui::GetPlatformIO().Monitors.empty()) ImGui_ImplGlfw_MonitorCallback(nullptr, 0);
     ImGui_ImplGlfw_NewFrame();
+    if (ImGui::GetPlatformIO().Monitors.empty()) ImGui::GetIO().ConfigFlags &= ~ImGuiConfigFlags_ViewportsEnable;
     ImGui::NewFrame();
 }
-
-void jImGUI_Vulkan::UpdateBuffers()
-{
-    if (!IsInitialized)
-        return;
-
-    ImDrawData* imDrawData = ImGui::GetDrawData();
-    if ((imDrawData->TotalVtxCount == 0) || (imDrawData->TotalIdxCount == 0))
-        return;
-
-    auto& DynamicBuffer = DynamicBufferData[g_rhi_vk->CurrentFrameIndex];
-
-    // Update buffers only if vertex or index count has been changed compared to current buffer size
-
-    // Vertex buffer
-    if (!DynamicBuffer.VertexBufferPtr || (DynamicBuffer.VertexBufferPtr->Buffer == VK_NULL_HANDLE) || (DynamicBuffer.vertexCount != imDrawData->TotalVtxCount))
-    {
-        const uint64 newBufferSize = imDrawData->TotalVtxCount * sizeof(ImDrawVert);
-        DynamicBuffer.VertexBufferPtr = g_rhi->CreateRawBuffer<jBuffer_Vulkan>(newBufferSize, 0
-            , EBufferCreateFlag::VertexBuffer | EBufferCreateFlag::CPUAccess, EResourceLayout::GENERAL);
-        DynamicBuffer.VertexBufferPtr->Map();
-        DynamicBuffer.vertexCount = imDrawData->TotalVtxCount;
-    }
-
-    // Index buffer
-    if (!DynamicBuffer.IndexBufferPtr || (DynamicBuffer.IndexBufferPtr->Buffer == VK_NULL_HANDLE) || (DynamicBuffer.indexCount < imDrawData->TotalIdxCount))
-    {
-        const uint64 newBufferSize = imDrawData->TotalIdxCount * sizeof(ImDrawIdx);
-
-        DynamicBuffer.IndexBufferPtr = g_rhi->CreateRawBuffer<jBuffer_Vulkan>(newBufferSize, 0
-            , EBufferCreateFlag::IndexBuffer | EBufferCreateFlag::CPUAccess, EResourceLayout::GENERAL);
-        DynamicBuffer.IndexBufferPtr->Map();
-        DynamicBuffer.indexCount = imDrawData->TotalIdxCount;
-    }
-
-    // Upload data
-    ImDrawVert* vtxDst = (ImDrawVert*)DynamicBuffer.VertexBufferPtr->GetMappedPointer();
-    ImDrawIdx* idxDst = (ImDrawIdx*)DynamicBuffer.IndexBufferPtr->GetMappedPointer();
-
-    for (int n = 0; n < imDrawData->CmdListsCount; n++) 
-    {
-        const ImDrawList* cmd_list = imDrawData->CmdLists[n];
-        memcpy(vtxDst, cmd_list->VtxBuffer.Data, cmd_list->VtxBuffer.Size * sizeof(ImDrawVert));
-        memcpy(idxDst, cmd_list->IdxBuffer.Data, cmd_list->IdxBuffer.Size * sizeof(ImDrawIdx));
-        vtxDst += cmd_list->VtxBuffer.Size;
-        idxDst += cmd_list->IdxBuffer.Size;
-    }
-}
-
-void jImGUI_Vulkan::Draw(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr)
-{
-    if (!IsInitialized)
-        return;
-
-    UpdateBuffers();
-
-    DEBUG_EVENT_WITH_COLOR(InRenderFrameContextPtr, "ImGUI", Vector4(0.8f, 0.8f, 0.8f, 1.0f));
-    check(InRenderFrameContextPtr);
-
-    // Prepare draw
-    jRenderPass* RenderPass = nullptr;
-    jPipelineStateInfo_Vulkan* PiplineStateInfo = nullptr;
-    {
-        const auto& extent = g_rhi_vk->Swapchain->GetExtent();
-        const auto& image = g_rhi_vk->Swapchain->GetSwapchainImage(InRenderFrameContextPtr->FrameIndex);
-
-        const auto& FinalColorPtr = InRenderFrameContextPtr->SceneRenderTargetPtr->FinalColorPtr;
-        g_rhi->TransitionLayout(InRenderFrameContextPtr->GetActiveCommandBuffer(), FinalColorPtr->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
-
-        jAttachment color = {
-            .RenderTargetPtr = FinalColorPtr,
-            .LoadStoreOp = EAttachmentLoadStoreOp::LOAD_STORE,
-            .StencilLoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_DONTCARE,
-            .RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
-            .InitialLayout = FinalColorPtr->GetLayout(),
-            .FinalLayout = EResourceLayout::PRESENT_SRC
-        };
-
-        RenderPass = g_rhi_vk->GetOrCreateRenderPass({ color }, { 0, 0 }, { FinalColorPtr->Info.Width, FinalColorPtr->Info.Height });
-        PiplineStateInfo = (jPipelineStateInfo_Vulkan*)CreatePipelineState(RenderPass, g_rhi_vk->GraphicsQueue.Queue);
-    }
-    check(RenderPass);
-    check(PiplineStateInfo);
-
-    const int32 frameIndex = InRenderFrameContextPtr->FrameIndex;
-    if (RenderPass->BeginRenderPass(InRenderFrameContextPtr->GetActiveCommandBuffer()))
-    {
-        VkCommandBuffer commandbuffer_vk = (VkCommandBuffer)InRenderFrameContextPtr->GetActiveCommandBuffer()->GetHandle();
-
-        ImGuiIO& io = ImGui::GetIO();
-
-        const VkPipelineLayout pipelineLayout = PiplineStateInfo->vkPipelineLayout;
-
-        vkCmdBindDescriptorSets(commandbuffer_vk, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &DescriptorSet, 0, nullptr);
-        vkCmdBindPipeline(commandbuffer_vk, VK_PIPELINE_BIND_POINT_GRAPHICS, PiplineStateInfo->vkPipeline);
-
-        const float DisplayWidth = io.DisplaySize.x;
-        const float DisplayHeight = io.DisplaySize.y;
-
-        VkViewport viewport = {};
-        viewport.width = DisplayWidth;
-        viewport.height = DisplayHeight;
-        viewport.minDepth = 0.0f;
-        viewport.maxDepth = 1.0f;
-        vkCmdSetViewport(commandbuffer_vk, 0, 1, &viewport);
-
-        // UI scale and translate via push constants
-        pushConstBlock.scale = Vector2(2.0f / DisplayWidth, 2.0f / DisplayHeight);
-        pushConstBlock.translate = Vector2(-1.0f);
-        vkCmdPushConstants(commandbuffer_vk, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstBlock), &pushConstBlock);
-
-        // Render commands
-        ImDrawData* imDrawData = ImGui::GetDrawData();
-        int32_t vertexOffset = 0;
-        int32_t indexOffset = 0;
-
-        if (imDrawData->CmdListsCount > 0 && DynamicBufferData.size() > frameIndex)
-        {
-            auto& DynamicBuffer = DynamicBufferData[frameIndex];
-
-            if (DynamicBuffer.VertexBufferPtr->Buffer && DynamicBuffer.IndexBufferPtr->Buffer)
-            {
-                VkDeviceSize offsets[1] = { 0 };
-                vkCmdBindVertexBuffers(commandbuffer_vk, 0, 1, &DynamicBuffer.VertexBufferPtr->Buffer, offsets);
-                vkCmdBindIndexBuffer(commandbuffer_vk, DynamicBuffer.IndexBufferPtr->Buffer, 0, VK_INDEX_TYPE_UINT16);
-
-                for (int32_t i = 0; i < imDrawData->CmdListsCount; i++)
-                {
-                    const ImDrawList* cmd_list = imDrawData->CmdLists[i];
-                    for (int32_t j = 0; j < cmd_list->CmdBuffer.Size; j++)
-                    {
-                        const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[j];
-                        VkRect2D scissorRect;
-                        scissorRect.offset.x = std::max((int32_t)(pcmd->ClipRect.x), 0);
-                        scissorRect.offset.y = std::max((int32_t)(pcmd->ClipRect.y), 0);
-                        scissorRect.extent.width = (uint32)(pcmd->ClipRect.z - pcmd->ClipRect.x);
-                        scissorRect.extent.height = (uint32)(pcmd->ClipRect.w - pcmd->ClipRect.y);
-                        vkCmdSetScissor(commandbuffer_vk, 0, 1, &scissorRect);
-                        vkCmdDrawIndexed(commandbuffer_vk, pcmd->ElemCount, 1, indexOffset, vertexOffset, 0);
-                        indexOffset += pcmd->ElemCount;
-                    }
-                    vertexOffset += cmd_list->VtxBuffer.Size;
-                }
-            }
-        }
-
-        RenderPass->EndRenderPass();
-    }
-}
-

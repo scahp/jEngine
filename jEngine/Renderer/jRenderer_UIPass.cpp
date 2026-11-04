@@ -431,6 +431,11 @@ namespace
 	//   });
 }
 
+#ifdef ENABLE_EDITOR_FEATURES
+#include "Code/Engine/Editor/jEditorWorkspace.h"
+#include "Code/Engine/Editor/jEditorUiRenderer.h"
+#endif
+
 void IRenderer::UIPass()
 {
 	check(g_ImGUI);
@@ -456,8 +461,21 @@ void IRenderer::UIPass()
         && IsRaytracingSceneValid
         && !IsForwardRenderer;
 
+#ifdef ENABLE_EDITOR_FEATURES
+    PrepareAuthoringUiFrame();
+    if (g_Editor && IsAuthoringWorkspaceVisible()) jEditorUiRenderer::PrepareScenePreview(RenderFrameContextPtr);
+#endif
 	g_ImGUI->NewFrame([=]()
 	{
+#ifdef ENABLE_EDITOR_FEATURES
+        if (IsAuthoringRuntimeMode()) return;
+        if (g_Editor && ImGui::IsKeyPressed(ImGuiKey_F10, false)) SetAuthoringWorkspaceVisible(!IsAuthoringWorkspaceVisible());
+        if (g_Editor && IsAuthoringWorkspaceVisible())
+        {
+            RenderAuthoringWorkspace(*g_Editor);
+            return;
+        }
+#endif
 		Vector4 clear_color(0.45f, 0.55f, 0.60f, 1.00f);
 
         static bool bShowEditorUI = true;
@@ -2265,8 +2283,6 @@ void IRenderer::UIPass()
 	});
 	g_ImGUI->Draw(RenderFrameContextPtr);
 }
-
-
 
 
 

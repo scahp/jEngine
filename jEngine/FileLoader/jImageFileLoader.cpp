@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "jImageFileLoader.h"
+#include "jEditorAssetPath.h"
 #include "lodepng.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -50,7 +51,7 @@ std::shared_ptr<jImageData> jImageFileLoader::DecodeImageData(const jName& filen
     bool IsHDR = false;
 
     {
-        const std::wstring FilenameWChar = ConvertToWchar(filename);
+        const std::wstring FilenameWChar = jEditorAssetPath::FromUtf8(filename.ToStr()).native();
 
         DirectX::ScratchImage image;
         if (ExtName == ExtDDS)

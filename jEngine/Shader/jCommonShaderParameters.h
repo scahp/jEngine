@@ -9,6 +9,9 @@ BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(RenderObjectUniformBuffer)
     SHADER_UNIFORM_BUFFER_MEMBER(float, Roughness)
     SHADER_UNIFORM_BUFFER_MEMBER(uint32, ObjectID)
     SHADER_UNIFORM_BUFFER_MEMBER(uint32, RenderObjectID)
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, BaseColorOpacity)
+    // xyz is linear emissive radiance; w selects authored material properties.
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, EmissiveOverride)
 END_SHADER_UNIFORM_BUFFER_STRUCT()
 
 BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(ViewUniformBuffer)

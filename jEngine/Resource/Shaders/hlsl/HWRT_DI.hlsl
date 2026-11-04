@@ -42,6 +42,7 @@ struct SurfaceData
     float3 GeometricWorldNormal;
     float2 UV;
     float3 Albedo;
+    float3 Emission;
     float3 AlbedoTextureSample;
     float3 NormalTextureSample;
     float3 RMTextureSample;
@@ -373,9 +374,10 @@ SurfaceData GetSurfaceDataInternal(in uint InstanceIdx, in uint PrimitiveIdx, in
     }
     Surface.AlbedoMipLevel = AlbedoMipLevel;
     const float4 AlbedoSample = SampleAlbedoTexture(InstanceIdx, MaterialInstance, Surface.UV, AlbedoMipLevel);
-    Surface.Albedo = AlbedoSample.rgb;
+    Surface.Albedo = AlbedoSample.rgb * RenderObjParam.BaseColorOpacity.rgb;
+    Surface.Emission = max(RenderObjParam.EmissiveOverride.xyz, 0.0);
     Surface.AlbedoTextureSample = AlbedoSample.rgb;
-    Surface.Alpha = AlbedoSample.a;
+    Surface.Alpha = AlbedoSample.a * RenderObjParam.BaseColorOpacity.a;
     float NormalMipLevel = 0.0;
     if (HasMaterialFlag(MaterialInstance, HWRTDI_MaterialFlag_HasNormalTexture))
     {
@@ -394,7 +396,7 @@ SurfaceData GetSurfaceDataInternal(in uint InstanceIdx, in uint PrimitiveIdx, in
     Surface.Metallic = RenderObjParam.Metallic;
     Surface.Roughness = RenderObjParam.Roughness;
 
-    if (HasMaterialFlag(MaterialInstance, HWRTDI_MaterialFlag_HasRMTexture))
+    if (HasMaterialFlag(MaterialInstance, HWRTDI_MaterialFlag_HasRMTexture) && RenderObjParam.EmissiveOverride.w < 0.5)
     {
         float RMMipLevel = ComputeApproxTextureMipLevel(RMTextureArray[InstanceIdx], Surface.WorldPos, Vertex0, Vertex1, Vertex2, RenderObjParam);
         if (ForceMipLevel0)
@@ -437,6 +439,9 @@ bool IsRayHitRejectedByMaterial(in uint InstanceIdx, in uint PrimitiveIdx, in fl
         {
             return true;
         }
+        const float Coverage = frac(sin(dot(float3(Barycentrics, InstanceIdx + PrimitiveIdx),
+            float3(12.9898, 78.233, 37.719))) * 43758.5453);
+        if (RenderObjParam.BaseColorOpacity.a <= Coverage) return true;
     }
 
     return false;
@@ -579,7 +584,7 @@ float3 EvaluateSurfaceRadianceFromViewPosition(in SurfaceData Surface, in MyAttr
 
     const float3 ViewDir = normalize(ViewPosition - Surface.WorldPos);
 
-    float3 Radiance = 0.0;
+    float3 Radiance = Surface.Emission;
     Radiance += EvaluateUnifiedLights(Surface, ViewDir);
     return Radiance;
 }

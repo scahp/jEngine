@@ -113,4 +113,6 @@ private:
 	// Special code for PBR test
     float LastMetallic = 0.0f;
     float LastRoughness = 0.0f;
+    const jMaterial* LastMaterial = nullptr;
+    uint64 LastMaterialRevision = uint64(-1);
 };

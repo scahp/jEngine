@@ -15,7 +15,8 @@
 #error MAX_RAY_PER_PIXEL should be defined.
 #endif // MAX_RAY_PER_PIXEL
 
-MaterialUniformBuffer GetMaterial(inout float3 InOutWorldNormal, in MaterialUniformBuffer InMaterial, float2 InUV)
+MaterialUniformBuffer GetMaterial(inout float3 InOutWorldNormal, in MaterialUniformBuffer InMaterial,
+    float2 InUV, uint InstanceIdx, RenderObjectUniformBuffer Object)
 {
     MaterialUniformBuffer mat;
     mat = InMaterial;
@@ -55,6 +56,19 @@ MaterialUniformBuffer GetMaterial(inout float3 InOutWorldNormal, in MaterialUnif
     if (mat.emissionmapTexID >= 0)
         mat.emission = pow(TextureBindlessArray[mat.emissionmapTexID].SampleLevel(DefaultSamplerState, InUV, 0).xyz, 2.2);
 
+    if (Object.EmissiveOverride.w > 0.5)
+    {
+        const float4 albedo = AuthoredAlbedoArray[InstanceIdx].SampleLevel(DefaultSamplerState, InUV, 0);
+        mat.baseColor = Object.BaseColorOpacity.rgb * pow(max(albedo.rgb, 0.0), 2.2);
+        mat.opacity = Object.BaseColorOpacity.a * albedo.a;
+        mat.emission = max(Object.EmissiveOverride.xyz, 0.0);
+        mat.metallic = Object.Metallic; mat.roughness = max(Object.Roughness, 0.04);
+        float3 normal = AuthoredNormalArray[InstanceIdx].SampleLevel(DefaultSamplerState, InUV, 0).xyz;
+        normal.y = 1 - normal.y;
+        normal = normal * 2 - 1;
+        float3 t, b; MakeTB_From_N(InOutWorldNormal, t, b);
+        InOutWorldNormal = normalize(t * normal.x + b * normal.y + InOutWorldNormal * normal.z);
+    }
     return mat;
 }
 
@@ -454,22 +468,28 @@ void MeshClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     float3 WorldNormal = 0;
     float3 WorldFaceNormal = 0;
 
-    const bool IsUsingWorldNormal = true;
+    const bool IsUsingWorldNormal = false;
     if (IsUsingWorldNormal)
     {
         WorldNormal = normal;
     }
     else
     {
-        WorldNormal = mul((float3x3) RenderObjParam[0].M, normal);
+        WorldNormal = normalize(mul(transpose((float3x3) RenderObjParam[0].InvM), normal));
     }
     WorldFaceNormal = mul((float3x3) RenderObjParam[0].M, FaceNormal);
 
     float2 uv = HitAttribute(Vertex0.TexCoord, Vertex1.TexCoord, Vertex2.TexCoord, attr);
-    MaterialUniformBuffer material = GetMaterial(WorldNormal, MaterialBindless, uv);
+    MaterialUniformBuffer material = GetMaterial(WorldNormal, MaterialBindless, uv, InstanceIdx, RenderObjParam[0]);
     
     // Set hit point to payload
     payload.HitPos = HitWorldPosition();
+    if (Random_0_1(payload.seed) > saturate(material.opacity))
+    {
+        payload.Attenuation = 1;
+        payload.HitReflectDir = WorldRayDirection();
+        return;
+    }
     
     float SamplePDF;
     float3 BRDF_Cos = 0;

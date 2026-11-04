@@ -6,6 +6,10 @@
 #include "RHI/jRaytracingScene.h"
 #include "RHI/jRenderFrameContext.h"
 #include "RHI/jRenderTargetPool.h"
+#include "RHI/jResourceBarrierBatcher.h"
+#ifdef ENABLE_EDITOR_FEATURES
+#include "Code/Engine/Editor/jEditorProcedural.h"
+#endif
 #include "RHI/jShaderBindingLayout.h"
 #include "Scene/Light/jDirectionalLight.h"
 #include "Scene/Light/jPointLight.h"
@@ -279,6 +283,9 @@ void jRenderer::Setup()
     SCOPE_CPU_PROFILE(Setup);
 
     FrameIndex = g_rhi->GetCurrentFrameIndex();
+#ifdef ENABLE_EDITOR_FEATURES
+    jEditorProcedural::PrepareRenderResources(RenderFrameContextPtr);
+#endif
     View.ShadowCasterLights.reserve(View.Lights.size());
 
     // Build per-light view data
@@ -824,6 +831,82 @@ void jRenderer::ShadowPass()
     }
 }
 
+namespace
+{
+void FlushPreparedPassTransitions(const std::shared_ptr<jRenderFrameContext>& frame)
+{
+#if USE_RESOURCE_BARRIER_BATCHER
+    const auto* command = frame->GetActiveCommandBuffer();
+    if (auto* global = g_rhi->GetGlobalBarrierBatcher()) global->Flush(command);
+    command->FlushBarrierBatch();
+#endif
+}
+struct PreparedDeferredLights
+{
+    // Commands retain pointers into generators' pipeline state; preserve both
+    // lifetimes until their draws have been recorded.
+    std::vector<jDrawCommand> Commands;
+    std::vector<std::unique_ptr<jDrawCommandGenerator>> Generators;
+};
+PreparedDeferredLights PrepareDeferredLights(const std::shared_ptr<jRenderFrameContext>& RenderFrameContextPtr,
+    const jView& View, jRenderPass* InRenderPass, int32 SubpassIndex)
+{
+    // GBuffer input attachment 바인딩
+    jShaderBindingInstanceGroup DefaultLightPassShaderBindingGroup;
+    DefaultLightPassShaderBindingGroup.Add(View.ViewUniformBufferShaderBindingInstance);
+    //////////////////////////////////////////////////////////////////////////
+
+    PreparedDeferredLights prepared;
+    auto& LightPasses = prepared.Commands;
+    LightPasses.reserve(View.Lights.size());
+    std::vector<const jViewLight*> DrawableLights;
+    DrawableLights.reserve(View.Lights.size());
+
+    const int32 RTWidth = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->Info.Width;
+    const int32 RTHeight = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->Info.Height;
+
+    // Create a separate DrawCommandGenerator for each light
+    auto& LightDrawCommandGenerators = prepared.Generators;
+    LightDrawCommandGenerators.reserve(View.Lights.size());
+
+    for (int32 i = 0; i < (int32)View.Lights.size(); ++i)
+    {
+        const auto& viewLight = View.Lights[i];
+        std::unique_ptr<jDrawCommandGenerator> generator;
+
+        switch (viewLight.Light->Type)
+        {
+        case ELightType::DIRECTIONAL:
+            generator = std::make_unique<jDirectionalLightDrawCommandGenerator>(DefaultLightPassShaderBindingGroup);
+            break;
+        case ELightType::POINT:
+            generator = std::make_unique<jPointLightDrawCommandGenerator>(DefaultLightPassShaderBindingGroup);
+            break;
+        case ELightType::SPOT:
+            generator = std::make_unique<jSpotLightDrawCommandGenerator>(DefaultLightPassShaderBindingGroup);
+            break;
+        default:
+            continue;
+        }
+
+        if (generator)
+        {
+            generator->Initialize(RTWidth, RTHeight);
+            LightDrawCommandGenerators.push_back(std::move(generator));
+            LightPasses.push_back(jDrawCommand());
+            DrawableLights.push_back(&viewLight);
+        }
+    }
+
+
+    check(DrawableLights.size() == LightPasses.size());
+    for (int32 i = 0; i < (int32)LightPasses.size(); ++i)
+        LightDrawCommandGenerators[i]->GenerateDrawCommand(&LightPasses[i], RenderFrameContextPtr,
+            &View, *DrawableLights[i], InRenderPass, SubpassIndex);
+    return prepared;
+}
+} // namespace
+
 void jRenderer::BasePass()
 {
     if (BasePassSetupCompleteEvent.valid())
@@ -853,6 +936,10 @@ void jRenderer::BasePass()
             g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), NewLayout);
         }
 
+        PreparedDeferredLights subpassLights;
+        if (!RenderFrameContextPtr->UseForwardRenderer && gOptions.UseSubpass && !UseHWRTDirectLighting)
+            subpassLights = PrepareDeferredLights(RenderFrameContextPtr, View, BaseRenderPass, 1);
+        FlushPreparedPassTransitions(RenderFrameContextPtr);
         //BasepassOcclusionTest.BeginQuery(RenderFrameContextPtr->GetActiveCommandBuffer());
         if (BaseRenderPass && BaseRenderPass->BeginRenderPass(RenderFrameContextPtr->GetActiveCommandBuffer()))
         {
@@ -866,7 +953,7 @@ void jRenderer::BasePass()
             if (!RenderFrameContextPtr->UseForwardRenderer && gOptions.UseSubpass && !UseHWRTDirectLighting)
             {
                 g_rhi->NextSubpass(RenderFrameContextPtr->GetActiveCommandBuffer());
-                DeferredLightPass_TodoRefactoring(BaseRenderPass);
+                for (const auto& command : subpassLights.Commands) command.Draw();
             }
 
             BaseRenderPass->EndRenderPass();
@@ -911,51 +998,7 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
     }
 
     //////////////////////////////////////////////////////////////////////////
-    // GBuffer input attachment 바인딩
-    jShaderBindingInstanceGroup DefaultLightPassShaderBindingGroup;
-    DefaultLightPassShaderBindingGroup.Add(View.ViewUniformBufferShaderBindingInstance);
-    //////////////////////////////////////////////////////////////////////////
-
-    std::vector<jDrawCommand> LightPasses;
-    LightPasses.reserve(View.Lights.size());
-    std::vector<const jViewLight*> DrawableLights;
-    DrawableLights.reserve(View.Lights.size());
-
-    const int32 RTWidth = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->Info.Width;
-    const int32 RTHeight = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->Info.Height;
-
-    // Create a separate DrawCommandGenerator for each light
-    std::vector<std::unique_ptr<jDrawCommandGenerator>> LightDrawCommandGenerators;
-    LightDrawCommandGenerators.reserve(View.Lights.size());
-
-    for (int32 i = 0; i < (int32)View.Lights.size(); ++i)
-    {
-        const auto& viewLight = View.Lights[i];
-        std::unique_ptr<jDrawCommandGenerator> generator;
-
-        switch (viewLight.Light->Type)
-        {
-        case ELightType::DIRECTIONAL:
-            generator = std::make_unique<jDirectionalLightDrawCommandGenerator>(DefaultLightPassShaderBindingGroup);
-            break;
-        case ELightType::POINT:
-            generator = std::make_unique<jPointLightDrawCommandGenerator>(DefaultLightPassShaderBindingGroup);
-            break;
-        case ELightType::SPOT:
-            generator = std::make_unique<jSpotLightDrawCommandGenerator>(DefaultLightPassShaderBindingGroup);
-            break;
-        default:
-            continue;
-        }
-
-        if (generator)
-        {
-            generator->Initialize(RTWidth, RTHeight);
-            LightDrawCommandGenerators.push_back(std::move(generator));
-            LightPasses.push_back(jDrawCommand());
-            DrawableLights.push_back(&viewLight);
-        }
-    }
+    PreparedDeferredLights prepared;
 
     {
         const int32 SubpassIndex = (!RenderFrameContextPtr->UseForwardRenderer && gOptions.UseSubpass) ? 1 : 0;
@@ -1008,20 +1051,15 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
             InRenderPass = (jRenderPass_Vulkan*)g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
 
             check(InRenderPass);
+        }
+
+        prepared = PrepareDeferredLights(RenderFrameContextPtr, View, InRenderPass, SubpassIndex);
+        if (!gOptions.UseSubpass)
+        {
+            FlushPreparedPassTransitions(RenderFrameContextPtr);
             InRenderPass->BeginRenderPass(RenderFrameContextPtr->GetActiveCommandBuffer());
         }
-
-        check(DrawableLights.size() == LightPasses.size());
-        check(LightDrawCommandGenerators.size() == LightPasses.size());
-        for (int32 i = 0; i < (int32)LightPasses.size(); ++i)
-        {
-            LightDrawCommandGenerators[i]->GenerateDrawCommand(&LightPasses[i], RenderFrameContextPtr, &View, *DrawableLights[i], InRenderPass, SubpassIndex);
-        }
-
-        for (int32 i = 0; i < (int32)LightPasses.size(); ++i)
-        {
-            LightPasses[i].Draw();
-        }
+        for (const auto& command : prepared.Commands) command.Draw();
 
         if (!gOptions.UseSubpass)
         {
@@ -1090,6 +1128,35 @@ void jRenderer::Render()
         }
 
         BasePass();
+
+        if (!RenderFrameContextPtr->UseForwardRenderer && !UseHWRTDirectLighting)
+        {
+            auto* emission = RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[int32(EGBufferType::EMISSIVE)]->GetTexture();
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(),
+                RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), emission, EResourceLayout::SHADER_READ_ONLY);
+            // One additive draw is independent of the light count and requires
+            // neither storage-image typed reads nor scene-color feedback.
+            jRHIUtil::DrawFullScreen(RenderFrameContextPtr, RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr,
+                [emission](const std::shared_ptr<jRenderFrameContext>&, jShaderBindingArray& bindings,
+                    jShaderBindingResourceInlineAllocator& allocator)
+                {
+                    jRHIUtil::BuildSingleTextureFragmentBindings(emission,
+                        TSamplerStateInfo<ETextureFilter::NEAREST, ETextureFilter::NEAREST>::Create(), bindings, allocator);
+                }, [](const std::shared_ptr<jRenderFrameContext>&)
+                {
+                    jShaderInfo info; info.SetName(jNameStatic("EditorEmissionPS"));
+                    info.SetShaderFilepath(jNameStatic("Resource/Shaders/hlsl/copy_ps.hlsl"));
+                    info.SetShaderType(EShaderAccessStageFlag::FRAGMENT);
+                    jRHIUtil::AppendSingleTextureFragmentShaderInfo(info);
+                    return g_rhi->CreateShader(info);
+                }, [](jRasterizationStateInfo*& raster, jBlendingStateInfo*& blend, jDepthStencilStateInfo*& depth)
+                {
+                    jRHIUtil::CreateDefaultFixedPipelineStates(raster, blend, depth);
+                    blend = TBlendingStateInfo<true, EBlendFactor::ONE, EBlendFactor::ONE, EBlendOp::ADD,
+                        EBlendFactor::ZERO, EBlendFactor::ONE, EBlendOp::ADD, EColorMask::ALL>::Create();
+                });
+        }
 
         // Calculate linear depth
         {
@@ -1234,5 +1301,3 @@ void jRenderer::Render()
     DebugPasses();
     UIPass();
 }
-
-

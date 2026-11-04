@@ -11,6 +11,16 @@ SHADERS = {'candidate-gather': 'main', 'winner-select': 'main', 'visualize': 'ma
 
 SHADERS = {name: (entry, 'cs_6_6') for name, entry in SHADERS.items()}
 SHADERS.update({
+    'editor-gbuffer': ('main', 'ps_6_6'),
+    'editor-gbuffer-vs': ('main', 'vs_6_6'),
+    'editor-forward': ('main', 'ps_6_6'),
+    'editor-path-mesh': ('MeshClosestHitShader', 'lib_6_6'),
+    'editor-shadow-vs': ('main', 'vs_6_6'),
+    'editor-shadow-instancing-vs': ('main', 'vs_6_6'),
+    'editor-spot-shadow-vs': ('main', 'vs_6_6'),
+    'editor-omni-shadow-vs': ('main', 'vs_6_6'),
+    'editor-shadow-ps': ('main', 'ps_6_6'),
+    'editor-omni-shadow-ps': ('main', 'ps_6_6'),
     'effect-eye-adaptation': ('main', 'cs_6_6'),
     'effect-bloom-setup': ('main', 'ps_6_6'),
     'effect-bloom-down-vs': ('main', 'vs_6_6'),
@@ -110,6 +120,7 @@ def main():
             target.mkdir(exist_ok=True)
             run([args.engine, '--ci-export-shaders', target, api], target / 'export.log', args.source)
             contracts = json.loads((target / 'cpu-layout.json').read_text())
+            contracts.update(json.loads((target / 'editor-cpu-layout.json').read_text()))
             for name, (entry, profile) in SHADERS.items():
                 output = target / (name + ('.spv' if api == 'vulkan' else '.dxil'))
                 flattened = target / (name + '.flattened.hlsl')
@@ -119,7 +130,8 @@ def main():
                 if api == 'vulkan':
                     command += ['-spirv', '-fspv-target-env=vulkan1.1spirv1.4', '-fvk-use-scalar-layout',
                                 '-fspv-use-unknown-image-format', '-fspv-extension=SPV_EXT_descriptor_indexing',
-                                '-fspv-extension=SPV_KHR_ray_tracing', '-fspv-extension=SPV_KHR_ray_query']
+                                '-fspv-extension=SPV_KHR_ray_tracing', '-fspv-extension=SPV_KHR_ray_query',
+                                '-fspv-extension=SPV_EXT_shader_viewport_index_layer']
                 run(command, target / (name + '.log'), args.source)
                 if api == 'vulkan': checked.update(check_layout(output, contracts))
                 report['shaders'].append(f'{api}/{name}')
