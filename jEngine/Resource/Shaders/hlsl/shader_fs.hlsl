@@ -82,10 +82,12 @@ float3 GetPointLight(jPointLightUniformBufferData light, float3 normal, float3 p
 {
     float3 lightDir = light.Position - pixelPos;
     float distanceSqr = dot(lightDir, lightDir);
+    if (distanceSqr <= 0.001f * 0.001f) return 0;
     lightDir = normalize(lightDir);
     float3 reflectLightDir = 2.0 * clamp(dot(lightDir, normal), 0.0, 1.0) * normal - lightDir;
 
-    return (GetPointLightDiffuse(light, normal, lightDir) + GetPointLightSpecular(light, reflectLightDir, viewDir)) * DistanceAttenuation2(distanceSqr, 1.0f / light.MaxDistance);
+    return (GetPointLightDiffuse(light, normal, lightDir) + GetPointLightSpecular(light, reflectLightDir, viewDir))
+        * DistanceAttenuation2(distanceSqr, 1.0f / light.MaxDistance) / distanceSqr;
 }
 
 float3 GetSpotLightDiffuse(jSpotLightUniformBufferData light, float3 normal, float3 lightDir)
@@ -102,6 +104,7 @@ float3 GetSpotLight(jSpotLightUniformBufferData light, float3 normal, float3 pix
 {
     float3 lightDir = light.Position - pixelPos;
     float distanceSqr = dot(lightDir, lightDir);
+    if (distanceSqr <= 0.001f * 0.001f) return 0;
     lightDir = normalize(lightDir);
     float3 reflectLightDir = 2.0 * clamp(dot(lightDir, normal), 0.0, 1.0) * normal - lightDir;
 
@@ -109,7 +112,7 @@ float3 GetSpotLight(jSpotLightUniformBufferData light, float3 normal, float3 pix
 
     return (GetSpotLightDiffuse(light, normal, lightDir)
         + GetSpotLightSpecular(light, reflectLightDir, viewDir))
-        * DistanceAttenuation2(distanceSqr, 1.0f / light.MaxDistance)
+        * DistanceAttenuation2(distanceSqr, 1.0f / light.MaxDistance) / distanceSqr
         * DiretionalFalloff(lightRadian, light.PenumbraRadian, light.UmbraRadian);
 }
 

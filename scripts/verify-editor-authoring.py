@@ -21,7 +21,10 @@ def main():
     parser.add_argument('--icd', type=Path)
     parser.add_argument('--api', choices=['vulkan', 'dx12'], default='vulkan')
     parser.add_argument('--output', type=Path, default=Path('build/authoring/verification'))
-    parser.add_argument('--case', action='append', choices=['uploads', 'workflow'])
+    parser.add_argument('--case', action='append', choices=['uploads', 'workflow', 'renderer-switch'])
+    parser.add_argument('--scene-id', default='Sponza_PathTracing/sponza.glb',
+                        help='Scene Browser scene used for renderer-switch verification; prepare its shared materials first.')
+    parser.add_argument('--scene-loader', default='Model', choices=['Model', 'PathTracing'])
     parser.add_argument('--wake-display', action='store_true',
                         help='Temporarily wake/hold a real macOS display for native-window validation.')
     args = parser.parse_args()
@@ -52,12 +55,17 @@ def main():
         for case in args.case or ['uploads', 'workflow']:
             destination = output / case
             destination.mkdir(parents=True, exist_ok=True)
-            command = [str(engine), '--ci-editor-gpu'] if case == 'uploads' else [
-                str(engine), '--ci-editor-flow', str(destination)]
+            if case == 'uploads':
+                command = [str(engine), '--ci-editor-gpu']
+            elif case == 'renderer-switch':
+                command = [str(engine), '--ci-renderer-switch', str(destination),
+                           '--scene-browser', args.scene_id, args.scene_loader]
+            else:
+                command = [str(engine), '--ci-editor-flow', str(destination)]
             command.append('-' + args.api)
             log_path = destination / 'run.log'
             case_env = {**env, 'JENGINE_LOG_FILE': str(destination / 'engine.jsonl')}
-            if case == 'workflow':
+            if case in ('workflow', 'renderer-switch'):
                 case_env['JENGINE_CAPTURE_FRAME'] = str(destination / 'workspace-raw.png')
             with log_path.open('w', encoding='utf-8') as log:
                 result = subprocess.run(command, cwd=root / 'jEngine', env=case_env,
@@ -74,6 +82,13 @@ def main():
                         or 'editing one real particle color preserves the other emitter' not in text):
                     raise RuntimeError('Upload/particle GPU checks or actual measurements are missing')
                 entry['measurements'] = [line for line in text.splitlines() if line.startswith('UPLOAD_')]
+            elif case == 'renderer-switch':
+                flow = json.loads((destination / 'renderer-switch-gpu-report.json').read_text())
+                if (flow['status'] != 'passed' or flow['failureCount']
+                        or len(flow['checks']) < 10 or not all(item['pass'] for item in flow['checks'])
+                        or not (destination / 'workspace-raw.png').is_file()):
+                    raise RuntimeError('Actual viewport renderer switching did not pass')
+                entry['renderer_switch_report'] = flow
             else:
                 flow = json.loads((destination / 'editor-authoring-gpu-report.json').read_text())
                 if (flow['status'] != 'passed' or flow['failureCount'] or flow['authoredEntities'] != 100

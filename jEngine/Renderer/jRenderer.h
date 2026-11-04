@@ -93,6 +93,9 @@ public:
 
     std::vector<jShadowDrawInfo> ShadowDrawInfo;
     std::vector<jDrawCommand> BasePasses;
+    std::vector<std::shared_ptr<IUniformBufferBlock>> ForwardLightUniformBuffers;
+    std::vector<std::shared_ptr<jShaderBindingInstance>> ForwardLightBindings;
+    std::vector<std::pair<jTexture*, float>> ForwardNeutralShadowClears;
 
     jRenderPass* BaseRenderPass = nullptr;
 

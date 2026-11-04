@@ -163,18 +163,22 @@ int main(int argc, char** argv)
     }
 
     // Validate external input before creating a window, GPU resources or worker threads.
-    std::string editorFlowDirectory;
+    std::string editorFlowDirectory, rendererSwitchDirectory;
     for (int i = 1; i < argc; ++i)
     {
-        if (std::strcmp(argv[i], "--ci-editor-flow") != 0) continue;
-        if (!editorFlowDirectory.empty() || ++i == argc || !argv[i][0] || argv[i][0] == '-')
-        { std::cerr << "Usage: --ci-editor-flow <owned-output-directory> [-vulkan|-dx12]" << std::endl; return EXIT_FAILURE; }
-        try { editorFlowDirectory = jEditorAssetPath::ToUtf8(std::filesystem::absolute(jEditorAssetPath::FromUtf8(argv[i]))); }
+        const bool rendererSwitch = std::strcmp(argv[i], "--ci-renderer-switch") == 0;
+        if (!rendererSwitch && std::strcmp(argv[i], "--ci-editor-flow") != 0) continue;
+        auto& directory = rendererSwitch ? rendererSwitchDirectory : editorFlowDirectory;
+        if (!directory.empty() || ++i == argc || !argv[i][0] || argv[i][0] == '-')
+        { std::cerr << "Usage: --ci-editor-flow|--ci-renderer-switch <owned-output-directory> [-vulkan|-dx12]" << std::endl; return EXIT_FAILURE; }
+        try { directory = jEditorAssetPath::ToUtf8(std::filesystem::absolute(jEditorAssetPath::FromUtf8(argv[i]))); }
         catch (const std::exception& error) { std::cerr << error.what() << std::endl; return EXIT_FAILURE; }
     }
-    if (!editorFlowDirectory.empty() && gCommandLineArgument.HasArgument("--ci-editor-gpu"))
+    if ((!editorFlowDirectory.empty() && !rendererSwitchDirectory.empty()) ||
+        ((!editorFlowDirectory.empty() || !rendererSwitchDirectory.empty()) && gCommandLineArgument.HasArgument("--ci-editor-gpu")))
     { std::cerr << "Select only one editor GPU test" << std::endl; return EXIT_FAILURE; }
     if (!editorFlowDirectory.empty()) SetAuthoringTestStateDirectory(jEditorAssetPath::FromUtf8(editorFlowDirectory) / "workspace-state");
+    if (!rendererSwitchDirectory.empty()) SetAuthoringTestStateDirectory(jEditorAssetPath::FromUtf8(rendererSwitchDirectory) / "workspace-state");
     std::string authoringError;
     if (!ConfigureEditorStartup(argc, argv, authoringError)) { std::cerr << authoringError << std::endl; return EXIT_FAILURE; }
     std::string browserScene, browserLoader;
@@ -202,7 +206,7 @@ int main(int argc, char** argv)
     }
     bool waitForTestScene = false;
     if (!ReadEngineBoolean("JENGINE_TEST_WAIT_FOR_SCENE", waitForTestScene)) return EXIT_FAILURE;
-    if (gCommandLineArgument.HasArgument("--ci-editor-gpu") || !editorFlowDirectory.empty()) waitForTestScene = true;
+    if (gCommandLineArgument.HasArgument("--ci-editor-gpu") || !editorFlowDirectory.empty() || !rendererSwitchDirectory.empty()) waitForTestScene = true;
     if (!ReadEngineBoolean("JENGINE_SURFEL_GI", gOptions.UseSurfelGI)
         || !ReadEngineBoolean("JENGINE_INLINE_RAY", gOptions.SurfelGIInlineRayEnable))
         return EXIT_FAILURE;
@@ -328,6 +332,12 @@ int main(int argc, char** argv)
         g_Engine->Release(); g_rhi->ReleaseRHI(); glfwTerminate(); return EXIT_FAILURE;
     }
 #endif
+    if (!rendererSwitchDirectory.empty())
+    {
+        const int failures = RunRendererSwitchGpuTests(rendererSwitchDirectory.c_str());
+        g_Engine->Release(); g_rhi->ReleaseRHI(); glfwTerminate();
+        return failures ? EXIT_FAILURE : EXIT_SUCCESS;
+    }
     if (!editorFlowDirectory.empty())
     {
         const int failures = RunEditorAuthoringGpuTests(editorFlowDirectory.c_str());

@@ -19,6 +19,7 @@
 #include "FileLoader/jModelLoader.h"
 #include "FileLoader/jAssetImportService.h"
 #include "Scene/jMeshObject.h"
+#include "Material/jMaterial.h"
 #include "FileLoader/jImageFileLoader.h"
 #include "Renderer/jSceneRenderTargets.h"    // temp
 #ifdef _WIN32
@@ -43,6 +44,7 @@
 #include <fstream>
 #include <iomanip>
 #include <sstream>
+#include <stdexcept>
 
 #ifdef ENABLE_EDITOR_FEATURES
 #include "Code/Engine/jEditor.h"
@@ -663,7 +665,160 @@ const char* jGame::GetActiveSceneRenderPipelineName() const
     if (IsUsingPathTracingRenderer() && IsUseDX12() && static_cast<jRHI_DX12*>(g_rhi)->IsUsingWarp())
         return "PathTracing (WARP)";
 #endif
-	return GetSceneRenderPipelineNameInternal(PathTracingSceneBrowser.ActiveRenderPipeline);
+	return GetSceneRenderPipelineNameInternal(GetActiveSceneRenderPipeline());
+}
+
+jGame::ESceneRenderPipeline jGame::GetActiveSceneRenderPipeline() const
+{
+    if (IsUsingPathTracingRenderer()) return ESceneRenderPipeline::PathTracing;
+    // Project settings and the existing raster controls also update this flag.
+    return gOptions.UseDeferredRenderer ? ESceneRenderPipeline::Deferred : ESceneRenderPipeline::Forward;
+}
+
+bool jGame::CanSwitchSceneRenderPipeline(ESceneRenderPipeline target, std::string& reason) const
+{
+    reason.clear();
+    switch (target)
+    {
+    case ESceneRenderPipeline::Deferred:
+    case ESceneRenderPipeline::Forward:
+    case ESceneRenderPipeline::PathTracing: break;
+    default: reason = "Unknown renderer."; return false;
+    }
+    if (SceneRenderPipelineSwitchPending && target != PendingSceneRenderPipeline)
+    {
+        reason = "A renderer switch is already queued for the next frame.";
+        return false;
+    }
+    if (target == GetActiveSceneRenderPipeline()) return true;
+    if (PendingImportId || PathTracingSceneBrowser.PendingLoadIndex >= 0 || PathTracingSceneBrowser.RestartIndex >= 0
+#ifdef ENABLE_EDITOR_FEATURES
+        || (g_Editor && g_Editor->PendingImportCount() != 0)
+#endif
+        )
+    {
+        reason = "Wait for scene and asset imports to finish before switching renderer.";
+        return false;
+    }
+    if (!g_rhi || !MainCamera)
+    {
+        reason = "The rendering device and camera must be initialized first.";
+        return false;
+    }
+    if (target != ESceneRenderPipeline::PathTracing)
+    {
+        if (gPathTracingScene)
+            for (const auto* object : gPathTracingScene->SpawnObjects)
+            {
+                if (!object) continue;
+                for (const auto* renderObject : object->RenderObjects)
+                {
+                    // Legacy group 1 is an analytic emitter's emissive mesh,
+                    // which already supplies raster Emissive properties.
+                    if (!renderObject || renderObject->RayTracingHitGroupIndex != 0) continue;
+                    const auto& material = renderObject->MaterialPtr;
+                    if (material && !material->IsUseSphericalMap() && material->MaterialDataPtr
+                        && (!material->Surface || !material->UseMaterialProperties))
+                    {
+                        reason = "Convert legacy scene materials to the shared material library before raster preview.";
+                        return false;
+                    }
+                }
+            }
+        return true;
+    }
+#if !USE_PATH_TRACING
+    reason = "Path tracing is disabled in this build.";
+    return false;
+#else
+    if (!GSupportRaytracing || !g_rhi->RaytracingScene)
+    {
+        reason = "Path tracing is unavailable on the current graphics device.";
+        return false;
+    }
+    bool hasGeometry = false;
+    for (const auto* object : jObject::GetStaticRenderObject())
+    {
+        if (!object || !object->IsSupportRaytracing()) continue;
+        const auto& geometry = object->GeometryDataPtr;
+        const auto vertexStream = geometry->VertexBufferPtr ? geometry->VertexBufferPtr->VertexStreamData : nullptr;
+        const auto indexStream = geometry->IndexBufferPtr ? geometry->IndexBufferPtr->IndexStreamData : nullptr;
+        // The existing PT shader reads one packed 56-byte vertex and indexed
+        // triangles. Do not silently remove other geometry from the shared AS.
+        if (geometry->GetPrimitiveType() != EPrimitiveType::TRIANGLES || !object->MaterialPtr
+            || !vertexStream || vertexStream->Params.empty() || !vertexStream->Params[0]
+            || vertexStream->Params[0]->Stride != 56 || !geometry->VertexBufferPtr->GetBuffer(0)
+            || !indexStream || !indexStream->Param || !geometry->IndexBufferPtr->GetBuffer()
+            || (indexStream->Param->GetElementSize() != 2 && indexStream->Param->GetElementSize() != 4)
+            || geometry->IndexBufferPtr->GetElementCount() < 3)
+        {
+            reason = "This scene contains geometry that the path tracer cannot render. Use indexed triangle meshes with compatible materials.";
+            return false;
+        }
+        hasGeometry = true;
+    }
+    if (!hasGeometry)
+    {
+        reason = "Add ray-traceable triangle geometry before selecting Path Tracing.";
+        return false;
+    }
+    return true;
+#endif
+}
+
+bool jGame::RequestSceneRenderPipeline(ESceneRenderPipeline target, std::string& reason)
+{
+    if (!CanSwitchSceneRenderPipeline(target, reason)) return false;
+    if (SceneRenderPipelineSwitchPending || target == GetActiveSceneRenderPipeline()) return true;
+    PendingSceneRenderPipeline = target;
+    SceneRenderPipelineSwitchPending = true;
+    return true;
+}
+
+void jGame::ProcessSceneRenderPipelineSwitch()
+{
+    if (!SceneRenderPipelineSwitchPending) return;
+    const auto target = PendingSceneRenderPipeline;
+    SceneRenderPipelineSwitchPending = false;
+    std::string reason;
+    // Scene replacement, asset completion or a capability change may have
+    // invalidated a request since the UI queued it during the previous Draw.
+    if (!CanSwitchSceneRenderPipeline(target, reason))
+    {
+        jConsole::Get().LogWarning("Renderer switch cancelled: " + reason);
+        return;
+    }
+    if (target == GetActiveSceneRenderPipeline()) return;
+    try
+    {
+        g_rhi->Flush();
+        if (target == ESceneRenderPipeline::PathTracing)
+        {
+            auto* scene = g_rhi->RaytracingScene;
+            if (!scene->IsValid() && !scene->ShouldUpdate())
+                for (auto* object : jObject::GetStaticRenderObject())
+                    if (object && object->IsSupportRaytracing()) scene->MarkAdd(object);
+            SyncRaytracingScene();
+            if (!scene->IsValid() || scene->InstanceList.empty())
+            {
+                jConsole::Get().LogWarning("Renderer switch cancelled: no valid ray tracing acceleration structure; current renderer retained.");
+                return;
+            }
+            // recreateOutput resets the existing PT accumulation counter on
+            // every entry, including re-entry with an unchanged scene/camera.
+            scene->RaytracingOutputPtr.reset();
+            ClearSceneBrowserRasterPreviewLights();
+        }
+        else EnsureSceneBrowserRasterPreviewLights();
+    }
+    catch (const std::exception& error)
+    {
+        jConsole::Get().LogError(std::string("Renderer switch failed; current renderer retained: ") + error.what());
+        return;
+    }
+    PathTracingSceneBrowser.ActiveRenderPipeline = target;
+    gOptions.UseDeferredRenderer = target == ESceneRenderPipeline::Deferred;
+    jConsole::Get().Log(std::string("Renderer switched to ") + GetSceneRenderPipelineNameInternal(target) + ".");
 }
 
 const char* jGame::GetSceneRecommendedLoaderName(int32 InIndex) const
@@ -1098,6 +1253,7 @@ void jGame::ClearSceneBrowserLoadedObjects()
 
 void jGame::ClearSceneBrowserLoadedLights()
 {
+    ClearSceneBrowserRasterPreviewLights();
 	for (jLight* light : SceneBrowserLoadedLights)
 	{
 		if (!light)
@@ -1112,6 +1268,44 @@ void jGame::ClearSceneBrowserLoadedLights()
 		delete light;
 	}
 	SceneBrowserLoadedLights.clear();
+}
+
+void jGame::EnsureSceneBrowserRasterPreviewLights()
+{
+    if (!SceneBrowserRasterPreviewLights.empty() || !gPathTracingScene || !MainCamera) return;
+    std::vector<std::unique_ptr<jLight>> prepared;
+    for (const auto& emitter : gPathTracingScene->lights)
+    {
+        if (emitter.area <= 0.f) continue;
+        const bool sphere = emitter.type == SphereLight;
+        const Vector center = sphere ? emitter.position : emitter.position + (emitter.u + emitter.v) * .5f;
+        const Vector color = emitter.emission * (emitter.area * (sphere ? .25f : 1.f));
+        const float range = std::max(1.f, (center - MainCamera->Target).Length() * 2.f
+            + (MainCamera->Pos - MainCamera->Target).Length());
+        std::unique_ptr<jLight> preview(jLight::CreatePointLight(center, color, range, Vector(1.f), Vector(1.f), 64.f));
+        if (!preview) throw std::runtime_error("Cannot prepare raster preview of an analytic emitter.");
+        preview->IsShadowCaster = false;
+        prepared.push_back(std::move(preview));
+    }
+    // Complete all fallible allocations before publishing any light. These
+    // approximations are not Placement lights and never enter the document.
+    SceneBrowserRasterPreviewLights.reserve(prepared.size());
+    jLight::s_Lights.reserve(jLight::s_Lights.size() + prepared.size());
+    for (auto& light : prepared)
+    {
+        jLight::AddLights(light.get());
+        SceneBrowserRasterPreviewLights.push_back(light.release());
+    }
+}
+
+void jGame::ClearSceneBrowserRasterPreviewLights()
+{
+    for (auto* light : SceneBrowserRasterPreviewLights)
+    {
+        jLight::RemoveLights(light);
+        delete light;
+    }
+    SceneBrowserRasterPreviewLights.clear();
 }
 
 int32 jGame::FindPathTracingSceneIndexById(const std::string& InSceneId) const
@@ -1373,6 +1567,7 @@ void jGame::LoadPathTracingSceneByIndex(int32 InIndex, bool InRebuildRaytracingS
         }
     }
     // Retain the previous scene until a replacement model is fully prepared.
+    SceneRenderPipelineSwitchPending = false;
 #ifdef ENABLE_EDITOR_FEATURES
     if (g_Editor) { jEditorExtensions::Shutdown(*g_Editor); jEditorTools::Shutdown(); g_Editor->ResetWorldBindings(true); }
 #endif
@@ -1423,24 +1618,6 @@ void jGame::LoadPathTracingSceneByIndex(int32 InIndex, bool InRebuildRaytracingS
     {
         PathTracingSceneBrowser.ActiveRenderPipeline = ESceneRenderPipeline::Deferred;
         std::cout << "Path tracing unavailable on this device; using Deferred for " << sceneDesc.SceneId << std::endl;
-        if (gPathTracingScene)
-        {
-            // Deferred does not shade the analytic emitters used by legacy scenes.
-            // Preserve their centers and approximate their radiant power for preview.
-            for (const auto& areaLight : gPathTracingScene->lights)
-            {
-                if (areaLight.area <= 0.f) continue;
-                const bool sphere = areaLight.type == SphereLight;
-                const Vector center = sphere ? areaLight.position : areaLight.position + (areaLight.u + areaLight.v) * .5f;
-                const Vector color = areaLight.emission * (areaLight.area * (sphere ? .25f : 1.f));
-                const float range = std::max(1.f, (center - MainCamera->Target).Length() * 2.f +
-                    (MainCamera->Pos - MainCamera->Target).Length());
-                auto* preview = jLight::CreatePointLight(center, color, range, Vector(1.f), Vector(1.f), 64.f);
-                preview->IsShadowCaster = false;
-                jLight::AddLights(preview);
-                SceneBrowserLoadedLights.push_back(preview);
-            }
-        }
     }
 	PathTracingSceneBrowser.ActiveLoader = resolvedLoader;
     ++gSelectedSceneIndex;
@@ -1465,6 +1642,7 @@ void jGame::LoadPathTracingSceneByIndex(int32 InIndex, bool InRebuildRaytracingS
 #ifdef ENABLE_EDITOR_FEATURES
     if (g_Editor) g_Editor->CaptureWorldToDocument();
 #endif
+    if (!IsUsingPathTracingRenderer()) EnsureSceneBrowserRasterPreviewLights();
 
 	if (InRebuildRaytracingScene && IsRaytracingSceneSupported() && g_rhi && g_rhi->RaytracingScene)
 	{
@@ -1684,6 +1862,7 @@ void jGame::Update(float deltaTime)
 	{
 		light->Update(deltaTime);
 	}
+    ProcessSceneRenderPipelineSwitch();
 }
 
 void jGame::SyncRaytracingScene()
@@ -1708,6 +1887,7 @@ void jGame::SyncRaytracingScene()
 }
 void jGame::ClearImportedSceneForAuthoring()
 {
+    SceneRenderPipelineSwitchPending = false;
     CancelSceneImport();
     if (g_rhi) g_rhi->Flush();
     if (gPathTracingScene) { gPathTracingScene->ClearSceneFor_jEngine(this); delete gPathTracingScene; gPathTracingScene = nullptr; }
@@ -1834,10 +2014,12 @@ void jGame::Resize(int32 width, int32 height)
 
 void jGame::Release()
 {
+    SceneRenderPipelineSwitchPending = false;
     CancelSceneImport();
     if (AssetImports) { AssetImports->Shutdown(); AssetImports.reset(); }
     jModelLoader::GetInstance().Shutdown();
 	g_rhi->Flush();
+    ClearSceneBrowserRasterPreviewLights();
 
 	delete jDirectionalLightDrawCommandGenerator::GlobalFullscreenPrimitive;
 	jDirectionalLightDrawCommandGenerator::GlobalFullscreenPrimitive = nullptr;

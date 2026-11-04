@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "jEditorIntegrationTests.h"
+#include "jViewportToolbarTests.h"
 #ifdef ENABLE_EDITOR_FEATURES
 #include "Code/Engine/jEditor.h"
 #include "Code/Engine/Editor/jEditorWorkspace.h"
@@ -12,6 +13,8 @@
 #include "Scene/Light/jLight.h"
 #include "Material/jMaterial.h"
 #include "RHI/Vulkan/jBufferUtil_Vulkan.h"
+#include "RHI/jRaytracingScene.h"
+#include "External/IMGUI/imgui_internal.h"
 #ifdef _WIN32
 #include "RHI/DX12/jBufferUtil_DX12.h"
 #include "RHI/DX12/jTexture_DX12.h"
@@ -539,6 +542,196 @@ int RunEditorAuthoringGpuTests(const char* outputDirectory)
 #else
     (void)outputDirectory;
     std::cerr << "Editor GPU workflow requires ENABLE_EDITOR_FEATURES" << std::endl;
+    return EXIT_FAILURE;
+#endif
+}
+
+int RunRendererSwitchGpuTests(const char* outputDirectory)
+{
+#ifdef ENABLE_EDITOR_FEATURES
+    using Pipeline = jGame::ESceneRenderPipeline;
+    Json report{{"checks", Json::array()}, {"captures", Json::array()}};
+    fs::path output;
+    int failures = 0;
+    uint32 rendered = 0;
+    const bool oldWorkspace = IsAuthoringWorkspaceVisible();
+    const auto oldKeys = g_KeyState;
+    const auto oldMouse = g_MouseState;
+    const auto expect = [&](bool pass, const char* name) {
+        report["checks"].push_back({{"name", name}, {"pass", pass}, {"frame", rendered}});
+        std::cout << (pass ? "PASS " : "FAIL ") << "renderer switch: " << name << std::endl;
+        failures += !pass;
+    };
+    const auto frame = [&] {
+        if (++rendered > 180) throw std::runtime_error("Renderer switch test exceeded 180 frames");
+        ResetAllKeyState(); ResetMouseAllState();
+        g_timeDeltaSecond = 1.f / 60.f;
+        g_Engine->ProcessInput(g_timeDeltaSecond);
+        g_rhi->IncrementFrameNumber();
+        g_Engine->Update(g_timeDeltaSecond);
+        g_Engine->Draw(); g_Engine->EndOfFrame();
+#ifdef _WIN32
+        if (IsUseDX12())
+        {
+            MSG message{};
+            while (PeekMessage(&message, nullptr, 0, 0, PM_REMOVE))
+            { TranslateMessage(&message); DispatchMessage(&message); }
+        }
+        else
+#endif
+            glfwPollEvents();
+    };
+    const auto frames = [&](uint32 count) { while (count--) frame(); };
+    const auto moveMouse = [&](const ImVec2& point) {
+        if (IsUseVulkan())
+        {
+            auto* window = static_cast<GLFWwindow*>(g_rhi->GetWindow());
+            int x = 0, y = 0;
+            if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) glfwGetWindowPos(window, &x, &y);
+            glfwSetCursorPos(window, point.x - x, point.y - y);
+        }
+        ImGui::GetIO().AddMousePosEvent(point.x, point.y);
+    };
+    const auto click = [&](const ImVec2& point) {
+        moveMouse(point); frame();
+        ImGui::GetIO().AddMouseButtonEvent(0, true); frame();
+        ImGui::GetIO().AddMouseButtonEvent(0, false); frame();
+    };
+    const auto popup = [&]() -> ImGuiWindow* {
+        auto* context = ImGui::GetCurrentContext();
+        if (!context || context->OpenPopupStack.empty()) return nullptr;
+        return context->OpenPopupStack.back().Window;
+    };
+    const auto openCombo = [&] {
+        float x = 0, y = 0, width = 0, height = 0;
+        if (!GetAuthoringRendererControlRect(x, y, width, height))
+            throw std::runtime_error("Viewport renderer control is not visible");
+        click(ImVec2(x + width * .5f, y + height * .5f));
+        // Combo popups use their opening frame to calculate the automatic size.
+        frame();
+        if (!popup()) throw std::runtime_error("Actual renderer combo click did not open its popup");
+    };
+    try
+    {
+        if (!outputDirectory || !*outputDirectory || !g_Engine || !g_Editor || !g_rhi || !ImGui::GetCurrentContext())
+            throw std::runtime_error("Renderer switch test requires initialized engine/UI and an owned output directory");
+        output = fs::absolute(jEditorAssetPath::FromUtf8(outputDirectory)); fs::create_directories(output);
+        auto& game = g_Engine->Game;
+        auto& editor = *g_Editor;
+        SetAuthoringWorkspaceVisible(true); frames(3);
+        std::string reason;
+        expect(!game.RequestSceneRenderPipeline(static_cast<Pipeline>(999), reason) && !reason.empty(),
+            "invalid renderer request is rejected with a reason");
+        expect(game.RequestSceneRenderPipeline(Pipeline::Deferred, reason), "initial Deferred request is accepted");
+        frames(3);
+        if (game.GetActiveSceneRenderPipeline() != Pipeline::Deferred) throw std::runtime_error("Cannot enter initial Deferred renderer");
+        auto* camera = game.MainCamera;
+        if (!camera) throw std::runtime_error("Camera is missing");
+        const auto cameraPosition = camera->Pos, cameraTarget = camera->Target, cameraUp = camera->Up;
+        const float fov = camera->FOVRad;
+        const auto selection = editor.GetSelectedEntities();
+        const auto document = editor.GetDocument().ToJson();
+        const bool dirty = editor.GetDocument().IsDirty();
+        const auto objects = jObject::GetStaticRenderObject();
+        std::vector<jRenderObjectGeometryData*> geometry;
+        std::vector<jMaterial*> materials;
+        for (const auto* object : objects)
+        { geometry.push_back(object->GeometryDataPtr.get()); materials.push_back(object->MaterialPtr.get()); }
+        const bool pathSupported = game.CanSwitchSceneRenderPipeline(Pipeline::PathTracing, reason);
+        report["pathTracingSupported"] = pathSupported;
+        report["pathTracingReason"] = reason;
+        if (!pathSupported)
+            expect(!game.RequestSceneRenderPipeline(Pipeline::PathTracing, reason) && !reason.empty()
+                && game.GetActiveSceneRenderPipeline() == Pipeline::Deferred,
+                "unsupported path tracing keeps the current renderer");
+        const Pipeline targets[] = {Pipeline::PathTracing, Pipeline::Deferred, Pipeline::Forward, Pipeline::PathTracing};
+        uint32 step = 0;
+        for (const auto target : targets)
+        {
+            if (target == Pipeline::PathTracing && !pathSupported) continue;
+            const auto before = game.GetActiveSceneRenderPipeline();
+            if (before == target) continue;
+            const auto previousPathOutput = g_rhi->RaytracingScene
+                ? g_rhi->RaytracingScene->RaytracingOutputPtr : std::shared_ptr<jTexture>{};
+            openCombo();
+            expect(!IsAuthoringViewportHovered() && !IsAuthoringViewportFocused(),
+                "renderer toolbar popup does not own scene camera or picking input");
+            float x = 0, y = 0, width = 0, height = 0;
+            if (!GetAuthoringRendererChoiceRect(static_cast<int>(target), x, y, width, height))
+                throw std::runtime_error("Requested renderer choice is missing from the actual popup");
+            click(ImVec2(x + width * .5f, y + height * .5f));
+            expect(game.GetActiveSceneRenderPipeline() == before && game.IsSceneRenderPipelineSwitchPending(),
+                "actual popup selection queues the switch without changing an in-flight renderer");
+            expect(game.RequestSceneRenderPipeline(target, reason)
+                && !game.RequestSceneRenderPipeline(before, reason) && !reason.empty(),
+                "a queued switch merges duplicate requests and rejects a conflicting request");
+            frame();
+            expect(game.GetActiveSceneRenderPipeline() == target && !game.IsSceneRenderPipelineSwitchPending(),
+                "requested renderer becomes active at the next frame boundary");
+            if (game.GetActiveSceneRenderPipeline() != target)
+                throw std::runtime_error(std::string("Unexpected active renderer: ") + game.GetActiveSceneRenderPipelineName());
+            if (target == Pipeline::PathTracing)
+                expect(g_rhi->RaytracingScene->RaytracingOutputPtr
+                    && g_rhi->RaytracingScene->RaytracingOutputPtr != previousPathOutput,
+                    "path tracing entry recreates accumulation storage, including re-entry");
+            frames(3);
+            bool sameBindings = objects == jObject::GetStaticRenderObject();
+            for (size_t i = 0; sameBindings && i < objects.size(); ++i)
+                sameBindings = objects[i]->GeometryDataPtr.get() == geometry[i] && objects[i]->MaterialPtr.get() == materials[i];
+            expect(sameBindings, "switch preserves the live geometry and material instances without reimporting");
+            expect(camera->Pos.IsNearlyEqual(cameraPosition) && camera->Target.IsNearlyEqual(cameraTarget)
+                && camera->Up.IsNearlyEqual(cameraUp) && std::abs(camera->FOVRad - fov) < .00001f,
+                "switch and toolbar clicks preserve the camera");
+            expect(selection == editor.GetSelectedEntities() && dirty == editor.GetDocument().IsDirty()
+                && document == editor.GetDocument().ToJson(),
+                "switch preserves selection, authored scene and unsaved state");
+            const auto capture = ReadScenePixels(jEditorUiRenderer::AcquireScenePreview(),
+                output / (std::to_string(++step) + "-scene.png"), nullptr, Vector::ZeroVector);
+            report["captures"].push_back({{"renderer", game.GetActiveSceneRenderPipelineName()}, {"pixels", capture}});
+            expect(capture.value("readback", false) && capture.value("pngSaved", false)
+                && capture.value("litPixels", size_t(0)) > 1000 && capture.value("distinctColorsAtMost1024", size_t(0)) > 32,
+                "active renderer produces a nonblack textured scene through the real GPU");
+        }
+        // The normal swapchain capture hook records frame 60, including the
+        // actual open selector. The separate captures above exclude editor UI.
+        if (g_rhi->GetCurrentFrameNumber() < 56)
+            frames(56 - g_rhi->GetCurrentFrameNumber());
+        openCombo();
+        frames(3);
+        expect(popup() != nullptr, "renderer choices remain visible in the viewport capture");
+        ImGui::GetIO().AddKeyEvent(ImGuiKey_Escape, true); frame();
+        ImGui::GetIO().AddKeyEvent(ImGuiKey_Escape, false); frame();
+        const int gizmoFailures = RunViewportToolbarGizmoGpuTests(output, frame);
+        expect(gizmoFailures == 0, "releasing a gizmo over the toolbar preserves Undo, Save and Play availability");
+        if (pathSupported && !objects.empty() && objects.front()->GeometryDataPtr)
+        {
+            game.RequestSceneRenderPipeline(Pipeline::Deferred, reason); frame();
+            g_rhi->Flush();
+            auto& geometryData = *objects.front()->GeometryDataPtr;
+            const auto indexBuffer = geometryData.IndexBufferPtr;
+            geometryData.IndexBufferPtr.reset();
+            const bool rejected = !game.CanSwitchSceneRenderPipeline(Pipeline::PathTracing, reason);
+            geometryData.IndexBufferPtr = indexBuffer;
+            expect(rejected && !reason.empty() && game.GetActiveSceneRenderPipeline() == Pipeline::Deferred,
+                "unsupported non-indexed geometry is rejected before any GPU switch");
+        }
+        editor.ResetWorldBindings(false); game.ClearImportedSceneForAuthoring(); editor.GetDocument().NewScene();
+        expect(!game.CanSwitchSceneRenderPipeline(Pipeline::PathTracing, reason) && !reason.empty()
+            && !game.RequestSceneRenderPipeline(Pipeline::PathTracing, reason)
+            && !game.IsSceneRenderPipelineSwitchPending(),
+            "an empty scene disables path tracing and keeps a raster renderer");
+    }
+    catch (const std::exception& error)
+    { ++failures; report["exception"] = error.what(); std::cerr << "FAIL renderer switch: " << error.what() << std::endl; }
+    if (ImGui::GetCurrentContext()) ImGui::GetIO().AddMouseButtonEvent(0, false);
+    SetAuthoringWorkspaceVisible(oldWorkspace); g_KeyState = oldKeys; g_MouseState = oldMouse;
+    report["renderedFrames"] = rendered; report["failureCount"] = failures;
+    report["status"] = failures ? "failed" : "passed";
+    if (!output.empty()) Write(output / "renderer-switch-gpu-report.json", report.dump(2) + "\n");
+    std::cout << "Renderer switch GPU workflow: " << rendered << " actual frames, " << failures << " failures" << std::endl;
+    return failures ? EXIT_FAILURE : EXIT_SUCCESS;
+#else
+    (void)outputDirectory;
     return EXIT_FAILURE;
 #endif
 }

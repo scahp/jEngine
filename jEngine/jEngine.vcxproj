@@ -436,6 +436,7 @@ xcopy /y /i "$(JEngineDxcDirectory)\dxil.dll" "$(OutDir)"</Command>
     <ClCompile Include="Code\Engine\Editor\jEditorProjectSettings.cpp"></ClCompile>
     <ClCompile Include="Tests\jEditorExtensionTests.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
     <ClCompile Include="Tests\jEditorIntegrationTests.cpp"></ClCompile>
+    <ClCompile Include="Tests\jViewportToolbarTests.cpp"></ClCompile>
     <ClCompile Include="Tests\jEditorProjectSettingsTests.cpp"></ClCompile>
     <ClCompile Include="Tests\jModelImportSettingsTests.cpp"></ClCompile>
     <ClCompile Include="Tests\jModelUploadTests.cpp"></ClCompile>

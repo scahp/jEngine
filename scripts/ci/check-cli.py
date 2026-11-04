@@ -29,7 +29,11 @@ def main():
         if result.returncode != 1 or name not in output or 'jEngine initialized:' in output:
             raise RuntimeError(f'Invalid {name}={value!r} did not fail before initialization: {result.returncode}\n{output}')
         print(f'PASS invalid {name}={value!r} rejected')
-    for arguments in (['--ci-export-shaders'], ['--ci-export-shaders', 'unused', 'invalid-api'], ['-vulkan', '-dx12']):
+    argument_cases = (['--ci-export-shaders'], ['--ci-export-shaders', 'unused', 'invalid-api'], ['-vulkan', '-dx12'],
+                      ['--ci-renderer-switch'], ['--ci-renderer-switch', '--invalid'],
+                      ['--ci-renderer-switch', 'unused', '--ci-editor-gpu'],
+                      ['--ci-renderer-switch', 'unused', '--ci-editor-flow', 'unused'])
+    for arguments in argument_cases:
         result = subprocess.run([str(engine), *arguments], cwd=source, env=base, capture_output=True, text=True, timeout=15)
         if result.returncode != 1 or 'jEngine initialized:' in result.stdout:
             raise RuntimeError(f'Invalid arguments accepted: {arguments}\n{result.stdout}\n{result.stderr}')
@@ -38,7 +42,7 @@ def main():
                             capture_output=True, text=True, timeout=180)
     if result.returncode or 'CPU checks: PASSED' not in result.stdout:
         raise RuntimeError(f'Headless tests incorrectly depend on runtime options\n{result.stdout}\n{result.stderr}')
-    print(f'PASS {len(cases) + 4} process input regressions; no GPU required')
+    print(f'PASS {len(cases) + len(argument_cases) + 1} process input regressions; no GPU required')
 
 
 if __name__ == '__main__':

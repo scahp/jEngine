@@ -32,9 +32,11 @@ using namespace jEditorAuthoring;
 using Json = nlohmann::json;
 enum class Dialog { None, Save, Open, NewProject, OpenProject, Import, SavePrefab, OpenPrefab, Package };
 struct Row { EntityId Id; int Depth; bool Children; std::string Label; };
+struct RendererChoiceRect { ImVec2 Position{}, Size{}; bool Visible = false; };
 struct Workspace
 {
     bool Visible = true, Runtime = false, ViewHovered = false, ViewFocused = false;
+    bool RendererControlVisible = false, ViewToolbarOwnsInput = false;
     bool FixedLayout = true, ShowAssets = true, ShowLogs = true, ShowProfiler = false, ShowTools = false;
     bool PaintTerrainInScene = false;
     bool Docking = true, PlatformWindows = false, DocksInitialized = false;
@@ -44,6 +46,10 @@ struct Workspace
     float LeftWidth = 245, RightWidth = 325, BottomHeight = 205, FontScale = 1;
     float AutoSaveSeconds = 0, WatchSeconds = 0;
     ImVec2 ViewPosition{}, ViewSize{};
+    ImVec2 RendererControlPosition{}, RendererControlSize{};
+    std::array<RendererChoiceRect, 3> RendererChoices{};
+    std::optional<jGame::ESceneRenderPipeline> RendererSwitchTarget;
+    std::string RendererSwitchError;
     uint64_t RowRevision = ~uint64_t(0), AssetRevision = ~uint64_t(0);
     uint64_t RowSignature = ~uint64_t(0);
     ImGuiTextFilter EntityFilter, AssetFilter, LogFilter;
@@ -77,6 +83,108 @@ void Message(const std::string& value, bool error = false)
 {
     State().Status = value;
     jLog::Get().Write(error ? EjLogLevel::Error : EjLogLevel::Info, "Editor", value);
+}
+const char* RendererLabel(jGame::ESceneRenderPipeline renderer)
+{
+    switch (renderer)
+    {
+    case jGame::ESceneRenderPipeline::Deferred: return "Deferred";
+    case jGame::ESceneRenderPipeline::Forward: return "Forward";
+    case jGame::ESceneRenderPipeline::PathTracing: return "Path Tracing";
+    }
+    return "Unknown";
+}
+bool ViewportRendererToolbar()
+{
+    auto& s = State();
+    auto* game = g_Engine ? &g_Engine->Game : nullptr;
+    const auto active = game ? game->GetActiveSceneRenderPipeline() : jGame::ESceneRenderPipeline::Deferred;
+    if (game && s.RendererSwitchTarget && !game->IsSceneRenderPipelineSwitchPending())
+    {
+        const auto target = *s.RendererSwitchTarget; s.RendererSwitchTarget.reset();
+        if (active == target)
+        {
+            s.RendererSwitchError.clear();
+            Message(std::string("Renderer: ") + RendererLabel(active));
+        }
+        else
+        {
+            s.RendererSwitchError = std::string("Renderer switch to ") + RendererLabel(target)
+                + " was not applied. Active: " + RendererLabel(active) + ". See Console for details.";
+            Message(s.RendererSwitchError, true);
+        }
+    }
+    const ImVec2 start = ImGui::GetCursorScreenPos();
+    const float available = std::max(0.0f, ImGui::GetContentRegionAvail().x);
+    const float labelWidth = ImGui::CalcTextSize("Renderer").x + ImGui::GetStyle().ItemSpacing.x;
+    const float comboWidth = ImGui::CalcTextSize("Path Tracing").x + 2 * ImGui::GetStyle().FramePadding.x + ImGui::GetFrameHeight();
+    const bool inlineLabel = available >= labelWidth + comboWidth;
+    ImGui::AlignTextToFramePadding(); ImGui::TextUnformatted("Renderer");
+    if (inlineLabel) ImGui::SameLine();
+    ImGui::SetNextItemWidth(std::max(1.0f, std::min(comboWidth, ImGui::GetContentRegionAvail().x)));
+    ImGui::BeginDisabled(!game || game->IsSceneRenderPipelineSwitchPending());
+    const bool popup = ImGui::BeginCombo("##ViewportRenderer", game ? RendererLabel(active) : "Unavailable");
+    if (popup)
+    {
+        const jGame::ESceneRenderPipeline choices[] = {jGame::ESceneRenderPipeline::Deferred,
+            jGame::ESceneRenderPipeline::Forward, jGame::ESceneRenderPipeline::PathTracing};
+        for (const auto choice : choices)
+        {
+            std::string reason;
+            const bool supported = game && game->CanSwitchSceneRenderPipeline(choice, reason);
+            const bool selected = ImGui::Selectable(RendererLabel(choice), active == choice, supported ? ImGuiSelectableFlags_None : ImGuiSelectableFlags_Disabled);
+            auto& choiceRect = s.RendererChoices[static_cast<size_t>(choice)];
+            choiceRect.Position = ImGui::GetItemRectMin();
+            const auto choiceEnd = ImGui::GetItemRectMax();
+            choiceRect.Size = ImVec2(choiceEnd.x - choiceRect.Position.x, choiceEnd.y - choiceRect.Position.y);
+            choiceRect.Visible = ImGui::IsItemVisible();
+            if (selected)
+            {
+                // Draw only queues the request. The owner update performs the GPU/lifecycle work.
+                if (game->RequestSceneRenderPipeline(choice, reason))
+                {
+                    s.RendererSwitchError.clear();
+                    if (game->IsSceneRenderPipelineSwitchPending())
+                    {
+                        s.RendererSwitchTarget = choice;
+                        Message(std::string("Renderer switch queued: ") + RendererLabel(choice));
+                    }
+                    else Message(std::string("Renderer: ") + RendererLabel(active));
+                }
+                else { s.RendererSwitchError = reason; Message(reason, true); }
+            }
+            if (active == choice) ImGui::SetItemDefaultFocus();
+            if (!supported && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            {
+                ImGui::BeginTooltip(); ImGui::PushTextWrapPos(ImGui::GetFontSize() * 28);
+                ImGui::TextUnformatted(reason.empty() ? "Renderer unavailable" : reason.c_str());
+                ImGui::PopTextWrapPos(); ImGui::EndTooltip();
+            }
+        }
+        ImGui::EndCombo();
+    }
+    // EndCombo restores the parent combo's item data; inside its popup these
+    // getters would describe a popup item rather than the control in Scene.
+    s.RendererControlPosition = ImGui::GetItemRectMin();
+    const auto controlEnd = ImGui::GetItemRectMax();
+    s.RendererControlSize = ImVec2(controlEnd.x - s.RendererControlPosition.x, controlEnd.y - s.RendererControlPosition.y);
+    s.RendererControlVisible = ImGui::IsItemVisible();
+    const bool comboActive = ImGui::IsItemActive();
+    const bool comboHovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled);
+    ImGui::EndDisabled();
+    if (game && game->IsSceneRenderPipelineSwitchPending())
+    {
+        const char* pending = "Switch pending";
+        if (start.x + available - controlEnd.x >= ImGui::CalcTextSize(pending).x + ImGui::GetStyle().ItemSpacing.x) ImGui::SameLine();
+        ImGui::TextDisabled("%s", pending);
+        if (comboHovered) ImGui::SetTooltip("The active renderer is shown until the owner update applies this request.");
+    }
+    else if (!s.RendererSwitchError.empty()) ImGui::TextWrapped("%s", s.RendererSwitchError.c_str());
+    ImGui::Separator();
+    const ImVec2 end(start.x + available, ImGui::GetCursorScreenPos().y);
+    const bool toolbarHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) && ImGui::IsMouseHoveringRect(start, end);
+    if (popup || comboActive || (toolbarHovered && (ImGui::IsMouseClicked(0) || ImGui::IsMouseClicked(1)))) s.ViewToolbarOwnsInput = true;
+    return toolbarHovered || popup || comboActive || ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup);
 }
 void ShowDialog(Dialog dialog, const fs::path& path = {})
 {
@@ -635,6 +743,30 @@ void SetAuthoringExecutablePath(const std::filesystem::path& path)
 }
 bool IsAuthoringViewportHovered() { return State().ViewHovered; }
 bool IsAuthoringViewportFocused() { return State().ViewFocused; }
+bool GetAuthoringViewportRect(float& x, float& y, float& width, float& height)
+{
+    const auto& s = State();
+    if (!IsAuthoringWorkspaceVisible() || s.ViewSize.x <= 0 || s.ViewSize.y <= 0) return false;
+    x = s.ViewPosition.x; y = s.ViewPosition.y; width = s.ViewSize.x; height = s.ViewSize.y;
+    return true;
+}
+bool GetAuthoringRendererControlRect(float& x, float& y, float& width, float& height)
+{
+    const auto& s = State();
+    if (!IsAuthoringWorkspaceVisible() || !s.RendererControlVisible) return false;
+    x = s.RendererControlPosition.x; y = s.RendererControlPosition.y;
+    width = s.RendererControlSize.x; height = s.RendererControlSize.y;
+    return width > 0 && height > 0;
+}
+bool GetAuthoringRendererChoiceRect(int renderer, float& x, float& y, float& width, float& height)
+{
+    const auto& s = State();
+    if (!IsAuthoringWorkspaceVisible() || renderer < 0 || static_cast<size_t>(renderer) >= s.RendererChoices.size()) return false;
+    const auto& choice = s.RendererChoices[static_cast<size_t>(renderer)];
+    if (!choice.Visible) return false;
+    x = choice.Position.x; y = choice.Position.y; width = choice.Size.x; height = choice.Size.y;
+    return width > 0 && height > 0;
+}
 bool MapAuthoringViewportPoint(double& x, double& y)
 {
     auto& s = State();
@@ -721,6 +853,8 @@ void TickAuthoringWorkspace(jEditor& editor, float dt)
 void RenderAuthoringWorkspace(jEditor& editor)
 {
     auto& s = State(); auto& document = editor.GetDocument();
+    s.ViewHovered = s.ViewFocused = s.RendererControlVisible = false; s.ViewSize = {};
+    for (auto& choice : s.RendererChoices) choice.Visible = false;
     editor.SetViewportInputState(false, false); editor.SetShortcutInputState(false);
     if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) jEditorTools::FinishTerrainStroke(editor);
     if (s.OwnPropertyTransaction && (s.PropertyOwner != editor.GetSelectedEntityId() || !ImGui::IsAnyItemActive())) FinishInspectorEdit(editor);
@@ -833,48 +967,62 @@ void RenderAuthoringWorkspace(jEditor& editor)
     const float viewWidth = std::max(64.0f, vp->Size.x - left - right);
     if (panel(document.IsPlaying() ? "Game" : "Scene", left, top, viewWidth, vp->Size.y - top - bottom))
     {
+        const bool toolbarBlocksInput = ViewportRendererToolbar();
+        if ((toolbarBlocksInput || s.ViewToolbarOwnsInput) && !ImGui::IsMouseDown(ImGuiMouseButton_Left))
+        {
+            // A release over the toolbar must finish the previous scene drag,
+            // even while the toolbar blocks further gizmo manipulation.
+            ImGuizmo::Enable(false);
+            editor.RenderViewportGizmo(nullptr);
+            ImGuizmo::Enable(true);
+        }
         auto position = ImGui::GetCursorScreenPos(); auto size = ImGui::GetContentRegionAvail();
-        const float aspect = static_cast<float>(SCR_WIDTH) / std::max(1, SCR_HEIGHT);
-        if (size.x / std::max(1.0f, size.y) > aspect) { const float width = size.y * aspect; position.x += (size.x - width) * .5f; size.x = width; }
-        else { const float height = size.x / aspect; position.y += (size.y - height) * .5f; size.y = height; }
-        size.x = std::max(1.0f, size.x); size.y = std::max(1.0f, size.y);
-        ImGui::SetCursorScreenPos(position); s.ViewPosition = position; s.ViewSize = size;
-        if (void* texture = jEditorUiRenderer::ScenePreviewTexture()) ImGui::Image(texture, size);
-        else ImGui::InvisibleButton("Scene surface", size);
-        s.ViewHovered = ImGui::IsItemHovered(); s.ViewFocused = ImGui::IsWindowFocused();
-        editor.SetViewportInputState(s.ViewHovered, s.ViewFocused);
-        if (s.ViewFocused) editor.SetShortcutInputState(true);
-        if (ImGui::BeginDragDropTarget())
+        if (size.x > 0 && size.y > 0)
         {
-            if (const auto* payload = ImGui::AcceptDragDropPayload("JENGINE_ASSET"))
-                if (s.Registry && payload->DataSize > 0)
-                    if (const auto* asset = s.Registry->FindById(static_cast<const char*>(payload->Data))) ActivateAsset(editor, *asset);
-            ImGui::EndDragDropTarget();
-        }
-        auto* sceneDraw = ImGui::GetWindowDrawList();
-        sceneDraw->PushClipRect(position, ImVec2(position.x + size.x, position.y + size.y), true);
-        auto* camera = Camera();
-        const bool terrainBrush = s.ShowTools && s.PaintTerrainInScene && camera &&
-            jEditorTools::RenderTerrainBrush(editor, *camera, position, size, s.ViewHovered);
-        if (!terrainBrush) editor.RenderViewportGizmo(camera, position.x, position.y, size.x, size.y);
-        sceneDraw->PopClipRect();
-        if (s.ViewHovered && (terrainBrush || (!ImGuizmo::IsUsing() && !ImGuizmo::IsOver())))
-        {
-            if (!terrainBrush && ImGui::IsMouseClicked(0) && !io.KeyAlt)
+            const float aspect = static_cast<float>(std::max(1, SCR_WIDTH)) / std::max(1, SCR_HEIGHT);
+            if (size.x > size.y * aspect) { const float width = size.y * aspect; position.x += (size.x - width) * .5f; size.x = width; }
+            else { const float height = size.x / aspect; position.y += (size.y - height) * .5f; size.y = height; }
+            ImGui::SetCursorScreenPos(position); s.ViewPosition = position; s.ViewSize = size;
+            if (void* texture = jEditorUiRenderer::ScenePreviewTexture()) ImGui::Image(texture, size);
+            else ImGui::InvisibleButton("Scene surface", size);
+            const bool imageHovered = ImGui::IsItemHovered();
+            if (imageHovered && (ImGui::IsMouseClicked(0) || ImGui::IsMouseClicked(1))) s.ViewToolbarOwnsInput = false;
+            s.ViewHovered = imageHovered && !toolbarBlocksInput && !s.ViewToolbarOwnsInput;
+            s.ViewFocused = ImGui::IsWindowFocused() && !toolbarBlocksInput && !s.ViewToolbarOwnsInput;
+            editor.SetViewportInputState(s.ViewHovered, s.ViewFocused);
+            if (s.ViewFocused) editor.SetShortcutInputState(true);
+            if (ImGui::BeginDragDropTarget())
             {
-                double x = io.MousePos.x, y = io.MousePos.y;
-                if (MapAuthoringViewportPoint(x, y)) { editor.Placement.bPickRequested = true; editor.Placement.PickMouseX = int32(x); editor.Placement.PickMouseY = int32(y); }
+                if (const auto* payload = ImGui::AcceptDragDropPayload("JENGINE_ASSET"))
+                    if (s.Registry && payload->DataSize > 0)
+                        if (const auto* asset = s.Registry->FindById(static_cast<const char*>(payload->Data))) ActivateAsset(editor, *asset);
+                ImGui::EndDragDropTarget();
             }
-            if ((io.MouseDown[1] || (io.KeyAlt && io.MouseDown[0])) && (io.MouseDelta.x || io.MouseDelta.y)) editor.HandleCameraMouseMove(int32(io.MouseDelta.x), int32(io.MouseDelta.y), Camera());
-        }
-        if (!s.Status.empty() && size.y > ImGui::GetTextLineHeight() + 16)
-        {
-            const ImVec2 status(position.x + 6, position.y + size.y - ImGui::GetTextLineHeight() - 8);
+            auto* sceneDraw = ImGui::GetWindowDrawList();
             sceneDraw->PushClipRect(position, ImVec2(position.x + size.x, position.y + size.y), true);
-            sceneDraw->AddRectFilled(ImVec2(status.x - 4, status.y - 3),
-                ImVec2(std::min(position.x + size.x, status.x + ImGui::CalcTextSize(s.Status.c_str()).x + 4), position.y + size.y - 2), IM_COL32(16,16,16,220));
-            sceneDraw->AddText(status, IM_COL32_WHITE, s.Status.c_str());
+            auto* camera = Camera();
+            const bool terrainBrush = s.ShowTools && s.PaintTerrainInScene && camera &&
+                jEditorTools::RenderTerrainBrush(editor, *camera, position, size, s.ViewHovered);
+            if (!terrainBrush && !toolbarBlocksInput && !s.ViewToolbarOwnsInput) editor.RenderViewportGizmo(camera, position.x, position.y, size.x, size.y);
             sceneDraw->PopClipRect();
+            if (s.ViewHovered && (terrainBrush || (!ImGuizmo::IsUsing() && !ImGuizmo::IsOver())))
+            {
+                if (!terrainBrush && ImGui::IsMouseClicked(0) && !io.KeyAlt)
+                {
+                    double x = io.MousePos.x, y = io.MousePos.y;
+                    if (MapAuthoringViewportPoint(x, y)) { editor.Placement.bPickRequested = true; editor.Placement.PickMouseX = int32(x); editor.Placement.PickMouseY = int32(y); }
+                }
+                if ((io.MouseDown[1] || (io.KeyAlt && io.MouseDown[0])) && (io.MouseDelta.x || io.MouseDelta.y)) editor.HandleCameraMouseMove(int32(io.MouseDelta.x), int32(io.MouseDelta.y), Camera());
+            }
+            if (!s.Status.empty() && size.x > 12 && size.y > ImGui::GetTextLineHeight() + 16)
+            {
+                const ImVec2 status(position.x + 6, position.y + size.y - ImGui::GetTextLineHeight() - 8);
+                sceneDraw->PushClipRect(position, ImVec2(position.x + size.x, position.y + size.y), true);
+                sceneDraw->AddRectFilled(ImVec2(status.x - 4, status.y - 3),
+                    ImVec2(std::min(position.x + size.x, status.x + ImGui::CalcTextSize(s.Status.c_str()).x + 4), position.y + size.y - 2), IM_COL32(16,16,16,220));
+                sceneDraw->AddText(status, IM_COL32_WHITE, s.Status.c_str());
+                sceneDraw->PopClipRect();
+            }
         }
     }
     ImGui::End();

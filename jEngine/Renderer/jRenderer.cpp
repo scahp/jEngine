@@ -7,6 +7,11 @@
 #include "RHI/jRenderFrameContext.h"
 #include "RHI/jRenderTargetPool.h"
 #include "RHI/jResourceBarrierBatcher.h"
+#include "RHI/Vulkan/jTexture_Vulkan.h"
+#ifdef _WIN32
+#include "RHI/DX12/jCommandBuffer_DX12.h"
+#include "RHI/DX12/jTexture_DX12.h"
+#endif
 #ifdef ENABLE_EDITOR_FEATURES
 #include "Code/Engine/Editor/jEditorProcedural.h"
 #endif
@@ -73,6 +78,50 @@ END_SHADER_PARAMETER_SET()
 
 namespace
 {
+void FlushPreparedPassTransitions(const std::shared_ptr<jRenderFrameContext>& frame);
+
+jTexture* AllocateForwardNeutralShadow(ETextureType type, float depthValue)
+{
+    // Pool/ring resources remain alive after this renderer has recorded its draws.
+    const auto target = jRenderTargetPool::GetRenderTargetForOneFrame({
+        .Type = type, .Format = ETextureFormat::D16, .Width = 1, .Height = 1,
+        .LayerCount = type == ETextureType::TEXTURE_CUBE ? 6 : 1,
+        .SampleCount = EMSAASamples::COUNT_1, .RTClearValue = jRTClearValue(depthValue, 0),
+        .TextureCreateFlag = ETextureCreateFlag::DSV | ETextureCreateFlag::TransferDst,
+        .ResourceName = jNameStatic("ForwardNeutralShadow")});
+    return target->GetTexture();
+}
+
+void ClearForwardNeutralShadow(const std::shared_ptr<jRenderFrameContext>& frame,
+    jTexture* texture, float depthValue)
+{
+    // Only the owner records commands after asynchronous setup has completed.
+    // Clear all cube faces directly; a cube sampling view is not a framebuffer view.
+    auto* command = frame->GetActiveCommandBuffer();
+    if (IsUseVulkan())
+    {
+        g_rhi->TransitionLayout(command, texture, EResourceLayout::TRANSFER_DST);
+        FlushPreparedPassTransitions(frame);
+        const VkClearDepthStencilValue clear{depthValue, 0};
+        const VkImageSubresourceRange range{VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0,
+            texture->Type == ETextureType::TEXTURE_CUBE ? 6u : 1u};
+        vkCmdClearDepthStencilImage((VkCommandBuffer)command->GetHandle(),
+            static_cast<jTexture_Vulkan*>(texture)->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            &clear, 1, &range);
+    }
+#ifdef _WIN32
+    else
+    {
+        g_rhi->TransitionLayout(command, texture, EResourceLayout::DEPTH_STENCIL_ATTACHMENT);
+        FlushPreparedPassTransitions(frame);
+        static_cast<jCommandBuffer_DX12*>(command)->Get()->ClearDepthStencilView(
+            static_cast<jTexture_DX12*>(texture)->DSV.CPUHandle, D3D12_CLEAR_FLAG_DEPTH,
+            depthValue, 0, 0, nullptr);
+    }
+#endif
+    g_rhi->TransitionLayout(command, texture, EResourceLayout::SHADER_READ_ONLY);
+}
+
 template <typename TShaderParameters>
 void DispatchShaderParameterComputePass(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr
     , jName InShaderName, jName InShaderFilePath, const TShaderParameters& InParameters
@@ -567,12 +616,17 @@ void jRenderer::SetupBasePass()
 
     if (RenderFrameContextPtr->UseForwardRenderer || gOptions.UseSubpass)
     {
+        // BasePass explicitly transitions the forward color target before begin;
+        // setup can still see the previous frame's sampled layout here.
+        const auto initialColorLayout = RenderFrameContextPtr->UseForwardRenderer
+            ? EResourceLayout::COLOR_ATTACHMENT
+            : RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetLayout();
         jAttachment color = {
             .RenderTargetPtr = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr,
             .LoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE,
             .StencilLoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_DONTCARE,
             .RTClearValue = ClearColor,
-            .InitialLayout = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetLayout(),
+            .InitialLayout = initialColorLayout,
             .FinalLayout = EResourceLayout::COLOR_ATTACHMENT
         };
         renderPassInfo.Attachments.push_back(color);
@@ -718,6 +772,124 @@ void jRenderer::SetupBasePass()
 
     jPushConstant* SimplePushConstant = new(jMemStack::Get()->Alloc<jPushConstant>()) jPushConstant(SimplePushConstantData, EShaderAccessStageFlag::FRAGMENT);
 
+    jShaderBindingInstanceGroup forwardBindings;
+    ForwardLightUniformBuffers.clear();
+    ForwardLightBindings.clear();
+    ForwardNeutralShadowClears.clear();
+    if (RenderFrameContextPtr->UseForwardRenderer)
+    {
+        // Forward declares exactly one directional, point and spot set in this
+        // order. Analytic PT lights and extra instances cannot shift those sets.
+        const jViewLight* directional = nullptr;
+        const jViewLight* point = nullptr;
+        const jViewLight* spot = nullptr;
+        for (const auto& light : View.Lights)
+        {
+            if (!light.Light) continue;
+            switch (light.Light->Type)
+            {
+            case ELightType::DIRECTIONAL: if (!directional) directional = &light; break;
+            case ELightType::POINT: if (!point) point = &light; break;
+            case ELightType::SPOT: if (!spot) spot = &light; break;
+            default: break;
+            }
+        }
+
+        const auto uniform = [&](jName name, const auto& data)
+        {
+            auto buffer = g_rhi->CreateUniformBufferBlock(name, jLifeTimeType::OneFrame, sizeof(data));
+            buffer->UpdateBufferData(&data, sizeof(data));
+            ForwardLightUniformBuffers.push_back(buffer);
+            return buffer;
+        };
+        const auto shadow = [](const jViewLight* light) -> jTexture*
+        {
+            return light && light->ShadowMapPtr ? light->ShadowMapPtr->GetTexture() : nullptr;
+        };
+        const auto* sampler = TSamplerStateInfo<ETextureFilter::LINEAR, ETextureFilter::LINEAR,
+            ETextureAddressMode::CLAMP_TO_BORDER, ETextureAddressMode::CLAMP_TO_BORDER,
+            ETextureAddressMode::CLAMP_TO_BORDER, 0.0f, 1.0f, Vector4(1.0f), true, ECompareOp::LESS>::Create();
+        const auto neutralProjection = Matrix::MakeTranslate(Vector(0.f, 0.f, .5f))
+            * Matrix::MakeScale(Vector::ZeroVector);
+        const auto neutralShadow = [&](ETextureType type, float depthValue)
+        {
+            auto* texture = AllocateForwardNeutralShadow(type, depthValue);
+            ForwardNeutralShadowClears.emplace_back(texture, depthValue);
+            return texture;
+        };
+        jTexture* neutral2D = nullptr;
+        const auto neutralWhite2D = [&]() -> jTexture*
+        {
+            if (!neutral2D) neutral2D = neutralShadow(ETextureType::TEXTURE_2D, 1.f);
+            return neutral2D;
+        };
+
+        jDirectionalLightUniformBufferData directionalData{};
+        directionalData.Direction = Vector(0.f, -1.f, 0.f);
+        directionalData.Color = directionalData.DiffuseIntensity = directionalData.SpecularIntensity = Vector::ZeroVector;
+        directionalData.ShadowVP = neutralProjection;
+        if (directional) directionalData = static_cast<jDirectionalLight*>(directional->Light)->GetLightData();
+        jDirectionalLightShaderParameters directionalParameters;
+        directionalParameters.DirectionalLight.Buffer = uniform(jNameStatic("ForwardDirectional"), directionalData);
+        directionalParameters.DirectionalLightShadowMap = {shadow(directional) ? shadow(directional) : neutralWhite2D(), sampler};
+        ForwardLightBindings.push_back(jShaderParameterSet::CreateShaderBindingInstance(directionalParameters,
+            EShaderAccessStageFlag::ALL_GRAPHICS, jShaderBindingInstanceType::SingleFrame));
+
+        jPointLightUniformBufferData pointData{};
+        pointData.Position = Vector(1e10f);
+        pointData.Color = pointData.DiffuseIntensity = pointData.SpecularIntensity = Vector::ZeroVector;
+        pointData.MaxDistance = 1.f;
+        if (point) pointData = static_cast<jPointLight*>(point->Light)->GetLightData();
+        jPointLightShaderParameters pointParameters;
+        pointParameters.PointLight.Buffer = uniform(jNameStatic("ForwardPoint"), pointData);
+        pointParameters.PointLightShadowCubeMap = {shadow(point) ? shadow(point)
+            : neutralShadow(ETextureType::TEXTURE_CUBE, 1.f), sampler};
+        ForwardLightBindings.push_back(jShaderParameterSet::CreateShaderBindingInstance(pointParameters,
+            EShaderAccessStageFlag::ALL_GRAPHICS, jShaderBindingInstanceType::SingleFrame));
+
+        jSpotLightUniformBufferData spotData{};
+        spotData.Position = Vector(1e10f);
+        spotData.Direction = Vector(0.f, -1.f, 0.f);
+        spotData.Color = spotData.DiffuseIntensity = spotData.SpecularIntensity = Vector::ZeroVector;
+        spotData.MaxDistance = 1.f;
+        spotData.PenumbraRadian = .3f;
+        spotData.UmbraRadian = .6f;
+        if (spot) spotData = static_cast<jSpotLight*>(spot->Light)->GetLightData();
+        jTexture* spotShadow = shadow(spot);
+        if (!spotShadow)
+        {
+            spotData.ShadowVP = neutralProjection;
+            spotShadow = USE_REVERSEZ_PERSPECTIVE_SHADOW
+                ? neutralShadow(ETextureType::TEXTURE_2D, 0.f)
+                : neutralWhite2D();
+        }
+        jSpotLightShaderParameters spotParameters;
+        spotParameters.SpotLight.Buffer = uniform(jNameStatic("ForwardSpot"), spotData);
+        spotParameters.SpotLightShadowMap = {spotShadow, sampler};
+        ForwardLightBindings.push_back(jShaderParameterSet::CreateShaderBindingInstance(spotParameters,
+            EShaderAccessStageFlag::ALL_GRAPHICS, jShaderBindingInstanceType::SingleFrame));
+
+        forwardBindings.Add(View.ViewUniformBufferShaderBindingInstance);
+        forwardBindings.Add(ForwardLightBindings);
+    }
+
+    const auto prepareBaseDraw = [&](jDrawCommand& draw, jRenderObject* object, jMaterial* material)
+    {
+        jShaderBindingInstanceGroup bindings;
+        auto mode = EDrawCommandBindingMode::Standard;
+        if (RenderFrameContextPtr->UseForwardRenderer)
+        {
+            bindings = forwardBindings;
+            bindings.Add(object->CreateShaderBindingInstance());
+            if (material) bindings.Add(material->CreateShaderBindingInstance());
+            mode = EDrawCommandBindingMode::Manual;
+        }
+        new (&draw) jDrawCommand(RenderFrameContextPtr, &View, object, BaseRenderPass,
+            GetOrCreateShaderFunc(object, material), baseState(material), material, bindings,
+            SimplePushConstant, nullptr, 0, mode);
+        draw.PrepareToDraw(false);
+    };
+
 #if PARALLELFOR_WITH_PASSSETUP
     BasePasses.resize(jObject::GetStaticRenderObject().size());
     jParallelFor::ParallelForWithTaskPerThread(MaxPassSetupTaskPerThreadCount, jObject::GetStaticRenderObject()
@@ -736,9 +908,7 @@ void jRenderer::SetupBasePass()
                 }
             }
 
-            new (&BasePasses[InIndex]) jDrawCommand(RenderFrameContextPtr, &View, InRenderObject, BaseRenderPass
-                , GetOrCreateShaderFunc(InRenderObject, Material), baseState(Material), Material, jShaderBindingInstanceArray(), SimplePushConstant);
-            BasePasses[InIndex].PrepareToDraw(false);
+            prepareBaseDraw(BasePasses[InIndex], InRenderObject, Material);
         });
 #else
     BasePasses.resize(jObject::GetStaticRenderObject().size());
@@ -760,9 +930,7 @@ void jRenderer::SetupBasePass()
 
         //Material = GDefaultMaterial.get();
 
-        new (&BasePasses[i]) jDrawCommand(RenderFrameContextPtr, &View, iter, BaseRenderPass
-            , GetOrCreateShaderFunc(iter, Material), baseState(Material), Material, jShaderBindingInstanceArray(), SimplePushConstant);
-        BasePasses[i].PrepareToDraw(false);
+        prepareBaseDraw(BasePasses[i], iter, Material);
         ++i;
     }
 #endif
@@ -920,6 +1088,10 @@ void jRenderer::BasePass()
 {
     if (BasePassSetupCompleteEvent.valid())
         BasePassSetupCompleteEvent.wait();
+
+    for (const auto& [texture, depthValue] : ForwardNeutralShadowClears)
+        ClearForwardNeutralShadow(RenderFrameContextPtr, texture, depthValue);
+    ForwardNeutralShadowClears.clear();
 
     const bool UseHWRTDirectLighting = IsUseHWRTDirectLighting();
 

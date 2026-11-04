@@ -111,7 +111,7 @@ void jRenderer::HitObjectPass()
 				.IsGenerateMipmap = false,
 				.SampleCount = EMSAASamples::COUNT_1,
 				.RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 0.0f),
-				.TextureCreateFlag = ETextureCreateFlag::RTV,
+				.TextureCreateFlag = ETextureCreateFlag::RTV | ETextureCreateFlag::TransferSrc,
 				.ResourceName = jNameStatic("HitObject_RT")
 			};
 			jSceneRenderTarget::HitObject_RT = g_rhi->CreateRenderTarget(HitObjectRTInfo);
@@ -228,7 +228,9 @@ void jRenderer::ReadbackHitObject()
 	RenderFrameContextPtr->GetActiveCommandBuffer()->FlushBarrierBatch();
 
 	// DX12 texture-to-buffer copies require a 256-byte aligned row pitch even for a 1x1 RGBA8 region.
-	static std::shared_ptr<jBuffer> ReadbackBuffer;
+	// This copy is completed below before mapping. Keep the lease local so a
+	// static destructor cannot release Vulkan memory after device shutdown.
+	std::shared_ptr<jBuffer> ReadbackBuffer;
 
 	if (!ReadbackBuffer || ReadbackBuffer->GetBufferSize() < HitObjectReadbackBufferSize)
 	{
