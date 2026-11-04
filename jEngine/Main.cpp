@@ -71,6 +71,31 @@ namespace
         result = parsed != 0;
         return true;
     }
+
+#ifdef _WIN32
+    bool RestartForSceneBrowser(const std::vector<std::string>& scene, const std::filesystem::path& project)
+    {
+        std::wstring executable(32768, L'\0');
+        const auto length = GetModuleFileNameW(nullptr, executable.data(), static_cast<DWORD>(executable.size()));
+        if (!length || length >= executable.size()) return false;
+        executable.resize(length);
+
+        // Scene IDs and project paths come from Windows filenames, which cannot
+        // contain quotes or end in a path separator.
+        std::wstring command = L"\"" + executable + L"\" -dx12 --scene-browser \"" +
+            jEditorAssetPath::FromUtf8(scene[0]).native() + L"\" " + jEditorAssetPath::FromUtf8(scene[1]).native();
+        if (!project.empty()) command += L" --project \"" + project.native() + L"\"";
+
+        STARTUPINFOW startup{};
+        startup.cb = sizeof(startup);
+        PROCESS_INFORMATION process{};
+        if (!CreateProcessW(executable.c_str(), command.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &startup, &process))
+            return false;
+        CloseHandle(process.hThread);
+        CloseHandle(process.hProcess);
+        return true;
+    }
+#endif
 }
 
 int RunCpuSelfTests();
@@ -152,6 +177,15 @@ int main(int argc, char** argv)
     if (!editorFlowDirectory.empty()) SetAuthoringTestStateDirectory(jEditorAssetPath::FromUtf8(editorFlowDirectory) / "workspace-state");
     std::string authoringError;
     if (!ConfigureEditorStartup(argc, argv, authoringError)) { std::cerr << authoringError << std::endl; return EXIT_FAILURE; }
+    std::string browserScene, browserLoader;
+    for (int i = 1; i < argc; ++i)
+    {
+        if (std::strcmp(argv[i], "--scene-browser") != 0) continue;
+        if (!browserScene.empty() || i + 2 >= argc || !argv[i + 1][0] || IsAuthoringRuntimeMode())
+        { std::cerr << "Usage: --scene-browser <scene-id> <loader> [-dx12|-vulkan]" << std::endl; return EXIT_FAILURE; }
+        browserScene = argv[++i];
+        browserLoader = argv[++i];
+    }
     uint32 frameLimit = 0;
     const auto frameLimitText = ReadEngineEnvironment("JENGINE_MAX_FRAMES");
     if (!frameLimitText.empty() && !jCommandLineArgument::TryParseUInt32(frameLimitText, frameLimit))
@@ -227,6 +261,8 @@ int main(int argc, char** argv)
 	GMainThreadID = std::this_thread::get_id();
 
 	g_Engine = new jEngine();
+    if (!browserScene.empty() && !g_Engine->Game.ConfigureSceneBrowserStartup(browserScene, browserLoader, authoringError))
+    { std::cerr << authoringError << std::endl; return EXIT_FAILURE; }
 	g_Engine->PreInit();
 
 	if (!g_rhi->InitRHI())
@@ -271,6 +307,12 @@ int main(int argc, char** argv)
         g_Engine->Release(); g_rhi->ReleaseRHI(); glfwTerminate(); return EXIT_FAILURE;
     }
 #endif
+    if (!browserScene.empty() && HasEditorStartupScene() &&
+        !g_Engine->Game.ConfigureSceneBrowserStartup(browserScene, browserLoader, authoringError))
+    {
+        std::cerr << authoringError << std::endl;
+        g_Engine->Release(); g_rhi->ReleaseRHI(); glfwTerminate(); return EXIT_FAILURE;
+    }
     if (waitForTestScene && !g_Engine->Game.WaitForSceneImportForTesting())
     {
         jLog::Get().Write(EjLogLevel::Error, "Assets", "GPU test scene import did not complete successfully");
@@ -329,7 +371,7 @@ int main(int argc, char** argv)
             ++renderedFrames;
             if (renderedFrames == 1 || renderedFrames % 120 == 0)
                 std::cout << "Rendered frames: " << renderedFrames << std::endl;
-            if (frameLimit && renderedFrames >= frameLimit)
+            if (g_Engine->Game.IsSceneBrowserRestartRequested() || (frameLimit && renderedFrames >= frameLimit))
                 break;
 
 			while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
@@ -389,6 +431,10 @@ int main(int argc, char** argv)
 		}
 	}
 
+#ifdef _WIN32
+    const auto restartScene = g_Engine->Game.GetSceneBrowserRestartArguments();
+    const auto restartProject = restartScene.empty() ? std::filesystem::path{} : GetAuthoringProjectFile();
+#endif
 	g_Engine->Release();
 
 	g_rhi->ReleaseRHI();
@@ -403,6 +449,13 @@ int main(int argc, char** argv)
         std::cerr << "Log shutdown failed: " << jLog::Get().GetLastError() << std::endl;
         return EXIT_FAILURE;
     }
+#ifdef _WIN32
+    if (!restartScene.empty() && !RestartForSceneBrowser(restartScene, restartProject))
+    {
+        std::cerr << "Could not restart jEngine for Scene Browser (Windows error " << GetLastError() << ")" << std::endl;
+        return EXIT_FAILURE;
+    }
+#endif
 	return 0;
 }
 

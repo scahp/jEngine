@@ -193,7 +193,7 @@ public:
         Exclusive,
     };
 
-	jRHI_DX12();
+	explicit jRHI_DX12(bool preferPathTracingDevice = false);
 	virtual ~jRHI_DX12();
 
 	//////////////////////////////////////////////////////////////////////////
@@ -240,6 +240,8 @@ public:
 	}
 
 	virtual bool InitRHI() override;
+    bool WasPathTracingDeviceRequested() const { return PreferPathTracingDevice; }
+    bool IsUsingWarp() const { return UsingWarp; }
 	virtual void ReleaseRHI() override;
     
     uint32 AdapterID = -1;
@@ -542,6 +544,10 @@ public:
 
 	jResourceBarrierBatcher_DX12* BarrierBatcher = nullptr;
 	virtual jResourceBarrierBatcher* GetGlobalBarrierBatcher() const override { return BarrierBatcher; }
+
+private:
+    const bool PreferPathTracingDevice;
+    bool UsingWarp = false;
 };
 
 extern jRHI_DX12* g_rhi_dx12;

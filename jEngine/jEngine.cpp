@@ -49,7 +49,7 @@ void jEngine::PreInit()
     else if (IsUseDX12())
     {
 #ifdef _WIN32
-        g_rhi = new jRHI_DX12();
+        g_rhi = new jRHI_DX12(Game.StartupSceneUsesPathTracing());
 #else
         throw std::runtime_error("DX12 is available only on Windows; use -vulkan");
 #endif

@@ -622,6 +622,11 @@ void RequestAuthoringSceneReplacement(std::function<void()> action)
     GuardUnsaved(*g_Editor, std::move(action));
 }
 bool IsAuthoringRuntimeMode() { return State().Runtime; }
+std::filesystem::path GetAuthoringProjectFile()
+{
+    const auto& project = State().Project;
+    return project ? project->GetProjectFile() : std::filesystem::path{};
+}
 void SetAuthoringExecutablePath(const std::filesystem::path& path)
 {
     std::error_code error;

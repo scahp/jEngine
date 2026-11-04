@@ -12,6 +12,7 @@ bool IsAuthoringViewportHovered();
 bool IsAuthoringViewportFocused();
 bool MapAuthoringViewportPoint(double& x, double& y);
 bool OpenAuthoringProject(jEditor& editor, const std::filesystem::path& project, std::string& error);
+std::filesystem::path GetAuthoringProjectFile();
 bool LoadAuthoringScene(jEditor& editor, const std::filesystem::path& scene, std::string& error);
 void TickAuthoringWorkspace(jEditor& editor, float deltaTime);
 void PrepareAuthoringUiFrame();

@@ -87,6 +87,10 @@ public:
 	void SetSelectedPathTracingSceneLoader(ESceneLoader InLoader);
 	void RequestLoadSelectedPathTracingScene();
 	bool CanLoadSelectedPathTracingScene() const;
+    bool ConfigureSceneBrowserStartup(const std::string& sceneId, const std::string& loader, std::string& error);
+    bool StartupSceneUsesPathTracing();
+    bool IsSceneBrowserRestartRequested() const { return PathTracingSceneBrowser.RestartIndex >= 0; }
+    std::vector<std::string> GetSceneBrowserRestartArguments() const;
     void RequestSceneMaterialRefresh() { SceneMaterialRefreshPending = true; }
     bool IsSceneImportPending() const { return PendingImportId != 0; }
     const std::string& GetSceneImportStatus() const { return SceneImportStatus; }
@@ -107,6 +111,7 @@ private:
 		int32 SelectedIndex = -1;
 		int32 ActiveIndex = -1;
 		int32 PendingLoadIndex = -1;
+        int32 RestartIndex = -1;
 		ESceneRenderPipeline ActiveRenderPipeline = ESceneRenderPipeline::Deferred;
 		ESceneLoader ActiveLoader = ESceneLoader::Model;
 	};

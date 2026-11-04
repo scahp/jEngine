@@ -254,7 +254,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 //////////////////////////////////////////////////////////////////////////
 // jRHI_DX12
 //////////////////////////////////////////////////////////////////////////
-jRHI_DX12::jRHI_DX12()
+jRHI_DX12::jRHI_DX12(bool preferPathTracingDevice)
+    : PreferPathTracingDevice(preferPathTracingDevice)
 {
 	g_rhi_dx12 = this;
 }
@@ -298,58 +299,12 @@ HWND jRHI_DX12::CreateMainWindow() const
 	return hWnd;
 }
 
-int32 GetHardwareAdapter(IDXGIFactory1* InFactory, IDXGIAdapter1** InAdapter
-	, bool requestHighPerformanceAdapter = false)
+static D3D12_RAYTRACING_TIER GetRaytracingTier(ID3D12Device* device)
 {
-	*InAdapter = nullptr;
-
-    uint32 adapterIndex = 0;
-	ComPtr<IDXGIAdapter1> adapter;
-	ComPtr<IDXGIFactory6> factory6;
-	if (JOK(InFactory->QueryInterface(IID_PPV_ARGS(&factory6))))
-	{
-		const auto GpuPreference = requestHighPerformanceAdapter
-			? DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE : DXGI_GPU_PREFERENCE_UNSPECIFIED;
-		
-		while (S_OK != factory6->EnumAdapterByGpuPreference(adapterIndex, GpuPreference, IID_PPV_ARGS(&adapter)))
-		{
-			++adapterIndex;
-
-			if (!adapter)
-				continue;
-
-			DXGI_ADAPTER_DESC1 desc;
-			adapter->GetDesc1(&desc);
-
-			if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
-			{
-				// 기본 렌더 드라이버 어댑터는 선택하지 않음, 소프트웨어 렌더러를 원하면 warpAdapter를 사용
-				continue;
-			}
-
-            break;
-		}
-	}
-	else
-	{
-		while (S_OK != InFactory->EnumAdapters1(adapterIndex, &adapter))
-		{
-			++adapterIndex;
-
-			DXGI_ADAPTER_DESC1 desc;
-			adapter->GetDesc1(&desc);
-
-			if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
-			{
-				continue;
-			}
-
-            break;
-		}
-	}
-
-	*InAdapter = adapter.Detach();
-    return adapterIndex;
+    D3D12_FEATURE_DATA_D3D12_OPTIONS5 features{};
+    if (FAILED(device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &features, sizeof(features))))
+        return D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
+    return features.RaytracingTier;
 }
 
 void jRHI_DX12::WaitForGPU() const
@@ -385,8 +340,6 @@ bool jRHI_DX12::InitRHI()
 {
     g_rhi = this;
 
-    m_hWnd = CreateMainWindow();
-
     // 1. Device
     uint32 dxgiFactoryFlags = 0;
 
@@ -410,6 +363,68 @@ bool jRHI_DX12::InitRHI()
     if (JFAIL(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory))))
         return false;
 
+    const bool wantDxr = USE_RAYTRACING && PreferPathTracingDevice;
+    auto raytracingTier = D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
+    for (uint32 index = 0; ; ++index)
+    {
+        ComPtr<IDXGIAdapter1> candidate;
+        if (FAILED(factory->EnumAdapters1(index, &candidate))) break;
+
+        DXGI_ADAPTER_DESC1 desc{};
+        if (FAILED(candidate->GetDesc1(&desc)) || (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)) continue;
+
+        ComPtr<IDXGIAdapter3> adapter;
+        ComPtr<ID3D12Device5> device;
+        if (FAILED(candidate.As(&adapter)) ||
+            FAILED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device))))
+            continue;
+
+        const auto tier = GetRaytracingTier(device.Get());
+        if (!Device || tier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED)
+        {
+            Adapter = std::move(adapter);
+            Device = std::move(device);
+            AdapterID = index;
+            AdapterName = desc.Description;
+            raytracingTier = tier;
+        }
+        if (!wantDxr || raytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED) break;
+    }
+
+    if (wantDxr && raytracingTier == D3D12_RAYTRACING_TIER_NOT_SUPPORTED)
+    {
+        ComPtr<IDXGIAdapter3> warp;
+        ComPtr<ID3D12Device5> device;
+        if (SUCCEEDED(factory->EnumWarpAdapter(IID_PPV_ARGS(&warp))) &&
+            SUCCEEDED(D3D12CreateDevice(warp.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device))))
+        {
+            const auto tier = GetRaytracingTier(device.Get());
+            if (tier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED)
+            {
+                DXGI_ADAPTER_DESC desc{};
+                warp->GetDesc(&desc);
+                AdapterName = desc.Description;
+                AdapterID = static_cast<uint32>(-1);
+                Adapter = std::move(warp);
+                Device = std::move(device);
+                raytracingTier = tier;
+                UsingWarp = true;
+
+                gOptions.MaxRecursionDepthForPathTracing = 3;
+                gOptions.RayPerPixelForPathTracing = 1;
+                gOptions.UseVRS = false;
+                std::cout << "DX12 path tracing uses WARP (software DXR tier "
+                    << static_cast<int>(tier) << ")" << std::endl;
+            }
+        }
+    }
+    if (!Device) return false;
+
+    GSupportRaytracing = USE_RAYTRACING && raytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
+    GSupportInlineRaytracing = USE_RAYTRACING && raytracingTier >= D3D12_RAYTRACING_TIER_1_1;
+
+    m_hWnd = CreateMainWindow();
+
     HRESULT hr = factory.As(&Factory);
     if (SUCCEEDED(hr))
     {
@@ -429,39 +444,11 @@ bool jRHI_DX12::InitRHI()
         }
     }
 
-    bool UseWarpDevice = false;		// Software rasterizer 사용 여부
-    if (UseWarpDevice)
-    {
-        if (JFAIL(factory->EnumWarpAdapter(IID_PPV_ARGS(&Adapter))))
-            return false;
-
-        if (JFAIL((D3D12CreateDevice(Adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&Device)))))
-            return false;
-    }
-    else
-    {
-        ComPtr<IDXGIAdapter1> hardwareAdapter;
-        const int32 ResultAdapterID = GetHardwareAdapter(factory.Get(), &hardwareAdapter);
-        hardwareAdapter.As(&Adapter);
-
-        if (JFAIL(D3D12CreateDevice(Adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&Device))))
-        {
-            return false;
-        }
-        else
-        {
-            DXGI_ADAPTER_DESC desc;
-            Adapter->GetDesc(&desc);
-            AdapterID = ResultAdapterID;
-            AdapterName = desc.Description;
-
 #ifdef _DEBUG
-            wchar_t buff[256] = {};
-            swprintf_s(buff, L"Direct3D Adapter (%u): VID:%04X, PID:%04X - %ls\n", AdapterID, desc.VendorId, desc.DeviceId, desc.Description);
-            OutputDebugStringW(buff);
+    wchar_t adapterMessage[256]{};
+    swprintf_s(adapterMessage, L"Direct3D Adapter (%u): %ls\n", AdapterID, AdapterName.c_str());
+    OutputDebugStringW(adapterMessage);
 #endif
-        }
-    }
 
     for(int32 i=0;i<(int32)EPlacedResourceType::MAX;++i)
         PlacedResourcePool[i].Init((EPlacedResourceType)i);
@@ -536,20 +523,6 @@ bool jRHI_DX12::InitRHI()
 
     // 7. Create sync object
     WaitForGPU();
-
-    // 8. Raytracing device and commandlist
-    D3D12_FEATURE_DATA_D3D12_OPTIONS5 featureSupportData{};
-    if (JFAIL(Device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &featureSupportData, sizeof(featureSupportData))))
-        return false;
-
-#if USE_RAYTRACING
-    GSupportRaytracing = featureSupportData.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
-    GSupportInlineRaytracing = featureSupportData.RaytracingTier >= D3D12_RAYTRACING_TIER_1_1;
-    // GSupportRaytracing = false; // temp
-#else // USE_RAYTRACING
-    GSupportRaytracing = false;
-    GSupportInlineRaytracing = false;
-#endif // USE_RAYTRACING
 
     // Create InstanceVertexBuffer for cube map six face
     // todo : It will be removed, when I have a system that can generate per instance data for visible faces

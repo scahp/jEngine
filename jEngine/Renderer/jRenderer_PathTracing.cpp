@@ -17,6 +17,7 @@
 #include "Shader/jShaderParameterSet.h"
 #ifdef _WIN32
 #include "RHI/DX12/jPipelineStateInfo_DX12.h"
+#include "RHI/DX12/jRHI_DX12.h"
 #endif
 
 BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jPathTracingSceneConstantBuffer)
@@ -214,6 +215,14 @@ void jRenderer_PathTracing::PathTracing()
 {
     int32 width = SCR_WIDTH;
     int32 height = SCR_HEIGHT;
+#ifdef _WIN32
+    if (IsUseDX12() && static_cast<const jRHI_DX12*>(g_rhi)->IsUsingWarp())
+    {
+        const float scale = std::min({1.f, 480.f / width, 272.f / height});
+        width = std::max(1, static_cast<int32>(width * scale));
+        height = std::max(1, static_cast<int32>(height * scale));
+    }
+#endif
     auto& output = RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr;
     const bool recreateOutput = !output || output->Width != width || output->Height != height || output->Format != ETextureFormat::RGBA32F;
 	if (recreateOutput)

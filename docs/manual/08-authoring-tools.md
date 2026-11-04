@@ -60,7 +60,9 @@
 python scripts/convert-scene-materials.py jEngine/Resource/sponza_pbr/sponza.glb jEngine/Resource/Sponza_PathTracing --pipeline PathTracing
 ```
 
-Scene Browser에서 변환한 씬을 불러온 후 `Authoring tools → Scene material library`에서 슬롯을 고릅니다. `Surface settings`에서 유리의 Transmission·IOR, Clear Coat, 알파 마스크와 패킹 텍스처를 확인할 수 있습니다. `Save and apply to scene`은 그래프 에셋을 저장하고 그 슬롯을 쓰는 메시들에 반영합니다. 패스 트레이싱을 지원하는 GPU에서는 유리와 코팅 계산에 이 값을 사용합니다. 패스 트레이싱 기능이 없는 장치에서는 Deferred로 씬을 엽니다.
+Scene Browser에서 변환한 씬을 불러온 후 `Authoring tools → Scene material library`에서 슬롯을 고릅니다. `Surface settings`에서 유리의 Transmission·IOR, Clear Coat, 알파 마스크와 패킹 텍스처를 확인할 수 있습니다. `Save and apply to scene`은 그래프 에셋을 저장하고 그 슬롯을 쓰는 메시들에 반영합니다. 패스 트레이싱에서는 유리와 코팅 계산에 이 값을 사용합니다.
+
+DX12에서 패스 트레이싱 씬을 열면 DXR을 지원하는 GPU를 우선 사용합니다. 해당 GPU가 없으면 DXR을 지원하는 WARP로 실행하고, WARP도 지원하지 않으면 Deferred로 전환합니다. 장치가 바뀌면 저장 확인을 거쳐 선택한 씬으로 앱을 다시 엽니다. WARP에서는 패스 트레이싱 해상도가 최대 480×272입니다.
 
 ## 변형 애니메이션과 Play/Stop
 

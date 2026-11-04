@@ -23,6 +23,7 @@
 #include "Renderer/jSceneRenderTargets.h"    // temp
 #ifdef _WIN32
 #include "dxcapi.h"
+#include "RHI/DX12/jRHI_DX12.h"
 #endif
 #include "RHI/jRaytracingScene.h"
 #include "Renderer/jDirectionalLightDrawCommandGenerator.h"
@@ -658,6 +659,10 @@ const char* jGame::GetSceneRenderPipelineName(int32 InIndex) const
 
 const char* jGame::GetActiveSceneRenderPipelineName() const
 {
+#ifdef _WIN32
+    if (IsUsingPathTracingRenderer() && IsUseDX12() && static_cast<jRHI_DX12*>(g_rhi)->IsUsingWarp())
+        return "PathTracing (WARP)";
+#endif
 	return GetSceneRenderPipelineNameInternal(PathTracingSceneBrowser.ActiveRenderPipeline);
 }
 
@@ -715,8 +720,54 @@ void jGame::RequestLoadSelectedPathTracingScene()
 	if (CanLoadSelectedPathTracingScene())
     {
         const int32 selected = PathTracingSceneBrowser.SelectedIndex;
-        RequestAuthoringSceneReplacement([this, selected] { PathTracingSceneBrowser.PendingLoadIndex = selected; });
+        RequestAuthoringSceneReplacement([this, selected] {
+#ifdef _WIN32
+            if (IsUseDX12())
+            {
+                const auto* dx12 = static_cast<const jRHI_DX12*>(g_rhi);
+                const bool pathTracing = PathTracingSceneBrowser.Scenes[selected].RenderPipeline == ESceneRenderPipeline::PathTracing;
+                const bool needsDxrDevice = pathTracing && !GSupportRaytracing && !dx12->WasPathTracingDeviceRequested();
+                if (USE_RAYTRACING && (needsDxrDevice || (!pathTracing && dx12->IsUsingWarp())))
+                {
+                    PathTracingSceneBrowser.RestartIndex = selected;
+                    return;
+                }
+            }
+#endif
+            PathTracingSceneBrowser.PendingLoadIndex = selected;
+        });
     }
+}
+
+bool jGame::ConfigureSceneBrowserStartup(const std::string& sceneId, const std::string& loader, std::string& error)
+{
+    InitializePathTracingSceneBrowser();
+    const int32 index = FindPathTracingSceneIndexById(sceneId);
+    ESceneLoader selectedLoader = ESceneLoader::Recommended;
+    if (index < 0 || !TryParseSceneLoader(loader, selectedLoader))
+    {
+        error = "Invalid Scene Browser scene or loader: " + sceneId + " (" + loader + ")";
+        return false;
+    }
+    PathTracingSceneBrowser.Scenes[index].SelectedLoader = selectedLoader;
+    PathTracingSceneBrowser.SelectedIndex = index;
+    PathTracingSceneBrowser.PendingLoadIndex = index;
+    return true;
+}
+
+bool jGame::StartupSceneUsesPathTracing()
+{
+    if (!HasEditorStartupScene())
+        InitializePathTracingSceneBrowser();
+    const int32 index = PathTracingSceneBrowser.PendingLoadIndex;
+    return index >= 0 && PathTracingSceneBrowser.Scenes[index].RenderPipeline == ESceneRenderPipeline::PathTracing;
+}
+
+std::vector<std::string> jGame::GetSceneBrowserRestartArguments() const
+{
+    if (!IsSceneBrowserRestartRequested()) return {};
+    const auto& scene = PathTracingSceneBrowser.Scenes[PathTracingSceneBrowser.RestartIndex];
+    return {scene.SceneId, GetSceneLoaderNameInternal(scene.SelectedLoader)};
 }
 
 bool jGame::CanLoadSelectedPathTracingScene() const
