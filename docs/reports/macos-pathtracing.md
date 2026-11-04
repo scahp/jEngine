@@ -2,8 +2,8 @@
 
 Verified on 2026-11-04 with the experimental MoltenVK runtime documented in the
 [platform guide](../platform-and-ci.md#surfelgi-hardware-inline-ray-queries).
-All images below are unmodified engine swapchain captures from the same Debug
-executable, at 1280×720, five rays per pixel and six maximum iterative bounces.
+All images below are unmodified engine swapchain captures of the same Debug
+renderer, at 1280×720, five rays per pixel and six maximum iterative bounces.
 
 ## Scene comparison
 
@@ -37,6 +37,23 @@ the legacy path tracer's analytic emitters. The image is therefore darker than
 the Deferred scene. This change does not add a new light-sampling system or a
 denoiser. Keeping the camera and settings fixed accumulates more samples and
 reduces noise; four times as many independent samples typically halves noise.
+
+### Sponza after 3,000 samples per pixel
+
+![Sponza after 600 accumulated frames, 3000 samples per pixel](images/macos-pathtracing-sponza-3000spp.png)
+
+With the camera and rendering settings fixed, a longer run reached dispatch 600
+with accumulation index 599: 3,000 samples per pixel, ten times the earlier
+capture. Wall and column surfaces show less grain. This image has no denoising,
+brightness adjustment or other image processing. Environment-only illumination
+remains dark. Independent-sample theory predicts about 3.16 times lower noise
+for this sample increase; this is not a measured noise ratio for these images.
+
+The run completed 604 frames in 217.90 seconds, with zero Vulkan/Metal validation
+problems and the source assets/preferences preserved. An isolated capture probe
+changed only the swapchain capture trigger from frame 60 to frame 600; production
+source was restored byte-for-byte before execution. The path-tracing renderer,
+shader code, sample count per frame and bounce limit were unchanged.
 
 ## What changed
 
