@@ -1,0 +1,21 @@
+# Original jEngine Studio sample geometry; MIT licensed.
+mtllib CheckerPyramid.mtl
+o CheckerPyramid
+v -8 0 -8
+v 8 0 -8
+v 8 0 8
+v -8 0 8
+v 0 18 0
+vt 0 0
+vt 1 0
+vt 1 1
+vt 0 1
+vt 0.5 1
+usemtl Checker
+s off
+f 1/1 5/5 2/2
+f 2/1 5/5 3/2
+f 3/1 5/5 4/2
+f 4/1 5/5 1/2
+f 1/1 2/2 3/3
+f 1/1 3/3 4/4

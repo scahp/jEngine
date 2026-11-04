@@ -2,3 +2,5 @@
 *.jscene.bak
 *.jproject.bak
 *.tmp-*
+# OBJ files here are model sources, not compiler object files.
+!Assets/Models/*.obj
