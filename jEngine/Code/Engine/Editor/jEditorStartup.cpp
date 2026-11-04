@@ -62,7 +62,14 @@ bool InitializeEditorStartup(jEditor& editor, std::string& error)
 {
     if (!StartupProject.empty() && !OpenAuthoringProject(editor, StartupProject, error)) return false;
     if (!StartupScene.empty() && editor.GetDocument().Path() != StartupScene && !LoadAuthoringScene(editor, StartupScene, error)) return false;
-    if (HasEditorStartupScene()) { editor.SetAuthoringEnabled(true); if (!editor.SyncDocumentToWorld()) { error = editor.LastError(); return false; } }
+    if (HasEditorStartupScene())
+    {
+        editor.SetAuthoringEnabled(true);
+        // Cold model instances publish through the normal CPU/GPU import ticks.
+        // An unfinished asynchronous request is a valid initialized scene.
+        if (!editor.SyncDocumentToWorld() && !editor.PendingImportCount())
+        { error = editor.LastError().empty() ? "Authored scene could not publish runtime bindings" : editor.LastError(); return false; }
+    }
     if (Runtime && !editor.BeginPlay()) { error = editor.LastError(); return false; }
     return true;
 }

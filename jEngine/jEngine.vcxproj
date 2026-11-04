@@ -428,10 +428,10 @@ xcopy /y /i "$(JEngineDxcDirectory)\dxil.dll" "$(OutDir)"</Command>
     <ClCompile Include="External\recastnavigation\Detour\Source\DetourNode.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
     <ClCompile Include="External\recastnavigation\Detour\Source\DetourAlloc.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
     <ClCompile Include="Code\Engine\Editor\jEditorAssetPanel.cpp"></ClCompile>
-    <ClCompile Include="Code\Engine\Editor\jEditorExtensions.cpp"></ClCompile>
-    <ClCompile Include="Code\Engine\Editor\jEditorPackaging.cpp"></ClCompile>
+    <ClCompile Include="Code\Engine\Editor\jEditorExtensions.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="Code\Engine\Editor\jEditorPackaging.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
     <ClCompile Include="Code\Engine\Editor\jEditorProjectSettings.cpp"></ClCompile>
-    <ClCompile Include="Tests\jEditorExtensionTests.cpp"></ClCompile>
+    <ClCompile Include="Tests\jEditorExtensionTests.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
     <ClCompile Include="Tests\jEditorIntegrationTests.cpp"></ClCompile>
     <ClCompile Include="Tests\jEditorProjectSettingsTests.cpp"></ClCompile>
     <ClCompile Include="Tests\jModelImportSettingsTests.cpp"></ClCompile>

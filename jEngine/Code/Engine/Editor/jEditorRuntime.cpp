@@ -782,7 +782,7 @@ void jEditor::RenderViewportGizmo(jCamera* camera,float x,float y,float width,fl
     for(auto id:roots){const auto m=s.World(id,worlds);center+=Vector(m.m30,m.m31,m.m32);}center/=static_cast<float>(roots.size());
     Matrix pivot=s.World(roots.front(),worlds);pivot.m30=center.x;pivot.m31=center.y;pivot.m32=center.z;
     const Matrix before=pivot;
-    ImGuizmo::SetDrawlist(ImGui::GetForegroundDrawList());ImGuizmo::SetOrthographic(!camera->IsPerspectiveProjection);
+    ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());ImGuizmo::SetOrthographic(!camera->IsPerspectiveProjection);
     const auto& io=ImGui::GetIO();ImGuizmo::SetRect(x,y,width>0?width:io.DisplaySize.x,height>0?height:io.DisplaySize.y);
     float* snap=Placement.UseSnap?(Placement.GizmoOperation==ImGuizmo::TRANSLATE?Placement.TranslationSnap:Placement.GizmoOperation==ImGuizmo::ROTATE?&Placement.RotationSnap:Placement.ScaleSnap):nullptr;
     const bool changed=ImGuizmo::Manipulate(camera->View.mm,camera->Projection.mm,Placement.GizmoOperation,Placement.GizmoMode,pivot.mm,nullptr,snap);

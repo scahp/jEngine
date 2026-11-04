@@ -759,7 +759,10 @@ void RenderAuthoringWorkspace(jEditor& editor)
                     if (const auto* asset = s.Registry->FindById(static_cast<const char*>(payload->Data))) ActivateAsset(editor, *asset);
             ImGui::EndDragDropTarget();
         }
+        auto* sceneDraw = ImGui::GetWindowDrawList();
+        sceneDraw->PushClipRect(position, ImVec2(position.x + size.x, position.y + size.y), true);
         editor.RenderViewportGizmo(Camera(), position.x, position.y, size.x, size.y);
+        sceneDraw->PopClipRect();
         if (s.ViewHovered && !ImGuizmo::IsUsing() && !ImGuizmo::IsOver())
         {
             if (ImGui::IsMouseClicked(0) && !io.KeyAlt)
@@ -768,6 +771,15 @@ void RenderAuthoringWorkspace(jEditor& editor)
                 if (MapAuthoringViewportPoint(x, y)) { editor.Placement.bPickRequested = true; editor.Placement.PickMouseX = int32(x); editor.Placement.PickMouseY = int32(y); }
             }
             if ((io.MouseDown[1] || (io.KeyAlt && io.MouseDown[0])) && (io.MouseDelta.x || io.MouseDelta.y)) editor.HandleCameraMouseMove(int32(io.MouseDelta.x), int32(io.MouseDelta.y), Camera());
+        }
+        if (!s.Status.empty() && size.y > ImGui::GetTextLineHeight() + 16)
+        {
+            const ImVec2 status(position.x + 6, position.y + size.y - ImGui::GetTextLineHeight() - 8);
+            sceneDraw->PushClipRect(position, ImVec2(position.x + size.x, position.y + size.y), true);
+            sceneDraw->AddRectFilled(ImVec2(status.x - 4, status.y - 3),
+                ImVec2(std::min(position.x + size.x, status.x + ImGui::CalcTextSize(s.Status.c_str()).x + 4), position.y + size.y - 2), IM_COL32(16,16,16,220));
+            sceneDraw->AddText(status, IM_COL32_WHITE, s.Status.c_str());
+            sceneDraw->PopClipRect();
         }
     }
     ImGui::End();
@@ -800,7 +812,6 @@ void RenderAuthoringWorkspace(jEditor& editor)
     if (s.ShowProfiler) { if (ImGui::Begin("Editor diagnostics", &s.ShowProfiler)) Profiler(editor); ImGui::End(); }
     if (s.ShowTools) { if (ImGui::Begin("Authoring tools", &s.ShowTools)) jEditorTools::Render(editor); ImGui::End(); }
     s.ResetLayout = false;
-    if (!s.Status.empty()) { ImGui::SetNextWindowPos(ImVec2(vp->Pos.x + left + 5, vp->Pos.y + vp->Size.y - bottom - 25), ImGuiCond_Always); if (ImGui::Begin("Editor status", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoInputs)) ImGui::TextUnformatted(s.Status.c_str()); ImGui::End(); }
     Dialogs(editor);
     jEditorExtensions::Render(editor);
     jEditorProjectSettings::Render(editor, s.Project.get());
