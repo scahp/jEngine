@@ -15,6 +15,9 @@
 #include "FileLoader/jImageFileLoader.h"
 #include "Shader/jShader.h"
 #include "Shader/jShaderParameterSet.h"
+#ifdef _WIN32
+#include "RHI/DX12/jPipelineStateInfo_DX12.h"
+#endif
 
 BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jPathTracingSceneConstantBuffer)
     SHADER_UNIFORM_BUFFER_MEMBER(Matrix, projectionToWorld)
@@ -25,6 +28,8 @@ BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(jPathTracingSceneConstantBuffer)
     SHADER_UNIFORM_BUFFER_MEMBER(uint32, FrameNumber)
     SHADER_UNIFORM_BUFFER_MEMBER(uint32, AccumulateNumber)
     SHADER_UNIFORM_BUFFER_MEMBER(Vector2, HaltonJitter)
+    SHADER_UNIFORM_BUFFER_MEMBER(float, RayMaxDistance)
+    SHADER_UNIFORM_BUFFER_MEMBER(uint32, UseEnvironmentLight)
 END_SHADER_UNIFORM_BUFFER_STRUCT()
 
 BEGIN_SHADER_PARAMETER_SET(jPathTracingGlobalParameters)
@@ -207,16 +212,17 @@ void jRenderer_PathTracing::Render()
 
 void jRenderer_PathTracing::PathTracing()
 {
-	if (!RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr
-		|| RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr->Width != (int32)SCR_WIDTH
-		|| RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr->Height != (int32)SCR_HEIGHT
-		|| RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr->Format != ETextureFormat::RGBA32F)
+    int32 width = SCR_WIDTH;
+    int32 height = SCR_HEIGHT;
+    auto& output = RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr;
+    const bool recreateOutput = !output || output->Width != width || output->Height != height || output->Format != ETextureFormat::RGBA32F;
+	if (recreateOutput)
 	{
-		RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr = g_rhi->Create2DTexture((uint32)SCR_WIDTH, (uint32)SCR_HEIGHT, (uint32)1, (uint32)1
+		output = g_rhi->Create2DTexture(width, height, 1, 1
 			, ETextureFormat::RGBA32F, ETextureCreateFlag::UAV, EResourceLayout::UAV);
 	}
 
-	jTexture* PathTracingOutput = RenderFrameContextPtr->RaytracingScene->RaytracingOutputPtr.get();
+	jTexture* PathTracingOutput = output.get();
 	check(PathTracingOutput);
 
 	{
@@ -295,12 +301,15 @@ void jRenderer_PathTracing::PathTracing()
 		sceneCB.focalDistance = mainCamera->FocalDist;
 		sceneCB.lensRadius = mainCamera->Aperture;
 		sceneCB.FrameNumber = g_rhi->GetCurrentFrameNumber();
+        sceneCB.RayMaxDistance = std::max(1000.f, mainCamera->Far);
+        // Model scenes have no legacy analytic emitters. Use the already-bound sky probe.
+        sceneCB.UseEnvironmentLight = !gPathTracingScene || gPathTracingScene->lights.empty();
 
 		static jOptions OldOptions = gOptions;
 		static auto OldMatrix = sceneCB.projectionToWorld;
 		static uint32 AccumulateNumber = 0;
         static int32 LastSelectedIndex = gSelectedSceneIndex;
-		if (!gOptions.UseAccumulateRay 
+		if (recreateOutput || !gOptions.UseAccumulateRay
 			|| OldMatrix != sceneCB.projectionToWorld 
 			|| OldOptions != gOptions 
 			|| gSelectedSceneIndex != LastSelectedIndex)
@@ -316,26 +325,26 @@ void jRenderer_PathTracing::PathTracing()
 		}
 		sceneCB.AccumulateNumber = AccumulateNumber;
 
-		static Vector2 HaltonJitter[] = {
-			Vector2(0.0f,      -0.333334f) / Vector2((float)SCR_WIDTH, (float)SCR_HEIGHT),
-			Vector2(-0.5f,     0.333334f) / Vector2((float)SCR_WIDTH, (float)SCR_HEIGHT),
-			Vector2(0.5f,      -0.777778f) / Vector2((float)SCR_WIDTH, (float)SCR_HEIGHT),
-			Vector2(-0.75f,    -0.111112f) / Vector2((float)SCR_WIDTH, (float)SCR_HEIGHT),
-			Vector2(0.25f,     0.555556f) / Vector2((float)SCR_WIDTH, (float)SCR_HEIGHT),
-			Vector2(-0.25f,    -0.555556f) / Vector2((float)SCR_WIDTH, (float)SCR_HEIGHT),
-			Vector2(0.75f,     0.111112f) / Vector2((float)SCR_WIDTH, (float)SCR_HEIGHT),
-			Vector2(-0.875f,   0.777778f) / Vector2((float)SCR_WIDTH, (float)SCR_HEIGHT),
-			Vector2(0.125f,    -0.925926f) / Vector2((float)SCR_WIDTH, (float)SCR_HEIGHT),
-			Vector2(-0.375f,   -0.259260f) / Vector2((float)SCR_WIDTH, (float)SCR_HEIGHT),
-			Vector2(0.625f,    0.407408f) / Vector2((float)SCR_WIDTH, (float)SCR_HEIGHT),
-			Vector2(-0.625f,   -0.703704f) / Vector2((float)SCR_WIDTH, (float)SCR_HEIGHT),
-			Vector2(0.375f,    -0.037038f) / Vector2((float)SCR_WIDTH, (float)SCR_HEIGHT),
-			Vector2(-0.125f,   0.629630f) / Vector2((float)SCR_WIDTH, (float)SCR_HEIGHT),
-			Vector2(0.875f,    -0.481482f) / Vector2((float)SCR_WIDTH, (float)SCR_HEIGHT),
-			Vector2(-0.9375f,  0.185186f) / Vector2((float)SCR_WIDTH, (float)SCR_HEIGHT)
+		static const Vector2 HaltonJitter[] = {
+			Vector2(0.0f,      -0.333334f),
+			Vector2(-0.5f,     0.333334f),
+			Vector2(0.5f,      -0.777778f),
+			Vector2(-0.75f,    -0.111112f),
+			Vector2(0.25f,     0.555556f),
+			Vector2(-0.25f,    -0.555556f),
+			Vector2(0.75f,     0.111112f),
+			Vector2(-0.875f,   0.777778f),
+			Vector2(0.125f,    -0.925926f),
+			Vector2(-0.375f,   -0.259260f),
+			Vector2(0.625f,    0.407408f),
+			Vector2(-0.625f,   -0.703704f),
+			Vector2(0.375f,    -0.037038f),
+			Vector2(-0.125f,   0.629630f),
+			Vector2(0.875f,    -0.481482f),
+			Vector2(-0.9375f,  0.185186f)
 		};
 
-		sceneCB.HaltonJitter = HaltonJitter[g_rhi->GetCurrentFrameNumber() % _countof(HaltonJitter)];
+		sceneCB.HaltonJitter = HaltonJitter[g_rhi->GetCurrentFrameNumber() % _countof(HaltonJitter)] / Vector2((float)width, (float)height);
 
 		auto SceneUniformBufferPtr = g_rhi->CreateUniformBufferBlock(jNameStatic("SceneData"), jLifeTimeType::OneFrame, sizeof(sceneCB));
 		SceneUniformBufferPtr->UpdateBufferData(&sceneCB, sizeof(sceneCB));
@@ -438,6 +447,16 @@ void jRenderer_PathTracing::PathTracing()
 					Textures[i].Texture = gPathTracingScene->textures[i];
 				}
 			}
+            // DX12 descriptor ranges require a nonzero count even when a scene
+            // has no analytic lights. No hit group references this dummy entry.
+            if (LightBuffers.empty())
+            {
+                const LightUniformBuffer emptyLight{};
+                auto buffer = g_rhi->CreateUniformBufferBlock(jNameStatic("EmptyPathTracingLight"), jLifeTimeType::OneFrame, sizeof(emptyLight));
+                buffer->UpdateBufferData(&emptyLight, sizeof(emptyLight));
+                LightBuffers.push_back(buffer.get());
+                RefCountMaintainer.push_back(std::move(buffer));
+            }
 		}
 
         jPathTracingBindlessParameters BindlessParameters;
@@ -462,6 +481,18 @@ void jRenderer_PathTracing::PathTracing()
 		RaytracingPipelineData.MaxTraceRecursionDepth = 31;
 		auto RaytracingPipelineState = g_rhi->CreateRaytracingPipelineStateInfo(RaytracingShaders, RaytracingPipelineData
 			, ShaderBindingGroup.GetLayoutArray(), nullptr);
+        if (!RaytracingPipelineState) return;
+#ifdef _WIN32
+        if (IsUseDX12())
+        {
+            const auto& pipeline = *static_cast<jPipelineStateInfo_DX12*>(RaytracingPipelineState);
+            if (!pipeline.RaytracingStateObject || !pipeline.RaygenBuffer || !pipeline.MissBuffer || !pipeline.HitGroupBuffer)
+            {
+                std::cerr << "Path tracing pipeline or shader table creation failed" << std::endl;
+                return;
+            }
+        }
+#endif
 		g_rhi->BindRaytracingShaderBindingInstances(RenderFrameContextPtr->GetActiveCommandBuffer(), RaytracingPipelineState, ShaderBindingGroup.GetCombiner(), 0);
 
 		// Binding Raytracing Pipeline State
@@ -471,8 +502,8 @@ void jRenderer_PathTracing::PathTracing()
 
 		// Dispatch Rays
 		jRaytracingDispatchData TracingData;
-		TracingData.Width = SCR_WIDTH;
-		TracingData.Height = SCR_HEIGHT;
+		TracingData.Width = width;
+		TracingData.Height = height;
 		TracingData.Depth = 1;
 		TracingData.PipelineState = RaytracingPipelineState;
 		g_rhi->DispatchRay(RenderFrameContextPtr, TracingData);

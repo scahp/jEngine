@@ -1346,7 +1346,32 @@ void jGame::LoadPathTracingSceneByIndex(int32 InIndex, bool InRebuildRaytracingS
 	PathTracingSceneBrowser.ActiveIndex = InIndex;
 	PathTracingSceneBrowser.SelectedIndex = InIndex;
 	PathTracingSceneBrowser.ActiveRenderPipeline = sceneDesc.RenderPipeline;
+    if (sceneDesc.RenderPipeline == ESceneRenderPipeline::PathTracing &&
+        (!GSupportRaytracing || !g_rhi->RaytracingScene))
+    {
+        PathTracingSceneBrowser.ActiveRenderPipeline = ESceneRenderPipeline::Deferred;
+        std::cout << "Path tracing unavailable on this device; using Deferred for " << sceneDesc.SceneId << std::endl;
+        if (gPathTracingScene)
+        {
+            // Deferred does not shade the analytic emitters used by legacy scenes.
+            // Preserve their centers and approximate their radiant power for preview.
+            for (const auto& areaLight : gPathTracingScene->lights)
+            {
+                if (areaLight.area <= 0.f) continue;
+                const bool sphere = areaLight.type == SphereLight;
+                const Vector center = sphere ? areaLight.position : areaLight.position + (areaLight.u + areaLight.v) * .5f;
+                const Vector color = areaLight.emission * (areaLight.area * (sphere ? .25f : 1.f));
+                const float range = std::max(1.f, (center - MainCamera->Target).Length() * 2.f +
+                    (MainCamera->Pos - MainCamera->Target).Length());
+                auto* preview = jLight::CreatePointLight(center, color, range, Vector(1.f), Vector(1.f), 64.f);
+                preview->IsShadowCaster = false;
+                jLight::AddLights(preview);
+                SceneBrowserLoadedLights.push_back(preview);
+            }
+        }
+    }
 	PathTracingSceneBrowser.ActiveLoader = resolvedLoader;
+    ++gSelectedSceneIndex;
 	PathTracingSceneBrowser.LastLoadedSceneId = sceneDesc.SceneId;
 	PathTracingSceneBrowser.LastLoadedLoader = resolvedLoader;
 	SavePathTracingSceneBrowserSettings();

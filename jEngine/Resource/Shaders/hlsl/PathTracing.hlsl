@@ -374,7 +374,7 @@ void RaygenShader()
         ray.Origin = origin;
         ray.Direction = rayDir;
         ray.TMin = 0.001;
-        ray.TMax = 1000.0;
+        ray.TMax = g_sceneCB.RayMaxDistance;
 
         RayPayload payload;
         payload.RecursionDepth = 0;
@@ -414,14 +414,10 @@ void RaygenShader()
     }
     TotalRadiance /= MAX_RAY_PER_PIXEL;
 
-    if (g_sceneCB.AccumulateNumber == 0)
-    {
-        RenderTarget[DispatchRaysIndex().xy].xyz = TotalRadiance;
-    }
-    else
-    {
-        RenderTarget[DispatchRaysIndex().xy].xyz = lerp(RenderTarget[DispatchRaysIndex().xy].xyz, TotalRadiance, 1.0f / g_sceneCB.AccumulateNumber);
-    }
+    const uint2 pixel = DispatchRaysIndex().xy;
+    if (g_sceneCB.AccumulateNumber != 0)
+        TotalRadiance = lerp(RenderTarget[pixel].xyz, TotalRadiance, 1.0f / (g_sceneCB.AccumulateNumber + 1));
+    RenderTarget[pixel] = float4(TotalRadiance, 1.0);
 
 }
 
@@ -500,15 +496,15 @@ void MeshClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     }
     SamplingBSDF(SampleDir, SamplePDF, BRDF_Cos, WorldNormal, WorldFaceNormal, -WorldRayDirection(), material, payload);
 
-    payload.Attenuation = BRDF_Cos / SamplePDF;
+    payload.Attenuation = SamplePDF > 0 ? BRDF_Cos / SamplePDF : 0;
     payload.HitReflectDir = SampleDir;
 }
 
 [shader("miss")]
 void MeshMissShader(inout RayPayload payload)
 {
-    //payload.Radiance = float3(1, 0, 0);
-    payload.Radiance = 0;
+    payload.Radiance = g_sceneCB.UseEnvironmentLight != 0
+        ? EnvTexture.SampleLevel(DefaultSamplerState, WorldRayDirection(), 0).rgb : 0;
     payload.Attenuation = 1;
     payload.RecursionDepth = MAX_RECURSION_DEPTH;
 }

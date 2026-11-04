@@ -113,9 +113,36 @@ void jPathTracingLoadData::CreateSceneFor_jEngine(jGame* InGame)
 
                 VerticesData[i].Pos = Vector(Pos_U);
                 VerticesData[i].Normal = Vector(Normal_V);
-                //VerticesData[i].Tangent = meshData->Tangents[i];
-                //VerticesData[i].Bitangent = meshData->Bitangents[i];
                 VerticesData[i].TexCoord = Vector2(Pos_U.w, Normal_V.w);
+            }
+            // The raster fallback samples the normal texture through this basis.
+            // Legacy OBJ streams can have no UVs, so still provide finite axes.
+            for (int32 i = 0; i + 2 < elementCount; i += 3)
+            {
+                const auto edge1 = VerticesData[i + 1].Pos - VerticesData[i].Pos;
+                const auto edge2 = VerticesData[i + 2].Pos - VerticesData[i].Pos;
+                const auto uv1 = VerticesData[i + 1].TexCoord - VerticesData[i].TexCoord;
+                const auto uv2 = VerticesData[i + 2].TexCoord - VerticesData[i].TexCoord;
+                const float determinant = uv1.x * uv2.y - uv1.y * uv2.x;
+                const bool hasUVBasis = std::abs(determinant) > 1e-8f;
+                const Vector tangent = hasUVBasis ? (edge1 * uv2.y - edge2 * uv1.y) * (1.f / determinant) : Vector::ZeroVector;
+                const Vector bitangent = hasUVBasis ? (edge2 * uv1.x - edge1 * uv2.x) * (1.f / determinant) : Vector::ZeroVector;
+                for (int32 corner = i; corner < i + 3; ++corner)
+                {
+                    auto& vertex = VerticesData[corner];
+                    if (vertex.Normal.IsNearlyZero()) vertex.Normal = edge1.CrossProduct(edge2);
+                    if (vertex.Normal.IsNearlyZero()) vertex.Normal = Vector(0.f, 1.f, 0.f);
+                    vertex.Normal = vertex.Normal.GetNormalize();
+                    auto axis = tangent - vertex.Normal * tangent.DotProduct(vertex.Normal);
+                    if (axis.IsNearlyZero())
+                    {
+                        const Vector up = std::abs(vertex.Normal.y) < .99f ? Vector(0.f, 1.f, 0.f) : Vector(1.f, 0.f, 0.f);
+                        axis = up.CrossProduct(vertex.Normal);
+                    }
+                    vertex.Tangent = axis.GetNormalize();
+                    vertex.Bitangent = vertex.Normal.CrossProduct(vertex.Tangent);
+                    if (hasUVBasis && vertex.Bitangent.DotProduct(bitangent) < 0.f) vertex.Bitangent *= -1.f;
+                }
             }
             vertexStreamData->Params.push_back(streamParam);
 
@@ -237,6 +264,8 @@ void jPathTracingLoadData::CreateSceneFor_jEngine(jGame* InGame)
             material.lightId = i;
 
 			std::shared_ptr<jMaterial> materialPtr = std::make_shared<jMaterial>();
+            materialPtr->UseMaterialProperties = true;
+            materialPtr->Emissive = L.emission;
 			materialPtr->MaterialDataPtr = std::make_shared<jMaterialData>();
 			materialPtr->MaterialDataPtr->Data.resize(sizeof(material));
 			memcpy(materialPtr->MaterialDataPtr->Data.data(), &material, sizeof(material));
@@ -257,6 +286,8 @@ void jPathTracingLoadData::CreateSceneFor_jEngine(jGame* InGame)
             material.lightId = i;
 
 			std::shared_ptr<jMaterial> materialPtr = std::make_shared<jMaterial>();
+            materialPtr->UseMaterialProperties = true;
+            materialPtr->Emissive = L.emission;
 			materialPtr->MaterialDataPtr = std::make_shared<jMaterialData>();
 			materialPtr->MaterialDataPtr->Data.resize(sizeof(material));
 			memcpy(materialPtr->MaterialDataPtr->Data.data(), &material, sizeof(material));
