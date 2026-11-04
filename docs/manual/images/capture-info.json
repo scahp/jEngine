@@ -9,7 +9,10 @@
     "02-scene-browser": "1 Scene Browser tab; 2 Filter; 3 active scene/renderer/loader; 4 scene tree; 5 Scene Loader; 6 Load Scene (disabled for active scene).",
     "03-placement-inspector": "1 Placement Tool tab; 2 add type/button; 3 search; 4 scene list; 5 gizmo mode/space/snap; 6 Position/Rotation/Scale; 7 Delete Selected Object.",
     "04-surfelgi": "1 SurfelGI tab; 2 single Enable SurfelGI checkbox; 3 radiance/intensity; 4 pool/spawn/radius; 5 five debug checkboxes.",
-    "05-console": "1 console mode; 2 recent/drop/error statistics; 3 log output; 4 empty command input."
+    "05-console": "1 console mode; 2 recent/drop/error statistics; 3 log output; 4 empty command input.",
+    "06-workspace": "Use case: precise-object-edit. Asset type: real software screenshot annotation for a Korean user manual.\nThe input is the EDIT TARGET, not design inspiration. Treat the original screenshot as a locked raster canvas. Preserve EVERY existing UI label, glyph, number, control, color, pixel, panel boundary, 3D object, lighting, texture, geometry and crop. Do not redraw, recreate, improve, translate or retype the interface. No mockup.\nONLY ADD thin bright-red rectangular outlines and small red circular number badges with white numerals. No arrows, no explanatory text, no Korean text, no new controls. Place badges only over empty space, never over an existing label or control.\nOutput PNG at the input's exact 1280x900 dimensions. Do not resize, rescale, crop, extend, recolor, brighten, darken, blur or sharpen the screenshot. All pixels outside the red outline/badge overlays must remain identical to the input. Outlines about 3 pixels; badges about 24 pixels with crisp white digits. Numbers restart from 1 in each image.\nAdd exactly FIVE numbered outlines in original-image pixel coordinates:\n1 top menu/Play bar: rectangle (2,1) to (1277,21), badge centered (1255,11) in empty right end.\n2 Hierarchy panel: rectangle (2,24) to (267,897), badge center (245,60) in blank toolbar space.\n3 Scene panel: rectangle (273,24) to (973,635), badge center (945,65) in empty black space.\n4 Inspector panel: rectangle (980,24) to (1277,897), badge center (1250,570) below the existing controls.\n5 Project tools panel: rectangle (273,640) to (973,897), badge center (945,651) in blank title-bar space.\nPreserve the floor, coral box, teal sphere, amber column and checker pyramid exactly. Added text is only white numerals 1,2,3,4,5.",
+    "07-authoring-tools": "Use case: precise-object-edit. Asset type: real software screenshot annotation for a Korean user manual.\nThe input is the EDIT TARGET, not design inspiration. Treat the original screenshot as a locked raster canvas. Preserve EVERY existing UI label, glyph, number, control, color, pixel, panel boundary, 3D object, lighting, texture, geometry and crop. Do not redraw, recreate, improve, translate or retype the interface. No mockup.\nONLY ADD thin bright-red rectangular outlines and small red circular number badges with white numerals. No arrows, no explanatory text, no Korean text, no new controls. Place badges only over empty space, never over an existing label or control.\nOutput PNG at the input's exact 1280x900 dimensions. Do not resize, rescale, crop, extend, recolor, brighten, darken, blur or sharpen the screenshot. All pixels outside the red outline/badge overlays must remain identical to the input. Outlines about 3 pixels; badges about 24 pixels with crisp white digits. Numbers restart from 1 in each image.\nAdd exactly FIVE numbered outlines to the EXISTING floating Authoring tools window:\n1 tabs: rectangle (291,82) to (764,107), badge center (946,95) in blank row space to their right.\n2 New node/Add node/Undo graph/Redo graph controls: rectangle (291,138) to (832,187), badge center (946,165) in blank space.\n3 actual node canvas and pins: rectangle (293,190) to (978,499), badge center (945,465) over empty canvas.\n4 three output selectors and Graph asset path: rectangle (291,502) to (970,599), badge center (945,585) to the right of the existing labels.\n5 Save and Apply button ONLY: rectangle (388,600) to (516,623), badge center (550,612) in empty space immediately to its right.\nDo not draw new graph edges. Do not alter any original pins/nodes/labels or path, especially Material graph, Animation, Particles, Terrain / Navigation, Base color output, Metallic output, Roughness output, Graph asset, Load graph, Save and Apply. Added text is only numerals 1,2,3,4,5.",
+    "08-project-settings": "Use case: precise-object-edit. Asset type: real software screenshot annotation for a Korean user manual.\nThe input is the EDIT TARGET, not design inspiration. Treat the original screenshot as a locked raster canvas. Preserve EVERY existing UI label, glyph, number, control, color, pixel, panel boundary, 3D object, lighting, texture, geometry and crop. Do not redraw, recreate, improve, translate or retype the interface. No mockup.\nONLY ADD thin bright-red rectangular outlines and small red circular number badges with white numerals. No arrows, no explanatory text, no Korean text, no new controls. Place badges only over empty space, never over an existing label or control.\nOutput PNG at the input's exact 1280x900 dimensions. Do not resize, rescale, crop, extend, recolor, brighten, darken, blur or sharpen the screenshot. All pixels outside the red outline/badge overlays must remain identical to the input. Outlines about 3 pixels; badges about 24 pixels with crisp white digits. Numbers restart from 1 in each image.\nAdd exactly FOUR numbered outlines to the EXISTING Project Settings window:\n1 Startup scene section: rectangle (305,164) to (946,279), badge center (920,249) in empty right side of the Refresh row.\n2 Renderer defaults section: rectangle (305,280) to (946,546), badge center (920,421) over empty space to the right of controls.\n3 Editor camera keys section: rectangle (305,548) to (946,747), badge center (921,559) at empty right end of the section header.\n4 Save and Apply button ONLY: rectangle (306,749) to (434,773), badge center (570,761) over empty space to the right of Revert edits.\nKeep every current checkbox state, W/S/A/D/E/Q binding, support message and long file path exactly as photographed. Do not invent or modify controls. Added text is only numerals 1,2,3,4."
   },
   "captures": [
     {
@@ -141,6 +144,165 @@
           "sha256": "d3e22dd387e84b2899e9ba432c54f2ce241a9f2314c27228fbf4c742576b9e91"
         }
       ]
+    },
+    {
+      "mode": "06-workspace",
+      "set": "authoring-06-08",
+      "source_mode": "overview",
+      "rendered_frames": 120,
+      "clean_shutdown": true,
+      "validation_errors": 0,
+      "legend": {
+        "1": "Top menus / Play",
+        "2": "Hierarchy",
+        "3": "Scene",
+        "4": "Inspector",
+        "5": "Project tools"
+      },
+      "files": [
+        {
+          "path": "raw/06-workspace.png",
+          "pixels": [
+            1280,
+            900
+          ],
+          "bytes": 143002,
+          "sha256": "681e46a4cf12bc9e8bffe995e16041cfb98d5c8e373757c5b7983c39f81699a9"
+        },
+        {
+          "path": "06-workspace.png",
+          "pixels": [
+            1495,
+            1052
+          ],
+          "bytes": 1576817,
+          "sha256": "64eefa0f1a375c804d2d7d2a2a36f1d6abaf2cb8ee7852470b44e3b2b86e52bd"
+        }
+      ]
+    },
+    {
+      "mode": "07-authoring-tools",
+      "set": "authoring-06-08",
+      "source_mode": "tools",
+      "rendered_frames": 120,
+      "clean_shutdown": true,
+      "validation_errors": 0,
+      "legend": {
+        "1": "Four authoring tabs",
+        "2": "New node / Add / Undo / Redo",
+        "3": "Node canvas and pins",
+        "4": "Outputs / Graph asset",
+        "5": "Save and Apply"
+      },
+      "files": [
+        {
+          "path": "raw/07-authoring-tools.png",
+          "pixels": [
+            1280,
+            900
+          ],
+          "bytes": 121805,
+          "sha256": "d778e0235b9ed0291d3819d992c8d9c0d9e48383193f1c7de658ea0e7d21ef01"
+        },
+        {
+          "path": "07-authoring-tools.png",
+          "pixels": [
+            1495,
+            1052
+          ],
+          "bytes": 1618799,
+          "sha256": "1fbc8c2957f65f5a5c16cea0c6437f1439af9d9c15d318738f7b709a3782cd4c"
+        }
+      ]
+    },
+    {
+      "mode": "08-project-settings",
+      "set": "authoring-06-08",
+      "source_mode": "settings",
+      "rendered_frames": 120,
+      "clean_shutdown": true,
+      "validation_errors": 0,
+      "legend": {
+        "1": "Startup scene",
+        "2": "Renderer defaults",
+        "3": "Editor camera keys",
+        "4": "Save and Apply"
+      },
+      "files": [
+        {
+          "path": "raw/08-project-settings.png",
+          "pixels": [
+            1280,
+            900
+          ],
+          "bytes": 179460,
+          "sha256": "a580789734e5df0365c2ad1fc6e54fb1fa8dac18bd1de05826993bbdac15fce9"
+        },
+        {
+          "path": "08-project-settings.png",
+          "pixels": [
+            1495,
+            1052
+          ],
+          "bytes": 1585191,
+          "sha256": "ae2438d5137624df66e6fabcfc2fb1d4548828bba0d693d423844b3cf559e112"
+        }
+      ]
     }
-  ]
+  ],
+  "legacy_global_fields_apply_to": "Classic capture set 01-05; original capture records retained unchanged.",
+  "annotation_prompt_file": "annotation-prompts.json",
+  "authoring_capture_set": {
+    "set": "authoring-06-08",
+    "repository_head_observed_at_capture_handoff": "6fa96001",
+    "source": "Actual normal --project startup of a byte-identical isolated examples/authoring-demo copy; source demo11file hashes rechecked before publication.",
+    "source_capture_metadata": "build/authoring/manual-release/capture-info.json",
+    "source_project_hashes": {
+      ".gitignore": "e41fbb9f769a53c8141b7ce45533f250d4ca9186f61b5f22a87d04d81806d27f",
+      "Assets/Models/CheckerPyramid.mtl": "8d95b38f423f56af474a930c31179c7d53ed481c1c316e7d26fd3845c8397a09",
+      "Assets/Models/CheckerPyramid.mtl.jasset": "9f1697b2bc1b7be2eef90c6e8376409f2d35d2508946f5dceec499d776891b28",
+      "Assets/Models/CheckerPyramid.obj": "b39df4858e8c2b0ad4aea653294b43a2a9f8486ccbd486a955782e657ac37689",
+      "Assets/Models/CheckerPyramid.obj.jasset": "c5e1cc7d6ee8860fc1f596a71a45f58985ee820c15785d34e45cdc294cbc25d7",
+      "Assets/Textures/StudioChecker.png": "d7c4baebc88eba23db725b51ba534ec255fa9f473304a750cd8edfe5ab3e85c2",
+      "Assets/Textures/StudioChecker.png.jasset": "f998ef818a951b842127b5a7714e6b95d996b032751f1400aca72b2cf76654ef",
+      "README.md": "69571d0bc0911ed2ba73fe604a84838c080e090b71df5647b475969464a13866",
+      "Scenes/Studio.jscene": "468419b323f76577a8a1a9fdb8f5aa02de8575800bb9d72a5c6fe181ca39549b",
+      "Scenes/Studio.jscene.jasset": "e8d2b0618d9bf7fce4f184e26f89e71dfdfe1a48c203922d166a1bd167936e7c",
+      "project.jproject": "077d2b18b0da875a0d1cf2a10134ad207c5ec1856c3e93bc8d2c02f8e4c7d706"
+    },
+    "source_project_preserved": true,
+    "original_preferences_preserved": true,
+    "source_binary_sha256": "d7a2fba8d13e53752437095cf2239c0bfb8a02af58c2820a5c179f2690618dec",
+    "source_main_sha256": "0d0208c9753654711af026117ed129b85a241e642a7368f1c95ea25a9341b099",
+    "capture_frame": 60,
+    "rendered_frames_per_mode": 120,
+    "raw_pixels": [
+      1280,
+      900
+    ],
+    "global_text_scale": 1.15,
+    "runtime": {
+      "VK_DRIVER_FILES": "/Users/Shared/git/jEngine/build/macos-rayquery/MoltenVK_icd.json",
+      "VK_ICD_FILENAMES": null,
+      "MVK_CONFIG_ENABLE_EXPERIMENTAL_RAY_TRACING": "1",
+      "VK_INSTANCE_LAYERS": "VK_LAYER_KHRONOS_validation",
+      "MTL_DEBUG_LAYER": "1"
+    },
+    "annotation_method": "Built-in image_gen__imagegen referenced-image edits only. Raw PNGs copied unmodified. No CLI/API/Python raster edits or compositing.",
+    "annotation_pixels": [
+      1495,
+      1052
+    ],
+    "annotation_fidelity": "Annotated outputs are upscaled by the built-in tool. Visual semantic UI/text/value/geometry preservation was reviewed; bit-identical generated pixels are NOT claimed. Raw SHA256 PNGs are authoritative.",
+    "semantic_review": {
+      "workspace": "Five panels/menus; all12entity names; selected Coral box ID3; Position -23/11/6, Rotation0/-15/0, Scale0.600/1.100/0.600, RGB242/74/56, Metallic0, Roughness0.420, Opacity1, visible floor/colored objects/checker model unchanged.",
+      "tools": "Existing four tabs, three unconnected constant nodes and A/B/Out pins, output IDs1/2/3, Assets/Materials/Material.jmaterial path and existing Load graph/Save and Apply retained.",
+      "settings": "Existing startup path/Scene picker; Deferred checked and other shown requests unchecked; actual Inline support message; intensity1.000/rays16; W/S/A/D/E/Q bindings; existing Save/Revert/Defaults retained.",
+      "refinements": "One annotation-only refinement each: workspace rectangles include title tabs; tools rectangle2 includes New node selector and Add/Undo/Redo. No added GUI controls, graph links, explanatory words or Korean image text."
+    },
+    "targeted_iteration_prompts": {
+      "06-workspace": "Use case: precise-object-edit. EDIT TARGET is the supplied already annotated real screenshot. Make ONE targeted annotation-only correction: move ONLY the top horizontal edges of the red rectangles for numbers 2, 3 and 4 upward from y49 to about y27 in this 1495x1052 image, extending their existing vertical sides to include the existing Hierarchy, Scene and Inspector title tabs. Keep their existing left/right/bottom edges, all five number badges and all other outlines unchanged. Preserve EVERY original UI glyph, label, number, control, scene object, texture, lighting and geometry exactly as supplied. Do not redraw, enhance, translate, retype or rearrange anything. Do not add or remove any text. Keep the same full image, aspect ratio and resolution. Only these three red top edges/short side extensions may change.",
+      "07-authoring-tools": "Use case: precise-object-edit. EDIT TARGET is the supplied already annotated real screenshot. Make ONE targeted annotation-only correction: expand ONLY the red rectangle belonging to badge 2 so it encloses BOTH the existing Color/New node selector row AND the Add node/Undo graph/Redo graph button row. In this 1495x1052 image use rectangle approximately left338, top162, right980, bottom222. Keep badge 2 at its current blank-space position and keep every other red rectangle/badge unchanged. Preserve EVERY original UI glyph, label, value, control, node, pin, path, scene geometry and pixel appearance. No new controls, no extra words, no translation, no retyping, no graph links. Keep the same full image, aspect ratio and resolution. Only the red outline 2 may change."
+    }
+  }
 }

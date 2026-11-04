@@ -8,11 +8,12 @@
 [![DirectX 12](https://img.shields.io/badge/DirectX-12-107C10)](#supported-platforms)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Simple toy engine for implementing graphics feature with multiple api
+A personal 3D engine and editor using Vulkan and DirectX 12.
  - Documentation : https://scahp.tistory.com/120
 
 [**User manual (Korean)**](docs/manual/README.md) — numbered screenshots, scene loading,
-object placement, SurfelGI, and console commands.
+projects, scene editing, assets, authoring tools, and packaging.
+[Editor guide](docs/editor-authoring.md) · [Implementation and measurements](docs/reports/editor-authoring.md) · [Studio sample](examples/authoring-demo/README.md)
 
 ## Supported platforms
 
@@ -111,3 +112,4 @@ See [third-party notices](THIRD_PARTY_NOTICES.md).
 11. stb : https://github.com/nothings/stb
 12. WinPixEventRuntime : https://devblogs.microsoft.com/pix/winpixeventruntime/
 13. xxHash : https://github.com/Cyan4973/xxHash
+14. Recast Navigation : https://github.com/recastnavigation/recastnavigation

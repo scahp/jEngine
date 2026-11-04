@@ -1,0 +1,491 @@
+{
+  "success": true,
+  "engine_sha256": "d5a3674f4180ee787701e3264d8ea2650ca40398f1080a4c886abe53d16f43de",
+  "api": "vulkan",
+  "cases": {
+    "workflow": {
+      "exit_code": 0,
+      "validation_problems": [],
+      "pass_lines": 44,
+      "workflow_report": {
+        "authoredEntities": 100,
+        "checks": [
+          {
+            "detail": "",
+            "name": "real project opens through transactional workspace lifecycle",
+            "pass": true,
+            "renderedFrames": 0
+          },
+          {
+            "detail": "",
+            "name": "100 mixed entities enter one actual document transaction",
+            "pass": true,
+            "renderedFrames": 0
+          },
+          {
+            "detail": "",
+            "name": "real platform and renderer advertise detached-window support",
+            "pass": true,
+            "renderedFrames": 0
+          },
+          {
+            "detail": "",
+            "name": "fixture camera projects authored grid center inside the actual view volume",
+            "pass": true,
+            "renderedFrames": 30
+          },
+          {
+            "detail": "",
+            "name": "actual pre-UI scene preview texture exists and supports independent GPU readback",
+            "pass": true,
+            "renderedFrames": 30
+          },
+          {
+            "detail": "",
+            "name": "GPU scene pixels contain visible varied geometry before any UI gizmo or thumbnail overlays",
+            "pass": true,
+            "renderedFrames": 30
+          },
+          {
+            "detail": "",
+            "name": "scene preview pixels are opaque so ImGui compositing cannot hide the rendered world",
+            "pass": true,
+            "renderedFrames": 30
+          },
+          {
+            "detail": "",
+            "name": "terrain floor is actually rasterized from above at an unoccluded pre-UI pixel patch",
+            "pass": true,
+            "renderedFrames": 30
+          },
+          {
+            "detail": "",
+            "name": "all 100 typed entities publish actual owned object/light/GPU bindings",
+            "pass": true,
+            "renderedFrames": 30
+          },
+          {
+            "detail": "Model upload complete; publishing shared instances.",
+            "name": "real OBJ and PNG import completes from CPU preparation through GPU admission",
+            "pass": true,
+            "renderedFrames": 30
+          },
+          {
+            "detail": "",
+            "name": "model instances have independent identities and share actual geometry/texture material resources",
+            "pass": true,
+            "renderedFrames": 30
+          },
+          {
+            "detail": "",
+            "name": "repeated primitive instances share actual GPU geometry rather than reuploading each mesh",
+            "pass": true,
+            "renderedFrames": 30
+          },
+          {
+            "detail": "",
+            "name": "parented mixed-axis authored transform reaches actual render-object world matrix",
+            "pass": true,
+            "renderedFrames": 30
+          },
+          {
+            "detail": "",
+            "name": "actual authored point/spot lights expose positioned runtime and shadow-camera resources",
+            "pass": true,
+            "renderedFrames": 30
+          },
+          {
+            "detail": "",
+            "name": "material edit clones only the edited runtime material and retains shared geometry/original material",
+            "pass": true,
+            "renderedFrames": 32
+          },
+          {
+            "detail": "",
+            "name": "authored override participates in real renderer descriptor publication after submitted frames",
+            "pass": true,
+            "renderedFrames": 32
+          },
+          {
+            "detail": "",
+            "name": "100 live entities save through production atomic persistence",
+            "pass": true,
+            "renderedFrames": 32
+          },
+          {
+            "detail": "",
+            "name": "duplicate command publishes independent live instance with shared GPU geometry",
+            "pass": true,
+            "renderedFrames": 34
+          },
+          {
+            "detail": "",
+            "name": "delete command accepts selected duplicate",
+            "pass": true,
+            "renderedFrames": 34
+          },
+          {
+            "detail": "",
+            "name": "delete retires actual runtime instance and clears authored ID",
+            "pass": true,
+            "renderedFrames": 36
+          },
+          {
+            "detail": "",
+            "name": "Undo restores delete command",
+            "pass": true,
+            "renderedFrames": 36
+          },
+          {
+            "detail": "",
+            "name": "Undo reconstructs actual GPU-backed instance under its original stable ID",
+            "pass": true,
+            "renderedFrames": 38
+          },
+          {
+            "detail": "",
+            "name": "Redo reapplies delete command",
+            "pass": true,
+            "renderedFrames": 38
+          },
+          {
+            "detail": "",
+            "name": "Redo removes reconstructed instance without stale world bindings",
+            "pass": true,
+            "renderedFrames": 40
+          },
+          {
+            "detail": "",
+            "name": "workspace reopens the saved authored scene transactionally",
+            "pass": true,
+            "renderedFrames": 40
+          },
+          {
+            "detail": "",
+            "name": "save/reopen preserves all stable IDs/properties and rebuilds real model/light bindings",
+            "pass": true,
+            "renderedFrames": 43
+          },
+          {
+            "detail": "",
+            "name": "prefab stores selected real authored instance",
+            "pass": true,
+            "renderedFrames": 43
+          },
+          {
+            "detail": "",
+            "name": "prefab instantiation creates a real renderer instance",
+            "pass": true,
+            "renderedFrames": 45
+          },
+          {
+            "detail": "",
+            "name": "prefab instantiate supports Undo",
+            "pass": true,
+            "renderedFrames": 45
+          },
+          {
+            "detail": "",
+            "name": "prefab Undo retires real instance",
+            "pass": true,
+            "renderedFrames": 47
+          },
+          {
+            "detail": "",
+            "name": "Play begins from real edit-state snapshot and timeline seek",
+            "pass": true,
+            "renderedFrames": 47
+          },
+          {
+            "detail": "",
+            "name": "Play sampling moves the actual GPU-rendered world without editing authored data",
+            "pass": true,
+            "renderedFrames": 50
+          },
+          {
+            "detail": "",
+            "name": "Play activates authored primary camera in the actual renderer",
+            "pass": true,
+            "renderedFrames": 50
+          },
+          {
+            "detail": "",
+            "name": "Play-only entity actually publishes live geometry",
+            "pass": true,
+            "renderedFrames": 52
+          },
+          {
+            "detail": "",
+            "name": "Stop restores edit snapshot",
+            "pass": true,
+            "renderedFrames": 52
+          },
+          {
+            "detail": "",
+            "name": "Stop removes ephemeral GPU instance and restores exact edit scene/camera state",
+            "pass": true,
+            "renderedFrames": 55
+          },
+          {
+            "detail": "",
+            "name": "terrain brush edits the actual authored height grid",
+            "pass": true,
+            "renderedFrames": 55
+          },
+          {
+            "detail": "",
+            "name": "terrain edit replaces actual uploaded geometry generation at frame-safe boundary",
+            "pass": true,
+            "renderedFrames": 58
+          },
+          {
+            "detail": "",
+            "name": "painted terrain GPU vertex bytes match the actual rebuilt CPU vertex stream",
+            "pass": true,
+            "renderedFrames": 58
+          },
+          {
+            "detail": "",
+            "name": "terrain brush undo command accepted",
+            "pass": true,
+            "renderedFrames": 58
+          },
+          {
+            "detail": "",
+            "name": "terrain Undo restores flat data and a live geometry generation",
+            "pass": true,
+            "renderedFrames": 61
+          },
+          {
+            "detail": "",
+            "name": "full initialized engine submits at least 144 bounded editor frames",
+            "pass": true,
+            "renderedFrames": 144
+          },
+          {
+            "detail": "",
+            "name": "detached ImGui window has a real OS handle renderer data and multiple submitted platform frames",
+            "pass": true,
+            "renderedFrames": 144
+          },
+          {
+            "detail": "",
+            "name": "closing detached probe drains and destroys secondary renderer/OS viewport resources",
+            "pass": true,
+            "renderedFrames": 148
+          }
+        ],
+        "failureCount": 0,
+        "finalScene": "/Users/Shared/git/jEngine-ci-integration/build/authoring/terrain-verified-gpu/workflow/fixture-5735814787409125/Scenes/100-entities.jscene",
+        "fixtureCamera": {
+          "centerClip": [
+            0.0,
+            0.00048828125,
+            975.21484375,
+            976.166015625
+          ],
+          "position": [
+            0.0,
+            5480.0,
+            -850.0
+          ],
+          "target": [
+            0.0,
+            4998.11474609375,
+            3.3385009765625
+          ]
+        },
+        "fixtureProject": "/Users/Shared/git/jEngine-ci-integration/build/authoring/terrain-verified-gpu/workflow/fixture-5735814787409125/project.jproject",
+        "frameCpuMilliseconds": [
+          1329.427084,
+          7.676291,
+          9.229583,
+          15.492541,
+          23.8475,
+          4.916959,
+          15.817625,
+          4.272583,
+          8.126083,
+          9.511292,
+          10.249959,
+          9.861375,
+          6.707041,
+          8.029292,
+          8.373959,
+          8.706583,
+          7.865958,
+          9.000625,
+          8.886667,
+          10.029375,
+          8.241667,
+          8.472417,
+          9.909166,
+          8.506625,
+          8.674167,
+          8.958667,
+          9.528084,
+          8.433167,
+          8.38175,
+          9.007,
+          8.843667,
+          11.168,
+          14.935209,
+          4.440791,
+          17.641834,
+          11.745917,
+          13.262333,
+          4.506542,
+          18.359375,
+          11.312458,
+          4.579916,
+          4.255458,
+          8.611625,
+          7.995208,
+          4.363583,
+          15.727375,
+          11.250583,
+          6.104875,
+          13.205583,
+          12.341583,
+          6.763458,
+          13.095458,
+          12.426792,
+          11.915583,
+          4.8705,
+          7.798917,
+          12.332958,
+          3.9385,
+          6.715292,
+          525.159334,
+          4.439709,
+          5.518334,
+          8.491084,
+          8.34575,
+          9.014667,
+          9.509166,
+          8.152209,
+          8.291709,
+          8.927166,
+          8.831917,
+          8.799583,
+          8.920583,
+          8.83475,
+          8.891333,
+          8.463791,
+          9.423667,
+          8.259833,
+          9.126333,
+          9.479833,
+          9.1155,
+          9.505917,
+          8.156459,
+          9.218459,
+          8.313208,
+          8.800458,
+          8.975375,
+          8.2265,
+          8.373209,
+          8.6325,
+          8.853834,
+          8.753791,
+          8.419833,
+          8.399375,
+          8.556875,
+          9.643458,
+          9.068875,
+          8.953,
+          8.350333,
+          8.381792,
+          9.766083,
+          8.409,
+          8.407458,
+          8.200167,
+          8.861625,
+          9.0395,
+          8.244042,
+          8.388666,
+          8.357083,
+          8.867458,
+          8.117625,
+          8.542708,
+          9.581666,
+          8.54,
+          8.693833,
+          8.148458,
+          8.738166,
+          8.43825,
+          9.378167,
+          8.903583,
+          10.003833,
+          9.328666,
+          8.367958,
+          9.42275,
+          8.377125,
+          9.103209,
+          8.754125,
+          9.160666,
+          8.298875,
+          8.955083,
+          8.248583,
+          9.463333,
+          7.946459,
+          10.380542,
+          10.059708,
+          9.135667,
+          9.051792,
+          8.489166,
+          8.836292,
+          8.320708,
+          8.762834,
+          8.714959,
+          8.256041,
+          8.853541,
+          8.52825,
+          22.185292,
+          4.259334,
+          3.988458,
+          9.238958
+        ],
+        "inlineRaySupported": true,
+        "liveGpuMeshes": 95,
+        "liveLightBindings": 3,
+        "liveObjectBindings": 95,
+        "materialUboReadback": "Not exposed publicly; checked live COW properties and actual descriptor publication.",
+        "maximumPlatformViewports": 2,
+        "preUiScenePixels": {
+          "available": true,
+          "distinctColorsAtMost1024": 1024,
+          "floorProbe": {
+            "inside": true,
+            "litPixels": 49,
+            "pixelX": 1004,
+            "pixelY": 547,
+            "samples": 49,
+            "world": [
+              380.0,
+              4990.0,
+              -380.0
+            ]
+          },
+          "height": 720,
+          "litPixels": 165240,
+          "maximumRgb": 255,
+          "minimumRgb": 0,
+          "opaquePixels": 921600,
+          "png": "/Users/Shared/git/jEngine-ci-integration/build/authoring/terrain-verified-gpu/workflow/scene-preview-before-ui.png",
+          "pngSaved": true,
+          "readback": true,
+          "width": 1280
+        },
+        "renderedFrames": 148,
+        "rhi": "Vulkan",
+        "schemaVersion": 1,
+        "scope": "Actual initialized engine, GPU resources, owner-thread frame lifecycle and platform windows",
+        "secondaryRenderedFrames": 144,
+        "status": "passed",
+        "test": "editor-authoring-gpu"
+      }
+    }
+  },
+  "checkout_preferences_preserved": true
+}

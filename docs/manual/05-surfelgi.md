@@ -4,11 +4,15 @@
 
 SurfelGI는 표면 위의 작은 샘플인 **surfel**에 조명 정보를 모아 간접광을 표현하는 실험 기능입니다. 먼저 기본 켜기·끄기와 표시 옵션을 비교한 뒤, 지원 환경에서 Inline Ray Gather를 시험하세요.
 
-**진입 경로:** `Features → SurfelGI`를 켠 뒤 오른쪽 `SurfelGI` 탭을 선택합니다.
+**기본 켜기·강도:** `Window → Project settings → Renderer defaults`에서 `SurfelGI`, `SurfelGI intensity`를 바꾸고 `Save and Apply`를 누릅니다.
+
+새 저작 화면의 위치는 [프로젝트 설정 그림의 ② Renderer defaults·④ Save and Apply](03-scene-browser.md)를 참고하세요. 아래 ①~⑤ 번호는 별도의 클래식 SurfelGI 그림에만 해당합니다.
+
+**그림의 자세한 시각화 패널:** `F10`으로 클래식 렌더링 화면을 연 뒤 `Features → SurfelGI`와 오른쪽 `SurfelGI` 탭을 선택합니다. 다시 F10을 누르면 저작 화면으로 돌아옵니다.
 
 ![현재 SurfelGI 패널의 활성화, 강도, 샘플 예산과 시각화 옵션](images/04-surfelgi.png)
 
-1280×900 실제 실행 원본에 빨간 번호 주석을 추가한 그림입니다. [원본 보기](images/raw/04-surfelgi.png)
+**클래식 SurfelGI 패널 참고 그림입니다.** 1280×900 실제 실행 원본에 빨간 번호 주석을 추가했습니다. [원본 보기](images/raw/04-surfelgi.png)
 
 ## 화면에서 켜고 비교하기
 
@@ -36,7 +40,9 @@ SurfelGI는 표면 위의 작은 샘플인 **surfel**에 조명 정보를 모아
 
 ## Inline Ray Gather는 어디서 켜나요?
 
-**현재 그림의 간단한 SurfelGI 패널에는 `Enable Inline Ray Gather` 체크박스가 없습니다.** 이 설정은 콘솔 명령 또는 실행 환경변수로 바꿉니다. 먼저 [콘솔 여는 법](06-console-logs.md)을 확인한 뒤 다음을 입력하세요.
+새 저작 화면에서는 `Window → Project settings → Renderer defaults → Inline ray gather (requested)`를 켜고 `Save and Apply`를 누릅니다. 같은 창의 지원 상태가 실제 활성 가능 여부를 알려줍니다. `Inline rays per surfel`은 1~16 범위입니다. 요청값을 프로젝트에 저장해도 지원하지 않는 장치에서는 실제 Inline 경로를 끕니다.
+
+**현재 그림의 클래식 간단 패널에는 이 Inline 체크박스가 없습니다.** 콘솔 명령이나 실행 환경변수로도 바꿀 수 있습니다. 먼저 [콘솔 여는 법](06-console-logs.md)을 확인한 뒤 다음을 입력하세요.
 
 ```text
 r.surfelgi.inline_ray.enable

@@ -1,93 +1,65 @@
-# From rendering prototype to a usable personal engine
+# jEngine authoring and runtime roadmap
 
-jEngine already has substantial rendering work: two graphics APIs, material and
-mesh rendering, scene cameras/lights, postprocessing, hardware ray queries and
-SurfelGI. The next milestone is a complete authoring loop: create a project,
-import assets, place and edit objects, save, reopen, run and package a small game
-without changing engine source for each scene.
+The current editor implements a project-to-runtime workflow: create a project,
+import assets, edit a hierarchy, save and reopen a scene, preview it with Play,
+and export a runtime folder. See the [authoring guide](editor-authoring.md),
+[Korean manual](manual/README.md) and [verification report](reports/editor-authoring.md)
+for supported behavior and measured limits.
 
-This roadmap targets a small 3D engine for one developer. A feature's presence in
-a commercial engine is not, by itself, a reason to implement it here.
+## Implemented editor foundation
 
-## Milestones and acceptance criteria
-
-| Priority | Work | Completion criterion |
-| --- | --- | --- |
-| Foundation, this change | Bounded asynchronous logging, CPU asset preparation with owner-thread publication, placement UI and repeatable benchmarks | Worker errors reach a bounded console and rotating file; Model import requests can fail/cancel without clearing the current scene; no worker mutates scene/GPU state; measured regressions pass. |
-| Next: reliable scene editing | Stable entity/asset IDs, scene hierarchy and parent transforms, scene save/load with schema versions, explicit edit commands and undo/redo | Import and place 100 mixed instances, edit/reparent/duplicate/delete, undo/redo, save and reopen with the same IDs/materials/transforms. |
-| Next: asset workflow | Asset registry and browser, source/import settings, dependency graph, shared mesh/material instances, thumbnails, import cache and safe reference-counted eviction | Reuse one mesh in 1,000 instances without decoding/uploading it 1,000 times; modified sources invalidate only affected imports; memory has a measured bound. |
-| Next: upload and failure handling | Graphics-queue upload batches, byte budgets, completion tickets, staging retirement and backend allocation-error propagation | Large imports publish only after completed uploads; cancellation retires submitted work by fence; a budget/allocation failure reports an error without dereferencing a null resource. |
-| Next: runtime boundary | Project settings, runtime/editor targets, play/stop state restoration, application lifecycle and input actions | Play mode starts from a scene copy, stop restores editing state; a packaged runtime opens the saved scene without editor panels or source-tree working-directory assumptions. |
-| Game-specific runtime | Minimal collision/physics, audio, animation, gameplay components and serialization as required by the first sample game | One small game can be authored and packaged with automated load/play/shutdown checks on Windows and macOS. Select maintained libraries before implementing these systems. |
-| Later: tooling scale | Docking/viewports, material tools, profiler timeline, hot reload and import cooking | Each feature has its own platform/lifetime tests and demonstrated authoring benefit. Parallel rendering or a larger job system requires profiling evidence first. |
-
-Stable IDs, commands, serialization and resource ownership precede arbitrary
-scene duplication and general undo. A pointer/index copied into an undo record
-does not provide a safe lifetime model.
-
-## Editor layout
-
-Use the existing ImGui and ImGuizmo first. A docking upgrade also changes backend
-and window lifecycle behavior; it is a separate, testable migration.
-
-| Area | Purpose |
+| Area | Current behavior |
 | --- | --- |
-| Center | Scene viewport, selection outline, move/rotate/scale gizmo, local/world modes and explicit snapping. Camera input is suppressed while typing in UI. |
-| Left | Searchable scene hierarchy with clipped rows, stable selection and an Add action. Parent/child hierarchy arrives with stable scene IDs. |
-| Right | Selection inspector with typed transform/material/light properties, units and validation. Editing a field creates one undoable command in the next milestone. |
-| Bottom | Asset browser/import queue and bounded searchable logs. Failed Model imports retain the current scene and expose a useful error. |
-| Top | Project/scene/save, play/stop and build actions. Add these as their underlying workflows become functional. |
+| Persistence and commands | Versioned `.jscene`, stable IDs, parent transforms, atomic saves/backups, autosave recovery, bounded Undo/Redo, transactions, Prefabs and multi-root clipboard operations. |
+| Workspace | Docked Hierarchy/Scene/Inspector/Project tools, optional native platform windows, saved layouts, multiselection and shared-pivot gizmos, guarded camera and keyboard input. |
+| Assets | Stable registry IDs and sidecars, dependency scans, folder/search/PNG previews, drag-to-scene, import settings, cancel/reimport, shared geometry and material/texture leases. |
+| Uploads | Byte/chunk/admission budgets, completion tickets, staged publication and cancellation retirement on the render owner thread. |
+| Authoring tools | PBR Inspector, bounded material graph, transform timeline, CPU billboard particles, terrain heightfields/brushes, selected-terrain Recast/Detour bake and path queries. |
+| Runtime and extensions | Play/Stop restoration, authored cameras, validated project settings, staged runtime export, versioned C ABI plugins and compiled-library reload/state migration. |
+| Diagnostics | Filtered bounded console, rotating JSON logs, import/resource counters, editor diagnostics and reproducible tests. |
 
-The current placement panel can provide compact **Add**, **Scene** and
-**Inspector** sections without requiring a new window system. Search and clipping
-must avoid formatting and submitting thousands of hidden rows. Multi-selection,
-arbitrary duplicate, group pivots, undo and general scene saving remain explicit
-follow-up work rather than partially working buttons.
+These implementations have defined scopes. Material graphs do not compile an
+arbitrary shading language; animation covers transforms rather than skeletons;
+particles use CPU simulation and raster rendering; navigation queries selected
+terrain rather than a complete game world. Packaging targets the host OS and
+architecture. See the guide before treating a feature name as a broader contract.
 
-## Asset/thread ownership contract
+## Next engine milestones
 
-1. A request copies its path/settings and receives an ID. Queue capacity and
-   completed CPU payload count are bounded. The scene browser uses the latest
-   requested scene; superseded results cannot publish themselves.
-2. CPU workers perform file reading, Assimp parsing, image decoding and stream
-   preparation. They own their intermediate data. Per-key in-flight decoding
-   shares results; a failed request can be retried.
-3. The scene/render owner thread polls completions. It creates GPU resources and
-   scene objects, then publishes a successful scene. Workers never call the RHI
-   or register global scene objects.
-4. Cancellation is cooperative between phases; an active library parse/decode
-   cannot be forcibly interrupted. Shutdown stops admission, cancels and joins
-   workers before releasing scene/GPU infrastructure.
-5. Initial GPU finalization remains synchronous and limited by request count,
-   not a guaranteed millisecond budget. The next step is staged uploads with
-   byte/time budgets and fence-based publication, after upload ownership is explicit.
+| Priority | Work | Acceptance criterion |
+| --- | --- | --- |
+| First sample game | Choose a small game and implement only its gameplay components, lifecycle and input actions. | Author, save, run and package a complete playable loop without editing engine source for each scene. |
+| Resident resource budgets | Handles and dependency-aware eviction across legacy and authored resources; streaming and measured RAM/VRAM ceilings. | Reuse one model in 1,000 instances, reimport safely while drawing, and prove bounded memory after repeated load/unload cycles. |
+| Remaining owner-thread stalls | Trace shader compilation, allocations, material texture upload, thumbnails, terrain rebuilds and acceleration structures. | Publish large imports without hiding long driver/AS work behind a byte-budget claim; record per-phase and tail latency. |
+| Gameplay services | Select maintained physics/collision and audio libraries; add game-specific scripting/components and serialization. | An actual sample uses collision, sound and reproducible play/load/shutdown checks on Windows and macOS. |
+| Broader authoring | Skeletal animation/events, richer graph compilation, model-render thumbnails, viewport terrain painting, navigation overlays/agents. | Each feature changes the actual runtime result and includes persistence, Undo, lifetime and platform tests. |
+| Deployment quality | Installers, platform signing/notarization, update and crash-recovery workflows. | A clean user machine runs an exported sample and exposes actionable startup diagnostics. |
 
-The legacy PathTracing importer remains synchronous and clears the previous scene before loading; its failure path is not transactional. The new retention/cancellation guarantee applies to the Model importer only.
+## Thread and resource ownership
 
-The existing renderer keeps raw texture references backed by caches. Evicting
-those cache entries would create dangling references. A real asset handle and
-resource ownership migration is required before promising a hard total-memory
-budget; a bounded import queue alone does not provide that guarantee.
-Owner-thread finalization checks the resulting model buffers, but lower-level
-backends do not yet propagate every allocation/device failure safely. Device loss
-or arbitrary GPU out-of-memory recovery is not guaranteed by this change.
+1. Requests copy paths/settings and receive IDs/generations. Queues and ready
+   payload counts are bounded; superseded results cannot publish themselves.
+2. CPU workers own file reading, import parsing, decoding and plain preparation
+   results. They never mutate scene registries or submit RHI work.
+3. The render owner admits upload chunks, tracks completion tickets and publishes
+   finished model instances. Cancellation retires submitted resources by completion.
+4. Library parsing/decoding is cooperatively cancellable between phases. Shutdown
+   cancels and joins workers before destroying the scene/GPU infrastructure.
+5. Shared geometry and material/texture leases keep old revisions alive while
+   consumers reference them. Legacy raw-reference caches still require migration
+   before promising a hard total-memory ceiling.
 
-## Bottlenecks and measurement
+A byte budget limits copy work, and an admission timer decides whether to start
+another chunk. Neither preempts a driver allocation, shader compilation or AS
+build that is already running. Legacy PathTracing scene import remains synchronous
+and its replacement path has different failure behavior from authored models.
+Arbitrary device-loss/out-of-memory recovery is not guaranteed.
 
-The audit identified a macOS image-cache lock spanning decoding, console locking
-across UI drawing, unbounded console retention, all-row placement UI work, and
-synchronous scene import/upload. The foundation change addresses these concrete
-paths. Existing per-resource GPU waits, shader compilation and path-tracing
-import/publication need separate traces before changing their synchronization.
-The shader watcher's cross-thread stop flag is now atomic, and Vulkan texture
-creation avoids one unused staging allocation and full-image copy. Actual texture
-upload/mip waits and publication/acceleration-structure completion waits remain.
-Vulkan mesh copy submissions are asynchronous; they must not be reported as a
-queue-idle wait per mesh. A future batching path should return explicit completion
-tickets and initially use the graphics queue before extending queue-family ownership.
+## Measurement contract
 
-Record CPU preparation, queue wait, owner-thread upload/publish, frame time,
-peak staging memory and cancellations separately. Compare the same assets,
-build configuration, driver, resolution and camera; distinguish CPU-only
-microbenchmarks from actual rendered-frame measurements. Keep raw samples and
-report median/tail latency, including regressions and unchanged results.
+Record CPU preparation, queue wait, upload admission, submission/completion,
+scene/AS publication, steady frame time, staging memory and cancellation separately.
+Use the same assets, build configuration, driver, resolution, camera and temporal
+history for before/after comparisons. Report new-feature overhead and regressions
+alongside improvements; CPU-only or cached-list gains do not establish an engine
+FPS improvement.

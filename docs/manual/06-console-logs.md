@@ -1,14 +1,29 @@
 # 6. 콘솔과 로그
 
-[← 이전: SurfelGI](05-surfelgi.md) · [목차](README.md) · [다음: 문제 해결과 한계 →](07-troubleshooting.md)
+[← 이전: SurfelGI](05-surfelgi.md) · [목차](README.md) · [다음: 문제 해결과 지원 범위 →](07-troubleshooting.md)
 
-콘솔에서는 설정값을 조회하거나 변경하고, 불러오기·셰이더·런타임 메시지를 읽을 수 있습니다. 명령은 화면 아래의 `>` 입력칸에 씁니다.
+콘솔에서는 설정값을 조회하거나 변경하고, 불러오기·셰이더·런타임 메시지를 읽을 수 있습니다.
 
-**진입 경로:** 엔진 창에서 **백틱(Grave Accent) 키**를 누릅니다.
+## 기본 저작 화면의 Console
+
+**진입 경로:** `Window → Assets / Console`을 켠 뒤 `Project tools → Console`.
+
+[기본 화면 그림의 ⑤ Project tools](02-screen-camera.md)에서 `Console` 탭을 누릅니다. 그 그림은 Assets 선택 상태이므로 로그 내용은 Console로 바꾼 뒤 확인하세요.
+
+1. `Minimum level`에서 표시할 최소 심각도를 고릅니다.
+2. `Search`에 분류나 메시지 일부를 입력해 최근 로그를 좁힙니다.
+3. 아래 `Command` 입력칸에 `find surfelgi`를 넣고 Enter를 누릅니다.
+4. 메시지 위에 마우스를 올리면 UTC 시각·스레드·순서 정보를 봅니다.
+
+**예상 결과:** 새 저작 화면 안에서 로그 필터와 명령 실행을 함께 사용할 수 있습니다. 이 간단한 Command 입력칸과 아래의 자동완성·기록 기능을 가진 클래식 콘솔은 입력 UI가 다릅니다.
+
+## 클래식 콘솔 그림
+
+**진입 경로:** 엔진 창에서 **백틱(Grave Accent) 키**를 누릅니다. 기본 저작 화면에서도 열 수 있습니다. 그림의 명령은 아래 `>` 입력칸에 씁니다.
 
 ![콘솔 모드, 최근 로그 상태, 메시지 목록과 명령 입력칸](images/05-console.png)
 
-1280×900 실제 실행 원본에 빨간 번호 주석을 추가한 그림입니다. [원본 보기](images/raw/05-console.png)
+**클래식 콘솔 참고 그림입니다.** 1280×900 실제 실행 원본에 빨간 번호 주석을 추가했습니다. [원본 보기](images/raw/05-console.png)
 
 ## 콘솔 열고 닫기
 
@@ -85,4 +100,4 @@ JENGINE_LOG_FILE="$PWD/build/my-session.log" ./scripts/run-macos.sh
 
 **`clear`는 최근 콘솔 출력만 지우며 이미 기록된 파일을 삭제하지 않습니다.** 콘솔에서 바꾼 배치나 렌더링 값을 파일 로그가 다시 적용해 주는 것도 아닙니다.
 
-[← 이전: SurfelGI](05-surfelgi.md) · [목차](README.md) · [다음: 문제 해결과 한계 →](07-troubleshooting.md)
+[← 이전: SurfelGI](05-surfelgi.md) · [목차](README.md) · [다음: 문제 해결과 지원 범위 →](07-troubleshooting.md)

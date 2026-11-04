@@ -77,6 +77,95 @@ int RunEditorProjectTests()
 
     {
         using jEditorAssetPath::FromUtf8;
+        const auto example = fs::absolute(FromUtf8(__FILE__)).parent_path().parent_path().parent_path()
+            / "examples/authoring-demo";
+        const auto copy = fixture / "ShippedStudio";
+        const std::vector<std::string> shippedFiles = {
+            "project.jproject", "Scenes/Studio.jscene", "Assets/Models/CheckerPyramid.obj",
+            "Assets/Models/CheckerPyramid.mtl", "Assets/Textures/StudioChecker.png",
+            "Scenes/Studio.jscene.jasset", "Assets/Models/CheckerPyramid.obj.jasset",
+            "Assets/Models/CheckerPyramid.mtl.jasset", "Assets/Textures/StudioChecker.png.jasset"};
+        const auto readBytes = [](const fs::path& path) {
+            std::ifstream file(path, std::ios::binary);
+            if (!file) throw std::runtime_error("Cannot open shipped Studio fixture input");
+            std::string bytes(std::istreambuf_iterator<char>(file), {});
+            if (file.bad() || bytes.empty()) throw std::runtime_error("Cannot read nonempty Studio fixture input");
+            return bytes;
+        };
+        std::map<std::string, std::string> sourceBytes;
+        bool copied = true;
+        try
+        {
+            // Never scan the checkout example: scans may update .jasset files.
+            // Copy shipped source and metadata byte-for-byte into our own fixture.
+            for (const auto& relative : shippedFiles)
+            {
+                const auto path = FromUtf8(relative);
+                const auto bytes = readBytes(example / path);
+                sourceBytes.emplace(relative, bytes);
+                fs::create_directories((copy / path).parent_path());
+                { std::ofstream file(copy / path, std::ios::binary); file.write(bytes.data(), static_cast<std::streamsize>(bytes.size())); }
+                if (readBytes(copy / path) != bytes) throw std::runtime_error("Studio fixture copy changed bytes");
+            }
+        }
+        catch (const std::exception& exception) { copied = false; std::cout << "DETAIL " << exception.what() << std::endl; }
+        expect(copied, "shipped Studio project scene OBJ MTL PNG and persistent metadata exist and copy verbatim");
+        if (copied)
+        {
+            jEditorProject studio;
+            const bool opened = studio.Open(copy / "project.jproject", error);
+            const auto startup = opened ? jEditorProject::ResolveSafe(studio.GetRoot(), studio.GetConfig().StartupScene, error, true) : std::nullopt;
+            expect(opened && startup == fs::canonical(copy / "Scenes/Studio.jscene"),
+                "shipped Studio project opens its actual declared startup scene from the temporary copy");
+            if (opened && startup)
+            {
+                jEditorAssetRegistry studioRegistry(studio);
+                const bool scanned = studioRegistry.Scan(error);
+                const auto* model = studioRegistry.FindBySourcePath("Assets/Models/CheckerPyramid.obj");
+                const auto* material = studioRegistry.FindBySourcePath("Assets/Models/CheckerPyramid.mtl");
+                const auto* texture = studioRegistry.FindBySourcePath("Assets/Textures/StudioChecker.png");
+                const auto* scene = studioRegistry.FindBySourcePath(studio.GetConfig().StartupScene);
+                expect(scanned && studioRegistry.GetAssets().size() == 4 && model && material && texture && scene
+                    && model->Kind == jEditorAssetKind::Model && texture->Kind == jEditorAssetKind::Texture,
+                    "shipped Studio catalog contains exactly four actual assets including its tracked OBJ source");
+                const bool dependencies = model && material && texture && scene
+                    && model->Dependencies == std::vector<std::string>{material->Id}
+                    && material->Dependencies == std::vector<std::string>{texture->Id}
+                    && std::find(scene->Dependencies.begin(), scene->Dependencies.end(), model->Id) != scene->Dependencies.end()
+                    && std::find(scene->Dependencies.begin(), scene->Dependencies.end(), texture->Id) != scene->Dependencies.end()
+                    && std::all_of(studioRegistry.GetAssets().begin(), studioRegistry.GetAssets().end(),
+                        [](const auto& asset) { return !asset.Missing && asset.MissingDependencies.empty(); });
+                expect(dependencies && studioRegistry.Resolve(model->Id, error) == fs::canonical(copy / "Assets/Models/CheckerPyramid.obj")
+                    && studioRegistry.Resolve(texture->Id, error) == fs::canonical(copy / "Assets/Textures/StudioChecker.png"),
+                    "shipped Studio scene model material and checker texture resolve their real transitive dependencies");
+                bool referencesResolve = true; size_t modelReferences = 0;
+                const auto document = Load(*startup);
+                for (const auto& entity : document.at("entities"))
+                {
+                    const auto source = entity.value("sourceAsset", std::string());
+                    if (source.empty()) continue;
+                    ++modelReferences;
+                    const auto* referenced = studioRegistry.FindBySourcePath(source);
+                    const auto id = entity.value("assetId", std::string());
+                    referencesResolve &= referenced && referenced->Kind == jEditorAssetKind::Model
+                        && (id.empty() || referenced->Id == id) && studioRegistry.Resolve(referenced->Id, error).has_value();
+                }
+                expect(referencesResolve && modelReferences > 0,
+                    "shipped Studio sourceAsset and persistent assetId references agree and resolve to actual model files");
+                jEditorThumbnail checker;
+                expect(texture && PrepareEditorThumbnail(copy / FromUtf8(texture->SourcePath), checker, error)
+                    && checker.Width && checker.Height && checker.Rgba.size() == size_t(checker.Width) * checker.Height * 4,
+                    "shipped Studio checker is a decodable real PNG after the verbatim fixture copy");
+                studioRegistry.Shutdown();
+            }
+            bool originalUnchanged = true;
+            for (const auto& [relative, bytes] : sourceBytes) originalUnchanged &= readBytes(example / FromUtf8(relative)) == bytes;
+            expect(originalUnchanged, "Studio validation writes metadata only in its temporary copy and preserves all shipped bytes");
+        }
+    }
+
+    {
+        using jEditorAssetPath::FromUtf8;
         using jEditorAssetPath::ToUtf8;
         const std::string picture = "자산/그림/녹색 그림.png";
         const auto nativePicture = FromUtf8(picture);

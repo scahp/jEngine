@@ -1,0 +1,207 @@
+{
+  "success": true,
+  "conditions": "Release binaries, isolated working directories with identical INI/resource layout/driver, fixed simulation timestep, sequential alternating processes; no forced validation; 120-frame warmup, 240-frame wall-clock loop average. Includes CPU/GPU/present waits; not per-frame p95, isolated GPU time or an unconstrained FPS measurement. Each executable uses the shader files and legacy UI binaries from its own source revision.",
+  "scene": "Same Sponza model/camera/static lights; legacy light callbacks disabled in isolated preset copies for both binaries.",
+  "scene_load_mode": "ready-before-first-frame",
+  "engine_sha256": {
+    "before": "f03e95378f58cd1b2ddb349a3260e139d09ab053c6d28f67e4f6845a55458359",
+    "after": "4e26bff430a19aaa10805185deb3e4ba872d9dee4e3a039d99116c5c14466536"
+  },
+  "samples": [
+    {
+      "label": "before",
+      "trial": 0,
+      "time_to_initialized_ms": 757.719625,
+      "scene_published_before_measurement": true,
+      "scene_published_before_first_frame": true,
+      "warmup_frames": 120,
+      "measured_frames": 240,
+      "loop_mean_ms": 21.2841236125,
+      "loop_fps": 46.98337682143078
+    },
+    {
+      "label": "after",
+      "trial": 0,
+      "time_to_initialized_ms": 1514.4649999999995,
+      "scene_published_before_measurement": true,
+      "scene_published_before_first_frame": true,
+      "warmup_frames": 120,
+      "measured_frames": 240,
+      "loop_mean_ms": 21.74001232916667,
+      "loop_fps": 45.998133987182136
+    },
+    {
+      "label": "after",
+      "trial": 1,
+      "time_to_initialized_ms": 684.7826660000003,
+      "scene_published_before_measurement": true,
+      "scene_published_before_first_frame": true,
+      "warmup_frames": 120,
+      "measured_frames": 240,
+      "loop_mean_ms": 21.9515484375,
+      "loop_fps": 45.55487294425628
+    },
+    {
+      "label": "before",
+      "trial": 1,
+      "time_to_initialized_ms": 591.2560829999975,
+      "scene_published_before_measurement": true,
+      "scene_published_before_first_frame": true,
+      "warmup_frames": 120,
+      "measured_frames": 240,
+      "loop_mean_ms": 21.560450000000014,
+      "loop_fps": 46.381221171172186
+    },
+    {
+      "label": "before",
+      "trial": 2,
+      "time_to_initialized_ms": 574.5012500000043,
+      "scene_published_before_measurement": true,
+      "scene_published_before_first_frame": true,
+      "warmup_frames": 120,
+      "measured_frames": 240,
+      "loop_mean_ms": 21.561007291666662,
+      "loop_fps": 46.380022346474526
+    },
+    {
+      "label": "after",
+      "trial": 2,
+      "time_to_initialized_ms": 705.8057089999963,
+      "scene_published_before_measurement": true,
+      "scene_published_before_first_frame": true,
+      "warmup_frames": 120,
+      "measured_frames": 240,
+      "loop_mean_ms": 21.821938716666683,
+      "loop_fps": 45.82544259627317
+    }
+  ],
+  "ui": "Baseline classic UI versus current default authoring UI, including scene-preview copy and extra material G-buffer.",
+  "static_preset": {
+    "original_sha256": "098d9c763dcba1b1a6c7a5e9df96ba64a002b3bc0871d7515d9675d26a00b1b3",
+    "controlled": {
+      "camera": {
+        "position": [
+          1124.351929,
+          31.903732,
+          18.57412
+        ],
+        "target": [
+          1123.424909,
+          32.168008,
+          18.308052
+        ],
+        "up": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "fovDegree": 45.0,
+        "near": 10.0,
+        "far": 5000.0
+      },
+      "lights": [
+        {
+          "type": "directional",
+          "direction": [
+            0.049,
+            -0.953,
+            -0.263
+          ],
+          "color": [
+            2.22,
+            1.77,
+            0.84
+          ]
+        },
+        {
+          "type": "point",
+          "position": [
+            10.0,
+            100.0,
+            10.0
+          ],
+          "color": [
+            20000.0,
+            15000.0,
+            15000.0
+          ],
+          "maxDistance": 1500.0
+        },
+        {
+          "type": "spot",
+          "position": [
+            0.0,
+            60.0,
+            5.0
+          ],
+          "direction": [
+            0.680414,
+            -0.680414,
+            0.272166
+          ],
+          "color": [
+            0.0,
+            20000.0,
+            0.0
+          ],
+          "maxDistance": 2000.0,
+          "penumbraRadian": 0.35,
+          "umbraRadian": 1.0
+        }
+      ],
+      "objects": [
+        {
+          "type": "sphere",
+          "position": [
+            65.0,
+            35.0,
+            10.0
+          ],
+          "radius": 1.0,
+          "slices": 60,
+          "stacks": 30,
+          "scale": [
+            30.0,
+            30.0,
+            30.0
+          ],
+          "color": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    "removed_light_callbacks": 1
+  },
+  "identical_asset_sha256": {
+    "sponza_pbr/sponza.glb": "fe031e50d71138a273287965187d8ca1b3eef4e02a7c4c717585f24faad76b6c",
+    "stpeters_probe_cubemp.dds": "68162ec8de8cd3add1ffe009009cfeb60ac2350c59033bf224278b9fe261dbfb",
+    "stpeters_probe_irradiancemap.dds": "fd4cc1ae4b034902ce5adb271ab88a914e6b6f64a39e0138c2d3f9aa1d0f75f1",
+    "stpeters_probe_filteredenvmap.dds": "9a740b09b6143b3997c538b2828fc15db55424ecdc318b17771b5b116ce38bdc"
+  },
+  "runtime_inputs": {
+    "before": {
+      "checkout": "/Users/Shared/git/jEngine",
+      "matching_shader_tree_sha256": "3ba75b1bcb85b2c6318eb6b5ee17fdca0a77b5ef4c57839775c3fac8eae03f57"
+    },
+    "after": {
+      "checkout": "/Users/Shared/git/jEngine-ci-integration",
+      "matching_shader_tree_sha256": "efca7dd64bb1192e64a377d0b5b0a50ac99805449a31b04b96eeba1e4d67a89f"
+    }
+  },
+  "summary": {
+    "before": {
+      "median_loop_ms": 21.560450000000014,
+      "median_time_to_initialized_ms": 591.2560829999975
+    },
+    "after": {
+      "median_loop_ms": 21.821938716666683,
+      "median_time_to_initialized_ms": 705.8057089999963
+    }
+  },
+  "source_preset_preserved": true,
+  "source_ini_preserved": true
+}

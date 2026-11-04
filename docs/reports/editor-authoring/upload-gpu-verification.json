@@ -1,0 +1,484 @@
+{
+  "success": true,
+  "engine_sha256": "b320704ee1550bb46b09dc2aa0d966dc84315c137e45e28b24ab5d431b502258",
+  "api": "vulkan",
+  "cases": {
+    "uploads": {
+      "exit_code": 0,
+      "validation_problems": [],
+      "pass_lines": 18,
+      "measurements": [
+        "UPLOAD_MEASUREMENT scenario=initial state=ready scope=first_step_to_terminal steps=50 upload_wall_ms=61.358 poll_pause_wall_ms=55.695 step_call_wall_total_ms=5.639 step_call_wall_max_ms=0.237 reported_admission_total_ms=5.618 reported_admission_max_ms=0.236 admission_budget_ms=100.000 admission_overrun_steps=0 actual_max_step_bytes=1024 actual_max_pending_chunks=2",
+        "UPLOAD_MEASUREMENT scenario=cached_texture state=ready scope=first_step_to_terminal steps=28 upload_wall_ms=33.844 poll_pause_wall_ms=30.714 step_call_wall_total_ms=3.115 step_call_wall_max_ms=0.180 reported_admission_total_ms=3.107 reported_admission_max_ms=0.180 admission_budget_ms=100.000 admission_overrun_steps=0 actual_max_step_bytes=1024 actual_max_pending_chunks=2",
+        "UPLOAD_MEASUREMENT scenario=reimport state=ready scope=first_step_to_terminal steps=50 upload_wall_ms=62.108 poll_pause_wall_ms=55.578 step_call_wall_total_ms=6.511 step_call_wall_max_ms=0.882 reported_admission_total_ms=6.499 reported_admission_max_ms=0.881 admission_budget_ms=100.000 admission_overrun_steps=0 actual_max_step_bytes=1024 actual_max_pending_chunks=2",
+        "UPLOAD_TEST steps=128 max_bytes_per_step=1024 admission_budget_ms=100.000 measured_uploads=3 upload_wall_ms_total=157.310 step_call_wall_ms_total=15.265 step_call_wall_ms_max=0.882 admission_overrun_steps=0"
+      ]
+    },
+    "workflow": {
+      "exit_code": 0,
+      "validation_problems": [],
+      "pass_lines": 43,
+      "workflow_report": {
+        "authoredEntities": 100,
+        "checks": [
+          {
+            "detail": "",
+            "name": "real project opens through transactional workspace lifecycle",
+            "pass": true,
+            "renderedFrames": 0
+          },
+          {
+            "detail": "",
+            "name": "100 mixed entities enter one actual document transaction",
+            "pass": true,
+            "renderedFrames": 0
+          },
+          {
+            "detail": "",
+            "name": "real platform and renderer advertise detached-window support",
+            "pass": true,
+            "renderedFrames": 0
+          },
+          {
+            "detail": "",
+            "name": "fixture camera projects authored grid center inside the actual view volume",
+            "pass": true,
+            "renderedFrames": 30
+          },
+          {
+            "detail": "",
+            "name": "actual pre-UI scene preview texture exists and supports independent GPU readback",
+            "pass": true,
+            "renderedFrames": 30
+          },
+          {
+            "detail": "",
+            "name": "GPU scene pixels contain visible varied geometry before any UI gizmo or thumbnail overlays",
+            "pass": true,
+            "renderedFrames": 30
+          },
+          {
+            "detail": "",
+            "name": "scene preview pixels are opaque so ImGui compositing cannot hide the rendered world",
+            "pass": true,
+            "renderedFrames": 30
+          },
+          {
+            "detail": "",
+            "name": "all 100 typed entities publish actual owned object/light/GPU bindings",
+            "pass": true,
+            "renderedFrames": 30
+          },
+          {
+            "detail": "Model upload complete; publishing shared instances.",
+            "name": "real OBJ and PNG import completes from CPU preparation through GPU admission",
+            "pass": true,
+            "renderedFrames": 30
+          },
+          {
+            "detail": "",
+            "name": "model instances have independent identities and share actual geometry/texture material resources",
+            "pass": true,
+            "renderedFrames": 30
+          },
+          {
+            "detail": "",
+            "name": "repeated primitive instances share actual GPU geometry rather than reuploading each mesh",
+            "pass": true,
+            "renderedFrames": 30
+          },
+          {
+            "detail": "",
+            "name": "parented mixed-axis authored transform reaches actual render-object world matrix",
+            "pass": true,
+            "renderedFrames": 30
+          },
+          {
+            "detail": "",
+            "name": "actual authored point/spot lights expose positioned runtime and shadow-camera resources",
+            "pass": true,
+            "renderedFrames": 30
+          },
+          {
+            "detail": "",
+            "name": "material edit clones only the edited runtime material and retains shared geometry/original material",
+            "pass": true,
+            "renderedFrames": 32
+          },
+          {
+            "detail": "",
+            "name": "authored override participates in real renderer descriptor publication after submitted frames",
+            "pass": true,
+            "renderedFrames": 32
+          },
+          {
+            "detail": "",
+            "name": "100 live entities save through production atomic persistence",
+            "pass": true,
+            "renderedFrames": 32
+          },
+          {
+            "detail": "",
+            "name": "duplicate command publishes independent live instance with shared GPU geometry",
+            "pass": true,
+            "renderedFrames": 34
+          },
+          {
+            "detail": "",
+            "name": "delete command accepts selected duplicate",
+            "pass": true,
+            "renderedFrames": 34
+          },
+          {
+            "detail": "",
+            "name": "delete retires actual runtime instance and clears authored ID",
+            "pass": true,
+            "renderedFrames": 36
+          },
+          {
+            "detail": "",
+            "name": "Undo restores delete command",
+            "pass": true,
+            "renderedFrames": 36
+          },
+          {
+            "detail": "",
+            "name": "Undo reconstructs actual GPU-backed instance under its original stable ID",
+            "pass": true,
+            "renderedFrames": 38
+          },
+          {
+            "detail": "",
+            "name": "Redo reapplies delete command",
+            "pass": true,
+            "renderedFrames": 38
+          },
+          {
+            "detail": "",
+            "name": "Redo removes reconstructed instance without stale world bindings",
+            "pass": true,
+            "renderedFrames": 40
+          },
+          {
+            "detail": "",
+            "name": "workspace reopens the saved authored scene transactionally",
+            "pass": true,
+            "renderedFrames": 40
+          },
+          {
+            "detail": "",
+            "name": "save/reopen preserves all stable IDs/properties and rebuilds real model/light bindings",
+            "pass": true,
+            "renderedFrames": 43
+          },
+          {
+            "detail": "",
+            "name": "prefab stores selected real authored instance",
+            "pass": true,
+            "renderedFrames": 43
+          },
+          {
+            "detail": "",
+            "name": "prefab instantiation creates a real renderer instance",
+            "pass": true,
+            "renderedFrames": 45
+          },
+          {
+            "detail": "",
+            "name": "prefab instantiate supports Undo",
+            "pass": true,
+            "renderedFrames": 45
+          },
+          {
+            "detail": "",
+            "name": "prefab Undo retires real instance",
+            "pass": true,
+            "renderedFrames": 47
+          },
+          {
+            "detail": "",
+            "name": "Play begins from real edit-state snapshot and timeline seek",
+            "pass": true,
+            "renderedFrames": 47
+          },
+          {
+            "detail": "",
+            "name": "Play sampling moves the actual GPU-rendered world without editing authored data",
+            "pass": true,
+            "renderedFrames": 50
+          },
+          {
+            "detail": "",
+            "name": "Play activates authored primary camera in the actual renderer",
+            "pass": true,
+            "renderedFrames": 50
+          },
+          {
+            "detail": "",
+            "name": "Play-only entity actually publishes live geometry",
+            "pass": true,
+            "renderedFrames": 52
+          },
+          {
+            "detail": "",
+            "name": "Stop restores edit snapshot",
+            "pass": true,
+            "renderedFrames": 52
+          },
+          {
+            "detail": "",
+            "name": "Stop removes ephemeral GPU instance and restores exact edit scene/camera state",
+            "pass": true,
+            "renderedFrames": 55
+          },
+          {
+            "detail": "",
+            "name": "terrain brush edits the actual authored height grid",
+            "pass": true,
+            "renderedFrames": 55
+          },
+          {
+            "detail": "",
+            "name": "terrain edit replaces actual uploaded geometry generation at frame-safe boundary",
+            "pass": true,
+            "renderedFrames": 58
+          },
+          {
+            "detail": "",
+            "name": "painted terrain GPU vertex bytes match the actual rebuilt CPU vertex stream",
+            "pass": true,
+            "renderedFrames": 58
+          },
+          {
+            "detail": "",
+            "name": "terrain brush undo command accepted",
+            "pass": true,
+            "renderedFrames": 58
+          },
+          {
+            "detail": "",
+            "name": "terrain Undo restores flat data and a live geometry generation",
+            "pass": true,
+            "renderedFrames": 61
+          },
+          {
+            "detail": "",
+            "name": "full initialized engine submits at least 144 bounded editor frames",
+            "pass": true,
+            "renderedFrames": 144
+          },
+          {
+            "detail": "",
+            "name": "detached ImGui window has a real OS handle renderer data and multiple submitted platform frames",
+            "pass": true,
+            "renderedFrames": 144
+          },
+          {
+            "detail": "",
+            "name": "closing detached probe drains and destroys secondary renderer/OS viewport resources",
+            "pass": true,
+            "renderedFrames": 148
+          }
+        ],
+        "failureCount": 0,
+        "finalScene": "/Users/Shared/git/jEngine-ci-integration/build/authoring/verified-gpu/workflow/fixture-5733771165121291/Scenes/100-entities.jscene",
+        "fixtureCamera": {
+          "centerClip": [
+            0.0,
+            0.00048828125,
+            975.21484375,
+            976.166015625
+          ],
+          "position": [
+            0.0,
+            5480.0,
+            -850.0
+          ],
+          "target": [
+            0.0,
+            4998.11474609375,
+            3.3385009765625
+          ]
+        },
+        "fixtureProject": "/Users/Shared/git/jEngine-ci-integration/build/authoring/verified-gpu/workflow/fixture-5733771165121291/project.jproject",
+        "frameCpuMilliseconds": [
+          1457.490208,
+          6.822209,
+          16.397792,
+          14.321,
+          22.823084,
+          4.949125,
+          14.170833,
+          4.197875,
+          7.085709,
+          9.800417,
+          10.504,
+          7.548625,
+          8.123708,
+          7.69975,
+          7.774083,
+          8.648958,
+          8.153708,
+          7.923292,
+          8.001084,
+          8.415792,
+          8.874292,
+          7.975667,
+          8.9135,
+          8.888958,
+          7.13125,
+          7.509667,
+          9.811709,
+          7.575625,
+          8.395416,
+          8.151875,
+          8.573291,
+          14.223167,
+          15.266708,
+          4.681875,
+          16.6925,
+          10.434834,
+          11.235416,
+          4.3055,
+          15.976708,
+          10.121959,
+          4.823,
+          4.29225,
+          8.391792,
+          7.159958,
+          4.378625,
+          15.998584,
+          10.319875,
+          5.814791,
+          11.700084,
+          12.106541,
+          6.304959,
+          11.361292,
+          11.345459,
+          10.50425,
+          4.308708,
+          7.583708,
+          10.420458,
+          4.251208,
+          6.846917,
+          538.450833,
+          4.09475,
+          4.715541,
+          10.258542,
+          6.939208,
+          8.066292,
+          7.409,
+          8.391875,
+          8.020792,
+          9.235584,
+          7.060292,
+          10.01575,
+          7.757833,
+          7.474375,
+          7.544208,
+          10.527625,
+          7.213292,
+          7.56925,
+          7.962458,
+          8.178542,
+          10.357625,
+          8.138458,
+          7.006042,
+          9.354667,
+          7.122666,
+          8.737834,
+          7.849041,
+          10.020834,
+          7.394834,
+          8.029917,
+          7.614625,
+          10.847542,
+          7.698,
+          8.276417,
+          7.98025,
+          10.750083,
+          7.081083,
+          7.658584,
+          7.2965,
+          9.979333,
+          7.445209,
+          7.538583,
+          8.359417,
+          10.461083,
+          7.620292,
+          7.423,
+          7.899541,
+          8.504458,
+          7.422125,
+          9.4365,
+          7.324708,
+          10.5615,
+          7.864084,
+          7.449791,
+          7.742708,
+          10.092208,
+          7.220458,
+          8.53275,
+          7.18425,
+          9.250959,
+          8.585542,
+          7.274916,
+          9.65925,
+          8.249791,
+          8.372041,
+          7.305083,
+          8.5965,
+          8.608792,
+          8.257125,
+          8.156166,
+          8.025875,
+          8.546209,
+          8.563417,
+          8.030125,
+          8.365417,
+          9.039417,
+          7.8765,
+          7.579209,
+          8.676083,
+          9.120916,
+          7.513125,
+          9.158375,
+          7.001375,
+          11.210333,
+          7.635,
+          18.542292,
+          4.413,
+          5.392834,
+          7.257584
+        ],
+        "inlineRaySupported": true,
+        "liveGpuMeshes": 95,
+        "liveLightBindings": 3,
+        "liveObjectBindings": 95,
+        "materialUboReadback": "Not exposed publicly; checked live COW properties and actual descriptor publication.",
+        "maximumPlatformViewports": 2,
+        "preUiScenePixels": {
+          "available": true,
+          "distinctColorsAtMost1024": 1024,
+          "height": 720,
+          "litPixels": 26297,
+          "maximumRgb": 255,
+          "minimumRgb": 0,
+          "opaquePixels": 921600,
+          "png": "/Users/Shared/git/jEngine-ci-integration/build/authoring/verified-gpu/workflow/scene-preview-before-ui.png",
+          "pngSaved": true,
+          "readback": true,
+          "width": 1280
+        },
+        "renderedFrames": 148,
+        "rhi": "Vulkan",
+        "schemaVersion": 1,
+        "scope": "Actual initialized engine, GPU resources, owner-thread frame lifecycle and platform windows",
+        "secondaryRenderedFrames": 144,
+        "status": "passed",
+        "test": "editor-authoring-gpu"
+      }
+    }
+  },
+  "checkout_preferences_preserved": true
+}

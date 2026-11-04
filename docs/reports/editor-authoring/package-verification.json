@@ -1,0 +1,12 @@
+{
+  "success": true,
+  "source_project_preserved": true,
+  "engine_sha256": "3d54a040976fe80ee26e0bfedbd9d4c1416d04dfa4d09da8f04f5cfbbe3b71f1",
+  "scope": "Production staged export, actual relocated runtime, same host OS/architecture.",
+  "relocated_root": "/Users/Shared/git/jEngine-ci-integration/build/authoring/package-verified/moved package \ud55c\uae00 $literal [x]",
+  "launch_working_directory": "/var/folders/c4/pqt4vqw101g0hjwh_1m3tltc0000gn/T/jengine-unrelated-cwd-gtyrezrc",
+  "exit_code": 0,
+  "validation_problems": [],
+  "capture_exists": true,
+  "clean_120_frame_shutdown": true
+}

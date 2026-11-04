@@ -1,5 +1,9 @@
 # Editor foundation: changes and measurements
 
+This is the historical foundation measurement. Later scene authoring, staged
+uploads and tooling are covered in the [authoring report](editor-authoring.md);
+the remaining-work statements below describe the measured foundation commit.
+
 Measured on 2026-11-04, Apple M4 / 10 logical CPUs / 16 GiB / macOS 26.6.2.
 CPU/UI/log measurements compare `ecb49a12` with feature commit `edc270d1`; the
 controlled render comparison uses `98adf5fc` on `codex/editor-foundation`. The
