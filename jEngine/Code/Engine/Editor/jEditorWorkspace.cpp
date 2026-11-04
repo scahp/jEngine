@@ -302,20 +302,111 @@ void Hierarchy(jEditor& editor)
     }
     ImGui::EndChild();
 }
-void TextureSlot(Document& document, Entity& entity, const char* label, std::string& path)
+const jEditorAssetRecord* AssetDropTarget()
 {
-    ImGui::TextWrapped("%s: %s", label, path.empty() ? "None (drop a texture)" : path.c_str());
+    const jEditorAssetRecord* asset = nullptr;
     if (ImGui::BeginDragDropTarget())
     {
         if (const auto* payload = ImGui::AcceptDragDropPayload("JENGINE_ASSET"))
         {
             auto& s = State();
-            const std::string id(static_cast<const char*>(payload->Data), static_cast<size_t>(payload->DataSize) - 1);
-            const auto* asset = s.Registry ? s.Registry->FindById(id) : nullptr;
-            if (asset && asset->Kind == jEditorAssetKind::Texture) { path = asset->SourcePath; entity.Material.OverrideEnabled = true; document.Update(entity, "Assign texture"); }
+            if (s.Registry && payload->DataSize > 0)
+            {
+                const std::string id(static_cast<const char*>(payload->Data), static_cast<size_t>(payload->DataSize) - 1);
+                asset = s.Registry->FindById(id);
+            }
         }
         ImGui::EndDragDropTarget();
     }
+    return asset;
+}
+void TextureSlot(Document& document, Entity& entity, const char* label, std::string& path,
+    const std::string* inherited = nullptr, bool* overridden = nullptr)
+{
+    const auto& shown = overridden && !*overridden ? *inherited : path;
+    auto& s = State();
+    ImGui::BeginGroup();
+    if (!shown.empty())
+    {
+        jEditorAssetPanel::RenderTexturePreview(s.Project.get(), s.Registry.get(), shown, ImVec2(56, 56));
+        ImGui::SameLine();
+    }
+    ImGui::BeginGroup();
+    ImGui::TextUnformatted(label);
+    if (!entity.Material.OverrideEnabled && !shown.empty()) ImGui::TextDisabled("Override inactive");
+    else if (overridden) ImGui::TextDisabled("%s", *overridden ? "Instance override" : "Shared value");
+    ImGui::TextWrapped("%s", shown.empty() ? "None (drop a texture)" : shown.c_str());
+    ImGui::EndGroup();
+    ImGui::EndGroup();
+    if (const auto* asset = AssetDropTarget(); asset && asset->Kind == jEditorAssetKind::Texture)
+    {
+        path = asset->SourcePath;
+        if (overridden) *overridden = true;
+        entity.Material.OverrideEnabled = true;
+        document.Update(entity, "Assign texture");
+    }
+}
+template <typename T>
+void ResetMaterialParameter(Document& document, Entity& entity, const char* label, bool& overridden,
+    T& value, const T& inherited)
+{
+    if (!overridden) return;
+    ImGui::PushID(label);
+    if (ImGui::SmallButton("Use shared value"))
+    {
+        overridden = false;
+        value = inherited;
+        document.Update(entity, "Reset material parameter");
+    }
+    ImGui::PopID();
+}
+void MaterialInspector(jEditor& editor, Entity& entity)
+{
+    auto& document = editor.GetDocument();
+    const auto& assetPath = entity.Material.GraphAsset;
+    ImGui::TextWrapped("Shared material: %s", entity.Material.GraphOverrides ? assetPath.c_str() : "Drop a .jmaterial here");
+    if (const auto* asset = AssetDropTarget(); asset && asset->Kind == jEditorAssetKind::Material)
+    {
+        std::string error;
+        if (jEditorTools::AssignSharedMaterial(editor, entity.Id, asset->SourcePath, error))
+            entity = *document.Find(entity.Id);
+        else Message(error, true);
+    }
+    auto& material = entity.Material;
+    if (entity.Kind == EntityKind::Model && ImGui::Checkbox("Override imported material", &material.OverrideEnabled))
+        document.Update(entity, "Toggle material override");
+
+    auto defaults = material;
+    if (defaults.GraphOverrides) defaults.GraphOverrides.emplace();
+    defaults = editor.ResolveMaterial(defaults);
+    auto* flags = material.GraphOverrides ? &*material.GraphOverrides : nullptr;
+    auto color = flags && !flags->BaseColor ? defaults.BaseColor : material.BaseColor;
+    const bool colorChanged = ImGui::ColorEdit3("Base color", &color.X);
+    if (colorChanged) { material.BaseColor = color; if (flags) flags->BaseColor = true; }
+    FinishMaterialProperty(document, entity, colorChanged, "Material color");
+    if (flags) ResetMaterialParameter(document, entity, "Base color", flags->BaseColor, material.BaseColor, defaults.BaseColor);
+
+    FinishMaterialProperty(document, entity, ImGui::ColorEdit3("Emissive", &material.Emissive.X, ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_Float), "Emissive");
+    auto scalar = [&](const char* label, float& value, float inherited, bool* overridden, float minimum)
+    {
+        float shown = overridden && !*overridden ? inherited : value;
+        const bool changed = ImGui::SliderFloat(label, &shown, minimum, 1);
+        if (changed) { value = shown; if (overridden) *overridden = true; }
+        FinishMaterialProperty(document, entity, changed, label);
+        if (overridden) ResetMaterialParameter(document, entity, label, *overridden, value, inherited);
+    };
+    scalar("Metallic", material.Metallic, defaults.Metallic, flags ? &flags->Metallic : nullptr, 0);
+    scalar("Roughness", material.Roughness, defaults.Roughness, flags ? &flags->Roughness : nullptr, .01f);
+    FinishMaterialProperty(document, entity, ImGui::SliderFloat("Opacity", &material.Opacity, 0, 1), "Opacity");
+    TextureSlot(document, entity, "Base color texture", material.BaseColorTexture, &defaults.BaseColorTexture,
+        flags ? &flags->BaseColorTexture : nullptr);
+    if (flags) ResetMaterialParameter(document, entity, "Base color texture", flags->BaseColorTexture,
+        material.BaseColorTexture, defaults.BaseColorTexture);
+    TextureSlot(document, entity, "Normal texture", material.NormalTexture, &defaults.NormalTexture,
+        flags ? &flags->NormalTexture : nullptr);
+    if (flags) ResetMaterialParameter(document, entity, "Normal texture", flags->NormalTexture,
+        material.NormalTexture, defaults.NormalTexture);
+    if (ImGui::Button("Material graph")) State().ShowTools = true;
 }
 void Inspector(jEditor& editor)
 {
@@ -343,18 +434,7 @@ void Inspector(jEditor& editor)
         if (editor.Placement.UseSnap) ImGui::DragFloat3("Move snap", editor.Placement.TranslationSnap, .1f, .001f, 10000);
     }
     if (e.Kind == EntityKind::Cube || e.Kind == EntityKind::Sphere || e.Kind == EntityKind::Model || e.Kind == EntityKind::Terrain)
-        if (ImGui::CollapsingHeader("Material", ImGuiTreeNodeFlags_DefaultOpen))
-        {
-            if (e.Kind == EntityKind::Model && ImGui::Checkbox("Override imported material", &e.Material.OverrideEnabled)) document.Update(e, "Toggle material override");
-            FinishMaterialProperty(document, e, ImGui::ColorEdit3("Base color", &e.Material.BaseColor.X), "Material color");
-            FinishMaterialProperty(document, e, ImGui::ColorEdit3("Emissive", &e.Material.Emissive.X, ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_Float), "Emissive");
-            FinishMaterialProperty(document, e, ImGui::SliderFloat("Metallic", &e.Material.Metallic, 0, 1), "Metallic");
-            FinishMaterialProperty(document, e, ImGui::SliderFloat("Roughness", &e.Material.Roughness, .01f, 1), "Roughness");
-            FinishMaterialProperty(document, e, ImGui::SliderFloat("Opacity", &e.Material.Opacity, 0, 1), "Opacity");
-            TextureSlot(document, e, "Base color texture", e.Material.BaseColorTexture);
-            TextureSlot(document, e, "Normal texture", e.Material.NormalTexture);
-            if (ImGui::Button("Material graph")) State().ShowTools = true;
-        }
+        if (ImGui::CollapsingHeader("Material", ImGuiTreeNodeFlags_DefaultOpen)) MaterialInspector(editor, e);
     if (e.Kind == EntityKind::PointLight || e.Kind == EntityKind::SpotLight || e.Kind == EntityKind::DirectionalLight)
         if (ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen))
         {
@@ -824,7 +904,7 @@ void RenderAuthoringWorkspace(jEditor& editor)
     if (s.ShowTools)
     {
         if (ImGui::Begin("Authoring tools", &s.ShowTools))
-            s.PaintTerrainInScene = jEditorTools::Render(editor);
+            s.PaintTerrainInScene = jEditorTools::Render(editor, s.Project.get(), s.Registry.get());
         ImGui::End();
     }
     if (!s.PaintTerrainInScene || !s.ShowTools) jEditorTools::FinishTerrainStroke(editor);

@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "jEditorAssetPanel.h"
 #include "Code/Engine/jEditor.h"
+#include "jEditorTools.h"
 #include "jEditorUiRenderer.h"
 #include "FileLoader/jEditorAssets.h"
 #include "FileLoader/jImageFileLoader.h"
@@ -22,9 +23,9 @@ using jEditorAssetPath::ToUtf8;
 constexpr size_t MaxThumbnails = 64, MaxThumbnailRequests = 8;
 enum class Operation { None, NewFolder, Import, Rename, Move, Trash, Settings, Reimport, Activate, Refresh, CancelScan };
 struct Request { Operation Type = Operation::None; std::string Id, Source; bool Folder = false; };
-struct ThumbnailRequest { std::string Key, Id; fs::path File; uint64_t Revision = 0; };
+struct ThumbnailRequest { std::string Key, Id; fs::path File, ProjectRoot; bool Material = false; };
 struct ThumbnailResult { ThumbnailRequest Request; jEditorThumbnail Pixels; std::string Error; };
-struct ThumbnailEntry { void* Handle = nullptr; std::string Error; uint64_t Used = 0; };
+struct ThumbnailEntry { void* Handle = nullptr; uint32_t Width = 0, Height = 0; std::string Error; uint64_t Used = 0; };
 struct FolderRow { std::string Path, Label; int Depth = 0; bool Children = false; };
 struct Panel
 {
@@ -44,7 +45,7 @@ struct Panel
     std::optional<ThumbnailRequest> Active;
     std::shared_ptr<std::atomic<bool>> Cancel;
     double LastUpload = 0;
-    size_t VisiblePngs = 0;
+    size_t VisiblePreviews = 0;
     Request Modal;
     std::vector<Request> Deferred;
     char Name[512]{}, SourceFile[2048]{}, Destination[2048]{};
@@ -74,10 +75,9 @@ void ReleaseRetired()
     for (auto handle : State().Retired) jEditorUiRenderer::ReleaseThumbnail(handle);
     State().Retired.clear();
 }
-void QueueThumbnail(const jEditorAssetRecord& asset, jEditorProject& project, bool priority = false)
+void QueueThumbnail(const jEditorAssetRecord& asset, const jEditorProject& project, bool material, bool priority)
 {
     auto& s = State();
-    if (asset.Missing || asset.Kind != jEditorAssetKind::Texture || Lower(ToUtf8(FromUtf8(asset.SourcePath).extension())) != ".png") return;
     const auto key = Key(asset); s.VisibleKeys.insert(key);
     if (auto found = s.Thumbnails.find(key); found != s.Thumbnails.end()) { found->second.Used = s.Frame; return; }
     if (s.Active && s.Active->Key == key) return;
@@ -91,17 +91,41 @@ void QueueThumbnail(const jEditorAssetRecord& asset, jEditorProject& project, bo
     std::string error;
     const auto file = jEditorProject::ResolveSafe(project.GetRoot(), asset.SourcePath, error, true);
     if (!file) return;
-    ThumbnailRequest request{key, asset.Id, *file, asset.Revision};
+    ThumbnailRequest request{key, asset.Id, *file, project.GetRoot(), material};
     if (priority) s.Requests.push_front(std::move(request)); else s.Requests.push_back(std::move(request));
 }
-void* Thumbnail(const jEditorAssetRecord& asset, jEditorProject& project, bool priority = false)
+struct PreviewImage
+{
+    void* Handle = nullptr;
+    uint32_t Width = 0, Height = 0;
+    const char* Status = "Preview unavailable";
+};
+PreviewImage Thumbnail(const jEditorAssetRecord& asset, const jEditorProject& project, bool priority = false)
 {
     auto& s = State();
-    const bool png = asset.Kind == jEditorAssetKind::Texture && Lower(ToUtf8(FromUtf8(asset.SourcePath).extension())) == ".png";
-    if (png && (priority || s.VisiblePngs++ < MaxThumbnails)) QueueThumbnail(asset, project, priority);
+    if (asset.Missing) return {nullptr, 0, 0, "Asset file missing"};
+    const auto file = FromUtf8(asset.SourcePath);
+    const bool material = asset.Kind == jEditorAssetKind::Material && Lower(ToUtf8(file.extension())) == ".jmaterial";
+    if (!material && (asset.Kind != jEditorAssetKind::Texture || !SupportsEditorThumbnail(file)))
+        return {nullptr, 0, 0, "Preview format unsupported"};
+    if (priority || s.VisiblePreviews++ < MaxThumbnails) QueueThumbnail(asset, project, material, priority);
     const auto found = s.Thumbnails.find(Key(asset));
-    if (found == s.Thumbnails.end()) return nullptr;
-    found->second.Used = s.Frame; return found->second.Handle;
+    if (found == s.Thumbnails.end()) return {nullptr, 0, 0, "Preparing preview"};
+    auto& entry = found->second;
+    entry.Used = s.Frame;
+    return {entry.Handle, entry.Width, entry.Height, entry.Error.c_str()};
+}
+ImVec2 FitPreview(const PreviewImage& preview, const ImVec2& bounds)
+{
+    const float width = float(preview.Width), height = float(preview.Height);
+    const float scale = std::min(bounds.x / width, bounds.y / height);
+    return ImVec2(width * scale, height * scale);
+}
+void DrawFittedPreview(ImDrawList& draw, const PreviewImage& preview, const ImVec2& min, const ImVec2& max)
+{
+    const auto size = FitPreview(preview, ImVec2(max.x - min.x, max.y - min.y));
+    const ImVec2 corner((min.x + max.x - size.x) * .5f, (min.y + max.y - size.y) * .5f);
+    draw.AddImage(preview.Handle, corner, ImVec2(corner.x + size.x, corner.y + size.y));
 }
 void AddFolders(const std::string& source)
 {
@@ -312,20 +336,21 @@ void Grid(jEditorProject& project, std::string& selected)
         s.FilterDirty = false;
     }
     if (s.Filtered.empty()) { ImGui::TextWrapped("No assets in this view."); return; }
+    constexpr float previewBottom = 82, tileHeight = 128, rowHeight = tileHeight + 8;
     const int columns = std::max(1, static_cast<int>(ImGui::GetContentRegionAvail().x / 108));
     if (!ImGui::BeginTable("asset_tiles", columns, ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_NoSavedSettings)) return;
-    ImGuiListClipper clip; clip.Begin(static_cast<int>((s.Filtered.size() + columns - 1) / columns), 112);
+    ImGuiListClipper clip; clip.Begin(static_cast<int>((s.Filtered.size() + columns - 1) / columns), rowHeight);
     while (clip.Step()) for (int row = clip.DisplayStart; row < clip.DisplayEnd; ++row)
     {
-        ImGui::TableNextRow(ImGuiTableRowFlags_None, 112);
+        ImGui::TableNextRow(ImGuiTableRowFlags_None, rowHeight);
         for (int column = 0; column < columns; ++column)
         {
             const size_t index = size_t(row) * columns + column; if (index >= s.Filtered.size()) break;
             ImGui::TableSetColumnIndex(column);
             const auto& asset = s.Assets[s.Filtered[index]];
             ImGui::PushID(asset.Id.c_str());
-            const float width = std::max(70.0f, ImGui::GetContentRegionAvail().x);
-            ImGui::InvisibleButton("asset", ImVec2(width, 104));
+            const float width = std::max(1.f, ImGui::GetContentRegionAvail().x);
+            ImGui::InvisibleButton("asset", ImVec2(width, tileHeight));
             const auto minimum = ImGui::GetItemRectMin(), maximum = ImGui::GetItemRectMax();
             const bool hovered = ImGui::IsItemHovered();
             if (ImGui::IsItemClicked()) { selected = asset.Id; s.Selected = selected; }
@@ -337,19 +362,25 @@ void Grid(jEditorProject& project, std::string& selected)
             const auto background = selected == asset.Id ? ImGui::GetColorU32(ImGuiCol_Header)
                 : hovered ? ImGui::GetColorU32(ImGuiCol_FrameBgHovered) : ImGui::GetColorU32(ImGuiCol_FrameBg);
             draw->AddRectFilled(minimum, maximum, background, 4);
-            if (auto* handle = Thumbnail(asset, project))
-                draw->AddImage(handle,
-                    ImVec2(minimum.x + 4, minimum.y + 4), ImVec2(minimum.x + width - 4, minimum.y + 72));
+            const auto preview = Thumbnail(asset, project);
+            if (preview.Handle && width > 12.f)
+            {
+                const ImVec2 previewMin(minimum.x + 6, minimum.y + 6), previewMax(maximum.x - 6, minimum.y + previewBottom);
+                draw->AddRectFilled(previewMin, previewMax, IM_COL32(20, 23, 29, 255), 3);
+                DrawFittedPreview(*draw, preview, previewMin, previewMax);
+            }
             else draw->AddText(ImVec2(minimum.x + 6, minimum.y + 24), ImGui::GetColorU32(ImGuiCol_TextDisabled), jEditorAssetKindName(asset.Kind));
             const auto label = ToUtf8(FromUtf8(asset.SourcePath).filename());
-            const ImVec4 clipRect(minimum.x + 4, minimum.y + 74, maximum.x - 4, maximum.y - 2);
-            draw->AddText(ImGui::GetFont(), ImGui::GetFontSize(), ImVec2(minimum.x + 4, minimum.y + 74),
-                asset.Missing ? IM_COL32(255, 120, 100, 255) : ImGui::GetColorU32(ImGuiCol_Text), label.c_str(), nullptr, width - 8, &clipRect);
+            const ImVec4 clipRect(minimum.x + 4, minimum.y + previewBottom + 4, maximum.x - 4, maximum.y - 2);
+            if (width > 8.f)
+                draw->AddText(ImGui::GetFont(), ImGui::GetFontSize(), ImVec2(clipRect.x, clipRect.y),
+                    asset.Missing ? IM_COL32(255, 120, 100, 255) : ImGui::GetColorU32(ImGuiCol_Text), label.c_str(), nullptr, width - 8, &clipRect);
             if (hovered)
             {
                 ImGui::BeginTooltip(); ImGui::TextUnformatted(asset.SourcePath.c_str());
                 ImGui::Text("%s | %llu bytes | revision %llu", jEditorAssetKindName(asset.Kind),
                     static_cast<unsigned long long>(asset.Fingerprint.Size), static_cast<unsigned long long>(asset.Revision));
+                if (preview.Handle) ImGui::Image(preview.Handle, FitPreview(preview, ImVec2(160, 160)));
                 for (const auto& missing : asset.MissingDependencies) ImGui::TextColored(ImVec4(1,.4f,.3f,1), "Missing: %s", missing.c_str());
                 const auto thumb = s.Thumbnails.find(Key(asset));
                 if (thumb != s.Thumbnails.end() && !thumb->second.Error.empty()) ImGui::TextWrapped("Preview: %s", thumb->second.Error.c_str());
@@ -365,8 +396,20 @@ void Details(jEditorProject& project, const std::string& selected)
     const auto* asset = Find(selected); if (!asset) return;
     ImGui::TextWrapped("%s", ToUtf8(FromUtf8(asset->SourcePath).filename()).c_str());
     ImGui::TextDisabled("%s", jEditorAssetKindName(asset->Kind));
-    if (auto* handle = Thumbnail(*asset, project, true))
-        ImGui::Image(handle, ImVec2(160, 160));
+    const auto preview = Thumbnail(*asset, project, true);
+    const auto available = ImGui::GetContentRegionAvail();
+    const float edge = std::min({160.f, available.x, std::max(48.f, available.y - ImGui::GetStyle().ItemSpacing.y)});
+    if (preview.Handle && edge > 8.f)
+    {
+        ImGui::Dummy(ImVec2(edge, edge));
+        const auto min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax();
+        auto* draw = ImGui::GetWindowDrawList();
+        draw->AddRectFilled(min, max, IM_COL32(20, 23, 29, 255), 3);
+        DrawFittedPreview(*draw, preview, ImVec2(min.x + 4, min.y + 4), ImVec2(max.x - 4, max.y - 4));
+    }
+    const auto status = State().Thumbnails.find(Key(*asset));
+    if (status != State().Thumbnails.end() && !status->second.Error.empty())
+        ImGui::TextWrapped("%s", status->second.Error.c_str());
     ImGui::TextWrapped("%s", asset->SourcePath.c_str());
     if (asset->Kind == jEditorAssetKind::Model && ImGui::Button("Import settings")) Open({Operation::Settings, asset->Id, asset->SourcePath});
     if (ImGui::Button("Reimport")) State().Deferred.push_back({Operation::Reimport, asset->Id, asset->SourcePath});
@@ -443,7 +486,8 @@ void Tick(jEditor& editor, jEditorProject& project, jEditorAssetRegistry& regist
                 s.Thumbnails.erase(oldest); ReleaseRetired();
             }
             ThumbnailEntry entry; entry.Error = result.Error; entry.Used = s.Frame;
-            if (entry.Error.empty())
+            entry.Width = result.Pixels.Width; entry.Height = result.Pixels.Height;
+            if (!result.Pixels.Rgba.empty())
             { entry.Handle = jEditorUiRenderer::CreateThumbnail(result.Pixels); if (!entry.Handle) entry.Error = "Preview could not be uploaded."; }
             s.Thumbnails.emplace(result.Request.Key, std::move(entry)); s.LastUpload = ImGui::GetTime();
         }
@@ -459,7 +503,14 @@ void Tick(jEditor& editor, jEditorProject& project, jEditorAssetRegistry& regist
         {
             s.Worker = std::async(std::launch::async, [request, cancel] {
                 ThumbnailResult result; result.Request = request;
-                try { if (!cancel->load()) PrepareEditorThumbnail(request.File, result.Pixels, result.Error, 128); }
+                try
+                {
+                    if (!cancel->load())
+                    {
+                        if (request.Material) jEditorTools::PrepareMaterialThumbnail(request.ProjectRoot, request.File, result.Pixels, result.Error);
+                        else PrepareEditorThumbnail(request.File, result.Pixels, result.Error, 128);
+                    }
+                }
                 catch (const std::exception& exception) { result.Pixels = {}; result.Error = exception.what(); }
                 catch (...) { result.Pixels = {}; result.Error = "Preview preparation failed."; }
                 if (cancel->load()) { result.Pixels = {}; result.Error = "Cancelled"; }
@@ -467,6 +518,44 @@ void Tick(jEditor& editor, jEditorProject& project, jEditorAssetRegistry& regist
             });
         }
         catch (const std::exception& exception) { s.Active.reset(); Message(exception.what(), true); }
+    }
+    // Draw calls from either panel mark requests for the next owner tick.
+    s.VisibleKeys.clear(); s.VisiblePreviews = 0;
+}
+
+void RenderTexturePreview(const jEditorProject* project, const jEditorAssetRegistry* registry,
+    const std::string& sourcePath, const ImVec2& size)
+{
+    ImGui::Dummy(size);
+    if (!ImGui::IsItemVisible()) return;
+    PreviewImage preview{nullptr, 0, 0, "Open a project to preview textures"};
+    if (sourcePath.empty()) preview.Status = "No texture assigned";
+    else if (project && registry)
+    {
+        if (State().ProjectToken != project->GetConfig().Id + "|" + ToUtf8(project->GetRoot()))
+            preview.Status = "Preparing asset catalog";
+        else if (const auto* asset = registry->FindBySourcePath(sourcePath); asset && asset->Kind == jEditorAssetKind::Texture)
+            preview = Thumbnail(*asset, *project, true);
+        else preview.Status = "Texture not in asset catalog";
+    }
+    auto* draw = ImGui::GetWindowDrawList();
+    const auto min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax();
+    draw->AddRectFilled(min, max, IM_COL32(20, 23, 29, 255), 3);
+    if (preview.Handle)
+        DrawFittedPreview(*draw, preview, ImVec2(min.x + 2, min.y + 2), ImVec2(max.x - 2, max.y - 2));
+    else
+    {
+        const auto textSize = ImGui::CalcTextSize("--");
+        draw->AddText(ImVec2((min.x + max.x - textSize.x) * .5f, (min.y + max.y - textSize.y) * .5f),
+            ImGui::GetColorU32(ImGuiCol_TextDisabled), "--");
+    }
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+    {
+        ImGui::BeginTooltip();
+        if (preview.Handle) ImGui::Image(preview.Handle, FitPreview(preview, ImVec2(180, 180)));
+        else ImGui::TextUnformatted(preview.Status);
+        if (!sourcePath.empty()) ImGui::TextUnformatted(sourcePath.c_str());
+        ImGui::EndTooltip();
     }
 }
 
@@ -476,7 +565,7 @@ void Render(jEditor& editor, jEditorProject& project, jEditorAssetRegistry& regi
     auto& s = State();
     if (s.ProjectToken != project.GetConfig().Id + "|" + ToUtf8(project.GetRoot()))
     { ImGui::TextUnformatted("Preparing asset browser..."); return; }
-    s.Deferred.clear(); s.VisibleKeys.clear(); s.VisiblePngs = 0;
+    s.Deferred.clear();
     const auto folder = s.Folder.empty() ? project.GetConfig().AssetRoot : s.Folder;
     if (ImGui::Button("New folder")) Open({Operation::NewFolder, {}, folder, true}, folder);
     ImGui::SameLine(); if (ImGui::Button("Import file")) Open({Operation::Import, {}, folder, true}, folder);
@@ -488,8 +577,10 @@ void Render(jEditor& editor, jEditorProject& project, jEditorAssetRegistry& regi
     if (ImGui::Combo("Kind", &s.KindFilter, "All\0Models\0Textures\0Materials\0Scenes\0Shaders\0Data\0")) s.FilterDirty = true;
     ImGui::BeginChild("asset_body", ImVec2(0, -ImGui::GetFrameHeightWithSpacing()), false);
     ImGui::BeginChild("asset_folders", ImVec2(170, 0), true); FolderTree(project); ImGui::EndChild();
-    ImGui::SameLine(); const bool details = Find(selected) && ImGui::GetContentRegionAvail().x > 600;
-    const float gridWidth = details ? ImGui::GetContentRegionAvail().x - 230 - ImGui::GetStyle().ItemSpacing.x : 0;
+    ImGui::SameLine();
+    const float available = ImGui::GetContentRegionAvail().x;
+    const bool details = Find(selected) && available >= 390.f;
+    const float gridWidth = details ? available - std::clamp(available * .33f, 150.f, 230.f) - ImGui::GetStyle().ItemSpacing.x : 0;
     ImGui::BeginChild("asset_grid", ImVec2(gridWidth, 0), true); Grid(project, selected); ImGui::EndChild();
     if (details) { ImGui::SameLine(); ImGui::BeginChild("asset_details", ImVec2(0, 0), true); Details(project, selected); ImGui::EndChild(); }
     ImGui::EndChild(); s.Selected = selected;
@@ -529,6 +620,7 @@ namespace jEditorAssetPanel
 {
 void Tick(jEditor&, jEditorProject&, jEditorAssetRegistry&) {}
 void Render(jEditor&, jEditorProject&, jEditorAssetRegistry&, std::string&, const ActivateAsset&) {}
+void RenderTexturePreview(const jEditorProject*, const jEditorAssetRegistry*, const std::string&, const ImVec2&) {}
 void Shutdown() {}
 }
 #endif

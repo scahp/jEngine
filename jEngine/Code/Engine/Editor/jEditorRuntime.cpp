@@ -1,7 +1,9 @@
 #include "pch.h"
 #ifdef ENABLE_EDITOR_FEATURES
 #include "jEditorRuntime.h"
+#include "jEditorTools.h"
 #include "FileLoader/jEditorAssetPath.h"
+#include "FileLoader/jEditorAssets.h"
 #include "jEditorProjectSettings.h"
 #include "Code/Engine/jEditor.h"
 #include "Scene/jObject.h"
@@ -138,6 +140,7 @@ struct jEditorRuntime::Impl
     };
     struct Borrowed { jObject* Object=nullptr;jObjectID Id=0;jLight* Light=nullptr;bool WasRegistered=false; };
     struct Prototype { std::shared_ptr<jObject> Object;std::vector<Matrix> MeshLocal; };
+    struct GraphDefaultsEntry { std::optional<MaterialProperties> Material; bool Dirty = true; };
     struct Import { std::string Key,Source,Id;uint64_t Revision=0; };
     jEditor& Editor;
     const std::thread::id Thread=std::this_thread::get_id();
@@ -150,6 +153,7 @@ struct jEditorRuntime::Impl
     std::map<EntityId,Binding> Bindings;
     std::map<jObjectID,Source> Sources;
     std::map<std::string,Prototype> Prototypes;
+    std::map<std::string, GraphDefaultsEntry> GraphDefaults;
     std::map<std::string,uint64_t> Revisions;
     std::map<uint64_t,Import> Imports;
     struct Upload { Import Job; std::unique_ptr<jModelUploadSession> Session; };
@@ -259,7 +263,7 @@ struct jEditorRuntime::Impl
                     else mesh->MaterialPtr=std::make_shared<jMaterial>(*mesh->MaterialPtr);
                     mesh->MaterialPtr->ShaderBindingInstance.reset();mesh->MaterialPtr->NeedToUpdateShaderBindingInstance=true;
                 }
-                ApplyMaterial(entity.Material,*b.Object);
+                ApplyMaterial(Editor.ResolveMaterial(entity.Material),*b.Object);
                 }
                 b.MaterialApplied=true;
             }
@@ -400,11 +404,43 @@ jEditorRuntime::~jEditorRuntime()=default;
 
 jEditorAuthoring::Document& jEditor::GetDocument(){return Runtime->Data->Doc;}
 const jEditorAuthoring::Document& jEditor::GetDocument()const{return Runtime->Data->Doc;}
-void jEditor::SetProjectRoot(const std::filesystem::path& root){auto& s=*Runtime->Data;if(!s.Owner())return;try{s.Root=std::filesystem::weakly_canonical(root);s.AppliedRevision=UINT64_MAX;}catch(const std::exception& e){s.Error=e.what();}}
+void jEditor::SetProjectRoot(const std::filesystem::path& root)
+{
+    auto& s = *Runtime->Data;
+    if (!s.Owner()) return;
+    try
+    {
+        s.Root = std::filesystem::weakly_canonical(root);
+        s.GraphDefaults.clear();
+        for (auto& [id, binding] : s.Bindings) binding.MaterialApplied = false;
+        s.AppliedRevision = UINT64_MAX;
+    }
+    catch (const std::exception& e) { s.Error = e.what(); }
+}
 const std::filesystem::path& jEditor::GetProjectRoot()const{return Runtime->Data->Root;}
 void jEditor::SetAssetResolver(AssetResolver resolver){auto& s=*Runtime->Data;if(s.Owner())s.Resolver=std::move(resolver);}
 void jEditor::SetProceduralFactory(ProceduralFactory factory,ProceduralUpdater update){auto& s=*Runtime->Data;if(!s.Owner())return;s.Factory=std::move(factory);s.UpdateProcedural=std::move(update);s.AppliedRevision=UINT64_MAX;}
 void jEditor::SetMaterialApplier(MaterialApplier apply){auto& s=*Runtime->Data;if(!s.Owner())return;s.ApplyMaterial=std::move(apply);for(auto& [id,b]:s.Bindings)b.MaterialApplied=false;s.AppliedRevision=UINT64_MAX;}
+MaterialProperties jEditor::ResolveMaterial(const MaterialProperties& material)
+{
+    auto& s = *Runtime->Data;
+    if (!s.Owner() || !material.GraphOverrides || !material.OverrideEnabled) return material;
+    auto& entry = s.GraphDefaults[material.GraphAsset];
+    if (entry.Dirty)
+    {
+        entry.Dirty = false;
+        std::string error;
+        const auto file = jEditorProject::ResolveSafe(s.Root, jEditorAssetPath::FromUtf8(material.GraphAsset), error, true);
+        jEditorTools::MaterialGraph graph;
+        MaterialProperties defaults;
+        if (file && jEditorTools::LoadMaterial(*file, graph, error) && jEditorTools::EvaluateMaterial(graph, defaults, error))
+            entry.Material = std::move(defaults);
+        else s.Error = material.GraphAsset + ": " + error;
+    }
+    auto resolved = material;
+    if (entry.Material) jEditorTools::InheritMaterialGraph(resolved, *entry.Material);
+    return resolved;
+}
 void jEditor::SetAuthoringEnabled(bool enabled){auto& s=*Runtime->Data;if(!s.Owner()||s.Enabled==enabled)return;s.Enabled=enabled;for(size_t i=0;i<s.Keys.size();++i)s.Keys[i]=IsKeyDown(static_cast<EInputKey>(i));}
 bool jEditor::IsAuthoringEnabled()const{return Runtime->Data->Enabled;}
 const std::string& jEditor::LastError()const{return Runtime->Data->Error;}
@@ -533,7 +569,7 @@ void jEditor::ResetWorldBindings(bool newDocument)
     for(auto& [id,b]:s.Bindings)s.Retire(b);
     s.Bindings.clear();s.CollectRetired(true);s.RestoreBorrowed();
     if(g_rhi&&!s.Prototypes.empty())g_rhi->Flush();
-    s.Sources.clear();s.Prototypes.clear();s.DuplicateOf.clear();s.FailedImports.clear();s.Selected.clear();
+    s.Sources.clear();s.Prototypes.clear();s.GraphDefaults.clear();s.DuplicateOf.clear();s.FailedImports.clear();s.Selected.clear();
     Placement.Clear();s.Captured=false;s.AppliedRevision=UINT64_MAX;s.Time=0;
     if(newDocument)s.Doc.NewScene();
 }
@@ -615,9 +651,21 @@ void jEditor::ReimportAsset(const std::string& source,uint64_t revision)
     const auto sourcePrefix=source+"|";
     std::erase_if(s.FailedImports,[&](const auto& key){return key.starts_with(sourcePrefix);});
     for(const auto& [id,entity]:s.Doc.Entities())if(entity.SourceAsset==source&&!entity.AssetId.empty())s.Revisions[entity.AssetId]=revision;
-    for(const auto& [id,entity]:s.Doc.Entities())
-        if(entity.Material.BaseColorTexture==source||entity.Material.NormalTexture==source)
-            if(auto binding=s.Bindings.find(id);binding!=s.Bindings.end())binding->second.MaterialApplied=false;
+    if (const auto graph = s.GraphDefaults.find(source); graph != s.GraphDefaults.end()) graph->second.Dirty = true;
+    for (const auto& [id, entity] : s.Doc.Entities())
+    {
+        const auto binding = s.Bindings.find(id);
+        if (binding == s.Bindings.end()) continue;
+        const auto& material = entity.Material;
+        if (material.GraphOverrides && material.GraphAsset == source)
+        {
+            binding->second.MaterialApplied = false;
+            continue;
+        }
+        const auto resolved = ResolveMaterial(material);
+        if (resolved.NormalTexture == source || resolved.BaseColorTexture == source)
+            binding->second.MaterialApplied = false;
+    }
     // Keep the last good instances until the new revision is fully prepared.
     s.AppliedRevision=UINT64_MAX;
 }

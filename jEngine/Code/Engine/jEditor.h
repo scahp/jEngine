@@ -34,6 +34,7 @@ public:
     void SetAssetResolver(AssetResolver resolver);
     void SetProceduralFactory(ProceduralFactory factory, ProceduralUpdater update = {});
     void SetMaterialApplier(MaterialApplier apply);
+    jEditorAuthoring::MaterialProperties ResolveMaterial(const jEditorAuthoring::MaterialProperties& material);
 
     // Call after existing import publication; paths are relative to project root.
     void TrackWorldObjectSource(jObject* object, const std::string& source,

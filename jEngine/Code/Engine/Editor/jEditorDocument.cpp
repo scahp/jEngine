@@ -221,6 +221,8 @@ bool ValidateEntity(const Entity& entity, std::string& error)
     if (!ValidText(entity.Name, MaxNameBytes)) return reject("Entity name must be valid UTF-8, 1..256 bytes without controls");
     if (!ValidAssetPath(entity.SourceAsset) || !ValidAssetPath(entity.Material.BaseColorTexture) || !ValidAssetPath(entity.Material.NormalTexture) || !ValidAssetPath(entity.Material.GraphAsset))
         return reject("Asset references must be normalized project-relative paths");
+    if (entity.Material.GraphOverrides && entity.Material.GraphAsset.empty())
+        return reject("Shared material overrides require a graph asset");
     if (!ValidText(entity.AssetId, 128, true)) return reject("Invalid asset ID");
     if (!ValidTransform(entity.Local)) return reject("Transform must be finite, bounded and have nonzero scale");
     if (entity.MeshLocalTransforms.size() > 65536) return reject("Mesh transform limit exceeded");
@@ -338,11 +340,15 @@ Json Encode(const Entity& e)
     Json meshes = Json::array();
     for (const auto& mesh : e.MeshLocalTransforms) meshes.push_back(Encode(mesh));
     for (const auto& key : e.Animation.Keys) keys.push_back({{"time", key.Time}, {"transform", Encode(key.Local)}});
+    Json material{{"overrideEnabled", e.Material.OverrideEnabled}, {"baseColor", Encode(e.Material.BaseColor)}, {"emissive", Encode(e.Material.Emissive)},
+        {"metallic", e.Material.Metallic}, {"roughness", e.Material.Roughness}, {"opacity", e.Material.Opacity},
+        {"baseColorTexture", e.Material.BaseColorTexture}, {"normalTexture", e.Material.NormalTexture}, {"graphAsset", e.Material.GraphAsset}};
+    if (const auto& overrides = e.Material.GraphOverrides)
+        material["graphOverrides"] = {{"baseColor", overrides->BaseColor}, {"baseColorTexture", overrides->BaseColorTexture},
+            {"metallic", overrides->Metallic}, {"roughness", overrides->Roughness}, {"normalTexture", overrides->NormalTexture}};
     return {{"id", e.Id}, {"parent", e.Parent}, {"kind", KindName(e.Kind)}, {"name", e.Name}, {"visible", e.Visible},
         {"locked", e.Locked}, {"transform", Encode(e.Local)}, {"sourceAsset", e.SourceAsset}, {"assetId", e.AssetId}, {"meshLocalTransforms", std::move(meshes)},
-        {"material", {{"overrideEnabled", e.Material.OverrideEnabled}, {"baseColor", Encode(e.Material.BaseColor)}, {"emissive", Encode(e.Material.Emissive)},
-            {"metallic", e.Material.Metallic}, {"roughness", e.Material.Roughness}, {"opacity", e.Material.Opacity},
-            {"baseColorTexture", e.Material.BaseColorTexture}, {"normalTexture", e.Material.NormalTexture}, {"graphAsset", e.Material.GraphAsset}}},
+        {"material", std::move(material)},
         {"light", {{"color", Encode(e.Light.Color)}, {"intensity", e.Light.Intensity}, {"range", e.Light.Range},
             {"innerConeDegrees", e.Light.InnerConeDegrees}, {"outerConeDegrees", e.Light.OuterConeDegrees}, {"castShadows", e.Light.CastShadows}}},
         {"camera", {{"verticalFovDegrees", e.Camera.VerticalFovDegrees}, {"nearPlane", e.Camera.NearPlane},
@@ -365,9 +371,10 @@ std::string Serialize(const SceneState& state, const char* format = "jEngineScen
     if (selectionRoots) result["roots"] = *selectionRoots;
     return result.dump(2) + "\n";
 }
-void ObjectKeys(const Json& json, std::initializer_list<const char*> keys)
+void ObjectKeys(const Json& json, std::initializer_list<const char*> keys, const char* optionalKey = nullptr)
 {
-    if (!json.is_object() || json.size() != keys.size()) throw std::runtime_error("Unexpected or missing JSON fields");
+    if (!json.is_object() || json.size() != keys.size() + (optionalKey && json.contains(optionalKey)))
+        throw std::runtime_error("Unexpected or missing JSON fields");
     for (const char* key : keys)
         if (!json.contains(key)) throw std::runtime_error(std::string("Missing JSON field: ") + key);
 }
@@ -427,11 +434,20 @@ Entity DecodeEntity(const Json& j)
     if (!meshes.is_array() || meshes.size() > 65536) throw std::runtime_error("Mesh transform limit exceeded");
     for (const auto& mesh : meshes) e.MeshLocalTransforms.push_back(DecodeTransform(mesh));
     const auto& m = j.at("material");
-    ObjectKeys(m, {"overrideEnabled", "baseColor", "emissive", "metallic", "roughness", "opacity", "baseColorTexture", "normalTexture", "graphAsset"});
+    ObjectKeys(m, {"overrideEnabled", "baseColor", "emissive", "metallic", "roughness", "opacity", "baseColorTexture", "normalTexture", "graphAsset"}, "graphOverrides");
     e.Material.OverrideEnabled = Boolean(m.at("overrideEnabled"));
     e.Material.BaseColor = DecodeVec(m.at("baseColor")); e.Material.Emissive = DecodeVec(m.at("emissive"));
     e.Material.Metallic = Float(m.at("metallic")); e.Material.Roughness = Float(m.at("roughness")); e.Material.Opacity = Float(m.at("opacity"));
     e.Material.BaseColorTexture = String(m.at("baseColorTexture")); e.Material.NormalTexture = String(m.at("normalTexture")); e.Material.GraphAsset = String(m.at("graphAsset"));
+    if (const auto it = m.find("graphOverrides"); it != m.end())
+    {
+        ObjectKeys(*it, {"baseColor", "baseColorTexture", "metallic", "roughness"}, "normalTexture");
+        // Older scenes stored any explicit normal path as a local slot.
+        const auto normal = it->find("normalTexture");
+        e.Material.GraphOverrides = MaterialGraphOverrides{Boolean(it->at("baseColor")), Boolean(it->at("baseColorTexture")),
+            Boolean(it->at("metallic")), Boolean(it->at("roughness")),
+            normal == it->end() ? !e.Material.NormalTexture.empty() : Boolean(*normal)};
+    }
     const auto& l = j.at("light");
     ObjectKeys(l, {"color", "intensity", "range", "innerConeDegrees", "outerConeDegrees", "castShadows"});
     e.Light.Color = DecodeVec(l.at("color")); e.Light.Intensity = Float(l.at("intensity")); e.Light.Range = Float(l.at("range"));
@@ -876,13 +892,19 @@ bool Document::GetWorldTransform(EntityId id, Transform& transform) const
     Matrix4 world;
     return Find(id) && WorldMatrix(Data->State, id, Data->Bounds.MaxHierarchyDepth, world) && Decompose(world, transform);
 }
-bool Document::GetWorldMatrix(EntityId id, float matrix[16]) const
+bool Document::GetWorldMatrix(EntityId id, float matrix[16], float inverse[16]) const
 {
     if (!matrix || !Find(id)) return false;
     Matrix4 world;
     if (!WorldMatrix(Data->State, id, Data->Bounds.MaxHierarchyDepth, world)) return false;
+    Matrix4 inverseWorld;
+    if (inverse && !InverseAffine(world, inverseWorld)) return false;
     for (int r = 0; r < 4; ++r)
-        for (int c = 0; c < 4; ++c) matrix[c * 4 + r] = float(world.M[r][c]);
+        for (int c = 0; c < 4; ++c)
+        {
+            matrix[c * 4 + r] = float(world.M[r][c]);
+            if (inverse) inverse[c * 4 + r] = float(inverseWorld.M[r][c]);
+        }
     return true;
 }
 bool Document::EvaluateLocal(EntityId id, float seconds, Transform& transform) const

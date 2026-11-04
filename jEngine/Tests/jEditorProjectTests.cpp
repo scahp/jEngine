@@ -291,7 +291,9 @@ int RunEditorProjectTests()
     Json scene{{"schemaVersion", 1}, {"entities", Json::array({
         {{"sourceAsset", "Assets/Models/triangle.obj"}, {"assetId", ""}},
         {{"sourceAsset", "Assets/Models/model.gltf"}, {"assetId", ""}},
-        {{"material", {{"graphAsset", "Assets/Materials/graph.jmaterial"}}}}
+        {{"material", {{"graphAsset", "Assets/Materials/graph.jmaterial"},
+            {"baseColorTexture", "Assets/Textures/previous-default.png"},
+            {"graphOverrides", {{"baseColorTexture", false}}}}}}
     })}};
     JsonFile(directory / "Scenes/startup.jscene", scene);
     jEditorAssetRegistry registry(project);

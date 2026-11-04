@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Code/Engine/Editor/jEditorTools.h"
+#include "FileLoader/jEditorAssets.h"
 #include <filesystem>
 #include <limits>
 
@@ -18,14 +19,42 @@ int RunEditorToolsTests()
     expect(!EvaluateMaterial(cycle, material, error) && material == previous, "cyclic graph rejects without changing compiled material");
     auto missing = graph; missing.Nodes[2].InputA = 100;
     expect(!EvaluateMaterial(missing, material, error), "missing graph reference rejects");
+    auto constants = graph;
+    constants.Nodes[0].Kind = NodeKind::Scalar;
+    constants.Nodes[0].Scalar = .2f;
+    constants.Nodes.push_back({4, 3, 2, NodeKind::Add});
+    constants.Roughness = 4;
+    MaterialProperties arithmetic;
+    expect(EvaluateMaterial(constants, arithmetic, error) &&
+        std::abs(arithmetic.BaseColor.X - .1f) < .0001f && std::abs(arithmetic.Roughness - .6f) < .0001f,
+        "connected scalar multiplication and addition use their actual input values");
     auto texture = graph; texture.Nodes[0].Kind = NodeKind::Texture; texture.Nodes[0].Texture = "Assets/Textures/color.png";
-    expect(EvaluateMaterial(texture, material, error) && material.BaseColorTexture == "Assets/Textures/color.png", "texture multiplied by color compiles a real texture slot");
+    expect(EvaluateMaterial(texture, material, error) && material.BaseColorTexture == "Assets/Textures/color.png" &&
+        material.BaseColor == Vec3{.5f, .5f, .5f}, "texture multiplication keeps both the texture slot and its constant tint");
     texture.Nodes[0].Texture = "../private.png";
     expect(!EvaluateMaterial(texture, material, error), "material path traversal rejects");
     const auto fixture = std::filesystem::temp_directory_path() / ("jengine-tools-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     std::filesystem::create_directory(fixture);
     const auto file = fixture / "test.jmaterial"; MaterialGraph loaded;
     expect(SaveMaterial(graph, file, error) && LoadMaterial(file, loaded, error) && EvaluateMaterial(loaded, material, error) && material.BaseColor == previous.BaseColor, "node graph saves and reloads connected values");
+    jEditorThumbnail preview;
+    const bool previewReady = PrepareMaterialThumbnail(fixture, file, preview, error);
+    const size_t middle = (size_t(preview.Height / 2) * preview.Width + preview.Width / 2) * 4;
+    expect(previewReady && error.empty() && preview.Width == preview.Height &&
+        preview.Rgba.size() > middle + 3 && preview.Rgba[3] == 0 &&
+        preview.Rgba[middle + 3] == 255 && preview.Rgba[middle + 2] > preview.Rgba[middle],
+        "material thumbnail draws a shaded sphere using the evaluated graph color");
+    graph.Nodes.push_back({4, 0, 0, NodeKind::Texture, {1, 1, 1}, 1, 0, 0, "Assets/Textures/normal.png"});
+    graph.Normal = 4;
+    expect(SaveMaterial(graph, file, error) && LoadMaterial(file, loaded, error) && EvaluateMaterial(loaded, material, error) &&
+        loaded.Normal == 4 && material.NormalTexture == "Assets/Textures/normal.png", "Normal output saves a texture in the material's normal slot");
+    expect(PrepareMaterialThumbnail(fixture, file, preview, error) && !preview.Rgba.empty() &&
+        error.find("Normal map preview unavailable") != std::string::npos,
+        "material thumbnail keeps the available graph values when a map is missing");
+    graph.Normal = 3;
+    expect(!EvaluateMaterial(graph, material, error) && material.NormalTexture == "Assets/Textures/normal.png",
+        "Normal output rejects a non-texture node without modifying the material");
+    graph.Normal = 0;
     TerrainProperties terrain; terrain.Resolution = 17;
     auto flat = BuildTerrain(terrain);
     expect(flat.Positions.size() == 289 && flat.Indices.size() == 16 * 16 * 6, "terrain mesh has complete grid topology");

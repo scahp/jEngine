@@ -16,13 +16,13 @@
 | ④ 출력·경로 | 세 PBR 출력과 Graph asset 입력칸 |
 | ⑤ `Save and Apply` | 그래프 저장과 실제 재질 적용 |
 
-그림은 연결 전 기본 상수 노드 세 개이며 아직 노드를 선택하지 않은 상태입니다. `Node color`·`Node value`는 노드 제목을 클릭하면 나타납니다. 나머지 탭은 ①에서 바꿉니다.
+그림은 기존 출력 선택 UI를 보여줍니다. 현재 버전에서는 캔버스의 `Material Output` 노드가 ④의 출력 선택을 대신합니다. `Node color`·`Node value`는 노드 제목을 클릭하면 나타납니다. 나머지 탭은 ①에서 바꿉니다.
 
 ## Material graph로 색 바꾸기
 
 1. Cube를 선택하고 **① `Material graph`** 탭을 엽니다.
 2. **③ 캔버스**의 기본 `Color` 노드 제목을 클릭하고 `Node color`를 바꿉니다. 노드 제목을 드래그하면 화면 안의 배치를 바꿉니다.
-3. **④ `Base color output`**이 해당 노드 ID인지 확인합니다. `Metallic output`, `Roughness output`은 Scalar 노드로 지정할 수 있습니다.
+3. 캔버스의 `Material Output → Base Color` 핀에 해당 노드가 연결되어 있는지 확인합니다. `Show output`을 누르면 출력 노드로 이동합니다.
 4. **④ `Graph asset`**에 `Assets/Materials/Cube.jmaterial` 같은 프로젝트 상대 경로를 넣습니다.
 5. **⑤ `Save and Apply`**를 눌러 그래프 파일과 실제 물체의 재질에 적용합니다.
 
@@ -36,7 +36,17 @@
 | `Multiply` | 상수끼리 곱하거나 색 텍스처 하나에 상수 색을 곱함 |
 | `Add` | 상수끼리 더함 |
 
-**② `New node → Add node`**로 노드를 추가하고 **③ `Out`**을 다른 노드의 `A`/`B`로 끌어 연결합니다. Texture를 쓰면 `Texture path`에 실제 프로젝트 파일 경로를 넣으세요. 순환 연결, 없는 노드 참조, 텍스처 둘의 혼합, 텍스처 더하기, 텍스처 Metallic/Roughness 출력은 거부됩니다. 범용 셰이더 언어가 아니라 제한된 PBR 속성 편집기이며, 별도 Normal 텍스처는 Inspector 슬롯에서 배정합니다.
+**② `New node → Add node`**로 노드를 추가하고 **③ `Out`**을 연산 노드의 `A`/`B`나 `Material Output`의 핀에 끌어 연결합니다. 출력 핀을 클릭해 연결할 노드를 선택하거나 연결을 끊을 수도 있습니다. `Base Color`는 색상과 텍스처를, `Normal`은 Texture 노드의 노멀맵을, `Metallic`과 `Roughness`는 수치 값을 받습니다. Texture를 쓰면 `Texture path`에 프로젝트 파일 경로를 넣으세요. 순환 연결, 없는 노드 참조, 텍스처 둘의 혼합, 텍스처 더하기, 텍스처 Metallic/Roughness 출력은 거부됩니다.
+
+프로젝트에 등록된 PNG, JPEG, BMP, TGA, HDR 이미지는 `Texture` 노드와 Inspector의 Base Color·Normal 텍스처 슬롯에 썸네일이 표시됩니다. 썸네일에 커서를 올리면 큰 미리보기와 파일 경로를 확인할 수 있습니다.
+
+`Scalar`에는 수치가, `Color`에는 RGB 값과 색상 견본이 표시됩니다. `Multiply`와 `Add`는 연결된 입력으로 계산한 결과를 표시합니다. 텍스처를 곱할 때는 적용될 색을 표시하며, 결과에 커서를 올리면 입력 A/B 값도 볼 수 있습니다.
+
+### 여러 오브젝트에서 그래프 공유하기
+
+`Assets`의 `.jmaterial`을 Inspector의 `Shared material`에 끌어 놓거나, 그래프에서 경로를 지정하고 `Use as shared material`을 누릅니다. 여러 오브젝트에 같은 파일을 연결할 수 있습니다.
+
+특정 오브젝트의 Base Color, Metallic, Roughness를 수정하거나 Inspector의 Base Color·Normal 슬롯에 다른 텍스처를 놓으면 해당 항목만 인스턴스 값이 됩니다. `Use shared value`를 누르면 공유 그래프의 값으로 돌아갑니다. 그래프의 `Save and Apply`는 공유 기본값을 갱신합니다.
 
 `Undo graph`·`Redo graph`는 그래프 편집 상태를 되돌립니다. `Edit → Undo`는 장면 문서 편집을 되돌립니다. 외부 그래프 파일의 덮어쓰기까지 장면 Undo가 복원하는 것은 아닙니다.
 

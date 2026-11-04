@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -26,12 +27,18 @@ struct Transform
     Vec3 Position{}, RotationDegrees{}, Scale{1, 1, 1};
     bool operator==(const Transform&) const = default;
 };
+struct MaterialGraphOverrides
+{
+    bool BaseColor = false, BaseColorTexture = false, Metallic = false, Roughness = false, NormalTexture = false;
+    bool operator==(const MaterialGraphOverrides&) const = default;
+};
 struct MaterialProperties
 {
     bool OverrideEnabled = false;
     Vec3 BaseColor{1, 1, 1}, Emissive{};
     float Metallic = 0, Roughness = 0.5f, Opacity = 1;
     std::string BaseColorTexture, NormalTexture, GraphAsset;
+    std::optional<MaterialGraphOverrides> GraphOverrides;
     bool operator==(const MaterialProperties&) const = default;
 };
 struct LightProperties
@@ -147,7 +154,7 @@ public:
     // Samples typed linear keyframes without mutating dirty/history/revision state.
     bool EvaluateLocal(EntityId id, float seconds, Transform& transform) const;
     // Column-major 4x4 affine matrix; preserves shear when ancestors introduce it.
-    bool GetWorldMatrix(EntityId id, float matrix[16]) const;
+    bool GetWorldMatrix(EntityId id, float matrix[16], float inverse[16] = nullptr) const;
     std::vector<EntityId> Children(EntityId parent = InvalidEntity) const;
     bool IsEffectivelyVisible(EntityId id) const;
     bool IsEffectivelyLocked(EntityId id) const;

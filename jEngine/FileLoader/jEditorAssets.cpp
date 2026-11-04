@@ -276,6 +276,11 @@ namespace
         if (json.is_array()) { for (const auto& item : json) JsonReferences(item, refs); return; }
         if (!json.is_object()) return;
         bool hasId = false;
+        const auto overrides = json.find("graphOverrides");
+        const auto inheritsTexture = [&](const char* slot)
+        {
+            return overrides != json.end() && overrides->is_object() && overrides->contains(slot) && (*overrides)[slot] == false;
+        };
         for (auto it = json.begin(); it != json.end(); ++it)
             if (Lower(it.key()) == "assetid" && it.value().is_string() && !it.value().get<std::string>().empty()) hasId = true;
         for (auto it = json.begin(); it != json.end(); ++it)
@@ -287,9 +292,11 @@ namespace
                 if (value.empty()) continue;
                 if (key == "assetid") refs.Ids.push_back(value);
                 else if (key == "sourceasset" || key == "asset" || key == "basecolortexture" || key == "normaltexture"
-                    || key == "graphasset" || key == "texture")
+                    || key == "graphasset" || key == "texture" || key == "metallicroughnesstexture" || key == "emissiontexture")
                 {
                     if (key == "sourceasset" && hasId) continue;
+                    if (key == "basecolortexture" && inheritsTexture("baseColorTexture")) continue;
+                    if (key == "normaltexture" && inheritsTexture("normalTexture")) continue;
                     if (ValidId(value)) refs.Ids.push_back(value); else refs.Paths.push_back(value);
                 }
             }
@@ -939,11 +946,17 @@ bool jEditorAssetRegistry::TrashPath(const std::string& inputSource, fs::path& r
     return Scan(error);
 }
 
+bool SupportsEditorThumbnail(const fs::path& filename)
+{
+    const auto ext = Lower(ToUtf8(filename.extension()));
+    return ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".bmp" || ext == ".tga" || ext == ".hdr";
+}
+
 bool PrepareEditorThumbnail(const fs::path& filename, jEditorThumbnail& thumbnail, std::string& error, std::uint32_t maxEdge)
 {
     thumbnail = {}; error.clear();
-    if (Lower(ToUtf8(filename.extension())) != ".png" || !maxEdge || maxEdge > 256)
-    { error = "Thumbnail requires PNG input and 1..256 output edge"; return false; }
+    if (!SupportsEditorThumbnail(filename) || !maxEdge || maxEdge > 256)
+    { error = "Thumbnail requires a supported image and 1..256 output edge"; return false; }
     // Open the native path once and validate/decode the same bounded snapshot.
     // Reopening a filename after stbi_info permits concurrent file replacement
     // to bypass the dimension check, and narrow fopen loses Windows Unicode.
@@ -961,7 +974,7 @@ bool PrepareEditorThumbnail(const fs::path& filename, jEditorThumbnail& thumbnai
         || width > 8192 || height > 8192 || std::uint64_t(width) * height > 16 * 1024 * 1024)
     { error = "Thumbnail source has invalid or excessive dimensions"; return false; }
     std::unique_ptr<unsigned char, decltype(&stbi_image_free)> pixels(stbi_load_from_memory(encoded.data(), byteCount, &width, &height, &channels, 4), stbi_image_free);
-    if (!pixels) { error = "PNG thumbnail decode failed"; return false; }
+    if (!pixels) { error = "Image thumbnail decode failed"; return false; }
     const double scale = std::min(1.0, double(maxEdge) / std::max(width, height));
     thumbnail.Width = std::max(1u, static_cast<unsigned>(width * scale));
     thumbnail.Height = std::max(1u, static_cast<unsigned>(height * scale));

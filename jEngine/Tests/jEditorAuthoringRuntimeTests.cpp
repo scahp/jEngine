@@ -311,6 +311,60 @@ int RunEditorAuthoringRuntimeTests()
             document.Find(terrain)->Terrain.Heights.empty(), "one undo restores the terrain before the whole viewport stroke");
         jEditorTools::Shutdown();
     }
+    {
+        jEditor editor;
+        editor.SetProjectRoot(directory);
+        auto& document = editor.GetDocument();
+        const auto first = document.Create(EntityKind::Cube, "Inherited material");
+        const auto second = document.Create(EntityKind::Cube, "Instance texture");
+        const std::string path = "Assets/shared.jmaterial";
+        jEditorTools::MaterialGraph graph;
+        graph.Nodes = {{1, 0, 0, jEditorTools::NodeKind::Texture, {1, 1, 1}, 1, 0, 0, "Assets/default.png"},
+            {2, 0, 0, jEditorTools::NodeKind::Scalar, {}, .4f},
+            {3, 0, 0, jEditorTools::NodeKind::Texture, {1, 1, 1}, 1, 0, 0, "Assets/default-normal.png"}};
+        graph.BaseColor = 1;
+        graph.Roughness = 2;
+        graph.Normal = 3;
+        std::string error;
+        expect(jEditorTools::SaveMaterial(graph, directory / path, error) &&
+            jEditorTools::AssignSharedMaterial(editor, first, path, error) &&
+            jEditorTools::AssignSharedMaterial(editor, second, path, error),
+            "two editor objects can reference one saved material graph");
+        auto variant = *document.Find(second);
+        variant.Material.BaseColorTexture = "Assets/variant.png";
+        variant.Material.NormalTexture = "Assets/variant-normal.png";
+        if (auto& overrides = variant.Material.GraphOverrides)
+        {
+            overrides->BaseColorTexture = true;
+            overrides->NormalTexture = true;
+        }
+        document.Update(variant, "Set instance texture");
+        Document reopened;
+        const bool roundTrip = reopened.LoadJson(document.ToJson());
+        expect(roundTrip && reopened.Find(second)->Material == variant.Material,
+            "material instance graph link and local parameter override survive scene reload");
+        graph.Nodes[0].Texture = "Assets/new-default.png";
+        graph.Nodes[1].Scalar = .8f;
+        graph.Nodes[2].Texture = "Assets/new-default-normal.png";
+        const bool saved = jEditorTools::SaveMaterial(graph, directory / path, error);
+        editor.ReimportAsset(path);
+        const auto a = editor.ResolveMaterial(document.Find(first)->Material);
+        const auto b = editor.ResolveMaterial(document.Find(second)->Material);
+        expect(saved && a.BaseColorTexture == "Assets/new-default.png" && b.BaseColorTexture == "Assets/variant.png" &&
+            a.Roughness == .8f && b.Roughness == .8f &&
+            a.NormalTexture == "Assets/new-default-normal.png" && b.NormalTexture == "Assets/variant-normal.png",
+            "shared graph edits propagate to inherited parameters without replacing a local texture");
+        { std::ofstream corrupted(directory / path); corrupted << "{}"; }
+        editor.ReimportAsset(path);
+        expect(editor.ResolveMaterial(document.Find(first)->Material) == a,
+            "invalid shared graph reload preserves the last valid material");
+        graph.Normal = 0;
+        const bool disconnected = jEditorTools::SaveMaterial(graph, directory / path, error);
+        editor.ReimportAsset(path);
+        expect(disconnected && editor.ResolveMaterial(document.Find(first)->Material).NormalTexture.empty() &&
+            editor.ResolveMaterial(document.Find(second)->Material).NormalTexture == "Assets/variant-normal.png",
+            "disconnecting Normal clears the inherited graph texture and keeps the instance texture");
+    }
     g_Editor=oldEditor;g_KeyState=oldKeys;g_MouseState=oldMouse;ImGui::DestroyContext(context);ImGui::SetCurrentContext(previousContext);
     std::error_code error;std::filesystem::remove_all(directory,error);
     return failures;

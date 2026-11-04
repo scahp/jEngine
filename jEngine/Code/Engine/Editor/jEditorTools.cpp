@@ -1,10 +1,12 @@
 #include "pch.h"
 #include "jEditorTools.h"
+#include "jEditorAssetPanel.h"
 #include "jEditorProcedural.h"
 #include "Code/Engine/jEditor.h"
 #include "Core/jLog.h"
 #include "FileLoader/jEditorAssets.h"
 #include "FileLoader/jEditorAssetPath.h"
+#include "FileLoader/jImageFileLoader.h"
 #include "Scene/jCamera.h"
 #include "External/PathTracingDataLoader/json.hpp"
 #include "Recast.h"
@@ -12,7 +14,6 @@
 #include "DetourNavMeshBuilder.h"
 #include "DetourNavMeshQuery.h"
 #include <fstream>
-#include <set>
 
 namespace jEditorTools
 {
@@ -20,6 +21,7 @@ using namespace jEditorAuthoring;
 using Json = nlohmann::json;
 namespace
 {
+constexpr size_t MaxMaterialNodes = 256;
 bool Finite(float value) { return std::isfinite(value) && std::abs(value) <= 1e8f; }
 bool SafeTexture(const std::string& path)
 {
@@ -56,53 +58,123 @@ bool Write(const std::filesystem::path& file, const std::string& text, std::stri
     }
     catch (const std::exception& e) { error = e.what(); if (!temporary.empty()) { std::error_code ignored; std::filesystem::remove_all(temporary, ignored); } return false; }
 }
-struct Value { Vec3 Color{1, 1, 1}; std::string Texture; };
+struct MaterialValue
+{
+    Vec3 Color{1, 1, 1};
+    std::string Texture;
+    bool IsScalar = false;
+};
+struct MaterialNodeResult
+{
+    MaterialValue Value;
+    const char* Error = "Material graph cycle rejected";
+};
+
+class MaterialEvaluator
+{
+public:
+    explicit MaterialEvaluator(const MaterialGraph& graph)
+    {
+        for (const auto& node : graph.Nodes) Nodes.emplace(node.Id, &node);
+    }
+    const MaterialNode* Find(uint32_t id) const
+    {
+        const auto node = Nodes.find(id);
+        return node == Nodes.end() ? nullptr : node->second;
+    }
+    const MaterialNodeResult& Read(uint32_t id)
+    {
+        // A recursive read of an unfinished entry observes its cycle error.
+        const auto [entry, inserted] = Results.try_emplace(id);
+        if (inserted) entry->second = Calculate(id);
+        return entry->second;
+    }
+
+private:
+    MaterialNodeResult Calculate(uint32_t id)
+    {
+        const auto* node = Find(id);
+        if (!node) return {{}, "Material input/output references a missing node"};
+        MaterialValue value;
+        switch (node->Kind)
+        {
+        case NodeKind::Color:
+            value.Color = node->Color;
+            break;
+        case NodeKind::Scalar:
+            value.Color = {node->Scalar, node->Scalar, node->Scalar};
+            value.IsScalar = true;
+            break;
+        case NodeKind::Texture:
+            if (node->Texture.empty()) return {{}, "Texture node requires a project-relative texture"};
+            value.Texture = node->Texture;
+            break;
+        case NodeKind::Multiply:
+        case NodeKind::Add:
+        {
+            const auto& a = Read(node->InputA);
+            if (a.Error) return a;
+            const auto& b = Read(node->InputB);
+            if (b.Error) return b;
+            const bool multiply = node->Kind == NodeKind::Multiply;
+            if ((!a.Value.Texture.empty() && !b.Value.Texture.empty()) ||
+                (!multiply && (!a.Value.Texture.empty() || !b.Value.Texture.empty())))
+                return {{}, "This PBR graph supports one texture multiplied by a constant color; texture mixing needs a shader node extension"};
+            value.Texture = a.Value.Texture.empty() ? b.Value.Texture : a.Value.Texture;
+            value.IsScalar = a.Value.IsScalar && b.Value.IsScalar;
+            const auto& x = a.Value.Color;
+            const auto& y = b.Value.Color;
+            value.Color = multiply ? Vec3{x.X * y.X, x.Y * y.Y, x.Z * y.Z} : Vec3{x.X + y.X, x.Y + y.Y, x.Z + y.Z};
+            break;
+        }
+        default:
+            return {{}, "Invalid material node kind"};
+        }
+        if (!Finite(value.Color.X) || !Finite(value.Color.Y) || !Finite(value.Color.Z))
+            return {{}, "Material graph overflow"};
+        return {std::move(value), nullptr};
+    }
+
+    std::map<uint32_t, const MaterialNode*> Nodes;
+    std::map<uint32_t, MaterialNodeResult> Results;
+};
 }
 bool EvaluateMaterial(const MaterialGraph& graph, MaterialProperties& material, std::string& error)
 {
     error.clear();
-    if (graph.Nodes.empty() || graph.Nodes.size() > 256) { error = "A material needs 1..256 nodes"; return false; }
-    std::map<uint32_t, const MaterialNode*> nodes;
+    if (graph.Nodes.empty() || graph.Nodes.size() > MaxMaterialNodes) { error = "A material needs 1..256 nodes"; return false; }
+    MaterialEvaluator evaluator(graph);
     for (const auto& node : graph.Nodes)
     {
-        if (!node.Id || !nodes.emplace(node.Id, &node).second || !Finite(node.Scalar) || !Finite(node.Color.X) || !Finite(node.Color.Y) || !Finite(node.Color.Z) || !Finite(node.X) || !Finite(node.Y) || !SafeTexture(node.Texture) || int(node.Kind) < 0 || int(node.Kind) > int(NodeKind::Add))
+        if (!node.Id || evaluator.Find(node.Id) != &node || !Finite(node.Scalar) || !Finite(node.Color.X) || !Finite(node.Color.Y) || !Finite(node.Color.Z) || !Finite(node.X) || !Finite(node.Y) || !SafeTexture(node.Texture) || int(node.Kind) < 0 || int(node.Kind) > int(NodeKind::Add))
         { error = "Invalid material node ID, number, kind or texture path"; return false; }
     }
-    std::map<uint32_t, Value> cache; std::set<uint32_t> active;
-    std::function<bool(uint32_t, Value&)> evaluate = [&](uint32_t id, Value& out)
-    {
-        if (const auto it = cache.find(id); it != cache.end()) { out = it->second; return true; }
-        const auto it = nodes.find(id);
-        if (it == nodes.end()) { error = "Material input/output references a missing node"; return false; }
-        if (!active.insert(id).second) { error = "Material graph cycle rejected"; return false; }
-        const auto& node = *it->second; Value a, b;
-        switch (node.Kind)
-        {
-        case NodeKind::Color: out.Color = node.Color; break;
-        case NodeKind::Scalar: out.Color = {node.Scalar, node.Scalar, node.Scalar}; break;
-        case NodeKind::Texture: if (node.Texture.empty()) { error = "Texture node requires a project-relative texture"; return false; } out.Texture = node.Texture; break;
-        case NodeKind::Multiply:
-        case NodeKind::Add:
-            if (!evaluate(node.InputA, a) || !evaluate(node.InputB, b)) return false;
-            if ((!a.Texture.empty() && !b.Texture.empty()) || (node.Kind == NodeKind::Add && (!a.Texture.empty() || !b.Texture.empty())))
-            { error = "This PBR graph supports one texture multiplied by a constant color; texture mixing needs a shader node extension"; return false; }
-            out.Texture = a.Texture.empty() ? b.Texture : a.Texture;
-            if (node.Kind == NodeKind::Multiply) out.Color = {a.Color.X * b.Color.X, a.Color.Y * b.Color.Y, a.Color.Z * b.Color.Z};
-            else out.Color = {a.Color.X + b.Color.X, a.Color.Y + b.Color.Y, a.Color.Z + b.Color.Z};
-            break;
-        }
-        active.erase(id); cache[id] = out;
-        if (!Finite(out.Color.X) || !Finite(out.Color.Y) || !Finite(out.Color.Z)) { error = "Material graph overflow"; return false; }
-        return true;
-    };
     // Validate disconnected nodes too: unused cyclic subgraphs must not persist.
-    for (const auto& [id, ignored] : nodes) { (void)ignored; Value value; if (!evaluate(id, value)) return false; }
-    auto result = material; Value color, metallic, roughness;
-    if (!evaluate(graph.BaseColor, color)) return false;
+    for (const auto& node : graph.Nodes)
+        if (const auto* problem = evaluator.Read(node.Id).Error) { error = problem; return false; }
+    auto result = material;
+    const auto& base = evaluator.Read(graph.BaseColor);
+    if (base.Error) { error = base.Error; return false; }
+    const auto& color = base.Value;
     result.BaseColor = {std::clamp(color.Color.X, 0.0f, 1.0f), std::clamp(color.Color.Y, 0.0f, 1.0f), std::clamp(color.Color.Z, 0.0f, 1.0f)};
     result.BaseColorTexture = color.Texture;
-    if (graph.Metallic) { if (!evaluate(graph.Metallic, metallic) || !metallic.Texture.empty()) { error = "Metallic output must be scalar"; return false; } result.Metallic = std::clamp(metallic.Color.X, 0.0f, 1.0f); }
-    if (graph.Roughness) { if (!evaluate(graph.Roughness, roughness) || !roughness.Texture.empty()) { error = "Roughness output must be scalar"; return false; } result.Roughness = std::clamp(roughness.Color.X, 0.0f, 1.0f); }
+    if (graph.Normal)
+    {
+        const auto* normal = evaluator.Find(graph.Normal);
+        if (!normal || normal->Kind != NodeKind::Texture)
+        { error = "Normal output requires a Texture node"; return false; }
+        result.NormalTexture = normal->Texture;
+    }
+    const auto scalarOutput = [&](uint32_t id, float& value, const char* message)
+    {
+        if (!id) return true;
+        const auto& output = evaluator.Read(id);
+        if (output.Error || !output.Value.Texture.empty()) { error = message; return false; }
+        value = std::clamp(output.Value.Color.X, 0.0f, 1.0f);
+        return true;
+    };
+    if (!scalarOutput(graph.Metallic, result.Metallic, "Metallic output must be scalar") ||
+        !scalarOutput(graph.Roughness, result.Roughness, "Roughness output must be scalar")) return false;
     result.OverrideEnabled = true; material = std::move(result); return true;
 }
 bool SaveMaterial(const MaterialGraph& graph, const std::filesystem::path& file, std::string& error)
@@ -110,7 +182,9 @@ bool SaveMaterial(const MaterialGraph& graph, const std::filesystem::path& file,
     MaterialProperties checked; if (!EvaluateMaterial(graph, checked, error)) return false;
     Json nodes = Json::array();
     for (const auto& n : graph.Nodes) nodes.push_back({{"id", n.Id}, {"kind", int(n.Kind)}, {"a", n.InputA}, {"b", n.InputB}, {"color", {n.Color.X, n.Color.Y, n.Color.Z}}, {"value", n.Scalar}, {"x", n.X}, {"y", n.Y}, {"texture", n.Texture}});
-    return Write(file, Json{{"format", "jEngineMaterial"}, {"version", 1}, {"nodes", nodes}, {"baseColor", graph.BaseColor}, {"metallic", graph.Metallic}, {"roughness", graph.Roughness}}.dump(2), error);
+    Json json{{"format", "jEngineMaterial"}, {"version", 1}, {"nodes", nodes}, {"baseColor", graph.BaseColor},
+        {"metallic", graph.Metallic}, {"roughness", graph.Roughness}, {"normal", graph.Normal}};
+    return Write(file, json.dump(2), error);
 }
 bool LoadMaterial(const std::filesystem::path& file, MaterialGraph& graph, std::string& error)
 {
@@ -118,8 +192,9 @@ bool LoadMaterial(const std::filesystem::path& file, MaterialGraph& graph, std::
     {
         if (std::filesystem::file_size(file) > 1024 * 1024) throw std::runtime_error("Material graph exceeds 1 MiB");
         std::ifstream in(file); Json json; in >> json;
-        if (json.at("format") != "jEngineMaterial" || json.at("version") != 1 || !json.at("nodes").is_array() || json.at("nodes").size() > 256) throw std::runtime_error("Unsupported material graph");
+        if (json.at("format") != "jEngineMaterial" || json.at("version") != 1 || !json.at("nodes").is_array() || json.at("nodes").size() > MaxMaterialNodes) throw std::runtime_error("Unsupported material graph");
         MaterialGraph result; result.BaseColor = json.at("baseColor").get<uint32_t>(); result.Metallic = json.at("metallic").get<uint32_t>(); result.Roughness = json.at("roughness").get<uint32_t>();
+        result.Normal = json.value("normal", uint32_t{0});
         for (const auto& j : json.at("nodes"))
         {
             MaterialNode node; node.Id = j.at("id").get<uint32_t>(); node.Kind = NodeKind(j.at("kind").get<int>());
@@ -132,6 +207,120 @@ bool LoadMaterial(const std::filesystem::path& file, MaterialGraph& graph, std::
     }
     catch (const std::exception& e) { error = e.what(); return false; }
 }
+
+namespace
+{
+Vector4 SamplePreviewMap(const jEditorThumbnail& image, float u, float v)
+{
+    const auto x = std::min(uint32_t(u * float(image.Width)), image.Width - 1);
+    const auto y = std::min(uint32_t(v * float(image.Height)), image.Height - 1);
+    const auto* rgba = image.Rgba.data() + (size_t(y) * image.Width + x) * 4;
+    return Vector4(rgba[0], rgba[1], rgba[2], rgba[3]) * (1.f / 255);
+}
+}
+
+bool PrepareMaterialThumbnail(const std::filesystem::path& root, const std::filesystem::path& file,
+    jEditorThumbnail& thumbnail, std::string& diagnostic)
+{
+    thumbnail = {};
+    MaterialGraph graph;
+    MaterialProperties material;
+    if (!LoadMaterial(file, graph, diagnostic) || !EvaluateMaterial(graph, material, diagnostic)) return false;
+
+    const auto loadMap = [&](const std::string& source, const char* label, jEditorThumbnail& image)
+    {
+        if (source.empty()) return;
+        std::string error;
+        const auto path = jEditorProject::ResolveSafe(root, source, error, true);
+        if (path && PrepareEditorThumbnail(*path, image, error, 256)) return;
+        if (!diagnostic.empty()) diagnostic += '\n';
+        diagnostic += std::string(label) + " preview unavailable. " + error;
+    };
+    jEditorThumbnail albedo, normalMap;
+    loadMap(material.BaseColorTexture, "Base Color map", albedo);
+    loadMap(material.NormalTexture, "Normal map", normalMap);
+
+    constexpr uint32_t edge = 128;
+    constexpr float center = edge * .5f, radius = edge * .44f;
+    thumbnail = {edge, edge, std::vector<uint8_t>(edge * edge * 4)};
+    const Vector tint(material.BaseColor.X, material.BaseColor.Y, material.BaseColor.Z);
+    const Vector key = Vector(-.6f, .7f, 1.f).GetNormalize();
+    const Vector half = (key + Vector(0, 0, 1)).GetNormalize();
+    const float gloss = std::lerp(96.f, 5.f, material.Roughness);
+    const auto encode = [](float linear)
+    {
+        return uint8_t(std::lround(std::pow(std::clamp(linear, 0.f, 1.f), 1.f / 2.2f) * 255.f));
+    };
+
+    // Orthographic sphere under fixed studio lighting, independent of the scene renderer.
+    for (uint32_t y = 0; y < edge; ++y)
+        for (uint32_t x = 0; x < edge; ++x)
+        {
+            const float sx = (float(x) + .5f - center) / radius;
+            const float sy = (center - float(y) - .5f) / radius;
+            const float r2 = sx * sx + sy * sy;
+            if (r2 >= 1.f) continue;
+            Vector normal(sx, sy, std::sqrt(1.f - r2));
+            const float u = .5f + std::atan2(normal.x, normal.z) / (2.f * PI);
+            const float v = std::acos(normal.y) / PI;
+            const auto texel = albedo.Rgba.empty() ? Vector4(1.f) : SamplePreviewMap(albedo, u, v);
+            if (texel.w < .5f) continue;
+            const Vector base = tint * Vector(std::pow(texel.x, 2.2f), std::pow(texel.y, 2.2f), std::pow(texel.z, 2.2f));
+            if (!normalMap.Rgba.empty())
+            {
+                const auto sample = SamplePreviewMap(normalMap, u, v);
+                const auto tangent = Vector(normal.z, 0, -normal.x).GetNormalize();
+                const auto bitangent = normal.CrossProduct(tangent);
+                normal = (tangent * (2.f * sample.x - 1.f) + bitangent * (2.f * sample.y - 1.f) +
+                    normal * (2.f * sample.z - 1.f)).GetNormalize();
+            }
+            const float diffuse = (.20f + .72f * std::max(0.f, normal.DotProduct(key))) * (1.f - .75f * material.Metallic);
+            const float highlight = .12f + 1.35f * std::pow(std::max(0.f, normal.DotProduct(half)), gloss);
+            const Vector reflectance = Vector(.04f * (1.f - material.Metallic)) + base * material.Metallic;
+            const Vector color = base * diffuse + reflectance * highlight;
+            auto* pixel = thumbnail.Rgba.data() + (size_t(y) * edge + x) * 4;
+            pixel[0] = encode(color.x); pixel[1] = encode(color.y); pixel[2] = encode(color.z);
+            pixel[3] = uint8_t(std::lround(std::min(1.f, (1.f - std::sqrt(r2)) * radius) * 255.f));
+        }
+    return true;
+}
+
+void InheritMaterialGraph(MaterialProperties& instance, const MaterialProperties& defaults)
+{
+    if (!instance.GraphOverrides) return;
+    const auto& overrides = *instance.GraphOverrides;
+    if (!overrides.BaseColor) instance.BaseColor = defaults.BaseColor;
+    if (!overrides.BaseColorTexture) instance.BaseColorTexture = defaults.BaseColorTexture;
+    if (!overrides.Metallic) instance.Metallic = defaults.Metallic;
+    if (!overrides.Roughness) instance.Roughness = defaults.Roughness;
+    if (!overrides.NormalTexture) instance.NormalTexture = defaults.NormalTexture;
+}
+
+bool AssignSharedMaterial(jEditor& editor, EntityId id, const std::string& path, std::string& error)
+{
+    auto& document = editor.GetDocument();
+    const auto* selected = document.Find(id);
+    if (!selected || document.IsPlaying() || document.IsEffectivelyLocked(id))
+    { error = "Select an editable object to assign a shared material"; return false; }
+    const auto file = jEditorProject::ResolveSafe(editor.GetProjectRoot(), jEditorAssetPath::FromUtf8(path), error, true);
+    MaterialGraph graph;
+    MaterialProperties defaults;
+    if (!file || !LoadMaterial(*file, graph, error) || !EvaluateMaterial(graph, defaults, error)) return false;
+    auto entity = *selected;
+    auto& material = entity.Material;
+    if (!material.GraphOverrides || material.GraphAsset != path)
+    {
+        const bool localNormal = !material.NormalTexture.empty() && (!material.GraphOverrides || material.GraphOverrides->NormalTexture);
+        material.GraphOverrides.emplace().NormalTexture = localNormal;
+    }
+    material.GraphAsset = path;
+    material.OverrideEnabled = true;
+    InheritMaterialGraph(material, defaults);
+    if (!document.Update(entity, "Assign shared material")) { error = document.LastError(); return false; }
+    editor.ReimportAsset(path);
+    return true;
+}
+
 Mesh BuildTerrain(const TerrainProperties& terrain)
 {
     jEditorProcedural::Mesh source; Mesh result; std::string error;
@@ -269,7 +458,8 @@ struct ToolState
 {
     EntityId Selected = 0; MaterialGraph Graph; uint32_t SelectedNode = 0, NextNode = 4;
     std::vector<MaterialGraph> Undo, Redo;
-    std::string Error; char GraphPath[512] = "Assets/Materials/Material.jmaterial";
+    std::string Error, AssignedGraph; char GraphPath[512] = "Assets/Materials/Material.jmaterial";
+    bool AssignedGraphHasNormal = false;
     float Time = 0, BrushX = 0, BrushZ = 0, BrushRadius = 100, BrushStrength = 20;
     int BrushMode = 0; bool Preview = false;
     bool PaintInScene = false;
@@ -389,60 +579,208 @@ void GraphHistory()
 {
     auto& s = Tools(); s.Undo.push_back(s.Graph); if (s.Undo.size() > 64) s.Undo.erase(s.Undo.begin()); s.Redo.clear();
 }
-void OutputCombo(const char* label, uint32_t& output)
+constexpr float MaterialNodeWidth = 165;
+constexpr float MaterialNodeHeight(NodeKind kind) { return kind == NodeKind::Texture ? 108.f : 82.f; }
+constexpr float MaterialPinY(int index) { return 41.f + float(index) * 25.f; }
+constexpr struct MaterialOutputPin
 {
-    auto& s = Tools(); const auto text = output ? std::to_string(output) : std::string("None");
-    if (ImGui::BeginCombo(label, text.c_str()))
-    {
-        if (ImGui::Selectable("None", output == 0)) { GraphHistory(); output = 0; }
-        for (const auto& node : s.Graph.Nodes) if (ImGui::Selectable(std::to_string(node.Id).c_str(), output == node.Id)) { GraphHistory(); output = node.Id; }
-        ImGui::EndCombo();
-    }
+    const char* Label;
+    uint32_t MaterialGraph::*Source;
+} MaterialOutputPins[] = {
+    {"Base Color", &MaterialGraph::BaseColor}, {"Normal", &MaterialGraph::Normal},
+    {"Metallic", &MaterialGraph::Metallic}, {"Roughness", &MaterialGraph::Roughness}
+};
+
+uint32_t DroppedMaterialNode()
+{
+    uint32_t node = 0;
+    if (!ImGui::BeginDragDropTarget()) return node;
+    if (const auto* payload = ImGui::AcceptDragDropPayload("JENGINE_MATERIAL_NODE"); payload && payload->DataSize == sizeof(node))
+        node = *static_cast<const uint32_t*>(payload->Data);
+    ImGui::EndDragDropTarget();
+    return node;
 }
-void GraphUI(jEditor& editor, Entity e)
+
+void DrawMaterialLink(ImDrawList& draw, const ImVec2& origin, const ImVec2& input, uint32_t id)
+{
+    if (!id) return;
+    const auto& nodes = Tools().Graph.Nodes;
+    const auto source = std::find_if(nodes.begin(), nodes.end(), [id](const auto& node) { return node.Id == id; });
+    if (source == nodes.end()) return;
+    const ImVec2 output(origin.x + source->X + MaterialNodeWidth, origin.y + source->Y + MaterialPinY(0));
+    const float bend = std::clamp(std::abs(input.x - output.x) * .5f, 32.f, 100.f);
+    draw.AddBezierCubic(output, ImVec2(output.x + bend, output.y), ImVec2(input.x - bend, input.y), input,
+        IM_COL32(90, 180, 255, 255), 2);
+}
+
+void DrawMaterialOutput(ImDrawList& draw, const ImVec2& position)
 {
     auto& s = Tools();
-    ImGui::TextWrapped("Drag node headers to arrange. Drag an output pin onto input A/B to connect. Save and Apply stores the graph and its compiled PBR properties.");
-    int type = 0; static int addKind = 0; ImGui::Combo("New node", &addKind, "Color\0Scalar\0Texture\0Multiply\0Add\0");
+    const ImVec2 end(position.x + MaterialNodeWidth, position.y + MaterialPinY(3) + 16);
+    draw.AddRectFilled(position, end, IM_COL32(42, 47, 55, 255), 5);
+    draw.AddRect(position, end, IM_COL32(110, 130, 160, 255), 5);
+    draw.AddRectFilled(position, ImVec2(end.x, position.y + 23), IM_COL32(46, 89, 135, 255), 5, ImDrawFlags_RoundCornersTop);
+    draw.AddText(ImVec2(position.x + 8, position.y + 4), IM_COL32_WHITE, "Material Output");
+    ImGui::PushID("MaterialOutput");
+    for (int i = 0; i < int(std::size(MaterialOutputPins)); ++i)
+    {
+        const auto& pin = MaterialOutputPins[i];
+        auto& output = s.Graph.*pin.Source;
+        const bool normal = pin.Source == &MaterialGraph::Normal;
+        ImGui::PushID(pin.Label);
+        ImGui::SetCursorScreenPos(ImVec2(position.x + 3, position.y + MaterialPinY(i) - 10));
+        if (ImGui::Button(pin.Label, ImVec2(91, 20))) ImGui::OpenPopup("Connect");
+        if (const auto dropped = DroppedMaterialNode(); dropped && dropped != output)
+        {
+            const auto source = std::find_if(s.Graph.Nodes.begin(), s.Graph.Nodes.end(), [dropped](const auto& node) { return node.Id == dropped; });
+            if (source != s.Graph.Nodes.end() && (!normal || source->Kind == NodeKind::Texture))
+            { GraphHistory(); output = dropped; s.Error.clear(); }
+            else if (normal) s.Error = "Normal output requires a Texture node";
+        }
+        ImGui::SameLine();
+        const auto source = output ? "#" + std::to_string(output) : std::string("None");
+        ImGui::TextDisabled("%s", source.c_str());
+        if (ImGui::BeginPopup("Connect"))
+        {
+            if (ImGui::Selectable("Disconnect", output == 0) && output) { GraphHistory(); output = 0; }
+            for (const auto& node : s.Graph.Nodes)
+                if ((!normal || node.Kind == NodeKind::Texture) &&
+                    ImGui::Selectable(("Node " + std::to_string(node.Id)).c_str(), output == node.Id) && output != node.Id)
+                { GraphHistory(); output = node.Id; s.Error.clear(); }
+            ImGui::EndPopup();
+        }
+        ImGui::PopID();
+    }
+    ImGui::PopID();
+}
+
+void FormatMaterialValue(char* text, size_t size, const MaterialValue& value, int precision)
+{
+    const auto& color = value.Color;
+    if (value.IsScalar)
+        std::snprintf(text, size, "%.*g", precision, color.X);
+    else if (!value.Texture.empty() && color.X == color.Y && color.X == color.Z)
+        std::snprintf(text, size, "Tint %.*g", precision, color.X);
+    else
+        std::snprintf(text, size, "%.*g %.*g %.*g", precision, color.X, precision, color.Y, precision, color.Z);
+}
+
+void DrawMaterialValue(ImDrawList& draw, const ImVec2& position, const MaterialNode& node, MaterialEvaluator& evaluator)
+{
+    const bool arithmetic = node.Kind == NodeKind::Multiply || node.Kind == NodeKind::Add;
+    const ImVec2 min(position.x + (arithmetic ? 34.f : 8.f), position.y + 56.f);
+    const ImVec2 max(position.x + MaterialNodeWidth - 8.f, position.y + 76.f);
+    if (!ImGui::IsRectVisible(min, max)) return;
+    const auto& result = evaluator.Read(node.Id);
+    const auto& value = result.Value;
+    draw.AddRectFilled(min, max, IM_COL32(23, 27, 33, 255), 3);
+    float textRight = max.x - 4.f;
+    if (!result.Error && !value.IsScalar)
+    {
+        const ImVec2 swatchMin(max.x - 17.f, min.y + 4.f), swatchMax(max.x - 4.f, max.y - 4.f);
+        draw.AddRectFilled(swatchMin, swatchMax, ImGui::ColorConvertFloat4ToU32(ImVec4(value.Color.X, value.Color.Y, value.Color.Z, 1)), 2);
+        draw.AddRect(swatchMin, swatchMax, IM_COL32(122, 132, 150, 255), 2);
+        textRight = swatchMin.x - 4.f;
+    }
+    char preview[96];
+    const char* label = preview;
+    if (result.Error) label = arithmetic && (!node.InputA || !node.InputB) ? "Unconnected" : "Unavailable";
+    else FormatMaterialValue(preview, sizeof(preview), value, 3);
+    const ImVec4 clip(min.x, min.y, textRight, max.y);
+    draw.AddText(ImGui::GetFont(), ImGui::GetFontSize(), ImVec2(min.x + 5.f, min.y + 3.f),
+        ImGui::GetColorU32(result.Error ? ImGuiCol_TextDisabled : ImGuiCol_Text), label, nullptr, 0, &clip);
+    if (!ImGui::IsWindowHovered() || !ImGui::IsMouseHoveringRect(min, max)) return;
+
+    ImGui::BeginTooltip();
+    if (result.Error) ImGui::TextUnformatted(result.Error);
+    else
+    {
+        FormatMaterialValue(preview, sizeof(preview), value, 9);
+        ImGui::Text("%s  %s", value.IsScalar ? "Value" : value.Texture.empty() ? "RGB" : "Texture factor", preview);
+        if (!value.Texture.empty()) ImGui::TextUnformatted(value.Texture.c_str());
+        if (arithmetic)
+        {
+            const auto& a = evaluator.Read(node.InputA).Value;
+            const auto& b = evaluator.Read(node.InputB).Value;
+            FormatMaterialValue(preview, sizeof(preview), a, 9);
+            ImGui::Text("A  %s%s", a.Texture.empty() ? "" : "Texture x ", preview);
+            FormatMaterialValue(preview, sizeof(preview), b, 9);
+            ImGui::Text("B  %s%s", b.Texture.empty() ? "" : "Texture x ", preview);
+        }
+    }
+    ImGui::EndTooltip();
+}
+
+void GraphUI(jEditor& editor, Entity e, const jEditorProject* project, const jEditorAssetRegistry* registry)
+{
+    auto& s = Tools();
+    ImGui::TextWrapped("Drag Out to A/B or a Material Output pin. Click a Material Output pin to choose or disconnect its source.");
+    static int addKind = 0; ImGui::Combo("New node", &addKind, "Color\0Scalar\0Texture\0Multiply\0Add\0");
+    ImGui::BeginDisabled(s.Graph.Nodes.size() >= MaxMaterialNodes);
     if (ImGui::Button("Add node")) { GraphHistory(); MaterialNode node; node.Id = s.NextNode++; node.Kind = NodeKind(addKind); node.X = 20 + float(s.Graph.Nodes.size() % 3) * 185; node.Y = 20 + float(s.Graph.Nodes.size() / 3) * 130; s.Graph.Nodes.push_back(node); }
+    ImGui::EndDisabled();
     ImGui::SameLine(); if (ImGui::Button("Undo graph") && !s.Undo.empty()) { s.Redo.push_back(s.Graph); s.Graph = s.Undo.back(); s.Undo.pop_back(); }
     ImGui::SameLine(); if (ImGui::Button("Redo graph") && !s.Redo.empty()) { s.Undo.push_back(s.Graph); s.Graph = s.Redo.back(); s.Redo.pop_back(); }
-    ImGui::BeginChild("MaterialCanvas", ImVec2(0, 310), true, ImGuiWindowFlags_HorizontalScrollbar);
+    ImGui::SameLine();
+    const bool showOutput = ImGui::Button("Show output");
+    ImGui::BeginChild("MaterialCanvas", ImVec2(0, 390), true, ImGuiWindowFlags_HorizontalScrollbar);
     const auto origin = ImGui::GetCursorScreenPos(); auto* draw = ImGui::GetWindowDrawList();
+    ImVec2 output(origin.x + 230, origin.y + 20);
+    float canvasBottom = output.y + MaterialPinY(3) + 28;
     for (const auto& node : s.Graph.Nodes)
-        for (int input = 0; input < 2; ++input)
+    {
+        output.x = std::max(output.x, origin.x + node.X + MaterialNodeWidth + 64);
+        canvasBottom = std::max(canvasBottom, origin.y + node.Y + MaterialNodeHeight(node.Kind) + 12);
+        if (node.Kind == NodeKind::Multiply || node.Kind == NodeKind::Add)
         {
-            const auto id = input ? node.InputB : node.InputA; const auto source = std::find_if(s.Graph.Nodes.begin(), s.Graph.Nodes.end(), [id](const auto& n) { return n.Id == id; });
-            if (source != s.Graph.Nodes.end())
-            {
-                ImVec2 a(origin.x + source->X + 160, origin.y + source->Y + 45), b(origin.x + node.X, origin.y + node.Y + 45 + input * 25);
-                draw->AddBezierCubic(a, ImVec2(a.x + 70, a.y), ImVec2(b.x - 70, b.y), b, IM_COL32(90, 180, 255, 255), 2);
-            }
+            const float x = origin.x + node.X, y = origin.y + node.Y;
+            DrawMaterialLink(*draw, origin, ImVec2(x, y + MaterialPinY(0)), node.InputA);
+            DrawMaterialLink(*draw, origin, ImVec2(x, y + MaterialPinY(1)), node.InputB);
         }
+    }
+    for (int i = 0; i < int(std::size(MaterialOutputPins)); ++i)
+        DrawMaterialLink(*draw, origin, ImVec2(output.x, output.y + MaterialPinY(i)), s.Graph.*MaterialOutputPins[i].Source);
+    MaterialEvaluator evaluator(s.Graph);
     for (auto& node : s.Graph.Nodes)
     {
         ImGui::PushID(int(node.Id)); ImVec2 p(origin.x + node.X, origin.y + node.Y);
-        draw->AddRectFilled(p, ImVec2(p.x + 165, p.y + 108), IM_COL32(42, 47, 55, 255), 5);
-        draw->AddRect(p, ImVec2(p.x + 165, p.y + 108), IM_COL32(110, 130, 160, 255), 5);
-        ImGui::SetCursorScreenPos(p); if (ImGui::Button(("Node " + std::to_string(node.Id)).c_str(), ImVec2(165, 23))) s.SelectedNode = node.Id;
+        const ImVec2 end(p.x + MaterialNodeWidth, p.y + MaterialNodeHeight(node.Kind));
+        draw->AddRectFilled(p, end, IM_COL32(42, 47, 55, 255), 5);
+        draw->AddRect(p, end, IM_COL32(110, 130, 160, 255), 5);
+        ImGui::SetCursorScreenPos(p); if (ImGui::Button(("Node " + std::to_string(node.Id)).c_str(), ImVec2(MaterialNodeWidth, 23))) s.SelectedNode = node.Id;
         if (ImGui::IsItemActivated()) GraphHistory();
-        if (ImGui::IsItemActive() && ImGui::IsMouseDragging(0)) { node.X += ImGui::GetIO().MouseDelta.x; node.Y += ImGui::GetIO().MouseDelta.y; }
-        for (int input = 0; input < 2; ++input)
+        if (ImGui::IsItemActive() && ImGui::IsMouseDragging(0))
         {
-            ImGui::SetCursorScreenPos(ImVec2(p.x + 3, p.y + 31 + input * 25)); ImGui::Button(input ? "B" : "A", ImVec2(24, 20));
-            if (ImGui::BeginDragDropTarget())
+            node.X = std::max(0.f, node.X + ImGui::GetIO().MouseDelta.x);
+            node.Y = std::max(0.f, node.Y + ImGui::GetIO().MouseDelta.y);
+        }
+        if (node.Kind == NodeKind::Multiply || node.Kind == NodeKind::Add)
+        {
+            for (int input = 0; input < 2; ++input)
             {
-                if (const auto* payload = ImGui::AcceptDragDropPayload("JENGINE_MATERIAL_NODE"))
-                    if (payload->DataSize == sizeof(uint32_t)) { GraphHistory(); (input ? node.InputB : node.InputA) = *static_cast<const uint32_t*>(payload->Data); }
-                ImGui::EndDragDropTarget();
+                ImGui::SetCursorScreenPos(ImVec2(p.x + 3, p.y + MaterialPinY(input) - 10));
+                ImGui::Button(input ? "B" : "A", ImVec2(24, 20));
+                auto& source = input ? node.InputB : node.InputA;
+                if (const auto dropped = DroppedMaterialNode(); dropped && dropped != source) { GraphHistory(); source = dropped; }
             }
         }
-        ImGui::SetCursorScreenPos(ImVec2(p.x + 132, p.y + 31)); ImGui::Button("Out", ImVec2(30, 20));
+        ImGui::SetCursorScreenPos(ImVec2(p.x + MaterialNodeWidth - 33, p.y + MaterialPinY(0) - 10)); ImGui::Button("Out", ImVec2(30, 20));
         if (ImGui::BeginDragDropSource()) { ImGui::SetDragDropPayload("JENGINE_MATERIAL_NODE", &node.Id, sizeof(node.Id)); ImGui::Text("Output %u", node.Id); ImGui::EndDragDropSource(); }
         static const char* kinds[] = {"Color", "Scalar", "Texture", "Multiply", "Add"};
-        draw->AddText(ImVec2(p.x + 35, p.y + 65), IM_COL32_WHITE, kinds[int(node.Kind)]); ImGui::PopID();
+        draw->AddText(ImVec2(p.x + 35, p.y + (node.Kind == NodeKind::Texture ? 65.f : 34.f)), IM_COL32_WHITE, kinds[int(node.Kind)]);
+        if (node.Kind == NodeKind::Texture)
+        {
+            ImGui::SetCursorScreenPos(ImVec2(p.x + 103, p.y + 55));
+            jEditorAssetPanel::RenderTexturePreview(project, registry, node.Texture, ImVec2(53, 46));
+        }
+        else DrawMaterialValue(*draw, p, node, evaluator);
+        ImGui::PopID();
     }
-    ImGui::SetCursorScreenPos(ImVec2(origin.x + 800, origin.y + 700)); ImGui::Dummy(ImVec2(1, 1)); ImGui::EndChild();
+    DrawMaterialOutput(*draw, output);
+    ImGui::SetCursorScreenPos(ImVec2(output.x + MaterialNodeWidth + 8, canvasBottom));
+    ImGui::Dummy(ImVec2(1, 1));
+    if (showOutput) { ImGui::SetScrollHereX(1); ImGui::SetScrollY(0); }
+    ImGui::EndChild();
     auto node = std::find_if(s.Graph.Nodes.begin(), s.Graph.Nodes.end(), [&](const auto& n) { return n.Id == s.SelectedNode; });
     if (node != s.Graph.Nodes.end())
     {
@@ -452,22 +790,44 @@ void GraphUI(jEditor& editor, Entity e)
         if (node->Kind == NodeKind::Scalar) ImGui::DragFloat("Node value", &node->Scalar, .01f);
         if (node->Kind == NodeKind::Texture) { char path[512]; std::snprintf(path, sizeof(path), "%s", node->Texture.c_str()); if (ImGui::InputText("Texture path", path, sizeof(path))) node->Texture = path; }
         if (node->Kind != NodeKind::Multiply && node->Kind != NodeKind::Add && ImGui::IsItemActivated()) { s.Undo.push_back(before); if (s.Undo.size() > 64) s.Undo.erase(s.Undo.begin()); s.Redo.clear(); }
-        if (ImGui::Button("Remove node")) { GraphHistory(); s.Graph.Nodes.erase(node); s.SelectedNode = 0; }
+        if (ImGui::Button("Remove node"))
+        {
+            GraphHistory();
+            for (const auto& pin : MaterialOutputPins)
+                if (s.Graph.*pin.Source == node->Id) s.Graph.*pin.Source = 0;
+            s.Graph.Nodes.erase(node);
+            s.SelectedNode = 0;
+        }
     }
-    OutputCombo("Base color output", s.Graph.BaseColor); OutputCombo("Metallic output", s.Graph.Metallic); OutputCombo("Roughness output", s.Graph.Roughness);
     ImGui::InputText("Graph asset", s.GraphPath, sizeof(s.GraphPath));
     if (ImGui::Button("Load graph"))
     {
         auto path = jEditorProject::ResolveSafe(editor.GetProjectRoot(), s.GraphPath, s.Error, true);
         if (path && LoadMaterial(*path, s.Graph, s.Error)) { s.NextNode = 1; for (const auto& n : s.Graph.Nodes) s.NextNode = std::max(s.NextNode, n.Id + 1); }
     }
+    ImGui::BeginDisabled(editor.GetDocument().IsPlaying() || editor.GetDocument().IsEffectivelyLocked(e.Id));
     ImGui::SameLine(); if (ImGui::Button("Save and Apply"))
     {
         auto path = jEditorProject::ResolveSafe(editor.GetProjectRoot(), s.GraphPath, s.Error);
-        if (path && EvaluateMaterial(s.Graph, e.Material, s.Error) && SaveMaterial(s.Graph, *path, s.Error))
-        { e.Material.GraphAsset = s.GraphPath; if (!editor.GetDocument().Update(e, "Apply material graph")) s.Error = editor.GetDocument().LastError(); }
+        auto defaults = e.Material.GraphOverrides ? MaterialProperties{} : e.Material;
+        if (s.AssignedGraphHasNormal) defaults.NormalTexture.clear();
+        if (path && EvaluateMaterial(s.Graph, defaults, s.Error) && SaveMaterial(s.Graph, *path, s.Error))
+        {
+            if (e.Material.GraphOverrides) InheritMaterialGraph(e.Material, defaults);
+            else e.Material = std::move(defaults);
+            e.Material.OverrideEnabled = true;
+            e.Material.GraphAsset = s.GraphPath;
+            if (!editor.GetDocument().Update(e, "Apply material graph")) s.Error = editor.GetDocument().LastError();
+            else { s.AssignedGraph = e.Material.GraphAsset; s.AssignedGraphHasNormal = s.Graph.Normal != 0; }
+            editor.ReimportAsset(s.GraphPath);
+        }
     }
+    ImGui::SameLine();
+    if (ImGui::Button("Use as shared material") && AssignSharedMaterial(editor, e.Id, s.GraphPath, s.Error))
+        s.Selected = 0;
+    ImGui::EndDisabled();
 }
+
 }
 void FinishTerrainStroke(jEditor& editor)
 {
@@ -532,22 +892,23 @@ bool RenderTerrainBrush(jEditor& editor, const jCamera& camera, const ImVec2& po
     return true;
 }
 
-bool Render(jEditor& editor)
+bool Render(jEditor& editor, const jEditorProject* project, const jEditorAssetRegistry* registry)
 {
     auto& s = Tools(); auto& doc = editor.GetDocument(); const auto* selected = doc.Find(editor.GetSelectedEntityId());
     if (!selected) { ImGui::TextUnformatted("Select an object to edit its material, animation or procedural components."); return false; }
     Entity e = *selected;
     bool paintInScene = false;
-    if (s.Selected != e.Id)
+    if (s.Selected != e.Id || s.AssignedGraph != e.Material.GraphAsset)
     {
-        s.Selected = e.Id; s.Graph = {}; s.Undo.clear(); s.Redo.clear();
-        s.Graph.Nodes = {{1, 0, 0, NodeKind::Color, e.Material.BaseColor, 1, 20, 20, ""}, {2, 0, 0, NodeKind::Scalar, {}, e.Material.Metallic, 220, 20, ""}, {3, 0, 0, NodeKind::Scalar, {}, e.Material.Roughness, 420, 20, ""}};
+        s.Selected = e.Id; s.AssignedGraph = e.Material.GraphAsset; s.Graph = {}; s.Undo.clear(); s.Redo.clear();
+        s.Graph.Nodes = {{1, 0, 0, NodeKind::Color, e.Material.BaseColor, 1, 20, 20, ""}, {2, 0, 0, NodeKind::Scalar, {}, e.Material.Metallic, 20, 120, ""}, {3, 0, 0, NodeKind::Scalar, {}, e.Material.Roughness, 20, 220, ""}};
         s.Graph.BaseColor = 1; s.Graph.Metallic = 2; s.Graph.Roughness = 3; s.NextNode = 4; s.Error.clear();
         if (!e.Material.GraphAsset.empty()) { std::snprintf(s.GraphPath, sizeof(s.GraphPath), "%s", e.Material.GraphAsset.c_str()); const auto file = editor.GetProjectRoot() / e.Material.GraphAsset; LoadMaterial(file, s.Graph, s.Error); for (const auto& n : s.Graph.Nodes) s.NextNode = std::max(s.NextNode, n.Id + 1); }
+        s.AssignedGraphHasNormal = s.Graph.Normal != 0;
     }
     if (ImGui::BeginTabBar("AdvancedTools"))
     {
-        if (ImGui::BeginTabItem("Material graph")) { GraphUI(editor, e); ImGui::EndTabItem(); }
+        if (ImGui::BeginTabItem("Material graph")) { GraphUI(editor, e, project, registry); ImGui::EndTabItem(); }
         if (ImGui::BeginTabItem("Animation"))
         {
             bool changed = ImGui::Checkbox("Enabled", &e.Animation.Enabled); ImGui::SameLine(); changed |= ImGui::Checkbox("Loop", &e.Animation.Loop);

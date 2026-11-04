@@ -143,8 +143,9 @@ struct jEditorThumbnail
     std::uint32_t Height = 0;
     std::vector<std::uint8_t> Rgba;
 };
-// CPU-only PNG thumbnail, bounded source dimensions and <=256x256 output.
+// CPU-only image thumbnail, bounded source dimensions and <=256x256 output.
 // The caller may schedule this on its worker and upload the result on the owner.
+bool SupportsEditorThumbnail(const std::filesystem::path& filename);
 bool PrepareEditorThumbnail(const std::filesystem::path& filename, jEditorThumbnail& thumbnail,
     std::string& error, std::uint32_t maxEdge = 128);
 
