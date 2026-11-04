@@ -15,7 +15,8 @@ namespace jEditorProjectSettings
 {
 // Known settings: render.deferred, render.surfelgi, render.surfelgi.inline,
 // render.ssgi, render.bloom, render.vsync (true/false); render.surfelgi.intensity
-// (0..8), render.surfelgi.inline.rays (1..16); input.camera.forward/back/left/
+// (0..8), render.surfelgi.inline.rays (1..16); render.shadow.filter (0=existing,
+// 1=Poisson PCF), render.shadow.radiusTexels (finite 0..4); input.camera.forward/back/left/
 // right/up/down (portable single key names). Unknown setting entries are preserved.
 bool Validate(const jEditorProjectConfig& config, std::string& error,
     const std::filesystem::path& projectRoot = {});

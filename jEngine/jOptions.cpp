@@ -45,6 +45,8 @@ jOptions::jOptions()
 	ShowGrid = false;
 	UseWaveIntrinsics = false;
 	UseDeferredRenderer = true;
+    ShadowFilterMode = 0;
+    ShadowFilterRadiusTexels = 1.0f;
 	UseHWRTDirectLighting = false;
     HWRTDirectLightingMode = 0;
     HWRTDebugViewMode = 0;

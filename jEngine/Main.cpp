@@ -99,6 +99,8 @@ namespace
 }
 
 int RunCpuSelfTests();
+int RunEditorGraphicsTests();
+int RunEditorProjectSettingsTests();
 int RunModelUploadGpuTests();
 int RunEditorParticleMaterialGpuTests();
 int RunLogBenchmark();
@@ -136,6 +138,17 @@ int main(int argc, char** argv)
 #endif
     gCommandLineArgument.Init(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "--ci-cpu") == 0) return RunCpuSelfTests();
+    if (argc >= 2 && std::strcmp(argv[1], "--ci-rendering-features") == 0)
+    {
+        if (argc != 2)
+        {
+            std::cerr << "Usage: --ci-rendering-features" << std::endl;
+            return EXIT_FAILURE;
+        }
+        const int graphics = RunEditorGraphicsTests();
+        const int settings = RunEditorProjectSettingsTests();
+        return graphics || settings ? EXIT_FAILURE : EXIT_SUCCESS;
+    }
     if (argc == 2 && std::strcmp(argv[1], "--ci-log-benchmark") == 0) return RunLogBenchmark();
     if (argc >= 2 && (std::strcmp(argv[1], "--benchmark-assets") == 0 || std::strcmp(argv[1], "--benchmark-editor") == 0))
     {

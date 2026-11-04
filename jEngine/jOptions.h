@@ -39,6 +39,8 @@ struct jOptions
     bool ShowGrid;
     bool UseWaveIntrinsics;
     bool UseDeferredRenderer;
+    int32 ShadowFilterMode;
+    float ShadowFilterRadiusTexels;
     bool UseHWRTDirectLighting;
     int32 HWRTDirectLightingMode;
     int32 HWRTDebugViewMode;

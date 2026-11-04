@@ -1717,6 +1717,8 @@ void jGame::Setup()
 		// External variable examples (connected to gOptions)
 		static jConsoleVariableBool* cvar_UseVRS = new jConsoleVariableBool("r.vrs", &gOptions.UseVRS, "Enable Variable Rate Shading");
 		static jConsoleVariableBool* cvar_UseSSGI = new jConsoleVariableBool("r.ssgi.enable", &gOptions.UseSSGI, "Enable Screen Space Global Illumination");
+        static jConsoleVariableInt* cvar_ShadowFilterMode = new jConsoleVariableInt("r.shadow.filter", &gOptions.ShadowFilterMode, "Shadow-map comparison filter (0=Existing, 1=Poisson PCF; invalid settings use Existing)");
+        static jConsoleVariableFloat* cvar_ShadowFilterRadius = new jConsoleVariableFloat("r.shadow.radius_texels", &gOptions.ShadowFilterRadiusTexels, "Shadow-map filter radius in texels (finite 0..4; invalid settings use Existing)");
         static jConsoleVariableBool* cvar_UseHWRTDirectLighting = new jConsoleVariableBool("r.hwrt.direct_lighting.enable", &gOptions.UseHWRTDirectLighting, "Enable HWRT direct lighting path");
         static jConsoleVariableInt* cvar_HWRTDirectLightingMode = new jConsoleVariableInt("r.hwrt.direct_lighting.mode", &gOptions.HWRTDirectLightingMode, "HWRT direct lighting mode (0=DispatchRays, 1=InlineRayQuery)");
         static jConsoleVariableBool* cvar_UseSurfelGI = new jConsoleVariableBool("r.surfelgi.enable", &gOptions.UseSurfelGI, "Enable SurfelGI prototype pool update");

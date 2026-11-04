@@ -1,4 +1,5 @@
 #include "common.hlsl"
+#include "shadowfiltering.hlsl"
 
 #ifndef USE_VARIABLE_SHADING_RATE
 #define USE_VARIABLE_SHADING_RATE 0
@@ -133,7 +134,8 @@ float4 main(VSOutput input
         float NormalizedDistance = DistanceToLight / PointLight.MaxDistance;
 
         const float Bias = 0.005f;
-        float Shadow = PointLightShadowCubeMap.SampleCmpLevelZero(PointLightShadowCubeMapSampler, LightDir.xyz, NormalizedDistance - Bias);
+        float Shadow = SampleShadowVisibilityCube(PointLightShadowCubeMap, PointLightShadowCubeMapSampler,
+            LightDir.xyz, NormalizedDistance - Bias, ViewParam.ShadowFilterParams.y, (int)ViewParam.ShadowFilterParams.x);
         if (Shadow > 0.0f)
         {
             PointLightLit = Shadow * GetPointLight(PointLight, input.Normal, input.WorldPos.xyz, ViewWorld);
@@ -148,8 +150,9 @@ float4 main(VSOutput input
     if (-1.0 <= DirectionalLightShadowPosition.z && DirectionalLightShadowPosition.z <= 1.0)
     {
         const float Bias = 0.01f;
-        float Shadow = DirectionalLightShadowMap.SampleCmpLevelZero(
-            DirectionalLightShadowMapSampler, (DirectionalLightShadowPosition.xy * 0.5 + 0.5), (DirectionalLightShadowPosition.z - Bias));
+        float Shadow = SampleShadowVisibility2D(DirectionalLightShadowMap, DirectionalLightShadowMapSampler,
+            DirectionalLightShadowPosition.xy * 0.5 + 0.5, DirectionalLightShadowPosition.z - Bias,
+            ViewParam.ShadowFilterParams.y, (int)ViewParam.ShadowFilterParams.x);
         DirectionalLightLit *= Shadow;
     }
 
@@ -162,9 +165,13 @@ float4 main(VSOutput input
     {
         const float Bias = 0.01f;
         #if USE_REVERSEZ
-		float Shadow = 1.0f - SpotLightShadowMap.SampleCmpLevelZero(SpotLightShadowMapSampler, SpotLightShadowPosition.xy * 0.5 + 0.5, SpotLightShadowPosition.z + Bias);
+		float Shadow = 1.0f - SampleShadowVisibility2D(SpotLightShadowMap, SpotLightShadowMapSampler,
+            SpotLightShadowPosition.xy * 0.5 + 0.5, SpotLightShadowPosition.z + Bias,
+            ViewParam.ShadowFilterParams.y, (int)ViewParam.ShadowFilterParams.x);
         #else
-        float Shadow = SpotLightShadowMap.SampleCmpLevelZero(SpotLightShadowMapSampler, SpotLightShadowPosition.xy * 0.5 + 0.5, SpotLightShadowPosition.z - Bias);
+        float Shadow = SampleShadowVisibility2D(SpotLightShadowMap, SpotLightShadowMapSampler,
+            SpotLightShadowPosition.xy * 0.5 + 0.5, SpotLightShadowPosition.z - Bias,
+            ViewParam.ShadowFilterParams.y, (int)ViewParam.ShadowFilterParams.x);
         #endif
         if (Shadow > 0.0f)
         {

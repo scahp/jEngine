@@ -30,6 +30,7 @@ def main():
             raise RuntimeError(f'Invalid {name}={value!r} did not fail before initialization: {result.returncode}\n{output}')
         print(f'PASS invalid {name}={value!r} rejected')
     argument_cases = (['--ci-export-shaders'], ['--ci-export-shaders', 'unused', 'invalid-api'], ['-vulkan', '-dx12'],
+                      ['--ci-rendering-features', 'unexpected'],
                       ['--ci-renderer-switch'], ['--ci-renderer-switch', '--invalid'],
                       ['--ci-renderer-switch', 'unused', '--ci-editor-gpu'],
                       ['--ci-renderer-switch', 'unused', '--ci-editor-flow', 'unused'])

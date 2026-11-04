@@ -41,6 +41,15 @@ The editor navigation tools bundle Recast and Detour at commit
 [zlib license](jEngine/External/recastnavigation/License.txt) and
 [source provenance](jEngine/External/recastnavigation/UPSTREAM.md).
 
+## Shadows algorithm reference
+
+The shared Poisson shadow filter adapts the ring-disk sampling algorithm from
+[scahp/Shadows](https://github.com/scahp/Shadows/blob/87853997029283edfbbb60eaad03cf163c95f26c/Shadows/Shaders/shadow.glsl),
+pinned at `87853997029283edfbbb60eaad03cf163c95f26c`.
+Its [MIT notice](https://github.com/scahp/Shadows/blob/87853997029283edfbbb60eaad03cf163c95f26c/LICENSE)
+is Copyright (c) 2019 Choi Jae Ho, the same notice already preserved in this
+repository's [LICENSE](LICENSE). No Shadows OpenGL runtime or scene assets are bundled.
+
 ## Existing library-local notices
 
 These links preserve access to the existing notices; they do not replace their

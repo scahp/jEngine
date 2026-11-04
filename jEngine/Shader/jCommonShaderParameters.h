@@ -27,6 +27,8 @@ BEGIN_SHADER_UNIFORM_BUFFER_STRUCT(ViewUniformBuffer)
     SHADER_UNIFORM_BUFFER_MEMBER(Vector, EyeWorld)
     SHADER_UNIFORM_BUFFER_MEMBER(float, padding0)
     SHADER_UNIFORM_BUFFER_MEMBER(Vector4, ScreenRect)
+    // x = comparison filter mode, y = radius in shadow-map texels; zw reserved.
+    SHADER_UNIFORM_BUFFER_MEMBER(Vector4, ShadowFilterParams)
 END_SHADER_UNIFORM_BUFFER_STRUCT()
 
 BEGIN_SHADER_PARAMETER_SET(jViewShaderParameters)

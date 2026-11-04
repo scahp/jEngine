@@ -1,6 +1,7 @@
 #include "common.hlsl"
 #include "lightutil.hlsl"
 #include "PBR.hlsl"
+#include "shadowfiltering.hlsl"
 
 #ifndef USE_SUBPASS
 #define USE_SUBPASS 0
@@ -53,9 +54,13 @@ float4 main(VSOutput input) : SV_TARGET
     {
         const float Bias = 0.01f;
         #if USE_REVERSEZ
-        Lit = 1.0f - SpotLightShadowMap.SampleCmpLevelZero(SpotLightShadowMapSampler, SpotLightShadowPosition.xy * 0.5 + 0.5, SpotLightShadowPosition.z + Bias);
+        Lit = 1.0f - SampleShadowVisibility2D(SpotLightShadowMap, SpotLightShadowMapSampler,
+            SpotLightShadowPosition.xy * 0.5 + 0.5, SpotLightShadowPosition.z + Bias,
+            ViewParam.ShadowFilterParams.y, (int)ViewParam.ShadowFilterParams.x);
         #else
-        Lit = SpotLightShadowMap.SampleCmpLevelZero(SpotLightShadowMapSampler, SpotLightShadowPosition.xy * 0.5 + 0.5, SpotLightShadowPosition.z - Bias);
+        Lit = SampleShadowVisibility2D(SpotLightShadowMap, SpotLightShadowMapSampler,
+            SpotLightShadowPosition.xy * 0.5 + 0.5, SpotLightShadowPosition.z - Bias,
+            ViewParam.ShadowFilterParams.y, (int)ViewParam.ShadowFilterParams.x);
         #endif
     }
 #endif // USE_SHADOW_MAP

@@ -7,6 +7,8 @@
 #include "Shader/jCommonShaderParameters.h"
 #include "jRHIType.h"
 #include "FileLoader/jImageFileLoader.h"
+#include "jOptions.h"
+#include "Renderer/Features/jShadowFiltering.h"
 
 const jRTClearValue jRTClearValue::Invalid = jRTClearValue();
 
@@ -226,6 +228,14 @@ void jView::PrepareViewUniformBufferShaderBindingInstance()
     ubo.PrevVP = Camera->PrevViewProjection;
 	ubo.EyeWorld = Camera->Pos;
     ubo.ScreenRect = Vector4(0.0f, 0.0f, (float)Camera->Width, (float)Camera->Height);
+    // Publish one validated snapshot for every raster consumer of this view.
+    // Console variables can contain arbitrary values; invalid input keeps the
+    // original comparison mode without passing nonfinite values to the GPU.
+    jShadowFiltering::Settings shadowFiltering;
+    jShadowFiltering::TryMakeSettings(gOptions.ShadowFilterMode,
+        gOptions.ShadowFilterRadiusTexels, shadowFiltering);
+    ubo.ShadowFilterParams = Vector4(static_cast<float>(shadowFiltering.Method),
+        shadowFiltering.RadiusTexels, 0.0f, 0.0f);
 
     ViewUniformBufferPtr = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(jNameStatic("ViewUniformParameters"), jLifeTimeType::OneFrame, sizeof(ubo)));
     ViewUniformBufferPtr->UpdateBufferData(&ubo, sizeof(ubo));

@@ -2,6 +2,10 @@
 #include "jEditorProjectSettings.h"
 #include "FileLoader/jEditorAssets.h"
 #include "jOptions.h"
+#include "jEngine.h"
+#include "Renderer/Features/jShadowFiltering.h"
+#include "RHI/jRHI.h"
+#include "RHI/jRaytracingScene.h"
 #include <algorithm>
 #include <array>
 #include <charconv>
@@ -21,13 +25,15 @@ constexpr std::array<Action, 6> Actions{{
     {"camera.left", "Left", EInputKey::A}, {"camera.right", "Right", EInputKey::D},
     {"camera.up", "Up (right mouse held)", EInputKey::E}, {"camera.down", "Down (right mouse held)", EInputKey::Q}
 }};
-constexpr std::array<const char*, 8> RenderKeys{{"render.deferred", "render.surfelgi", "render.surfelgi.inline",
-    "render.ssgi", "render.bloom", "render.vsync", "render.surfelgi.intensity", "render.surfelgi.inline.rays"}};
+constexpr std::array<const char*, 10> RenderKeys{{"render.deferred", "render.surfelgi", "render.surfelgi.inline",
+    "render.ssgi", "render.bloom", "render.vsync", "render.surfelgi.intensity", "render.surfelgi.inline.rays",
+    "render.shadow.filter", "render.shadow.radiusTexels"}};
 struct Prepared
 {
     bool Deferred, SurfelGI, Inline, SSGI, Bloom, VSync = false;
     float Intensity;
     int Rays;
+    jShadowFiltering::Settings ShadowFilter;
     std::map<std::string, EInputKey> Bindings;
     Prepared()
     {
@@ -35,6 +41,7 @@ struct Prepared
         Deferred = defaults.UseDeferredRenderer; SurfelGI = defaults.UseSurfelGI;
         Inline = defaults.SurfelGIInlineRayEnable; SSGI = defaults.UseSSGI; Bloom = defaults.BloomEyeAdaptation;
         Intensity = defaults.SurfelGIIntensity; Rays = defaults.SurfelGIInlineRayCount;
+        jShadowFiltering::TryMakeSettings(defaults.ShadowFilterMode, defaults.ShadowFilterRadiusTexels, ShadowFilter);
         for (const auto& action : Actions) Bindings.emplace(action.Name, action.Default);
     }
 };
@@ -129,6 +136,22 @@ bool Prepare(const jEditorProjectConfig& config, Prepared& prepared, std::string
         { error = "render.surfelgi.inline.rays must be an integer from 1 to 16"; return false; }
         prepared.Rays = value;
     }
+    int shadowMode = static_cast<int>(prepared.ShadowFilter.Method);
+    float shadowRadius = prepared.ShadowFilter.RadiusTexels;
+    if (auto found = config.Settings.find("render.shadow.filter"); found != config.Settings.end())
+    {
+        const auto parsed = std::from_chars(found->second.data(), found->second.data() + found->second.size(), shadowMode);
+        if (parsed.ec != std::errc() || parsed.ptr != found->second.data() + found->second.size())
+        { error = "render.shadow.filter must be 0 (existing) or 1 (Poisson PCF)"; return false; }
+    }
+    if (auto found = config.Settings.find("render.shadow.radiusTexels"); found != config.Settings.end())
+    {
+        const auto parsed = std::from_chars(found->second.data(), found->second.data() + found->second.size(), shadowRadius);
+        if (parsed.ec != std::errc() || parsed.ptr != found->second.data() + found->second.size())
+        { error = "render.shadow.radiusTexels must be a finite number from 0 to 4"; return false; }
+    }
+    if (!jShadowFiltering::TryMakeSettings(shadowMode, shadowRadius, prepared.ShadowFilter))
+    { error = "Shadow filtering requires render.shadow.filter 0 or 1 and finite render.shadow.radiusTexels from 0 to 4"; return false; }
     std::map<EInputKey, std::string> used;
     for (const auto& action : Actions)
     {
@@ -170,6 +193,8 @@ void Publish(Prepared&& prepared)
     const bool vsync = prepared.VSync && GRHISupportVsync;
     if (GUseVsync != vsync) state.PresentModeChange = true;
     gOptions.UseDeferredRenderer = prepared.Deferred;
+    gOptions.ShadowFilterMode = static_cast<int>(prepared.ShadowFilter.Method);
+    gOptions.ShadowFilterRadiusTexels = prepared.ShadowFilter.RadiusTexels;
     gOptions.UseSurfelGI = prepared.SurfelGI;
     gOptions.SurfelGIInlineRayEnable = prepared.Inline && GSupportInlineRaytracing;
     gOptions.UseSSGI = prepared.SSGI;
@@ -344,6 +369,34 @@ void Render(jEditor& editor, jEditorProject* project)
     if (ImGui::CollapsingHeader("Renderer defaults", ImGuiTreeNodeFlags_DefaultOpen))
     {
         BoolWidget("Deferred renderer", "render.deferred", requested.Deferred);
+        if (ImGui::TreeNodeEx("Shadows", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            constexpr const char* filters[] = {"Existing", "Poisson PCF"};
+            int mode = static_cast<int>(requested.ShadowFilter.Method);
+            float radius = requested.ShadowFilter.RadiusTexels;
+            ImGui::PushItemWidth(std::max(1.0f, ImGui::GetContentRegionAvail().x
+                - ImGui::CalcTextSize("Radius in texels").x - ImGui::GetStyle().ItemInnerSpacing.x));
+            const bool modeChanged = ImGui::Combo("Filter", &mode, filters, 2);
+            const bool radiusChanged = ImGui::SliderFloat("Radius in texels", &radius, 0.0f, 4.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
+            ImGui::PopItemWidth();
+            jShadowFiltering::Settings validated;
+            if ((modeChanged || radiusChanged) && jShadowFiltering::TryMakeSettings(mode, radius, validated))
+            {
+                state.Draft.Settings["render.shadow.filter"] = std::to_string(static_cast<int>(validated.Method));
+                state.Draft.Settings["render.shadow.radiusTexels"] = std::to_string(validated.RadiusTexels);
+                state.Changed = true;
+            }
+            const bool pathTracing = g_Engine && g_Engine->Game.IsUsingPathTracingRenderer();
+            const bool hwrt = g_Engine && !pathTracing
+                && g_Engine->Game.GetActiveSceneRenderPipeline() == jGame::ESceneRenderPipeline::Deferred
+                && gOptions.UseHWRTDirectLighting && gOptions.UseRaytracing && GSupportRaytracing
+                && g_rhi && g_rhi->RaytracingScene && g_rhi->RaytracingScene->IsValid();
+            if (g_Engine) ImGui::Text("Active renderer: %s", g_Engine->Game.GetActiveSceneRenderPipelineName());
+            if (pathTracing) ImGui::TextWrapped("Path Tracing is active; these settings are retained for raster shadow maps.");
+            else if (hwrt) ImGui::TextWrapped("HWRT direct lighting is active; ray-traced shadows bypass this filter.");
+            else ImGui::TextWrapped("Shadow-map filtering only. Path Tracing and HWRT rays do not use this filter.");
+            ImGui::TreePop();
+        }
         BoolWidget("SurfelGI", "render.surfelgi", requested.SurfelGI);
         BoolWidget("Inline ray gather (requested)", "render.surfelgi.inline", requested.Inline);
         ImGui::TextColored(GSupportInlineRaytracing ? ImVec4(.4f,1,.4f,1) : ImVec4(1,.75f,.25f,1), "%s",
@@ -356,7 +409,7 @@ void Render(jEditor& editor, jEditorProject* project)
         if (ImGui::SliderFloat("SurfelGI intensity", &intensity, 0, 8)) { state.Draft.Settings["render.surfelgi.intensity"] = std::to_string(intensity); state.Changed = true; }
         int rays = requested.Rays;
         if (ImGui::SliderInt("Inline rays per surfel", &rays, 1, 16)) { state.Draft.Settings["render.surfelgi.inline.rays"] = std::to_string(rays); state.Changed = true; }
-        ImGui::TextWrapped("Renderer defaults control the existing raster renderer. The legacy path-tracing scene pipeline may override them.");
+        ImGui::TextWrapped("Saved renderer defaults are shared by Scene and Game. Ray-based lighting bypasses shadow-map filtering.");
     }
     if (ImGui::CollapsingHeader("Editor camera keys", ImGuiTreeNodeFlags_DefaultOpen))
     {

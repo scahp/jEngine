@@ -1,6 +1,7 @@
 #include "common.hlsl"
 #include "lightutil.hlsl"
 #include "PBR.hlsl"
+#include "shadowfiltering.hlsl"
 
 #ifndef USE_VARIABLE_SHADING_RATE
 #define USE_VARIABLE_SHADING_RATE 0
@@ -57,8 +58,9 @@ float4 main(VSOutput input
     if (-1.0 <= DirectionalLightShadowPosition.z && DirectionalLightShadowPosition.z <= 1.0)
     {
         const float Bias = 0.002f;
-        Lit = DirectionalLightShadowMap.SampleCmpLevelZero(
-            DirectionalLightShadowMapSampler, (DirectionalLightShadowPosition.xy * 0.5 + 0.5), (DirectionalLightShadowPosition.z - Bias));
+        Lit = SampleShadowVisibility2D(DirectionalLightShadowMap, DirectionalLightShadowMapSampler,
+            DirectionalLightShadowPosition.xy * 0.5 + 0.5, DirectionalLightShadowPosition.z - Bias,
+            ViewParam.ShadowFilterParams.y, (int)ViewParam.ShadowFilterParams.x);
     }
 #endif // USE_SHADOW_MAP
 

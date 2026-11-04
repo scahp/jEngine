@@ -49,15 +49,21 @@ int RunEditorProjectSettingsTests()
         candidate.Settings = {{"render.deferred", "false"}, {"render.surfelgi", "false"}, {"render.surfelgi.inline", "true"},
             {"render.ssgi", "true"}, {"render.bloom", "true"}, {"render.vsync", "true"},
             {"render.surfelgi.intensity", "2.5"}, {"render.surfelgi.inline.rays", "8"},
+            {"render.shadow.filter", "1"}, {"render.shadow.radiusTexels", "2.25"},
             {"input.camera.forward", "I"}, {"input.camera.back", "K"}, {"input.camera.left", "J"},
             {"input.camera.right", "L"}, {"input.camera.up", "U"}, {"input.camera.down", "O"},
             {"custom.future.option", "preserve this value"}};
         GSupportInlineRaytracing = false; GRHISupportVsync = false;
+        const auto documentBeforeSettings = editor.GetDocument().ToJson();
+        const auto revisionBeforeSettings = editor.GetDocument().Revision();
         expect(Settings::Validate(candidate, error, fixture), "validated typed renderer defaults and portable camera bindings");
         expect(Settings::Save(project, editor, candidate, error), "save candidate manifest then apply actual settings");
         expect(!gOptions.UseDeferredRenderer && !gOptions.UseSurfelGI && gOptions.UseSSGI && gOptions.BloomEyeAdaptation
             && gOptions.SurfelGIIntensity == 2.5f && gOptions.SurfelGIInlineRayCount == 8,
             "renderer options reflect persisted values rather than a UI-only copy");
+        expect(gOptions.ShadowFilterMode == 1 && gOptions.ShadowFilterRadiusTexels == 2.25f
+            && editor.GetDocument().ToJson() == documentBeforeSettings && editor.GetDocument().Revision() == revisionBeforeSettings,
+            "saved Poisson shadow-map settings apply without changing the scene document or undo revision");
         expect(!gOptions.SurfelGIInlineRayEnable && !GUseVsync
             && project.GetConfig().Settings.at("render.surfelgi.inline") == "true"
             && project.GetConfig().Settings.at("render.vsync") == "true", "unsupported requested features retained while effective states remain disabled");
@@ -65,9 +71,12 @@ int RunEditorProjectSettingsTests()
         expect(reopened.Open(project.GetProjectFile(), error) && Settings::Validate(reopened, error)
             && reopened.GetConfig().Settings == candidate.Settings && reopened.GetConfig().StartupScene == candidate.StartupScene,
             "saved renderer/input/startup settings survive a real project reopen");
+        gOptions.ShadowFilterMode = 0; gOptions.ShadowFilterRadiusTexels = 1.0f;
         GSupportInlineRaytracing = true; GRHISupportVsync = true;
         expect(Settings::Apply(reopened, editor, error) && gOptions.SurfelGIInlineRayEnable && GUseVsync,
             "same request enables actual inline/VSync options when capabilities are present");
+        expect(gOptions.ShadowFilterMode == 1 && gOptions.ShadowFilterRadiusTexels == 2.25f,
+            "reopened project restores actual shadow filtering options");
         expect(Settings::ConsumePresentModeChange() && !Settings::ConsumePresentModeChange(), "VSync queues exactly one safe-boundary swapchain refresh request");
         ResetAllKeyState(); SetKeyDownState(EInputKey::I, true);
         expect(Settings::ActionDown("camera.forward", EInputKey::W) && !Settings::ActionDown("camera.back", EInputKey::S),
@@ -89,21 +98,38 @@ int RunEditorProjectSettingsTests()
             "portable key parser accepts canonical case-insensitive names");
         expect(Settings::ParseKey("7", parsed) && parsed == EInputKey::NUM7 && !Settings::ParseKey("CTRL", parsed)
             && !Settings::ParseKey("CMD+W", parsed) && !Settings::ParseKey("F24", parsed), "modifier chords and unsupported names are rejected as camera keys");
+        for (const auto& values : {std::pair{"0", "0"}, std::pair{"1", "4"}})
+        {
+            auto boundary = project.GetConfig();
+            boundary.Settings["render.shadow.filter"] = values.first;
+            boundary.Settings["render.shadow.radiusTexels"] = values.second;
+            expect(Settings::Save(project, editor, boundary, error)
+                && gOptions.ShadowFilterMode == std::stoi(values.first) && gOptions.ShadowFilterRadiusTexels == std::stof(values.second),
+                "both shadow filter modes and inclusive radius endpoints save and publish");
+        }
+        expect(Settings::Save(project, editor, candidate, error), "restore the valid Poisson project before transactional rejection checks");
         const auto validConfig = project.GetConfig();
         const auto validDisk = text(project.GetProjectFile());
         const auto reject = [&](const jEditorProjectConfig& bad, const char* name) {
             const bool deferred = gOptions.UseDeferredRenderer, surfel = gOptions.UseSurfelGI;
+            const int shadowMode = gOptions.ShadowFilterMode;
+            const float shadowRadius = gOptions.ShadowFilterRadiusTexels;
             const auto binding = Settings::Binding("camera.forward", EInputKey::W);
             expect(!Settings::Save(project, editor, bad, error) && !error.empty()
                 && project.GetConfig().Settings == validConfig.Settings && project.GetConfig().Name == validConfig.Name
                 && project.GetConfig().StartupScene == validConfig.StartupScene && text(project.GetProjectFile()) == validDisk
                 && gOptions.UseDeferredRenderer == deferred && gOptions.UseSurfelGI == surfel
+                && gOptions.ShadowFilterMode == shadowMode && gOptions.ShadowFilterRadiusTexels == shadowRadius
                 && Settings::Binding("camera.forward", EInputKey::W) == binding, name);
         };
         for (const std::string invalid : {"NaN", "inf", "-1", "8.1", "2garbage", "", " 1", "1 "})
         { auto bad = validConfig; bad.Settings["render.surfelgi.intensity"] = invalid; reject(bad, "invalid numeric setting preserves current config/disk/runtime"); }
         for (const std::string invalid : {"0", "17", "1.5", "3x", "-1"})
         { auto bad = validConfig; bad.Settings["render.surfelgi.inline.rays"] = invalid; reject(bad, "invalid integer/ray count rejected transactionally"); }
+        for (const std::string invalid : {"2", "-1", "1.0", "1x", "NaN", "", " 1", "1 "})
+        { auto bad = validConfig; bad.Settings["render.shadow.filter"] = invalid; reject(bad, "invalid shadow mode preserves config disk and actual runtime options"); }
+        for (const std::string invalid : {"NaN", "inf", "-0.01", "4.01", "2garbage", "", " 1", "1 "})
+        { auto bad = validConfig; bad.Settings["render.shadow.radiusTexels"] = invalid; reject(bad, "nonfinite out-of-range or malformed shadow radius rejected transactionally"); }
         { auto bad = validConfig; bad.Settings["render.ssgi"] = "yes"; reject(bad, "ambiguous boolean cannot silently enable renderer settings"); }
         { auto bad = validConfig; bad.Settings["input.camera.forward"] = "CTRL+I"; reject(bad, "invalid camera key cannot replace active bindings"); }
         { auto bad = validConfig; bad.Settings["input.camera.forward"] = "K"; reject(bad, "conflicting camera bindings rejected with diagnostic"); }
@@ -126,14 +152,18 @@ int RunEditorProjectSettingsTests()
             && gOptions.UseSurfelGI == defaults.UseSurfelGI && gOptions.UseSSGI == defaults.UseSSGI
             && gOptions.BloomEyeAdaptation == defaults.BloomEyeAdaptation && gOptions.SurfelGIIntensity == defaults.SurfelGIIntensity
             && gOptions.SurfelGIInlineRayCount == defaults.SurfelGIInlineRayCount && !GUseVsync
+            && gOptions.ShadowFilterMode == defaults.ShadowFilterMode && gOptions.ShadowFilterRadiusTexels == defaults.ShadowFilterRadiusTexels
             && Settings::Binding("camera.forward", EInputKey::I) == EInputKey::W, "omitted known settings restore engine defaults rather than previous project values");
         expect(Settings::ConsumePresentModeChange(), "resetting VSync defaults also schedules frame-boundary refresh");
         const auto savedSettings = project.GetConfig();
         fs::rename(project.GetProjectFile(), fixture / "saved-manifest.jproject");
         fs::create_directory(project.GetProjectFile());
         auto failedIo = savedSettings; failedIo.Settings["render.bloom"] = "true";
+        failedIo.Settings["render.shadow.filter"] = "1"; failedIo.Settings["render.shadow.radiusTexels"] = "4";
         expect(!Settings::Save(project, editor, failedIo, error) && project.GetConfig().Settings == savedSettings.Settings
-            && gOptions.BloomEyeAdaptation == defaults.BloomEyeAdaptation, "real manifest write failure preserves last valid config and renderer state");
+            && gOptions.BloomEyeAdaptation == defaults.BloomEyeAdaptation
+            && gOptions.ShadowFilterMode == defaults.ShadowFilterMode && gOptions.ShadowFilterRadiusTexels == defaults.ShadowFilterRadiusTexels,
+            "real manifest write failure preserves last valid config and renderer state");
         fs::remove(project.GetProjectFile()); fs::rename(fixture / "saved-manifest.jproject", project.GetProjectFile());
         auto* context = ImGui::CreateContext();
         auto& io = ImGui::GetIO(); io.IniFilename = nullptr; io.LogFilename = nullptr; io.DisplaySize = ImVec2(900, 900); io.DeltaTime = 1.0f / 60;
@@ -159,6 +189,7 @@ int RunEditorProjectSettingsTests()
     ImGui::SetCurrentContext(oldContext);
     GSupportInlineRaytracing = oldInline; GRHISupportVsync = oldVsyncSupport; GUseVsync = oldVsync;
     gOptions.UseDeferredRenderer = oldOptions.UseDeferredRenderer; gOptions.UseSurfelGI = oldOptions.UseSurfelGI;
+    gOptions.ShadowFilterMode = oldOptions.ShadowFilterMode; gOptions.ShadowFilterRadiusTexels = oldOptions.ShadowFilterRadiusTexels;
     gOptions.SurfelGIInlineRayEnable = oldOptions.SurfelGIInlineRayEnable; gOptions.UseSSGI = oldOptions.UseSSGI;
     gOptions.BloomEyeAdaptation = oldOptions.BloomEyeAdaptation; gOptions.SurfelGIIntensity = oldOptions.SurfelGIIntensity;
     gOptions.SurfelGIInlineRayCount = oldOptions.SurfelGIInlineRayCount;

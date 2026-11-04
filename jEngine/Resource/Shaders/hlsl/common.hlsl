@@ -33,6 +33,7 @@ struct ViewUniformBuffer
     float3 EyeWorld;
     float padding0;
     float4 ScreenRect;
+    float4 ShadowFilterParams;
 };
 #endif
 

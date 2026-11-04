@@ -1,6 +1,7 @@
 #include "common.hlsl"
 #include "lightutil.hlsl"
 #include "PBR.hlsl"
+#include "shadowfiltering.hlsl"
 
 #ifndef USE_SUBPASS
 #define USE_SUBPASS 0
@@ -49,7 +50,8 @@ float4 main(VSOutput input) : SV_TARGET
         float NormalizedDistance = DistanceToLight / PointLight.MaxDistance;
 
         const float Bias = 0.02f;
-        Lit = PointLightShadowCubeMap.SampleCmpLevelZero(PointLightShadowCubeMapSampler, LightDir.xyz, NormalizedDistance - Bias);
+        Lit = SampleShadowVisibilityCube(PointLightShadowCubeMap, PointLightShadowCubeMapSampler,
+            LightDir.xyz, NormalizedDistance - Bias, ViewParam.ShadowFilterParams.y, (int)ViewParam.ShadowFilterParams.x);
     }
 #endif // USE_SHADOW_MAP
 

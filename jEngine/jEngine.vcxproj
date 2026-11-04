@@ -276,6 +276,7 @@ xcopy /y /i "$(JEngineDxcDirectory)\dxil.dll" "$(OutDir)"</Command>
     <ClInclude Include="Shader\jAOShaderParameters.h" />
     <ClInclude Include="Shader\jCommonShaderParameters.h" />
     <ClInclude Include="Shader\jLightingShaderParameters.h" />
+    <ClInclude Include="Renderer\Features\jShadowFiltering.h" />
     <ClInclude Include="Shader\jShader.h" />
     <ClInclude Include="Shader\jShaderParameterSet.h" />
     <ClInclude Include="Shader\Spirv\jSpirvHelper.h" />

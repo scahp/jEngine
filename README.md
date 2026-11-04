@@ -97,6 +97,8 @@ code push and on PRs targeting `main`. Build artifacts and logs are kept for fiv
 
 [Engine roadmap](docs/engine-roadmap.md) · [Editor foundation measurements](docs/reports/editor-foundation-performance.md)
 
+[Rendering feature intake](docs/rendering-feature-intake.md) — reusable modules and pending integration choices.
+
 ## Third party libraries
 
 See [third-party notices](THIRD_PARTY_NOTICES.md).

@@ -2,6 +2,7 @@
 #include "Code/Engine/Editor/jEditorProcedural.h"
 #include "Shader/jCommonShaderParameters.h"
 #include "Shader/jLightingShaderParameters.h"
+#include "Renderer/Features/jShadowFiltering.h"
 #include <cmath>
 #include <limits>
 
@@ -16,6 +17,25 @@ int RunEditorGraphicsTests()
         offsetof(RenderObjectUniformBuffer, EmissiveOverride) == 160 && offsetof(RenderObjectUniformBuffer, SurfaceFlags) == 176 &&
         offsetof(RenderObjectUniformBuffer, IndexElementSize) == 184 && offsetof(RenderObjectUniformBuffer, SurfacePadding) == 188,
         "material and geometry UBO keeps its 192-byte layout with explicit index width");
+    expect(sizeof(ViewUniformBuffer) == 368 && offsetof(ViewUniformBuffer, ShadowFilterParams) == 352,
+        "shared view filter settings use the same aligned 16-byte block on CPU and GPU");
+    jShadowFiltering::Settings filtering;
+    expect(jShadowFiltering::TryMakeSettings(1, 4.0f, filtering) &&
+        filtering.Method == jShadowFiltering::Mode::Poisson16 && filtering.RadiusTexels == 4.0f,
+        "shadow filtering accepts the bounded Poisson mode and texel radius");
+    const auto validFiltering = filtering;
+    bool invalidFilteringRejected = true;
+    for (int mode : {-1, 2})
+        invalidFilteringRejected &= !jShadowFiltering::TryMakeSettings(mode, 1.0f, filtering);
+    for (float radius : {-1.0f, 4.001f, std::numeric_limits<float>::infinity(),
+        std::numeric_limits<float>::quiet_NaN()})
+        invalidFilteringRejected &= !jShadowFiltering::TryMakeSettings(1, radius, filtering);
+    expect(invalidFilteringRejected && filtering.Method == validFiltering.Method &&
+        filtering.RadiusTexels == validFiltering.RadiusTexels,
+        "invalid and nonfinite shadow settings leave the last valid result unchanged");
+    expect(jShadowFiltering::TryMakeSettings(0, 0.0f, filtering) &&
+        filtering.Method == jShadowFiltering::Mode::Single && filtering.RadiusTexels == 0.0f,
+        "existing comparison sampling and zero-radius settings remain valid");
     TerrainProperties terrain;
     terrain.Resolution = 3; terrain.SizeX = 20; terrain.SizeZ = 10;
     Mesh mesh; std::string error;
@@ -83,10 +103,27 @@ int ExportEditorGraphicsShaderFixtures(const char* directory, bool vulkan)
         write("editor-gbuffer-vs", "#define PIXEL_SHADER 0\n#define COMPUTE_SHADER 0\n"
             "#define USE_ALBEDO_TEXTURE 1\n#define USE_VERTEX_BITANGENT 1\n#define USE_VERTEX_COLOR 0\n" +
             declarations + "\n#include \"gbuffer_vs.hlsl\"\n");
-        write("editor-forward", flags + "\n#include \"common.hlsl\"\n" + declarations +
-            jShaderParameterSet::GenerateHLSL<jDirectionalLightShaderParameters>(3) +
-            jShaderParameterSet::GenerateHLSL<jPointLightShaderParameters>(4) +
-            jShaderParameterSet::GenerateHLSL<jSpotLightShaderParameters>(5) + "\n#include \"shader_fs.hlsl\"\n");
+        write("editor-forward", flags + "\n#include \"common.hlsl\"\n" +
+            jShaderParameterSet::GenerateHLSL<jViewShaderParameters>(0) +
+            jShaderParameterSet::GenerateHLSL<jDirectionalLightShaderParameters>(1) +
+            jShaderParameterSet::GenerateHLSL<jPointLightShaderParameters>(2) +
+            jShaderParameterSet::GenerateHLSL<jSpotLightShaderParameters>(3) +
+            jShaderParameterSet::GenerateHLSL<jRenderObjectShaderParameters>(4) +
+            jShaderParameterSet::GenerateHLSL<jMaterialShaderParameters>(5) + "\n#include \"shader_fs.hlsl\"\n");
+        const std::string deferredFlags = flags + "#define USE_SHADOW_MAP 1\n#define USE_SUBPASS 0\n"
+            "#define USE_REVERSEZ 0\n";
+        const std::string deferredView = jShaderParameterSet::GenerateHLSL<jViewShaderParameters>(0);
+        const std::string sceneTextures = jShaderParameterSet::GenerateHLSL<jSceneTexturesShaderParameters>(3);
+        write("shadow-directional", deferredFlags + "#include \"common.hlsl\"\n" + deferredView +
+            jShaderParameterSet::GenerateHLSL<jDirectionalLightShaderParameters>(1) +
+            jShaderParameterSet::GenerateHLSL<jDirectionalLightIBLShaderParameters>(2) + sceneTextures +
+            "\n#include \"directionallight_fs.hlsl\"\n");
+        write("shadow-point", deferredFlags + "#include \"common.hlsl\"\n" + deferredView +
+            jShaderParameterSet::GenerateHLSL<jPointLightShaderParameters>(1) + sceneTextures +
+            "\n#include \"pointlight_fs.hlsl\"\n");
+        write("shadow-spot", deferredFlags + "#include \"common.hlsl\"\n" + deferredView +
+            jShaderParameterSet::GenerateHLSL<jSpotLightShaderParameters>(1) + sceneTextures +
+            "\n#include \"spotlight_fs.hlsl\"\n");
         const std::string shadowPrefix = "#define COMPUTE_SHADER 0\n#define PIXEL_SHADER 0\n#include \"common.hlsl\"\n" +
             jShaderParameterSet::GenerateHLSL<jRenderObjectShaderParameters>(1);
         write("editor-shadow-vs", shadowPrefix + jShaderParameterSet::GenerateHLSL<jDirectionalLightOnlyShaderParameters>(0) +
@@ -105,6 +142,13 @@ int ExportEditorGraphicsShaderFixtures(const char* directory, bool vulkan)
         contract << "{\"RenderObjectUniformBuffer\":{\"size\":" << sizeof(RenderObjectUniformBuffer) << ",\"fields\":{";
         bool first = true;
         for (const auto& field : RenderObjectUniformBuffer::GetShaderUniformBufferFieldMembers())
+        {
+            if (!first) contract << ',';
+            first = false; contract << '"' << field.Name << "\":" << field.ByteOffset;
+        }
+        contract << "}},\"ViewUniformBuffer\":{\"size\":" << sizeof(ViewUniformBuffer) << ",\"fields\":{";
+        first = true;
+        for (const auto& field : ViewUniformBuffer::GetShaderUniformBufferFieldMembers())
         {
             if (!first) contract << ',';
             first = false; contract << '"' << field.Name << "\":" << field.ByteOffset;
