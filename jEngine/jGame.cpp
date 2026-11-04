@@ -728,6 +728,19 @@ bool jGame::CanLoadSelectedPathTracingScene() const
 			|| ResolveSceneLoader(PathTracingSceneBrowser.Scenes[selectedIndex]) != PathTracingSceneBrowser.ActiveLoader));
 }
 
+bool jGame::RefreshSceneMaterialLibrary(std::string& error)
+{
+    const auto index = PathTracingSceneBrowser.ActiveIndex;
+    if (index < 0 || index >= int32(PathTracingSceneBrowser.Scenes.size()))
+    { error = "No active scene material library"; return false; }
+    const auto& scene = PathTracingSceneBrowser.Scenes[index];
+    const auto& objects = gPathTracingScene ? gPathTracingScene->SpawnObjects : SceneBrowserLoadedObjects;
+    size_t slots = 0;
+    if (!jEditorTools::ApplySceneMaterialLibrary(scene.FilePath, objects, slots, error)) return false;
+    if (slots) ++gSelectedSceneIndex;
+    return true;
+}
+
 void jGame::CancelSceneImport()
 {
     if (AssetImports) AssetImports->CancelAll();
@@ -1343,6 +1356,14 @@ void jGame::LoadPathTracingSceneByIndex(int32 InIndex, bool InRebuildRaytracingS
 #endif
 	}
 
+    std::string materialError;
+    size_t materialSlots = 0;
+    const auto& materialObjects = usePathTracingSceneLoader ? gPathTracingScene->SpawnObjects : SceneBrowserLoadedObjects;
+    if (!jEditorTools::ApplySceneMaterialLibrary(sceneDesc.FilePath, materialObjects, materialSlots, materialError))
+        jConsole::Get().LogError("Scene materials: " + materialError);
+    else if (materialSlots)
+        std::cout << "Scene materials: " << sceneDesc.SceneId << " bound " << materialSlots << " shared graphs" << std::endl;
+
 	PathTracingSceneBrowser.ActiveIndex = InIndex;
 	PathTracingSceneBrowser.SelectedIndex = InIndex;
 	PathTracingSceneBrowser.ActiveRenderPipeline = sceneDesc.RenderPipeline;
@@ -1545,6 +1566,11 @@ static jConsoleVariableInt* cvar_SurfelGIInlineRayCount = new jConsoleVariableIn
 
 void jGame::Update(float deltaTime)
 {
+    if (std::exchange(SceneMaterialRefreshPending, false))
+    {
+        std::string error;
+        if (!RefreshSceneMaterialLibrary(error)) jConsole::Get().LogError("Scene materials: " + error);
+    }
 	SCOPE_DEBUG_EVENT(g_rhi, "Game::Update");
 
     ProcessSceneImports();

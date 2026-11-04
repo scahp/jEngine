@@ -87,6 +87,7 @@ public:
 	void SetSelectedPathTracingSceneLoader(ESceneLoader InLoader);
 	void RequestLoadSelectedPathTracingScene();
 	bool CanLoadSelectedPathTracingScene() const;
+    void RequestSceneMaterialRefresh() { SceneMaterialRefreshPending = true; }
     bool IsSceneImportPending() const { return PendingImportId != 0; }
     const std::string& GetSceneImportStatus() const { return SceneImportStatus; }
     void CancelSceneImport();
@@ -123,6 +124,8 @@ private:
 
     std::unique_ptr<jAssetImportService> AssetImports;
     std::uint64_t PendingImportId = 0;
+    bool SceneMaterialRefreshPending = false;
+    bool RefreshSceneMaterialLibrary(std::string& error);
     std::string PendingImportSceneId;
     std::string SceneImportStatus;
 	jPathTracingSceneBrowserState PathTracingSceneBrowser;

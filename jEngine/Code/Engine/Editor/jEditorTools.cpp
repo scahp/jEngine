@@ -7,7 +7,11 @@
 #include "FileLoader/jEditorAssets.h"
 #include "FileLoader/jEditorAssetPath.h"
 #include "FileLoader/jImageFileLoader.h"
+#include "RHI/jRHI.h"
+#include "RHI/jRaytracingScene.h"
 #include "Scene/jCamera.h"
+#include "Scene/jMeshObject.h"
+#include "jEngine.h"
 #include "External/PathTracingDataLoader/json.hpp"
 #include "Recast.h"
 #include "DetourNavMesh.h"
@@ -31,6 +35,75 @@ bool SafeTexture(const std::string& path)
     if (p.is_absolute()) return false;
     for (const auto& part : p) if (part == ".." || part == ".") return false;
     return true;
+}
+bool ValidSurface(const MaterialGraph::SurfaceProperties& surface)
+{
+    const auto& s = surface.Shading;
+    const auto unit = [](float value) { return value >= 0.f && value <= 1.f; };
+    const auto radiance = [](float value) { return value >= 0.f && value <= 1e6f; };
+    return unit(s.Transmission) && s.Ior >= 1.f && s.Ior <= 4.f && unit(s.ClearCoat) && unit(s.ClearCoatGloss) &&
+        unit(s.Subsurface) && s.Anisotropy >= -1.f && s.Anisotropy <= 1.f && unit(s.SpecularTint) &&
+        unit(s.Sheen) && unit(s.SheenTint) && unit(s.AlphaCutoff) && unit(surface.Opacity) &&
+        uint32_t(s.AlphaMode) <= uint32_t(jSurfaceAlphaMode::Blend) &&
+        radiance(surface.Emission.X) && radiance(surface.Emission.Y) && radiance(surface.Emission.Z) &&
+        SafeTexture(surface.MetallicRoughnessTexture) && SafeTexture(surface.EmissionTexture);
+}
+MaterialGraph::SurfaceProperties ReadSurface(const Json& json)
+{
+    if (!json.is_object()) throw std::runtime_error("Invalid material surface");
+    MaterialGraph::SurfaceProperties result;
+    auto& s = result.Shading;
+    s.Transmission = json.value("transmission", 0.f); s.Ior = json.value("ior", 1.5f);
+    s.ClearCoat = json.value("clearCoat", 0.f); s.ClearCoatGloss = json.value("clearCoatGloss", 0.f);
+    s.Subsurface = json.value("subsurface", 0.f); s.Anisotropy = json.value("anisotropy", 0.f);
+    s.SpecularTint = json.value("specularTint", 0.f); s.Sheen = json.value("sheen", 0.f); s.SheenTint = json.value("sheenTint", 0.f);
+    const auto alpha = json.value("alphaMode", std::string("opaque"));
+    if (alpha == "mask") s.AlphaMode = jSurfaceAlphaMode::Mask;
+    else if (alpha == "blend") s.AlphaMode = jSurfaceAlphaMode::Blend;
+    else if (alpha != "opaque") throw std::runtime_error("Invalid material alpha mode");
+    s.AlphaCutoff = json.value("alphaCutoff", .5f);
+    s.DoubleSided = json.value("doubleSided", false); s.LegacyPackedMap = json.value("legacyPackedMap", false);
+    result.Opacity = json.value("opacity", 1.f);
+    if (const auto emission = json.find("emission"); emission != json.end())
+    {
+        if (!emission->is_array() || emission->size() != 3) throw std::runtime_error("Invalid material emission");
+        result.Emission = {emission->at(0).get<float>(), emission->at(1).get<float>(), emission->at(2).get<float>()};
+    }
+    result.MetallicRoughnessTexture = json.value("metallicRoughnessTexture", std::string{});
+    result.EmissionTexture = json.value("emissionTexture", std::string{});
+    return result;
+}
+Json WriteSurface(const MaterialGraph::SurfaceProperties& surface)
+{
+    const auto& s = surface.Shading;
+    const char* alpha = s.AlphaMode == jSurfaceAlphaMode::Mask ? "mask" : s.AlphaMode == jSurfaceAlphaMode::Blend ? "blend" : "opaque";
+    return {{"transmission", s.Transmission}, {"ior", s.Ior}, {"clearCoat", s.ClearCoat}, {"clearCoatGloss", s.ClearCoatGloss},
+        {"subsurface", s.Subsurface}, {"anisotropy", s.Anisotropy}, {"specularTint", s.SpecularTint}, {"sheen", s.Sheen}, {"sheenTint", s.SheenTint},
+        {"alphaMode", alpha}, {"alphaCutoff", s.AlphaCutoff}, {"doubleSided", s.DoubleSided}, {"legacyPackedMap", s.LegacyPackedMap},
+        {"opacity", surface.Opacity}, {"emission", {surface.Emission.X, surface.Emission.Y, surface.Emission.Z}},
+        {"metallicRoughnessTexture", surface.MetallicRoughnessTexture}, {"emissionTexture", surface.EmissionTexture}};
+}
+Json ReadSceneMaterialBindings(const std::filesystem::path& source)
+{
+    auto sidecar = source;
+    sidecar += ".materials.json";
+    if (!std::filesystem::exists(sidecar)) return Json::object();
+    const auto root = std::filesystem::absolute(source).parent_path();
+    std::string error;
+    const auto manifest = jEditorProject::ResolveSafe(root, sidecar.filename(), error, true);
+    if (!manifest) throw std::runtime_error(error);
+    if (std::filesystem::file_size(*manifest) > 1024 * 1024) throw std::runtime_error("Material library exceeds 1 MiB");
+    std::ifstream stream(*manifest);
+    Json data;
+    stream >> data;
+    const auto& bindings = data.at("materials");
+    if (data.at("format") != "jEngineSceneMaterials" || data.at("version") != 1 ||
+        !bindings.is_object() || bindings.size() > 4096)
+        throw std::runtime_error("Invalid scene material library");
+    for (const auto& [name, value] : bindings.items())
+        if (name.empty() || !value.is_string() || !SafeTexture(value.get<std::string>()))
+            throw std::runtime_error("Invalid scene material binding");
+    return bindings;
 }
 bool Write(const std::filesystem::path& file, const std::string& text, std::string& error)
 {
@@ -143,6 +216,7 @@ bool EvaluateMaterial(const MaterialGraph& graph, MaterialProperties& material, 
 {
     error.clear();
     if (graph.Nodes.empty() || graph.Nodes.size() > MaxMaterialNodes) { error = "A material needs 1..256 nodes"; return false; }
+    if (graph.Surface && !ValidSurface(*graph.Surface)) { error = "Invalid material surface value or texture path"; return false; }
     MaterialEvaluator evaluator(graph);
     for (const auto& node : graph.Nodes)
     {
@@ -175,6 +249,11 @@ bool EvaluateMaterial(const MaterialGraph& graph, MaterialProperties& material, 
     };
     if (!scalarOutput(graph.Metallic, result.Metallic, "Metallic output must be scalar") ||
         !scalarOutput(graph.Roughness, result.Roughness, "Roughness output must be scalar")) return false;
+    if (graph.Surface)
+    {
+        result.Emissive = graph.Surface->Emission;
+        result.Opacity = graph.Surface->Opacity;
+    }
     result.OverrideEnabled = true; material = std::move(result); return true;
 }
 bool SaveMaterial(const MaterialGraph& graph, const std::filesystem::path& file, std::string& error)
@@ -184,6 +263,7 @@ bool SaveMaterial(const MaterialGraph& graph, const std::filesystem::path& file,
     for (const auto& n : graph.Nodes) nodes.push_back({{"id", n.Id}, {"kind", int(n.Kind)}, {"a", n.InputA}, {"b", n.InputB}, {"color", {n.Color.X, n.Color.Y, n.Color.Z}}, {"value", n.Scalar}, {"x", n.X}, {"y", n.Y}, {"texture", n.Texture}});
     Json json{{"format", "jEngineMaterial"}, {"version", 1}, {"nodes", nodes}, {"baseColor", graph.BaseColor},
         {"metallic", graph.Metallic}, {"roughness", graph.Roughness}, {"normal", graph.Normal}};
+    if (graph.Surface) json["surface"] = WriteSurface(*graph.Surface);
     return Write(file, json.dump(2), error);
 }
 bool LoadMaterial(const std::filesystem::path& file, MaterialGraph& graph, std::string& error)
@@ -195,6 +275,7 @@ bool LoadMaterial(const std::filesystem::path& file, MaterialGraph& graph, std::
         if (json.at("format") != "jEngineMaterial" || json.at("version") != 1 || !json.at("nodes").is_array() || json.at("nodes").size() > MaxMaterialNodes) throw std::runtime_error("Unsupported material graph");
         MaterialGraph result; result.BaseColor = json.at("baseColor").get<uint32_t>(); result.Metallic = json.at("metallic").get<uint32_t>(); result.Roughness = json.at("roughness").get<uint32_t>();
         result.Normal = json.value("normal", uint32_t{0});
+        if (const auto surface = json.find("surface"); surface != json.end()) result.Surface = ReadSurface(*surface);
         for (const auto& j : json.at("nodes"))
         {
             MaterialNode node; node.Id = j.at("id").get<uint32_t>(); node.Kind = NodeKind(j.at("kind").get<int>());
@@ -204,6 +285,88 @@ bool LoadMaterial(const std::filesystem::path& file, MaterialGraph& graph, std::
         }
         MaterialProperties checked; if (!EvaluateMaterial(result, checked, error)) return false;
         graph = std::move(result); return true;
+    }
+    catch (const std::exception& e) { error = e.what(); return false; }
+}
+
+bool ApplySceneMaterialLibrary(const std::filesystem::path& source, const std::vector<jObject*>& objects,
+    size_t& appliedSlots, std::string& error)
+{
+    appliedSlots = 0;
+    error.clear();
+    try
+    {
+        const auto bindings = ReadSceneMaterialBindings(source);
+        if (bindings.empty()) return true;
+        const auto root = std::filesystem::absolute(source).parent_path();
+
+        const auto loadTexture = [&](jMaterial& target, jMaterial::EMaterialTextureType slot, const std::string& relative)
+        {
+            auto& destination = target.TexData[int(slot)];
+            destination.Texture = nullptr;
+            if (relative.empty()) return true;
+            const auto path = jEditorProject::ResolveSafe(root, relative, error, true);
+            if (!path) return false;
+            destination.FilePath = jName(jEditorAssetPath::ToUtf8(*path));
+            auto texture = jImageFileLoader::GetInstance().LoadTextureOwned(destination.FilePath);
+            if (!texture) { error = "Could not load material texture " + relative; return false; }
+            destination.Texture = texture.get();
+            target.OwnedTextures.push_back(std::move(texture));
+            return true;
+        };
+
+        std::map<std::string, std::shared_ptr<jMaterial>> resolved;
+        std::vector<std::pair<jRenderObject*, std::shared_ptr<jMaterial>>> staged;
+        for (auto* object : objects)
+            for (auto* render : object->RenderObjects)
+            {
+                const auto& original = render->MaterialPtr;
+                if (!original || original->SourceMaterialName.empty()) continue;
+                const auto match = bindings.find(original->SourceMaterialName);
+                if (match == bindings.end()) continue;
+                auto& target = resolved[original->SourceMaterialName];
+                if (!target)
+                {
+                    const auto path = jEditorProject::ResolveSafe(root, match->get<std::string>(), error, true);
+                    MaterialGraph graph;
+                    MaterialProperties properties;
+                    if (!path || !LoadMaterial(*path, graph, error) || !EvaluateMaterial(graph, properties, error)) return false;
+                    if (const auto mesh = std::dynamic_pointer_cast<jMeshMaterial>(original)) target = std::make_shared<jMeshMaterial>(*mesh);
+                    else target = std::make_shared<jMaterial>(*original);
+                    target->ShaderBindingInstance.reset();
+                    target->NeedToUpdateShaderBindingInstance = true;
+                    target->UseMaterialProperties = true;
+                    target->BaseColorOpacity = Vector4(properties.BaseColor.X, properties.BaseColor.Y, properties.BaseColor.Z, properties.Opacity);
+                    target->Emissive = Vector(properties.Emissive.X, properties.Emissive.Y, properties.Emissive.Z);
+                    target->MetallicFactor = properties.Metallic;
+                    target->RoughnessFactor = properties.Roughness;
+                    const auto surface = graph.Surface.value_or(MaterialGraph::SurfaceProperties{});
+                    target->Surface = surface.Shading;
+                    target->bRaytracingAlphaTest = surface.Shading.AlphaMode == jSurfaceAlphaMode::Mask;
+                    target->RaytracingAlphaCutoff = surface.Shading.AlphaCutoff;
+                    using Slot = jMaterial::EMaterialTextureType;
+                    const auto* environment = target->TexData[int(Slot::Env)].Texture;
+                    std::erase_if(target->OwnedTextures, [environment](const auto& texture) { return texture.get() != environment; });
+                    if (!loadTexture(*target, Slot::Albedo, properties.BaseColorTexture) ||
+                        !loadTexture(*target, Slot::Normal, properties.NormalTexture) ||
+                        !loadTexture(*target, Slot::Metallic, surface.MetallicRoughnessTexture) ||
+                        !loadTexture(*target, Slot::Emission, surface.EmissionTexture)) return false;
+                    if (!target->HasAlbedoTexture()) target->TexData[int(Slot::Albedo)].Texture = GWhiteTexture.get();
+                    ++target->Revision;
+                }
+                staged.emplace_back(render, target);
+            }
+        if (staged.empty() && !bindings.empty()) { error = "No source material slots matched the library"; return false; }
+        if (!staged.empty() && g_rhi) g_rhi->Flush();
+        for (auto& [render, material] : staged)
+        {
+            if (g_rhi && g_rhi->RaytracingScene && render->IsSupportRaytracing() &&
+                material->IsRaytracingAlphaTestEnabled() != render->MaterialPtr->IsRaytracingAlphaTestEnabled())
+                g_rhi->RaytracingScene->MarkBLASDirty(render);
+            render->MaterialPtr = std::move(material);
+        }
+        appliedSlots = resolved.size();
+        return true;
     }
     catch (const std::exception& e) { error = e.what(); return false; }
 }
@@ -460,6 +623,9 @@ struct ToolState
     std::vector<MaterialGraph> Undo, Redo;
     std::string Error, AssignedGraph; char GraphPath[512] = "Assets/Materials/Material.jmaterial";
     bool AssignedGraphHasNormal = false;
+    std::filesystem::path SceneMaterialRoot;
+    std::vector<std::pair<std::string, std::string>> SceneMaterials;
+    size_t SceneMaterialIndex = 0;
     float Time = 0, BrushX = 0, BrushZ = 0, BrushRadius = 100, BrushStrength = 20;
     int BrushMode = 0; bool Preview = false;
     bool PaintInScene = false;
@@ -711,9 +877,37 @@ void DrawMaterialValue(ImDrawList& draw, const ImVec2& position, const MaterialN
     ImGui::EndTooltip();
 }
 
+void SurfaceSettings(MaterialGraph::SurfaceProperties& surface)
+{
+    if (!ImGui::CollapsingHeader("Surface settings")) return;
+    auto edited = surface;
+    auto& shading = edited.Shading;
+    bool changed = ImGui::SliderFloat("Transmission", &shading.Transmission, 0.f, 1.f);
+    changed |= ImGui::SliderFloat("IOR", &shading.Ior, 1.f, 4.f);
+    changed |= ImGui::SliderFloat("Clear Coat", &shading.ClearCoat, 0.f, 1.f);
+    changed |= ImGui::SliderFloat("Clear Coat Gloss", &shading.ClearCoatGloss, 0.f, 1.f);
+    changed |= ImGui::SliderFloat("Opacity", &edited.Opacity, 0.f, 1.f);
+    changed |= ImGui::ColorEdit3("Emission", &edited.Emission.X, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+    int alphaMode = int(shading.AlphaMode);
+    if (ImGui::Combo("Alpha mode", &alphaMode, "Opaque\0Mask\0Blend\0"))
+    { shading.AlphaMode = jSurfaceAlphaMode(alphaMode); changed = true; }
+    if (shading.AlphaMode == jSurfaceAlphaMode::Mask)
+        changed |= ImGui::SliderFloat("Alpha cutoff", &shading.AlphaCutoff, 0.f, 1.f);
+    changed |= ImGui::Checkbox("Double sided", &shading.DoubleSided);
+    const auto textureField = [&](const char* label, std::string& texture)
+    {
+        char path[512]; std::snprintf(path, sizeof(path), "%s", texture.c_str());
+        if (ImGui::InputText(label, path, sizeof(path))) { texture = path; changed = true; }
+    };
+    textureField("Metallic Roughness map", edited.MetallicRoughnessTexture);
+    textureField("Emission map", edited.EmissionTexture);
+    if (changed) { GraphHistory(); surface = std::move(edited); }
+}
+
 void GraphUI(jEditor& editor, Entity e, const jEditorProject* project, const jEditorAssetRegistry* registry)
 {
     auto& s = Tools();
+    const bool library = !s.SceneMaterialRoot.empty();
     ImGui::TextWrapped("Drag Out to A/B or a Material Output pin. Click a Material Output pin to choose or disconnect its source.");
     static int addKind = 0; ImGui::Combo("New node", &addKind, "Color\0Scalar\0Texture\0Multiply\0Add\0");
     ImGui::BeginDisabled(s.Graph.Nodes.size() >= MaxMaterialNodes);
@@ -799,6 +993,17 @@ void GraphUI(jEditor& editor, Entity e, const jEditorProject* project, const jEd
             s.SelectedNode = 0;
         }
     }
+    if (s.Graph.Surface) SurfaceSettings(*s.Graph.Surface);
+    if (library)
+    {
+        ImGui::TextWrapped("%s", s.GraphPath);
+        if (ImGui::Button("Save and apply to scene"))
+        {
+            auto path = jEditorProject::ResolveSafe(s.SceneMaterialRoot, s.GraphPath, s.Error, true);
+            if (path && SaveMaterial(s.Graph, *path, s.Error)) g_Engine->Game.RequestSceneMaterialRefresh();
+        }
+        return;
+    }
     ImGui::InputText("Graph asset", s.GraphPath, sizeof(s.GraphPath));
     if (ImGui::Button("Load graph"))
     {
@@ -828,6 +1033,69 @@ void GraphUI(jEditor& editor, Entity e, const jEditorProject* project, const jEd
     ImGui::EndDisabled();
 }
 
+void SelectSceneMaterial(size_t index)
+{
+    auto& s = Tools();
+    const auto& path = s.SceneMaterials[index].second;
+    auto file = jEditorProject::ResolveSafe(s.SceneMaterialRoot, path, s.Error, true);
+    MaterialGraph graph;
+    if (!file || !LoadMaterial(*file, graph, s.Error)) return;
+    s.SceneMaterialIndex = index;
+    s.Graph = std::move(graph);
+    s.SelectedNode = 0;
+    s.NextNode = 1;
+    for (const auto& node : s.Graph.Nodes) s.NextNode = std::max(s.NextNode, node.Id + 1);
+    s.Undo.clear(); s.Redo.clear();
+    std::snprintf(s.GraphPath, sizeof(s.GraphPath), "%s", path.c_str());
+}
+
+bool RenderSceneMaterialLibrary(jEditor& editor, const jEditorProject* project, const jEditorAssetRegistry* registry)
+{
+    if (!g_Engine) return false;
+    auto& s = Tools();
+    const auto& game = g_Engine->Game;
+    const auto active = game.GetActivePathTracingSceneIndex();
+    if (active < 0) return false;
+    if (s.SceneMaterialRoot.empty())
+    {
+        if (!ImGui::SmallButton("Scene material library")) return false;
+        try
+        {
+            const std::filesystem::path source(game.GetLoadablePathTracingScenes().at(active).FilePath);
+            const auto bindings = ReadSceneMaterialBindings(source);
+            if (bindings.empty()) throw std::runtime_error("The active scene has no material library");
+            s.SceneMaterials.clear();
+            for (const auto& [name, path] : bindings.items())
+                s.SceneMaterials.emplace_back(name, path.get<std::string>());
+            s.SceneMaterialRoot = std::filesystem::absolute(source).parent_path();
+            s.Graph = {};
+            s.SceneMaterialIndex = 0;
+            SelectSceneMaterial(0);
+        }
+        catch (const std::exception& error) { s.Error = error.what(); ImGui::TextWrapped("%s", s.Error.c_str()); return false; }
+    }
+    else if (ImGui::SmallButton("Object material graph"))
+    {
+        s.SceneMaterialRoot.clear();
+        s.Selected = 0;
+        s.AssignedGraph.clear();
+        return false;
+    }
+    const auto& selected = s.SceneMaterials[s.SceneMaterialIndex];
+    if (ImGui::BeginCombo("Source material", selected.first.c_str()))
+    {
+        for (size_t i = 0; i < s.SceneMaterials.size(); ++i)
+            if (ImGui::Selectable(s.SceneMaterials[i].first.c_str(), i == s.SceneMaterialIndex)) SelectSceneMaterial(i);
+        ImGui::EndCombo();
+    }
+    if (!s.Graph.Nodes.empty())
+    {
+        const bool matchingProject = project && project->GetRoot() == s.SceneMaterialRoot;
+        GraphUI(editor, {}, matchingProject ? project : nullptr, matchingProject ? registry : nullptr);
+    }
+    if (!s.Error.empty()) ImGui::TextWrapped("%s", s.Error.c_str());
+    return true;
+}
 }
 void FinishTerrainStroke(jEditor& editor)
 {
@@ -894,6 +1162,7 @@ bool RenderTerrainBrush(jEditor& editor, const jCamera& camera, const ImVec2& po
 
 bool Render(jEditor& editor, const jEditorProject* project, const jEditorAssetRegistry* registry)
 {
+    if (RenderSceneMaterialLibrary(editor, project, registry)) return false;
     auto& s = Tools(); auto& doc = editor.GetDocument(); const auto* selected = doc.Find(editor.GetSelectedEntityId());
     if (!selected) { ImGui::TextUnformatted("Select an object to edit its material, animation or procedural components."); return false; }
     Entity e = *selected;

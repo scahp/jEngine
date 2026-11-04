@@ -162,7 +162,7 @@ namespace GLSLPT
                 // add material to map
                 if (materialMap.find(name) == materialMap.end()) // New material
                 {
-                    int id = scene->AddMaterial(material);
+                    int id = scene->AddMaterial(material, name);
                     materialMap[name] = MaterialData{ material, id };
                 }
             }

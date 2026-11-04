@@ -214,6 +214,7 @@ void jPathTracingLoadData::CreateSceneFor_jEngine(jGame* InGame)
         const Material& material = materials[MeshInst.materialID];
 
         std::shared_ptr<jMaterial> materialPtr = std::make_shared<jMaterial>();
+        materialPtr->SourceMaterialName = materialNames[MeshInst.materialID];
         materialPtr->MaterialDataPtr = std::make_shared<jMaterialData>();
         materialPtr->MaterialDataPtr->Data.resize(sizeof(material));
         memcpy(materialPtr->MaterialDataPtr->Data.data(), &material, sizeof(material));
@@ -443,10 +444,11 @@ int32 jPathTracingLoadData::AddTexture(const std::string& filename)
     return id;
 }
 
-int32 jPathTracingLoadData::AddMaterial(const Material& material)
+int32 jPathTracingLoadData::AddMaterial(const Material& material, const std::string& name)
 {
     int32 id = (int32)materials.size();
     materials.push_back(material);
+    materialNames.push_back(name);
     return id;
 }
 

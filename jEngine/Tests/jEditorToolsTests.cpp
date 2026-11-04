@@ -1,7 +1,10 @@
 #include "pch.h"
 #include "Code/Engine/Editor/jEditorTools.h"
 #include "FileLoader/jEditorAssets.h"
+#include "Scene/jObject.h"
+#include "Scene/jRenderObject.h"
 #include <filesystem>
+#include <fstream>
 #include <limits>
 
 int RunEditorToolsTests()
@@ -55,6 +58,40 @@ int RunEditorToolsTests()
     expect(!EvaluateMaterial(graph, material, error) && material.NormalTexture == "Assets/Textures/normal.png",
         "Normal output rejects a non-texture node without modifying the material");
     graph.Normal = 0;
+    auto& surface = graph.Surface.emplace();
+    surface.Shading.Transmission = 1.f;
+    surface.Shading.Ior = 1.45f;
+    surface.Shading.ClearCoat = .75f;
+    surface.Shading.AlphaMode = jSurfaceAlphaMode::Mask;
+    surface.Shading.AlphaCutoff = .4f;
+    surface.Emission = {.25f, .5f, 1.f};
+    const auto glass = fixture / "glass.jmaterial";
+    expect(SaveMaterial(graph, glass, error) && LoadMaterial(glass, loaded, error) && loaded.Surface &&
+        loaded.Surface->Shading.Transmission == 1.f && loaded.Surface->Shading.Ior == 1.45f &&
+        loaded.Surface->Shading.ClearCoat == .75f && loaded.Surface->Emission == surface.Emission,
+        "scene material graph round-trips glass, coat and emission values");
+    {
+        const auto source = fixture / "example.scene";
+        std::ofstream sidecar(fixture / "example.scene.materials.json");
+        sidecar << R"({"format":"jEngineSceneMaterials","version":1,"materials":{"Glass":"glass.jmaterial"}})";
+        sidecar.close();
+        jObject object;
+        for (const char* name : {"Glass", "Glass", "Wall"})
+        {
+            auto* mesh = new jRenderObject();
+            mesh->MaterialPtr = std::make_shared<jMaterial>();
+            mesh->MaterialPtr->SourceMaterialName = name;
+            object.RenderObjects.push_back(mesh);
+        }
+        const auto wall = object.RenderObjects[2]->MaterialPtr;
+        size_t bound = 0;
+        const bool applied = ApplySceneMaterialLibrary(source, {&object}, bound, error);
+        const auto& glassMaterial = object.RenderObjects[0]->MaterialPtr;
+        expect(applied && bound == 1 && glassMaterial == object.RenderObjects[1]->MaterialPtr &&
+            glassMaterial->Surface && glassMaterial->Surface->Ior == 1.45f &&
+            glassMaterial->IsRaytracingAlphaTestEnabled() && object.RenderObjects[2]->MaterialPtr == wall,
+            "scene library shares one material across matching source slots and leaves other slots intact");
+    }
     TerrainProperties terrain; terrain.Resolution = 17;
     auto flat = BuildTerrain(terrain);
     expect(flat.Positions.size() == 289 && flat.Indices.size() == 16 * 16 * 6, "terrain mesh has complete grid topology");

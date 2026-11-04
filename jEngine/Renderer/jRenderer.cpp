@@ -502,6 +502,15 @@ void jRenderer::SetupBasePass()
 
     jPipelineStateFixedInfo BasePassPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, DepthStencilState, BlendingState
         , jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT), gOptions.UseVRS);
+    auto twoSidedRaster = *RasterizationState;
+    twoSidedRaster.CullMode = ECullMode::NONE;
+    twoSidedRaster.Hash = 0;
+    jPipelineStateFixedInfo twoSidedBasePass(g_rhi->CreateRasterizationState(twoSidedRaster), DepthStencilState, BlendingState
+        , jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT), gOptions.UseVRS);
+    const auto baseState = [&](const jMaterial* material)
+    {
+        return material && material->Surface && material->Surface->DoubleSided ? &twoSidedBasePass : &BasePassPipelineStateFixed;
+    };
 
     auto TranslucentBlendingState = TBlendingStateInfo<true, EBlendFactor::SRC_ALPHA, EBlendFactor::ONE_MINUS_SRC_ALPHA, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
     jPipelineStateFixedInfo TranslucentPassPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, DepthStencilState, TranslucentBlendingState
@@ -728,7 +737,7 @@ void jRenderer::SetupBasePass()
             }
 
             new (&BasePasses[InIndex]) jDrawCommand(RenderFrameContextPtr, &View, InRenderObject, BaseRenderPass
-                , GetOrCreateShaderFunc(InRenderObject, Material), &BasePassPipelineStateFixed, Material, jShaderBindingInstanceArray(), SimplePushConstant);
+                , GetOrCreateShaderFunc(InRenderObject, Material), baseState(Material), Material, jShaderBindingInstanceArray(), SimplePushConstant);
             BasePasses[InIndex].PrepareToDraw(false);
         });
 #else
@@ -752,7 +761,7 @@ void jRenderer::SetupBasePass()
         //Material = GDefaultMaterial.get();
 
         new (&BasePasses[i]) jDrawCommand(RenderFrameContextPtr, &View, iter, BaseRenderPass
-            , GetOrCreateShaderFunc(iter, Material), &BasePassPipelineStateFixed, Material, jShaderBindingInstanceArray(), SimplePushConstant);
+            , GetOrCreateShaderFunc(iter, Material), baseState(Material), Material, jShaderBindingInstanceArray(), SimplePushConstant);
         BasePasses[i].PrepareToDraw(false);
         ++i;
     }

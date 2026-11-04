@@ -396,7 +396,8 @@ SurfaceData GetSurfaceDataInternal(in uint InstanceIdx, in uint PrimitiveIdx, in
     Surface.Metallic = RenderObjParam.Metallic;
     Surface.Roughness = RenderObjParam.Roughness;
 
-    if (HasMaterialFlag(MaterialInstance, HWRTDI_MaterialFlag_HasRMTexture) && RenderObjParam.EmissiveOverride.w < 0.5)
+    if (HasMaterialFlag(MaterialInstance, HWRTDI_MaterialFlag_HasRMTexture) &&
+        (RenderObjParam.EmissiveOverride.w < 0.5 || (RenderObjParam.SurfaceFlags & 2u) != 0u))
     {
         float RMMipLevel = ComputeApproxTextureMipLevel(RMTextureArray[InstanceIdx], Surface.WorldPos, Vertex0, Vertex1, Vertex2, RenderObjParam);
         if (ForceMipLevel0)
@@ -405,8 +406,21 @@ SurfaceData GetSurfaceDataInternal(in uint InstanceIdx, in uint PrimitiveIdx, in
         }
         Surface.RMMipLevel = RMMipLevel;
         const float4 RMSample = RMTextureArray[InstanceIdx].SampleLevel(RMSamplerArray[MaterialInstance.RMSamplerIndex], Surface.UV, RMMipLevel);
-        Surface.Roughness = RMSample.y;
-        Surface.Metallic = RMSample.z;
+        if ((RenderObjParam.SurfaceFlags & 4u) != 0u)
+        {
+            Surface.Roughness = RMSample.y * RMSample.y;
+            Surface.Metallic = RMSample.x;
+        }
+        else if ((RenderObjParam.SurfaceFlags & 2u) != 0u)
+        {
+            Surface.Roughness *= RMSample.y;
+            Surface.Metallic *= RMSample.z;
+        }
+        else
+        {
+            Surface.Roughness = RMSample.y;
+            Surface.Metallic = RMSample.z;
+        }
         Surface.RMTextureSample = RMSample.rgb;
     }
 
@@ -435,6 +449,8 @@ bool IsRayHitRejectedByMaterial(in uint InstanceIdx, in uint PrimitiveIdx, in fl
         const MyAttributes Attr = MakeAttributesFromBarycentrics(Barycentrics);
         const float2 UV = HitAttribute(Vertex0.TexCoord, Vertex1.TexCoord, Vertex2.TexCoord, Attr);
         const float Alpha = SampleAlbedoTexture(InstanceIdx, MaterialInstance, UV, 0.0).a;
+        if ((RenderObjParam.SurfaceFlags & 8u) != 0u)
+            return Alpha * RenderObjParam.BaseColorOpacity.a < RenderObjParam.SurfaceAlphaCutoff;
         if (Alpha < saturate(MaterialInstance.AlphaCutoff))
         {
             return true;

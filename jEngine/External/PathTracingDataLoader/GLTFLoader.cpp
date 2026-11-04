@@ -316,14 +316,14 @@ namespace GLSLPT
                     material.specTrans = (float)(ext.Get("transmissionFactor").Get<double>());
             }
 
-            scene->AddMaterial(material);
+            scene->AddMaterial(material, gltfMaterial.name);
         }
 
         // Default material
         if (scene->materials.size() == 0)
         {
             Material defaultMat;
-            scene->materials.push_back(defaultMat);
+            scene->AddMaterial(defaultMat);
         }
     }
 

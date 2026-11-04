@@ -239,12 +239,23 @@ const std::shared_ptr<jShaderBindingInstance>& jRenderObject::CreateShaderBindin
         ubo.Roughness = gOptions.Roughness;
         ubo.BaseColorOpacity = Vector4(1.0f);
         ubo.EmissiveOverride = Vector4(0.0f);
+        ubo.SurfaceFlags = 0;
+        ubo.SurfaceAlphaCutoff = .5f;
+        ubo.SurfacePadding = Vector2(0.f, 0.f);
         if (MaterialPtr && MaterialPtr->UseMaterialProperties)
         {
             ubo.BaseColorOpacity = MaterialPtr->BaseColorOpacity;
             ubo.EmissiveOverride = Vector4(MaterialPtr->Emissive, 1.0f);
             ubo.Metallic = MaterialPtr->MetallicFactor;
             ubo.Roughness = MaterialPtr->RoughnessFactor;
+            if (const auto& surface = MaterialPtr->Surface)
+            {
+                using Slot = jMaterial::EMaterialTextureType;
+                ubo.SurfaceFlags = 1u | (MaterialPtr->TexData[int(Slot::Metallic)].Texture ? 2u : 0u)
+                    | (surface->LegacyPackedMap ? 4u : 0u) | (surface->AlphaMode == jSurfaceAlphaMode::Mask ? 8u : 0u)
+                    | (surface->AlphaMode == jSurfaceAlphaMode::Blend ? 16u : 0u);
+                ubo.SurfaceAlphaCutoff = surface->AlphaCutoff;
+            }
         }
         ubo.ObjectID = Owner ? Owner->ObjectID : 0;
         ubo.RenderObjectID = RenderObjectID;

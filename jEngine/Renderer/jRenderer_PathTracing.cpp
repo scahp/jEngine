@@ -376,6 +376,21 @@ void jRenderer_PathTracing::PathTracing()
 		std::vector<const IUniformBufferBlock*> MaterialBuffers;
 		std::vector<const IUniformBufferBlock*> LightBuffers;
 		std::vector<jTextureResourceBindless::jTextureBindData> Textures;
+        std::map<jTexture*, int32> textureIds;
+        if (gPathTracingScene)
+            for (auto* texture : gPathTracingScene->textures)
+            {
+                textureIds.emplace(texture, int32(Textures.size()));
+                Textures.push_back({texture, nullptr, 0});
+            }
+        const auto textureIndex = [&](const jMaterial& material, jMaterial::EMaterialTextureType slot)
+        {
+            auto* texture = material.TexData[int(slot)].Texture;
+            if (!texture) return -1;
+            const auto [it, inserted] = textureIds.emplace(texture, int32(Textures.size()));
+            if (inserted) Textures.push_back({texture, nullptr, 0});
+            return it->second;
+        };
 		std::vector<jTextureResourceBindless::jTextureBindData> AuthoredAlbedo, AuthoredNormal;
 		std::vector<std::shared_ptr<IUniformBufferBlock>> RefCountMaintainer;
 
@@ -404,10 +419,38 @@ void jRenderer_PathTracing::PathTracing()
                 fallback.baseColor = Vector(1.0f); fallback.roughness = 0.5f; fallback.ior = 1.5f;
                 fallback.lightId = -1; fallback.baseColorTexId = fallback.metallicRoughnessTexID = -1;
                 fallback.normalmapTexID = fallback.emissionmapTexID = -1; fallback.opacity = 1.0f;
-                const auto& payload = RObj->MaterialPtr->MaterialDataPtr;
-                const bool validPayload = payload && payload->GetDataSizeInBytes() == sizeof(MaterialUniformBuffer);
+                const auto& material = *RObj->MaterialPtr;
+                const auto& payload = material.MaterialDataPtr;
+                if (payload && payload->GetDataSizeInBytes() == sizeof(MaterialUniformBuffer))
+                    std::memcpy(&fallback, payload->GetData(), sizeof(MaterialUniformBuffer));
+                fallback.padding2 = 0.f;
+                if (const auto& surface = material.Surface)
+                {
+                    using Slot = jMaterial::EMaterialTextureType;
+                    fallback.baseColor = Vector(material.BaseColorOpacity);
+                    fallback.opacity = material.BaseColorOpacity.w;
+                    fallback.emission = material.Emissive;
+                    fallback.metallic = material.MetallicFactor;
+                    fallback.roughness = material.RoughnessFactor;
+                    fallback.specTrans = surface->Transmission;
+                    fallback.ior = surface->Ior;
+                    fallback.clearcoat = surface->ClearCoat;
+                    fallback.clearcoatGloss = surface->ClearCoatGloss;
+                    fallback.subsurface = surface->Subsurface;
+                    fallback.anisotropic = surface->Anisotropy;
+                    fallback.specularTint = surface->SpecularTint;
+                    fallback.sheen = surface->Sheen;
+                    fallback.sheenTint = surface->SheenTint;
+                    fallback.alphaMode = float(surface->AlphaMode);
+                    fallback.alphaCutoff = surface->AlphaCutoff;
+                    fallback.baseColorTexId = textureIndex(material, Slot::Albedo);
+                    fallback.normalmapTexID = textureIndex(material, Slot::Normal);
+                    fallback.metallicRoughnessTexID = textureIndex(material, Slot::Metallic);
+                    fallback.emissionmapTexID = textureIndex(material, Slot::Emission);
+                    fallback.padding2 = surface->LegacyPackedMap ? 2.f : 1.f;
+                }
                 auto MaterialUniformParametersPtr = g_rhi->CreateUniformBufferBlock(jNameStatic("jMaterialUniformBuffer"), jLifeTimeType::OneFrame, sizeof(MaterialUniformBuffer));
-                MaterialUniformParametersPtr->UpdateBufferData(validPayload ? payload->GetData() : &fallback, sizeof(MaterialUniformBuffer));
+                MaterialUniformParametersPtr->UpdateBufferData(&fallback, sizeof(MaterialUniformBuffer));
                 AuthoredAlbedo.push_back({ RObj->MaterialPtr->GetTexture(jMaterial::EMaterialTextureType::Albedo), nullptr, 0 });
                 AuthoredNormal.push_back({ RObj->MaterialPtr->GetTexture(jMaterial::EMaterialTextureType::Normal), nullptr, 0 });
 				MaterialBuffers.push_back(MaterialUniformParametersPtr.get());
@@ -434,19 +477,7 @@ void jRenderer_PathTracing::PathTracing()
 				RefCountMaintainer.push_back(LightUniformParametersPtr);
 			}
 
-			if (!gPathTracingScene || gPathTracingScene->textures.empty())
-			{
-				Textures.resize(1);
-				Textures[0].Texture = GWhiteTexture.get();
-			}
-			else
-			{
-				Textures.resize(gPathTracingScene->textures.size());
-				for (int32 i = 0; i < (int32)gPathTracingScene->textures.size(); ++i)
-				{
-					Textures[i].Texture = gPathTracingScene->textures[i];
-				}
-			}
+            if (Textures.empty()) Textures.push_back({GWhiteTexture.get(), nullptr, 0});
             // DX12 descriptor ranges require a nonzero count even when a scene
             // has no analytic lights. No hit group references this dummy entry.
             if (LightBuffers.empty())

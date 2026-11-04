@@ -14,6 +14,9 @@ struct RenderObjectUniformBuffer
     uint RenderObjectID;
     float4 BaseColorOpacity;
     float4 EmissiveOverride;
+    uint SurfaceFlags;
+    float SurfaceAlphaCutoff;
+    float2 SurfacePadding;
 };
 #endif
 

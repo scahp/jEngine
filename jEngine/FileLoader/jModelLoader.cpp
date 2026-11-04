@@ -223,6 +223,9 @@ std::unique_ptr<jPreparedModel> jModelLoader::PrepareModel(const char* filename,
 		aiMaterial* material = scene->mMaterials[i];
         auto materialOwner = std::make_shared<jMeshMaterial>();
         auto* newMeshMaterial = materialOwner.get();
+        aiString materialName;
+        if (material->Get(AI_MATKEY_NAME, materialName) == aiReturn_SUCCESS)
+            newMeshMaterial->SourceMaterialName = materialName.C_Str();
         meshData->Materials.emplace(i, std::move(materialOwner));
 #if USE_SPONZA_PBR
 		for (uint32 k = aiTextureType_NONE; k <= aiTextureType_UNKNOWN; ++k)

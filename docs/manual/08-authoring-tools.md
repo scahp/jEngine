@@ -50,6 +50,18 @@
 
 `Undo graph`·`Redo graph`는 그래프 편집 상태를 되돌립니다. `Edit → Undo`는 장면 문서 편집을 되돌립니다. 외부 그래프 파일의 덮어쓰기까지 장면 Undo가 복원하는 것은 아닙니다.
 
+### Sponza, Cornell Box, Hyperion 재질 가져오기
+
+`python scripts/convert-scene-materials.py <원본 .glb 또는 .scene> <Resource 아래의 새 폴더>`로 Scene Browser용 복사본을 만듭니다. GLB는 `--pipeline Deferred` 또는 `--pipeline PathTracing`으로 렌더러를 지정할 수 있습니다. 변환기는 원본 슬롯 이름과 `Assets/Materials/*.jmaterial`을 씬 옆의 `.materials.json`에 연결합니다.
+
+저장소 루트에서 아래 명령을 실행하면 Scene Browser에 `Sponza_PathTracing/sponza.glb`를 추가할 수 있습니다.
+
+```powershell
+python scripts/convert-scene-materials.py jEngine/Resource/sponza_pbr/sponza.glb jEngine/Resource/Sponza_PathTracing --pipeline PathTracing
+```
+
+Scene Browser에서 변환한 씬을 불러온 후 `Authoring tools → Scene material library`에서 슬롯을 고릅니다. `Surface settings`에서 유리의 Transmission·IOR, Clear Coat, 알파 마스크와 패킹 텍스처를 확인할 수 있습니다. `Save and apply to scene`은 그래프 에셋을 저장하고 그 슬롯을 쓰는 메시들에 반영합니다. 패스 트레이싱을 지원하는 GPU에서는 유리와 코팅 계산에 이 값을 사용합니다. 패스 트레이싱 기능이 없는 장치에서는 Deferred로 씬을 엽니다.
+
 ## 변형 애니메이션과 Play/Stop
 
 **진입 경로:** 물체 선택 → `Authoring tools → Animation`.

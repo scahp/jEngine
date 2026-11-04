@@ -1,5 +1,7 @@
 ﻿#pragma once
 #include "RHI/jRHIType.h"
+#include <optional>
+#include <string>
 
 struct jTexture;
 struct jShaderBindingInstance;
@@ -11,6 +13,18 @@ struct jMaterialData
     uint32 GetDataSizeInBytes() const { return (uint32)Data.size(); }
 
     std::vector<uint8> Data;
+};
+
+enum class jSurfaceAlphaMode : uint32 { Opaque, Mask, Blend };
+
+struct jSurfaceShading
+{
+    float Transmission = 0.f, Ior = 1.5f, ClearCoat = 0.f, ClearCoatGloss = 0.f;
+    float Subsurface = 0.f, Anisotropy = 0.f, SpecularTint = 0.f, Sheen = 0.f, SheenTint = 0.f;
+    jSurfaceAlphaMode AlphaMode = jSurfaceAlphaMode::Opaque;
+    float AlphaCutoff = .5f;
+    bool DoubleSided = false;
+    bool LegacyPackedMap = false;
 };
 
 class jMaterial
@@ -29,6 +43,7 @@ public:
         //Roughness,
 #endif
         Env,
+        Emission,
         Max
     };
 
@@ -67,6 +82,8 @@ public:
     
     // Raw material payload used by RT/path tracing paths that manage their own uniform buffers.
     std::shared_ptr<jMaterialData> MaterialDataPtr;
+    std::string SourceMaterialName;
+    std::optional<jSurfaceShading> Surface;
 
     // Authored instances clone before editing; imported prototypes stay shared.
     bool UseMaterialProperties = false;

@@ -52,7 +52,7 @@ FSOutput main(VSOutput input
 
 #if USE_ALBEDO_TEXTURE
     color *= DiffuseTexture.Sample(DiffuseTextureSampler, input.TexCoord.xy);
-    if (color.w < 0.5f)
+    if (RenderObjectParam.SurfaceFlags == 0 && color.w < 0.5f)
     {
         discard;
     }
@@ -79,7 +79,15 @@ FSOutput main(VSOutput input
     // that the deferred pass provides sorted transparent blending.
     const uint2 pixel = uint2(input.Pos.xy);
     const float coverage = frac(dot(float2(pixel), float2(0.754877666, 0.569840296)));
-    if (color.a < coverage || color.a <= 0.0) discard;
+    const uint surfaceFlags = RenderObjectParam.SurfaceFlags;
+    if ((surfaceFlags & 8u) != 0u)
+    {
+        if (color.a < RenderObjectParam.SurfaceAlphaCutoff) discard;
+    }
+    else if (surfaceFlags == 0 || (surfaceFlags & 16u) != 0u)
+    {
+        if (color.a < coverage || color.a <= 0.0) discard;
+    }
 
 #if USE_VARIABLE_SHADING_RATE
     if (pushConsts.ShowVRSArea)
@@ -147,6 +155,22 @@ FSOutput main(VSOutput input
         Metallic = RenderObjectParam.Metallic;
         Roughness = RenderObjectParam.Roughness;
     }
+#if USE_PBR && USE_ALBEDO_TEXTURE
+    if ((surfaceFlags & 2u) != 0u)
+    {
+        const float3 packed = RMTexture.Sample(RMTextureSampler, input.TexCoord.xy).rgb;
+        if ((surfaceFlags & 4u) != 0u)
+        {
+            Metallic = packed.r;
+            Roughness = packed.g * packed.g;
+        }
+        else
+        {
+            Metallic *= packed.b;
+            Roughness *= packed.g;
+        }
+    }
+#endif
     
     //output.GBuffer0.xy = EncodeOctNormal(WorldNormal * 0.5 + 0.5);
     output.GBuffer0.xyz = WorldNormal * 0.5 + 0.5;

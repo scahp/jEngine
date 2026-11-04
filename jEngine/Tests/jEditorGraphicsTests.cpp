@@ -12,8 +12,9 @@ int RunEditorGraphicsTests()
     int failures = 0;
     auto expect = [&](bool pass, const char* label)
     { std::cout << (pass ? "PASS " : "FAIL ") << label << '\n'; failures += !pass; };
-    expect(sizeof(RenderObjectUniformBuffer) == 176 && offsetof(RenderObjectUniformBuffer, BaseColorOpacity) == 144 &&
-        offsetof(RenderObjectUniformBuffer, EmissiveOverride) == 160, "authored material UBO keeps legacy prefix and 16-byte aligned factors");
+    expect(sizeof(RenderObjectUniformBuffer) == 192 && offsetof(RenderObjectUniformBuffer, BaseColorOpacity) == 144 &&
+        offsetof(RenderObjectUniformBuffer, EmissiveOverride) == 160 && offsetof(RenderObjectUniformBuffer, SurfaceFlags) == 176,
+        "authored material UBO keeps legacy prefix and aligns the surface flags");
     TerrainProperties terrain;
     terrain.Resolution = 3; terrain.SizeX = 20; terrain.SizeZ = 10;
     Mesh mesh; std::string error;

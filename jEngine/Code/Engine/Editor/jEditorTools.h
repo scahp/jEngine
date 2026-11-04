@@ -1,5 +1,6 @@
 #pragma once
 #include "jEditorDocument.h"
+#include "Material/jMaterial.h"
 #include <string>
 #include <vector>
 #include <memory>
@@ -7,6 +8,7 @@ class jEditor;
 class jCamera;
 class jEditorProject;
 class jEditorAssetRegistry;
+class jObject;
 struct ImVec2;
 struct Vector;
 struct jEditorThumbnail;
@@ -31,10 +33,20 @@ struct MaterialGraph
 {
     std::vector<MaterialNode> Nodes;
     uint32_t BaseColor = 0, Metallic = 0, Roughness = 0, Normal = 0;
+    struct SurfaceProperties
+    {
+        jSurfaceShading Shading;
+        jEditorAuthoring::Vec3 Emission{};
+        float Opacity = 1.f;
+        std::string MetallicRoughnessTexture, EmissionTexture;
+    };
+    std::optional<SurfaceProperties> Surface;
 };
 bool EvaluateMaterial(const MaterialGraph& graph, jEditorAuthoring::MaterialProperties& material, std::string& error);
 bool SaveMaterial(const MaterialGraph& graph, const std::filesystem::path& file, std::string& error);
 bool LoadMaterial(const std::filesystem::path& file, MaterialGraph& graph, std::string& error);
+bool ApplySceneMaterialLibrary(const std::filesystem::path& source, const std::vector<jObject*>& objects,
+    size_t& appliedSlots, std::string& error);
 bool PrepareMaterialThumbnail(const std::filesystem::path& root, const std::filesystem::path& file,
     jEditorThumbnail& thumbnail, std::string& diagnostic);
 void InheritMaterialGraph(jEditorAuthoring::MaterialProperties& instance, const jEditorAuthoring::MaterialProperties& defaults);

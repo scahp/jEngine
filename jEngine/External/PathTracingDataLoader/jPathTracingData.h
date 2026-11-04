@@ -237,7 +237,7 @@ public:
 
     int32 AddMesh(const std::string& filename);
     int32 AddTexture(const std::string& filename);
-    int32 AddMaterial(const Material& material);
+    int32 AddMaterial(const Material& material, const std::string& name = {});
     int32 AddMeshInstance(const MeshInstance& meshInstance);
     int32 AddLight(const Light& light);
     void AddCamera(const Vector& InPos, const Vector& InTarget, const Vector& InUp, float InFov, float InNear = 0.1f, float InFar = 5000.0f);
@@ -257,6 +257,7 @@ public:
 
     // Materials
     std::vector<Material> materials;
+    std::vector<std::string> materialNames;
 
     // Instances
     std::vector<MeshInstance> meshInstances;

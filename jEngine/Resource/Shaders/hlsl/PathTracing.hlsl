@@ -20,11 +20,12 @@ MaterialUniformBuffer GetMaterial(inout float3 InOutWorldNormal, in MaterialUnif
 {
     MaterialUniformBuffer mat;
     mat = InMaterial;
+    const bool unifiedSurface = mat.padding2 > 0.5;
 
     // Base Color Map
     if (mat.baseColorTexId >= 0)
     {
-        float4 col = TextureBindlessArray[mat.baseColorTexId].SampleLevel(DefaultSamplerState, InUV, 0);
+        float4 col = TextureBindlessArray[NonUniformResourceIndex(mat.baseColorTexId)].SampleLevel(DefaultSamplerState, InUV, 0);
         mat.baseColor.rgb *= pow(col.rgb, 2.2);
         mat.opacity *= col.a;
     }
@@ -32,15 +33,23 @@ MaterialUniformBuffer GetMaterial(inout float3 InOutWorldNormal, in MaterialUnif
     // Metallic Roughness Map
     if (mat.metallicRoughnessTexID >= 0)
     {
-        float4 matRgh = TextureBindlessArray[mat.metallicRoughnessTexID].SampleLevel(DefaultSamplerState, InUV, 0);
-        mat.metallic = matRgh.x;
-        mat.roughness = max(matRgh.y * matRgh.y, 0.001);
+        float4 matRgh = TextureBindlessArray[NonUniformResourceIndex(mat.metallicRoughnessTexID)].SampleLevel(DefaultSamplerState, InUV, 0);
+        if (unifiedSurface && mat.padding2 < 1.5)
+        {
+            mat.metallic *= matRgh.b;
+            mat.roughness = max(mat.roughness * matRgh.g, 0.001);
+        }
+        else
+        {
+            mat.metallic = matRgh.r;
+            mat.roughness = max(matRgh.g * matRgh.g, 0.001);
+        }
     }
 
     // Normal Map
     if (mat.normalmapTexID >= 0)
     {
-        float3 texNormal = TextureBindlessArray[mat.normalmapTexID].SampleLevel(DefaultSamplerState, InUV, 0).xyz;
+        float3 texNormal = TextureBindlessArray[NonUniformResourceIndex(mat.normalmapTexID)].SampleLevel(DefaultSamplerState, InUV, 0).xyz;
         texNormal.y = 1.0 - texNormal.y;
         texNormal = normalize(texNormal * 2.0 - 1.0);
         
@@ -54,16 +63,24 @@ MaterialUniformBuffer GetMaterial(inout float3 InOutWorldNormal, in MaterialUnif
 
     // Emission Map
     if (mat.emissionmapTexID >= 0)
-        mat.emission = pow(TextureBindlessArray[mat.emissionmapTexID].SampleLevel(DefaultSamplerState, InUV, 0).xyz, 2.2);
-
-    if (Object.EmissiveOverride.w > 0.5)
     {
-        const float4 albedo = AuthoredAlbedoArray[InstanceIdx].SampleLevel(DefaultSamplerState, InUV, 0);
+        const float3 emissionMap = pow(TextureBindlessArray[NonUniformResourceIndex(mat.emissionmapTexID)].SampleLevel(DefaultSamplerState, InUV, 0).xyz, 2.2);
+        mat.emission = unifiedSurface ? mat.emission * emissionMap : emissionMap;
+    }
+
+    if (unifiedSurface)
+    {
+        if (mat.alphaMode < 0.5) mat.opacity = 1;
+        else if (mat.alphaMode < 1.5) mat.opacity = mat.opacity >= mat.alphaCutoff ? 1 : 0;
+    }
+    else if (Object.EmissiveOverride.w > 0.5)
+    {
+        const float4 albedo = AuthoredAlbedoArray[NonUniformResourceIndex(InstanceIdx)].SampleLevel(DefaultSamplerState, InUV, 0);
         mat.baseColor = Object.BaseColorOpacity.rgb * pow(max(albedo.rgb, 0.0), 2.2);
         mat.opacity = Object.BaseColorOpacity.a * albedo.a;
         mat.emission = max(Object.EmissiveOverride.xyz, 0.0);
         mat.metallic = Object.Metallic; mat.roughness = max(Object.Roughness, 0.04);
-        float3 normal = AuthoredNormalArray[InstanceIdx].SampleLevel(DefaultSamplerState, InUV, 0).xyz;
+        float3 normal = AuthoredNormalArray[NonUniformResourceIndex(InstanceIdx)].SampleLevel(DefaultSamplerState, InUV, 0).xyz;
         normal.y = 1 - normal.y;
         normal = normal * 2 - 1;
         float3 t, b; MakeTB_From_N(InOutWorldNormal, t, b);
@@ -106,16 +123,17 @@ void GetShaderBindingResources(
     inout MaterialUniformBuffer MaterialBuffer,
     in uint InstanceIdx)
 {
-    VertexIndexOffsetBuffer = VertexIndexOffsetArray[InstanceIdx];
-    IndexBuffer = IndexBindlessArray[InstanceIdx];
-    RenderObjParam = RenderObjParamArray[InstanceIdx];
-    VerticesBuffer = VerticesBindlessArray[InstanceIdx];
-    MaterialBuffer = MaterialBindlessArray[InstanceIdx];
+    const uint index = NonUniformResourceIndex(InstanceIdx);
+    VertexIndexOffsetBuffer = VertexIndexOffsetArray[index];
+    IndexBuffer = IndexBindlessArray[index];
+    RenderObjParam = RenderObjParamArray[index];
+    VerticesBuffer = VerticesBindlessArray[index];
+    MaterialBuffer = MaterialBindlessArray[index];
 }
 
 void GetLightShaderBindingResource(inout LightUniformBuffer LightBuffer, int LightId)
 {
-    LightBuffer = LightBindlessArray[LightId];
+    LightBuffer = LightBindlessArray[NonUniformResourceIndex(LightId)];
 }
 
 typedef BuiltInTriangleIntersectionAttributes MyAttributes;
@@ -480,7 +498,8 @@ void MeshClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     
     // Set hit point to payload
     payload.HitPos = HitWorldPosition();
-    if (Random_0_1(payload.seed) > saturate(material.opacity))
+    const float coverage = Random_0_1(payload.seed);
+    if (material.opacity <= 0 || coverage > saturate(material.opacity))
     {
         payload.Attenuation = 1;
         payload.HitReflectDir = WorldRayDirection();
