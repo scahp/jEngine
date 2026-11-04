@@ -548,7 +548,12 @@ void jRenderer_PathTracing::PathTracing()
 		TracingData.PipelineState = RaytracingPipelineState;
 		g_rhi->DispatchRay(RenderFrameContextPtr, TracingData);
 
-        if (std::getenv("JENGINE_TEST_PATH_TRACING"))
+#ifdef _WIN32
+        const bool traceDiagnostics = GetEnvironmentVariableA("JENGINE_TEST_PATH_TRACING", nullptr, 0) > 0;
+#else
+        const bool traceDiagnostics = std::getenv("JENGINE_TEST_PATH_TRACING") != nullptr;
+#endif
+        if (traceDiagnostics)
         {
             static uint32 dispatchCount = 0;
             ++dispatchCount;
