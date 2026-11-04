@@ -239,15 +239,20 @@ bool jRHI_Vulkan::InitRHI()
         };
         VkPhysicalDeviceAccelerationStructureFeaturesKHR asSupport{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR};
         VkPhysicalDeviceRayQueryFeaturesKHR querySupport{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR};
+        VkPhysicalDeviceRayTracingPipelineFeaturesKHR pipelineSupport{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR};
+        VkPhysicalDeviceBufferDeviceAddressFeatures addressSupport{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES};
         VkPhysicalDeviceFeatures2 rtSupport{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
         rtSupport.pNext = &asSupport; asSupport.pNext = &querySupport;
+        querySupport.pNext = &pipelineSupport; pipelineSupport.pNext = &addressSupport;
         vkGetPhysicalDeviceFeatures2(PhysicalDevice, &rtSupport);
-        GSupportInlineRaytracing = hasExtension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME)
+        const bool accelerationStructureSupport = hasExtension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME)
             && hasExtension(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME)
+            && asSupport.accelerationStructure && addressSupport.bufferDeviceAddress;
+        GSupportInlineRaytracing = accelerationStructureSupport
             && hasExtension(VK_KHR_RAY_QUERY_EXTENSION_NAME)
-            && asSupport.accelerationStructure && querySupport.rayQuery;
-        // Compute ray queries are validated independently from the RT pipeline path.
-        GSupportRaytracing = false;
+            && querySupport.rayQuery;
+        GSupportRaytracing = GSupportRaytracing && accelerationStructureSupport
+            && pipelineSupport.rayTracingPipeline;
 #endif
         std::cout << "Ray query support: " << GSupportInlineRaytracing
                   << "; RT pipeline support: " << GSupportRaytracing << std::endl;
@@ -269,10 +274,9 @@ bool jRHI_Vulkan::InitRHI()
 			vkGetPhysicalDeviceProperties2(PhysicalDevice, &DeviceProperties);
 
 			AccelerationStructureFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
-			AccelerationStructureFeatures.pNext = (void*)DeviceProperties.pNext;
-			DeviceFeatures2.pNext = &AccelerationStructureFeatures;
+			AccelerationStructureFeatures.pNext = nullptr;
 
-			indexing_features.pNext = (void*)DeviceProperties.pNext;
+			indexing_features.pNext = &AccelerationStructureFeatures;
 			DeviceFeatures2.pNext = &indexing_features;
 			vkGetPhysicalDeviceFeatures2(PhysicalDevice, &DeviceFeatures2);
 		}
@@ -428,13 +432,22 @@ bool jRHI_Vulkan::InitRHI()
         scalar.pNext = &portability;
         enabledBufferDeviceAddresFeatures.pNext = &scalar;
         timelineSemaphoreFeatures.pNext = &enabledBufferDeviceAddresFeatures;
-        if (GSupportInlineRaytracing) {
+        if (GSupportRaytracing || GSupportInlineRaytracing) {
             enabledAccelerationStructureFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
             enabledAccelerationStructureFeatures.accelerationStructure = VK_TRUE;
             enabledAccelerationStructureFeatures.pNext = timelineSemaphoreFeatures.pNext;
+            timelineSemaphoreFeatures.pNext = &enabledAccelerationStructureFeatures;
+        }
+        if (GSupportRaytracing) {
+            enabledRayTracingPipelineFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
+            enabledRayTracingPipelineFeatures.rayTracingPipeline = VK_TRUE;
+            enabledRayTracingPipelineFeatures.pNext = timelineSemaphoreFeatures.pNext;
+            timelineSemaphoreFeatures.pNext = &enabledRayTracingPipelineFeatures;
+        }
+        if (GSupportInlineRaytracing) {
             enabledRayQueryFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
             enabledRayQueryFeatures.rayQuery = VK_TRUE;
-            enabledRayQueryFeatures.pNext = &enabledAccelerationStructureFeatures;
+            enabledRayQueryFeatures.pNext = timelineSemaphoreFeatures.pNext;
             timelineSemaphoreFeatures.pNext = &enabledRayQueryFeatures;
         }
         createInfo.pNext = &timelineSemaphoreFeatures;
@@ -449,7 +462,7 @@ bool jRHI_Vulkan::InitRHI()
 		}
 
 		#ifdef __APPLE__
-        if (GSupportInlineRaytracing) {
+        if (GSupportInlineRaytracing && !GSupportRaytracing) {
             DeviceExtensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
             DeviceExtensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
             DeviceExtensions.push_back(VK_KHR_RAY_QUERY_EXTENSION_NAME);
@@ -540,12 +553,25 @@ bool jRHI_Vulkan::InitRHI()
 		vkDestroyAccelerationStructureKHR = (PFN_vkDestroyAccelerationStructureKHR)vkGetDeviceProcAddr(Device, "vkDestroyAccelerationStructureKHR");
 		vkGetAccelerationStructureBuildSizesKHR = (PFN_vkGetAccelerationStructureBuildSizesKHR)vkGetDeviceProcAddr(Device, "vkGetAccelerationStructureBuildSizesKHR");
 		vkGetAccelerationStructureDeviceAddressKHR = (PFN_vkGetAccelerationStructureDeviceAddressKHR)vkGetDeviceProcAddr(Device, "vkGetAccelerationStructureDeviceAddressKHR");
+        if (!vkGetBufferDeviceAddressKHR || !vkCmdBuildAccelerationStructuresKHR
+            || !vkCreateAccelerationStructureKHR || !vkDestroyAccelerationStructureKHR
+            || !vkGetAccelerationStructureBuildSizesKHR || !vkGetAccelerationStructureDeviceAddressKHR)
+        {
+            std::cerr << "Acceleration structure entry points unavailable; disabling ray tracing" << std::endl;
+            GSupportRaytracing = false;
+            GSupportInlineRaytracing = false;
+        }
 	}
 	if (GSupportRaytracing)
 	{
 		vkCmdTraceRaysKHR = (PFN_vkCmdTraceRaysKHR)vkGetDeviceProcAddr(Device, "vkCmdTraceRaysKHR");
 		vkGetRayTracingShaderGroupHandlesKHR = (PFN_vkGetRayTracingShaderGroupHandlesKHR)vkGetDeviceProcAddr(Device, "vkGetRayTracingShaderGroupHandlesKHR");
 		vkCreateRayTracingPipelinesKHR = (PFN_vkCreateRayTracingPipelinesKHR)vkGetDeviceProcAddr(Device, "vkCreateRayTracingPipelinesKHR");
+        if (!vkCmdTraceRaysKHR || !vkGetRayTracingShaderGroupHandlesKHR || !vkCreateRayTracingPipelinesKHR)
+        {
+            std::cerr << "RT pipeline entry points unavailable; retaining the ray query fallback" << std::endl;
+            GSupportRaytracing = false;
+        }
 	}
 
 	// Swapchain
@@ -2193,7 +2219,8 @@ jPipelineStateInfo* jRHI_Vulkan::CreateComputePipelineStateInfo(const jShader* s
 jPipelineStateInfo* jRHI_Vulkan::CreateRaytracingPipelineStateInfo(const std::vector<jRaytracingPipelineShader>& InShaders
 	, const jRaytracingPipelineData& InRaytracingData, const jShaderBindingLayoutArray& InShaderBindingArray, const jPushConstant* pushConstant) const
 {
-	return PipelineStatePool.GetOrCreateMove(std::move(jPipelineStateInfo(InShaders, InRaytracingData, InShaderBindingArray, pushConstant)));
+	auto* pipeline = PipelineStatePool.GetOrCreateMove(std::move(jPipelineStateInfo(InShaders, InRaytracingData, InShaderBindingArray, pushConstant)));
+    return pipeline && pipeline->vkPipeline ? pipeline : nullptr;
 }
 
 void jRHI_Vulkan::RemovePipelineStateInfo(size_t InHash)

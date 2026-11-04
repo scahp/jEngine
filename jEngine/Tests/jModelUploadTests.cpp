@@ -17,11 +17,12 @@
 namespace
 {
     namespace fs = std::filesystem;
+    constexpr int FixtureTriangleCount = 129; // An odd uint16 index count ends in half a uint word.
     void WriteModel(const fs::path& folder, const char* stem, bool green)
     {
         std::ofstream obj(folder / (std::string(stem) + ".obj"));
         obj << "mtllib " << stem << ".mtl\nusemtl color\n";
-        for (int triangle = 0; triangle < 128; ++triangle)
+        for (int triangle = 0; triangle < FixtureTriangleCount; ++triangle)
         {
             obj << "v " << triangle << " 0 0\nv " << triangle + 1 << " 0 0\nv " << triangle << " 1 0\n";
             const int first = triangle * 3 + 1;
@@ -272,9 +273,15 @@ int RunModelUploadGpuTests()
     const auto& geometry = *first->RenderObjectGeometryDataPtr;
     expect(geometry.VertexStreamPtr->Params[0]->GetBufferSize() > budget.MaxBytes
         && BufferMatches(geometry.VertexBufferPtr->GetBuffer(0), *geometry.VertexStreamPtr->Params[0])
-        && BufferMatches(geometry.VertexBuffer_PositionOnlyPtr->GetBuffer(0), *geometry.VertexStream_PositionOnlyPtr->Params[0])
-        && BufferMatches(geometry.IndexBufferPtr->GetBuffer(), *geometry.IndexStreamPtr->Param),
-        "GPU readback preserves vertex position and index bytes across geometry chunk boundaries");
+        && BufferMatches(geometry.VertexBuffer_PositionOnlyPtr->GetBuffer(0), *geometry.VertexStream_PositionOnlyPtr->Params[0]),
+        "GPU readback preserves vertex and position bytes across geometry chunk boundaries");
+    const auto& indexParam = *geometry.IndexStreamPtr->Param;
+    const uint64 indexBytes = indexParam.GetBufferSize();
+    expect(indexParam.GetElementSize() == sizeof(uint16)
+        && geometry.IndexStreamPtr->ElementCount == FixtureTriangleCount * 3 && indexBytes % 4 == 2
+        && (!IsUseVulkan() || geometry.IndexBufferPtr->GetBuffer()->GetBufferSize() >= Align(indexBytes, uint64(4)))
+        && BufferMatches(geometry.IndexBufferPtr->GetBuffer(), indexParam),
+        "GPU readback preserves the final odd uint16 index with a padded Vulkan uint-word allocation");
     auto* firstTexture = MaterialTexture(*first);
     expect(firstImage && TextureMatches(firstTexture, *firstImage), "GPU readback preserves every uploaded texture row across chunk boundaries");
     if (IsUseVulkan() && firstTexture && firstImage && firstTexture->MipLevel > firstImage->MipLevel)

@@ -86,8 +86,8 @@ Requires Xcode Command Line Tools and Homebrew. Vulkan runs on Metal via MoltenV
 ./scripts/run-macos.sh
 ```
 
-SurfelGI inline ray queries require the experimental MoltenVK runtime.
-See [setup and verification details](docs/platform-and-ci.md#surfelgi-hardware-inline-ray-queries).
+SurfelGI ray queries and the existing path tracer require the experimental MoltenVK runtime.
+See [setup details](docs/platform-and-ci.md#surfelgi-hardware-inline-ray-queries) and [verified M4 scenes](docs/reports/macos-pathtracing.md).
 
 ## GitHub Actions
 

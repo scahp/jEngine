@@ -548,6 +548,26 @@ void jRenderer_PathTracing::PathTracing()
 		TracingData.PipelineState = RaytracingPipelineState;
 		g_rhi->DispatchRay(RenderFrameContextPtr, TracingData);
 
+        if (std::getenv("JENGINE_TEST_PATH_TRACING"))
+        {
+            static uint32 dispatchCount = 0;
+            ++dispatchCount;
+            if (dispatchCount == 1 || dispatchCount % 60 == 0)
+            {
+                const auto& instances = RenderFrameContextPtr->RaytracingScene->InstanceList;
+                const auto indexStream = instances.empty() || !instances[0]->GeometryDataPtr->IndexBufferPtr
+                    ? nullptr : instances[0]->GeometryDataPtr->IndexBufferPtr->IndexStreamData;
+                std::cout << "PathTracing dispatch: count=" << dispatchCount
+                    << " accumulation=" << sceneCB.AccumulateNumber
+                    << " size=" << width << 'x' << height
+                    << " rays_per_pixel=" << gOptions.RayPerPixelForPathTracing
+                    << " bounces=" << gOptions.MaxRecursionDepthForPathTracing
+                    << " instances=" << instances.size()
+                    << " index_bytes=" << (indexStream && indexStream->Param ? indexStream->Param->GetElementSize() : 0)
+                    << std::endl;
+            }
+        }
+
 		g_rhi->TransitionLayout(CmdBuffer, PathTracingOutput, EResourceLayout::SHADER_READ_ONLY);
 	}
 

@@ -397,7 +397,10 @@ namespace
             ETextureFormat format = ETextureFormat::R32UI;
             if (job.Param->Attributes[0].UnderlyingType == EBufferElementType::UINT16) format = ETextureFormat::R16UI;
             if (job.Param->Attributes[0].UnderlyingType == EBufferElementType::BYTE) format = ETextureFormat::R8UI;
-            return g_rhi->CreateFormattedBuffer(job.Size, 0, format, flags, layout);
+            // Vulkan shaders unpack indices from uint words. Reserve the final
+            // word without extending the CPU payload or the copy-byte budget.
+            const uint64 allocationSize = IsUseVulkan() ? Align(job.Size, uint64(4)) : job.Size;
+            return g_rhi->CreateFormattedBuffer(allocationSize, 0, format, flags, layout);
         }
         return g_rhi->CreateRawBuffer(job.Size, 0, flags, layout);
     }

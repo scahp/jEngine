@@ -62,10 +62,13 @@ bool jIndexBuffer_Vulkan::Initialize(const std::shared_ptr<jIndexStreamData>& In
         return false;
 
     IndexStreamData = InStreamData;
-    VkDeviceSize bufferSize = InStreamData->Param->GetBufferSize();
+    const VkDeviceSize bufferSize = InStreamData->Param->GetBufferSize();
+    // Ray tracing reads packed indices through uint words; keep the final word
+    // inside the allocation without changing the original index data/count.
+    const VkDeviceSize allocationSize = Align(bufferSize, VkDeviceSize(4));
 
     const EBufferCreateFlag BufferCreateFlag = EBufferCreateFlag::IndexBuffer | EBufferCreateFlag::UAV | EBufferCreateFlag::AccelerationStructureBuildInput;
-    BufferPtr = g_rhi->CreateStructuredBuffer<jBuffer_Vulkan>(bufferSize, 0, GetVulkanIndexStride(IndexStreamData->Param->Attributes[0].UnderlyingType)
+    BufferPtr = g_rhi->CreateStructuredBuffer<jBuffer_Vulkan>(allocationSize, 0, GetVulkanIndexStride(IndexStreamData->Param->Attributes[0].UnderlyingType)
         , BufferCreateFlag, EResourceLayout::TRANSFER_DST, InStreamData->Param->GetBufferData(), bufferSize, jNameStatic("IndexBuffer"));
 
     return true;

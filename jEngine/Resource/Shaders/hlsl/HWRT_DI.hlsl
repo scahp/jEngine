@@ -181,16 +181,16 @@ void GetTriangleVertices(
 
     const uint VertexOffset = VertexIndexOffset[0].x;
     const uint IndexOffset = VertexIndexOffset[0].y;
+    RenderObjParam = RenderObjParamBuffer[0];
 
     const uint3 Indices = uint3(
-        IndexBuffer[IndexOffset + PrimitiveIdx * 3 + 0],
-        IndexBuffer[IndexOffset + PrimitiveIdx * 3 + 1],
-        IndexBuffer[IndexOffset + PrimitiveIdx * 3 + 2]);
+        LoadRaytracingIndex(IndexBuffer, IndexOffset + PrimitiveIdx * 3 + 0, RenderObjParam.IndexElementSize),
+        LoadRaytracingIndex(IndexBuffer, IndexOffset + PrimitiveIdx * 3 + 1, RenderObjParam.IndexElementSize),
+        LoadRaytracingIndex(IndexBuffer, IndexOffset + PrimitiveIdx * 3 + 2, RenderObjParam.IndexElementSize));
 
     Vertex0 = GetVertex(VertexBuffer, Indices.x + VertexOffset);
     Vertex1 = GetVertex(VertexBuffer, Indices.y + VertexOffset);
     Vertex2 = GetVertex(VertexBuffer, Indices.z + VertexOffset);
-    RenderObjParam = RenderObjParamBuffer[0];
 }
 
 float ComputeApproxTextureMipLevel(

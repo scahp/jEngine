@@ -241,7 +241,21 @@ const std::shared_ptr<jShaderBindingInstance>& jRenderObject::CreateShaderBindin
         ubo.EmissiveOverride = Vector4(0.0f);
         ubo.SurfaceFlags = 0;
         ubo.SurfaceAlphaCutoff = .5f;
-        ubo.SurfacePadding = Vector2(0.f, 0.f);
+        ubo.IndexElementSize = sizeof(uint32);
+        ubo.SurfacePadding = 0.f;
+        if (GeometryDataPtr && GeometryDataPtr->IndexBufferPtr)
+        {
+            const auto& stream = GeometryDataPtr->IndexBufferPtr->IndexStreamData;
+            if (stream && stream->Param && !stream->Param->Attributes.empty())
+            {
+                switch (stream->Param->Attributes[0].UnderlyingType)
+                {
+                case EBufferElementType::BYTE: ubo.IndexElementSize = 1; break;
+                case EBufferElementType::UINT16: ubo.IndexElementSize = 2; break;
+                default: break;
+                }
+            }
+        }
         if (MaterialPtr && MaterialPtr->UseMaterialProperties)
         {
             ubo.BaseColorOpacity = MaterialPtr->BaseColorOpacity;

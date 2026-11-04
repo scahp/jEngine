@@ -16,7 +16,8 @@ struct RenderObjectUniformBuffer
     float4 EmissiveOverride;
     uint SurfaceFlags;
     float SurfaceAlphaCutoff;
-    float2 SurfacePadding;
+    uint IndexElementSize;
+    float SurfacePadding;
 };
 #endif
 
@@ -184,6 +185,21 @@ float3 Reflect(float3 v, float3 n)
 }
 
 #define VERTEX_STRID 56
+#ifdef JENGINE_INDEX_BUFFER
+uint LoadRaytracingIndex(JENGINE_INDEX_BUFFER buffer, uint index, uint elementSize)
+{
+#ifdef __spirv__
+    // Vulkan storage buffers expose uint words, including packed raster indices.
+    if (elementSize == 2)
+        return (buffer[index >> 1] >> ((index & 1) * 16)) & 0xffff;
+    if (elementSize == 1)
+        return (buffer[index >> 2] >> ((index & 3) * 8)) & 0xff;
+#endif
+    // DX12 typed SRVs already convert R8/R16/R32 indices to uint.
+    return buffer[index];
+}
+#endif
+
 struct jVertex
 {
 	float3 Pos;

@@ -425,7 +425,10 @@ void* jPipelineStateInfo_Vulkan::CreateComputePipelineState()
 
 void* jPipelineStateInfo_Vulkan::CreateRaytracingPipelineState()
 {
-    if (!GSupportRaytracing)
+    if (!GSupportRaytracing || !g_rhi_vk->vkCreateRayTracingPipelinesKHR
+        || !g_rhi_vk->vkGetRayTracingShaderGroupHandlesKHR || !g_rhi_vk->vkGetBufferDeviceAddressKHR
+        || !g_rhi_vk->RayTracingPipelineProperties.maxRayRecursionDepth
+        || RaytracingPipelineData.MaxTraceRecursionDepth <= 0)
         return nullptr;
 
     // 미리 만들어 둔게 있으면 사용
@@ -514,9 +517,20 @@ void* jPipelineStateInfo_Vulkan::CreateRaytracingPipelineState()
     rayTracingPipelineCI.pStages = shaderStages.data();
     rayTracingPipelineCI.groupCount = static_cast<uint32>(MergedShaderGroups.size());
     rayTracingPipelineCI.pGroups = MergedShaderGroups.data();
-    rayTracingPipelineCI.maxPipelineRayRecursionDepth = RaytracingPipelineData.MaxTraceRecursionDepth;
+    // Raygen's iterative path bounces do not require nested TraceRay calls.
+    rayTracingPipelineCI.maxPipelineRayRecursionDepth = std::min(
+        static_cast<uint32>(RaytracingPipelineData.MaxTraceRecursionDepth),
+        g_rhi_vk->RayTracingPipelineProperties.maxRayRecursionDepth);
     rayTracingPipelineCI.layout = vkPipelineLayout;
-    verify(VK_SUCCESS == g_rhi_vk->vkCreateRayTracingPipelinesKHR(g_rhi_vk->Device, VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &rayTracingPipelineCI, nullptr, &vkPipeline));
+    const auto pipelineResult = g_rhi_vk->vkCreateRayTracingPipelinesKHR(g_rhi_vk->Device,
+        VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &rayTracingPipelineCI, nullptr, &vkPipeline);
+    if (pipelineResult != VK_SUCCESS)
+    {
+        std::cerr << "RT pipeline creation failed: " << pipelineResult << std::endl;
+        if (vkPipeline) vkDestroyPipeline(g_rhi_vk->Device, vkPipeline, nullptr);
+        vkPipeline = VK_NULL_HANDLE;
+        return nullptr;
+    }
 
     // ShaderBindingTable
     const uint32 handleSize = g_rhi_vk->RayTracingPipelineProperties.shaderGroupHandleSize;
@@ -525,7 +539,15 @@ void* jPipelineStateInfo_Vulkan::CreateRaytracingPipelineState()
     const uint32 sbtSize = groupCount * handleSizeAligned;
 
     std::vector<uint8> shaderHandleStorage(sbtSize);
-    verify(VK_SUCCESS == g_rhi_vk->vkGetRayTracingShaderGroupHandlesKHR(g_rhi_vk->Device, vkPipeline, 0, groupCount, sbtSize, shaderHandleStorage.data()));
+    const auto handlesResult = g_rhi_vk->vkGetRayTracingShaderGroupHandlesKHR(g_rhi_vk->Device,
+        vkPipeline, 0, groupCount, sbtSize, shaderHandleStorage.data());
+    if (handlesResult != VK_SUCCESS)
+    {
+        std::cerr << "RT shader group handle query failed: " << handlesResult << std::endl;
+        vkDestroyPipeline(g_rhi_vk->Device, vkPipeline, nullptr);
+        vkPipeline = VK_NULL_HANDLE;
+        return nullptr;
+    }
 
     auto getBufferDeviceAddress = [](VkBuffer buffer)
     {

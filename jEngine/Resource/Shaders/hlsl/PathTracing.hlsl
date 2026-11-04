@@ -462,10 +462,11 @@ void MeshClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     uint IndexOffset = VertexIndexOffset[0].y;
 
     uint PrimIdx = PrimitiveIndex();
+    const uint indexElementSize = RenderObjParam[0].IndexElementSize;
     uint3 Indices = uint3(
-        IndexBindless[IndexOffset + PrimIdx * 3],
-        IndexBindless[IndexOffset + PrimIdx * 3 + 1],
-        IndexBindless[IndexOffset + PrimIdx * 3 + 2]);
+        LoadRaytracingIndex(IndexBindless, IndexOffset + PrimIdx * 3, indexElementSize),
+        LoadRaytracingIndex(IndexBindless, IndexOffset + PrimIdx * 3 + 1, indexElementSize),
+        LoadRaytracingIndex(IndexBindless, IndexOffset + PrimIdx * 3 + 2, indexElementSize));
 
     jVertex Vertex0 = GetVertex(VerticesBindless, Indices.x + VertexOffset);
     jVertex Vertex1 = GetVertex(VerticesBindless, Indices.y + VertexOffset);

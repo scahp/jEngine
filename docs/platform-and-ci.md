@@ -99,8 +99,24 @@ Windows execution has not been tested on this Mac.
 The Vulkan shader generator now emits C++ member byte offsets and trailing struct
 padding explicitly. This keeps scalar-layout SPIR-V compatible with aligned CPU
 uniforms and structured buffers. The previous mismatch produced valid surfel
-samples but a black GI resolve output. Bindless index buffers likewise use Vulkan
-storage-buffer declarations while retaining DX12 typed-buffer declarations.
+samples but a black GI resolve output. Bindless index buffers use Vulkan storage
+buffers with explicit index-width decoding, retaining DX12 typed-buffer reads.
+
+### Existing RT-pipeline path tracer
+
+The verified experimental runtime also advertises `VK_KHR_ray_tracing_pipeline`.
+On supporting devices, macOS enables that feature when creating the Vulkan device
+and uses the existing `jRenderer_PathTracing` / `PathTracing.hlsl` renderer.
+This is the same renderer used by Cornell Box and Hyperion. It is independent of
+SurfelGI's inline ray-query option. Unsupported devices retain the Deferred fallback.
+
+On M4, the driver limits nested RT pipeline recursion to four; pipeline creation
+respects that limit. The shader's iterative bounce count remains configurable.
+Sponza's packed 16-bit indices are decoded using their actual width, so RT hit
+shaders read the correct normals and UVs. Both immediate and staged Vulkan index
+allocations reserve the final complete uint word without increasing copy budgets.
+
+See [scene captures, reproduction commands and limits](reports/macos-pathtracing.md).
 
 ## GitHub Actions CI
 
