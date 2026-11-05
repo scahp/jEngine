@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "FileLoader/jEditorAssetPath.h"
 #include "FileLoader/jModelLoader.h"
 #include "FileLoader/jModelUploadSession.h"
 #include "FileLoader/jModelUploadPlanning.h"
@@ -208,9 +209,10 @@ int RunModelUploadGpuTests()
     auto& images = jImageFileLoader::GetInstance();
     WriteModel(folder, "model", false);
     std::string error;
-    const auto source = folder / "model.obj", texturePath = folder / "model.png";
+    const auto source = folder / "model.obj";
+    const jName textureName(jEditorAssetPath::ToUtf8(folder / "model.png"));
     auto prepare = [&] { return loader.PrepareModel(source.string().c_str(), folder.string().c_str(), {}, &error); };
-    auto firstImage = images.LoadImageDataFromFile(jName(texturePath.string())).lock();
+    auto firstImage = images.LoadImageDataFromFile(textureName).lock();
     auto session = loader.BeginFinalize(prepare(), &error);
     expect(!!session, "real model upload session starts from prepared geometry and PNG pixels");
     if (!session) { std::cout << error << std::endl; return failures + 1; }
@@ -292,9 +294,9 @@ int RunModelUploadGpuTests()
     expect(second && MaterialTexture(*second) == firstTexture,
         "managed image identity deduplicates GPU texture uploads across model prototypes");
     WriteModel(folder, "model", true);
-    images.InvalidateImageData(jName(texturePath.string()));
+    images.InvalidateImageData(textureName);
     auto replacement = loader.BeginFinalize(prepare(), &error);
-    auto newImage = images.LoadImageDataFromFile(jName(texturePath.string())).lock();
+    auto newImage = images.LoadImageDataFromFile(textureName).lock();
     expect(replacement && complete(*replacement, "reimport"), "invalidated image data uploads a new prepared revision");
     auto third = replacement ? replacement->TakeModel() : nullptr;
     expect(third && MaterialTexture(*third) != firstTexture && TextureMatches(firstTexture, *firstImage)

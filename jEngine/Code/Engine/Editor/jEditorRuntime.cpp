@@ -296,6 +296,7 @@ struct jEditorRuntime::Impl
     std::vector<Borrowed> BorrowedObjects;
     std::unique_ptr<jAssetImportService> Importer;
     std::vector<EntityId> Selected;
+    std::optional<jEditor::ModelSubmeshSelection> SelectedSubmesh;
     std::array<bool,static_cast<size_t>(EInputKey::MAX)> Keys{};
     std::string Error,Status;
     uint64_t AppliedRevision=UINT64_MAX;
@@ -946,15 +947,26 @@ bool jEditor::CaptureWorldToDocument()
         else if(!matrices.empty()&&!Decompose(matrices[0],entity.Local)){
             s.Error="An external primitive transform cannot be represented as saved TRS; its object was not captured.";s.Doc.Delete(id);continue;
         }
+        Matrix primitiveLocal{IdentityType};
+        if (info.SourceSphereRadius)
+        {
+            // Save the size relative to the authored sphere and keep the borrowed mesh's radius.
+            const float radiusScale = *info.SourceSphereRadius / SphereRadius;
+            entity.Local.Scale = A(V(entity.Local.Scale) * radiusScale);
+            primitiveLocal = Matrix::MakeScale(Vector(1.0f / radiusScale));
+        }
         entity.Visible=object->Visible;entity.Material.Metallic=gOptions.Metallic;entity.Material.Roughness=gOptions.Roughness;
         if(!s.Doc.Update(entity,"Capture properties")){s.Error=s.Doc.LastError();s.Doc.Delete(id);continue;}
         jEditorRuntime::Impl::Binding b;b.Object=object;b.Last=entity;b.Registered=true;b.MaterialApplied=true;
         b.InheritedShadowCaster=!object->SkipShadowMapGen;b.HasInheritedShadowCaster=true;
-        b.MeshLocal=kind==EntityKind::Model?matrices:std::vector<Matrix>(matrices.size(),Matrix(IdentityType));
+        b.MeshLocal=kind==EntityKind::Model?matrices:std::vector<Matrix>(matrices.size(),primitiveLocal);
         b.AssetKey=kind==EntityKind::Model?s.Key(entity.SourceAsset,entity.AssetId):std::string();
         s.Bindings[id]=b;s.BorrowedObjects.push_back({object,object->GetObjectID(),nullptr,true});
-        const auto key=kind==EntityKind::Model?s.Key(entity.SourceAsset,entity.AssetId):std::string("builtin:")+KindName(kind);
-        s.Prototypes[key]={CloneObject(*object),b.MeshLocal};
+        if (!info.SourceSphereRadius)
+        {
+            const auto key=kind==EntityKind::Model?s.Key(entity.SourceAsset,entity.AssetId):std::string("builtin:")+KindName(kind);
+            s.Prototypes[key]={CloneObject(*object),b.MeshLocal};
+        }
     }
     for(auto* light:lights){
         const auto kind=LightKind(light);if(kind==EntityKind::Empty)continue;
@@ -1023,6 +1035,7 @@ void jEditor::ResetWorldBindings(bool newDocument)
     s.Bindings.clear();s.CollectRetired(true);s.RestoreBorrowed();
     if(g_rhi&&!s.Prototypes.empty())g_rhi->Flush();
     s.Sources.clear();s.Prototypes.clear();s.GraphDefaults.clear();s.DuplicateOf.clear();s.FailedImports.clear();s.Selected.clear();
+    s.SelectedSubmesh.reset();
     s.PlacementAssets.clear();s.PlacementTerrains.clear();s.LastDuplicateOffset.reset();
     Placement.Clear();s.Captured=false;s.AppliedRevision=UINT64_MAX;s.Time=0;
     if(newDocument)s.Doc.NewScene();
@@ -1044,9 +1057,60 @@ jEditor::EntityId jEditor::EntityForObject(const jObject* object)const
     return 0;
 }
 jObject* jEditor::ObjectForEntity(EntityId id)const{const auto& b=Runtime->Data->Bindings;auto it=b.find(id);return it==b.end()?nullptr:it->second.Object;}
+bool jEditor::SelectModelSubmesh(EntityId model, size_t index)
+{
+    auto& s = *Runtime->Data;
+    if (!s.Owner() || s.Doc.IsPlaying()) return false;
+    const auto* entity = s.Doc.Find(model);
+    const auto* object = ObjectForEntity(model);
+    if (!entity || entity->Kind != EntityKind::Model || !object || index >= object->RenderObjects.size()) return false;
+    const auto* mesh = object->RenderObjects[index];
+    if (!mesh || !SelectEntity(0)) return false;
+    s.SelectedSubmesh = ModelSubmeshSelection{model, index, mesh->RenderObjectID};
+    return true;
+}
+
+std::optional<jEditor::ModelSubmeshSelection> jEditor::GetSelectedModelSubmesh() const
+{
+    const auto& s = *Runtime->Data;
+    if (s.Doc.IsPlaying() || s.Doc.SelectedId() || !s.SelectedSubmesh) return std::nullopt;
+    const auto& selected = *s.SelectedSubmesh;
+    const auto* entity = s.Doc.Find(selected.Model);
+    const auto* object = ObjectForEntity(selected.Model);
+    if (!entity || entity->Kind != EntityKind::Model || !object || selected.Index >= object->RenderObjects.size()) return std::nullopt;
+    const auto* mesh = object->RenderObjects[selected.Index];
+    if (!mesh || mesh->RenderObjectID != selected.RenderId) return std::nullopt;
+    return selected;
+}
+
+void jEditor::SelectViewportHit(const jRenderObject* hit, bool toggleSelection)
+{
+    const auto* owner = hit ? hit->Owner : nullptr;
+    const auto id = EntityForObject(owner);
+    if (toggleSelection)
+    {
+        ToggleEntitySelection(id);
+        return;
+    }
+    if (owner && id)
+    {
+        const auto& meshes = owner->RenderObjects;
+        const auto mesh = std::find(meshes.begin(), meshes.end(), hit);
+        if (mesh != meshes.end() && SelectModelSubmesh(id, static_cast<size_t>(mesh - meshes.begin()))) return;
+    }
+    SelectEntity(id);
+}
+
 std::vector<jRenderObject*> jEditor::GetSelectionRenderObjects() const
 {
     const auto& s = *Runtime->Data;
+    if (const auto selected = GetSelectedModelSubmesh())
+    {
+        const auto& binding = s.Bindings.at(selected->Model);
+        if (binding.Registered && binding.Object->Visible && s.Doc.IsEffectivelyVisible(selected->Model))
+            return {binding.Object->RenderObjects[selected->Index]};
+        return {};
+    }
     std::vector<jRenderObject*> meshes;
     if (!s.Doc.SelectedId() || s.Doc.IsPlaying()) return meshes;
     std::set<EntityId> selected(s.Selected.begin(), s.Selected.end());
@@ -1071,6 +1135,7 @@ const std::vector<jEditor::EntityId>& jEditor::GetSelectedEntities()const{return
 bool jEditor::SelectEntity(EntityId id,bool additive)
 {
     auto& s=*Runtime->Data;if(!s.Owner()||!s.Doc.Select(id))return false;
+    s.SelectedSubmesh.reset();
     if(!additive)s.Selected.clear();
     if(id){std::erase(s.Selected,id);s.Selected.push_back(id);}
     if(auto* object=ObjectForEntity(id))Placement.SelectObject(object);

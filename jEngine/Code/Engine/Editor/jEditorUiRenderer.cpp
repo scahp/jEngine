@@ -10,6 +10,7 @@
 #include "RHI/Vulkan/jTexture_Vulkan.h"
 #include "Renderer/jSceneRenderTargets.h"
 #include "Scene/jCamera.h"
+#include "imgui_internal.h"
 #ifdef _WIN32
 #include "RHI/DX12/jImGui_DX12.h"
 #include "RHI/DX12/jRHI_DX12.h"
@@ -170,10 +171,14 @@ void RenderPlatformWindows()
 {
     // Call after the engine has submitted/presented the main viewport. Both
     // adapters submit detached draws to the same graphics queue as its copy.
-    if (SupportsPlatformWindows() && (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable))
-    {
-        ImGui::UpdatePlatformWindows();
+    const auto* context = ImGui::GetCurrentContext();
+    if (!context || context->FrameCountEnded != context->FrameCount || context->FrameCountPlatformEnded >= context->FrameCount)
+        return;
+
+    // ImGui records the completed frame even when viewports are disabled. The
+    // next NewFrame checks that record if a tool opens a native window.
+    ImGui::UpdatePlatformWindows();
+    if (context->ConfigFlagsCurrFrame & ImGuiConfigFlags_ViewportsEnable)
         ImGui::RenderPlatformWindowsDefault();
-    }
 }
 }

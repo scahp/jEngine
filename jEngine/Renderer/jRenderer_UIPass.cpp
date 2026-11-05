@@ -488,6 +488,7 @@ void IRenderer::UIPass()
             RenderAuthoringWorkspace(*g_Editor);
             return;
         }
+        KeepAuthoringDockSpaceAlive();
 #endif
 		Vector4 clear_color(0.45f, 0.55f, 0.60f, 1.00f);
 
@@ -596,10 +597,9 @@ void IRenderer::UIPass()
 		const float panelBottomY = workPos.y + workSize.y - 6.0f;
 
 		const ImGuiWindowFlags dockPanelFlags = ImGuiWindowFlags_None;
-        const ImGuiWindowFlags mainPanelFlags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse;
-        const ImGuiWindowFlags featurePanelFlags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse;
-		const ImGuiWindowFlags barFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_MenuBar;
-        const ImGuiWindowFlags autoHideFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
+        const ImGuiWindowFlags fixedPanelFlags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDocking;
+        const ImGuiWindowFlags autoHideFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoDocking;
+        const ImGuiWindowFlags barFlags = autoHideFlags | ImGuiWindowFlags_MenuBar;
         auto DrawFeatureMenuItem = [](const char* label, bool& bShowPanel, bool& bSelectTab)
         {
             const bool bWasVisible = bShowPanel;
@@ -731,7 +731,7 @@ void IRenderer::UIPass()
 			ImGui::SetNextWindowPos(ImVec2(workPos.x + margin, topPanelY), ImGuiCond_Always);
             ImGui::SetNextWindowSize(ImVec2(mainPanelWidth, panelBottomY - topPanelY), ImGuiCond_Appearing);
             ImGui::SetNextWindowSizeConstraints(ImVec2(minMainPanelWidth, panelBottomY - topPanelY), ImVec2(maxMainPanelWidth, panelBottomY - topPanelY));
-			if (ImGui::Begin("Main", &bShowMainPanel, mainPanelFlags))
+			if (ImGui::Begin("Main", &bShowMainPanel, fixedPanelFlags))
 			{
                 MainPanelWidth = Clamp(ImGui::GetWindowSize().x, minMainPanelWidth, maxMainPanelWidth);
                 if (ImGui::BeginTabBar("MainTabs"))
@@ -1654,7 +1654,7 @@ void IRenderer::UIPass()
             ImGui::SetNextWindowSize(ImVec2(sidePanelWidth, panelBottomY - topPanelY), ImGuiCond_Appearing);
             ImGui::SetNextWindowSizeConstraints(ImVec2(minFeaturePanelWidth, panelBottomY - topPanelY), ImVec2(maxFeaturePanelWidth, panelBottomY - topPanelY));
             bool bFeaturePanelOpen = true;
-			if (ImGui::Begin("Feature Panels", &bFeaturePanelOpen, featurePanelFlags))
+			if (ImGui::Begin("Feature Panels", &bFeaturePanelOpen, fixedPanelFlags))
 			{
                 FeaturePanelWidth = Clamp(ImGui::GetWindowSize().x, minFeaturePanelWidth, maxFeaturePanelWidth);
 				if (ImGui::BeginTabBar("FeaturePanelTabs", ImGuiTabBarFlags_Reorderable))

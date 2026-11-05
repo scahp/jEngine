@@ -4,6 +4,7 @@
 
 #include "PlacementTool/jPlacementTool.h"
 #include "Editor/jEditorDocument.h"
+#include "Scene/jObjectTypes.h"
 #include <functional>
 #include <memory>
 
@@ -27,6 +28,12 @@ public:
     {
         jEditorAuthoring::Vec3 Point, Normal{0, 1, 0};
         EntityId Surface = 0;
+    };
+    struct ModelSubmeshSelection
+    {
+        EntityId Model;
+        size_t Index;
+        jRenderObjectID RenderId;
     };
     enum class PlacementReadiness { Ready, Pending, Failed };
     enum class WorldAxis { X, Y, Z };
@@ -72,6 +79,9 @@ public:
     bool SelectEntity(EntityId id, bool additive = false);
     void ToggleEntitySelection(EntityId id);
     void SetSelectedEntities(const std::vector<EntityId>& ids);
+    bool SelectModelSubmesh(EntityId model, size_t index);
+    std::optional<ModelSubmeshSelection> GetSelectedModelSubmesh() const;
+    void SelectViewportHit(const jRenderObject* hit, bool toggleSelection);
     EntityId EntityForObject(const jObject* object) const;
     jObject* ObjectForEntity(EntityId id) const;
     std::vector<jRenderObject*> GetSelectionRenderObjects() const;

@@ -61,6 +61,11 @@ void WriteModelFixture(const fs::path& assets)
     fs::create_directories(assets);
     Write(assets / "triangle.obj", "mtllib triangle.mtl\nusemtl fixture\n"
         "v -15 0 0\nv 15 0 0\nv 0 30 0\nvt 0 0\nvt 1 0\nvt 0.5 1\nvn 0 0 -1\nf 1/1/1 3/3/1 2/2/1\n");
+    Write(assets / "pick-parts.obj", "mtllib triangle.mtl\n"
+        "v 45 0 0\nv 75 0 0\nv 60 30 0\nv -15 0 0\nv 15 0 0\nv 0 30 0\n"
+        "vt 0 0\nvt 1 0\nvt 0.5 1\nvn 0 0 -1\n"
+        "o Side\nusemtl fixture\nf 1/1/1 3/3/1 2/2/1\n"
+        "o Center\nusemtl fixture\nf 4/1/1 6/3/1 5/2/1\n");
     Write(assets / "triangle.mtl", "newmtl fixture\nKd 1 1 1\nmap_Kd color.png\n");
     std::array<unsigned char, 4 * 4 * 4> red{};
     for (size_t i = 0; i < red.size(); i += 4) red[i] = red[i + 3] = 255;
@@ -381,6 +386,60 @@ int RunEditorAuthoringGpuTests(const char* outputDirectory)
         if (!camera) throw std::runtime_error("Initialized engine has no main camera");
         report["rhi"] = g_rhi->GetRHIName().ToStr();
         report["inlineRaySupported"] = GSupportInlineRaytracing;
+        frame();
+        SetAuthoringToolsVisible(true);
+        frames(3);
+        auto* tools = ImGui::FindWindowByName("Authoring tools");
+        auto* toolsViewport = tools ? tools->Viewport : nullptr;
+        const auto* mainViewport = ImGui::GetMainViewport();
+        const auto* sceneWindow = ImGui::FindWindowByName("Scene");
+        const bool detached = toolsViewport && toolsViewport != mainViewport && toolsViewport->PlatformHandle
+            && toolsViewport->RendererUserData && toolsViewport->DrawData && toolsViewport->DrawData->TotalVtxCount > 0;
+        expect(detached && sceneWindow && sceneWindow->Viewport == mainViewport,
+            "Authoring tools renders in its own native window while Scene stays in the main window");
+        if (detached)
+        {
+            const auto viewportId = toolsViewport->ID;
+            toolsViewport->PlatformRequestClose = true;
+            frames(3);
+            const auto* closedViewport = ImGui::FindViewportByID(viewportId);
+            expect((!closedViewport || (!closedViewport->PlatformHandle && !closedViewport->RendererUserData))
+                && ImGui::GetMainViewport()->PlatformHandle,
+                "closing the Authoring tools native window keeps the main editor open");
+        }
+        SetAuthoringToolsVisible(false);
+        const auto& startupEntities = editor.GetDocument().Entities();
+        if (std::any_of(startupEntities.begin(), startupEntities.end(), [](const auto& entry) {
+            return entry.second.SourceAsset.ends_with("sponza_pbr/sponza.glb");
+        }))
+        {
+            const auto sphere = std::find_if(startupEntities.begin(), startupEntities.end(), [](const auto& entry) {
+                return entry.second.Kind == EntityKind::Sphere && entry.second.Local.Position == Vec3{65, 35, 10};
+            });
+            const auto id = sphere == startupEntities.end() ? InvalidEntity : sphere->first;
+            const auto* object = editor.ObjectForEntity(id);
+            expect(object && sphere->second.Local.Scale == Vec3{2, 2, 2}, "Sponza preset sphere appears in the document at its original size");
+            jCamera::SetCamera(camera, Vector(155,35,10), Vector(65,35,10), Vector(155,36,10),
+                DegreeToRadian(60), 1, 5000, SCR_WIDTH, SCR_HEIGHT, true, 90);
+            camera->UpdateCamera();
+            const auto pickSphere = [&] {
+                editor.Placement.EnablePlacementMode = true;
+                editor.Placement.bPickRequested = true;
+                editor.Placement.PickMouseX = SCR_WIDTH / 2;
+                editor.Placement.PickMouseY = SCR_HEIGHT / 2;
+                frame();
+            };
+            pickSphere();
+            const auto sphereWorld = Matrix::MakeTranslate(Vector(65, 35, 10)) * Matrix::MakeScale(Vector(30.0f));
+            expect(object && !object->RenderObjects.empty() && MatrixNear(object->RenderObjects.front()->World, sphereWorld)
+                && editor.GetSelectedEntityId() == id && editor.GetSelectionRenderObjects() == object->RenderObjects,
+                "GPU picking selects the Sponza preset sphere in the Hierarchy at its original world size");
+            SetAuthoringWorkspaceVisible(false);
+            pickSphere();
+            expect(object && editor.Placement.PickedObject == object && editor.Placement.SelectedPlacedObjectIndex >= 0,
+                "F10 Placement picks the same Sponza preset sphere");
+            SetAuthoringWorkspaceVisible(true);
+        }
         const auto fixture = output / ("fixture-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
         jEditorProject project; std::string error;
         if (!project.Create(fixture, "GPU editor workflow fixture", error)) throw std::runtime_error(error);
@@ -422,6 +481,22 @@ int RunEditorAuthoringGpuTests(const char* outputDirectory)
         editor.Placement.PickToggleSelection = true;
         frame();
         expect(editor.GetSelectedEntities().empty() && !document.SelectedId(), "Ctrl Scene picking toggles the mesh out of selection");
+        const auto pickModel = editor.AddModel("Assets/pick-parts.obj", {}, 0, Vec3{0, 1200, 0});
+        jCamera::SetCamera(camera, Vector(0,1210,-200), Vector(0,1210,0), Vector(0,1211,-200),
+            DegreeToRadian(60), 1, 20000, SCR_WIDTH, SCR_HEIGHT, true, 200);
+        camera->UpdateCamera();
+        const uint32_t pickDeadline = rendered + 20;
+        while (pickModel && !editor.ObjectForEntity(pickModel) && rendered < pickDeadline) frame();
+        const auto* modelObject = editor.ObjectForEntity(pickModel);
+        editor.Placement.bPickRequested = true;
+        editor.Placement.PickMouseX = SCR_WIDTH / 2;
+        editor.Placement.PickMouseY = SCR_HEIGHT / 2;
+        frame();
+        const auto pickedSubmesh = editor.GetSelectedModelSubmesh();
+        const auto pickedOutline = editor.GetSelectionRenderObjects();
+        expect(modelObject && modelObject->RenderObjects.size() == 2 && pickedSubmesh && pickedSubmesh->Model == pickModel
+            && pickedSubmesh->Index == 1 && pickedOutline == std::vector<jRenderObject*>{modelObject->RenderObjects[1]},
+            "GPU Scene picking preserves the exact imported submesh and outlines only that part");
         if (!LoadAuthoringScene(editor, fixture / "Scenes/start.jscene", error)) throw std::runtime_error(error);
         std::vector<EntityId> ids;
         document.BeginTransaction("Create 100 GPU-backed authored entities");

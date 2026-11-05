@@ -281,9 +281,7 @@ void IRenderer::ReadbackHitObject(const std::shared_ptr<jRenderTarget>& target, 
     auto* picked = objectId ? jRenderObject::FindRenderObjectByID(objectId) : nullptr;
     if (authoring)
     {
-        const auto id = g_Editor->EntityForObject(picked ? picked->Owner : nullptr);
-        if (toggleSelection) g_Editor->ToggleEntitySelection(id);
-        else g_Editor->SelectEntity(id);
+        g_Editor->SelectViewportHit(picked, toggleSelection);
         RevealAuthoringSelection(*g_Editor);
     }
     else g_Editor->Placement.SelectObject(picked);

@@ -383,12 +383,7 @@ void jPlacementTool::CreateSphere(const Vector& position)
 
 	auto* sphere = jPrimitiveUtil::CreateSphere(position, radius, slices, stacks, scale, color, false, true);
 
-	// AddObject's registration callback must reuse this entry.
-	PlacedObjectInfo info;
-	info.Object = sphere;
-	info.Type = EPlacedObjectType::SHAPE;
-	info.ShapeType = EPlacementShapeType::SPHERE;
-	PlacedObjects.push_back(info);
+	RegisterStaticObject(sphere, radius);
 	jObject::AddObject(sphere);
 }
 
@@ -1158,7 +1153,7 @@ void jPlacementTool::Clear()
 	SelectedShapeType = EPlacementShapeType::CUBE;
 }
 
-void jPlacementTool::RegisterStaticObject(jObject* obj)
+void jPlacementTool::RegisterStaticObject(jObject* obj, std::optional<float> sphereRadius)
 {
 	// Called from jObject::AddObject to register static objects
 	// This allows all static objects to appear in the placement list
@@ -1172,6 +1167,8 @@ void jPlacementTool::RegisterStaticObject(jObject* obj)
 		PlacedObjectInfo info;
 		info.Object = obj;
 		info.Type = EPlacedObjectType::SHAPE;  // Static objects are shapes
+		info.ShapeType = sphereRadius ? EPlacementShapeType::SPHERE : EPlacementShapeType::NONE;
+		info.SourceSphereRadius = sphereRadius;
 		PlacedObjects.push_back(info);
 		SceneListDirty = true;
 	}

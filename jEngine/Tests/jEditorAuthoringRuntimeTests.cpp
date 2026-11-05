@@ -98,7 +98,11 @@ void CheckViewportPlacement(const std::filesystem::path& directory, Expect expec
             io.AddKeyEvent(ImGuiMod_Shift, shift);
             io.AddKeyEvent(ImGuiMod_Ctrl, ctrl);
             io.AddKeyEvent(ImGuiKey_S, save);
-            ImGui::NewFrame(); RenderAuthoringWorkspace(editor); ImGui::Render();
+            PrepareAuthoringUiFrame();
+            ImGui::NewFrame();
+            if (IsAuthoringWorkspaceVisible()) RenderAuthoringWorkspace(editor);
+            else KeepAuthoringDockSpaceAlive();
+            ImGui::Render();
         };
         frame(ImVec2(1, 1), false);
         if (const auto* scene = ImGui::FindWindowByName("Scene"); scene && GetAuthoringSceneAspect() > 0)
@@ -147,7 +151,8 @@ void CheckViewportPlacement(const std::filesystem::path& directory, Expect expec
             loadedModel.AddRenderObject(mesh);
             jObject::AddObject(&loadedModel);
             editor.TrackWorldObjectSource(&loadedModel, model->SourcePath, model->Id, model->Revision);
-            for (int i = 0; i < 2; ++i)
+            constexpr size_t submeshCount = 64;
+            for (size_t i = 0; i < submeshCount; ++i)
             {
                 auto* part = new jRenderObject();
                 part->GeometryDataPtr = std::make_shared<jRenderObjectGeometryData>();
@@ -183,12 +188,70 @@ void CheckViewportPlacement(const std::filesystem::path& directory, Expect expec
             const auto* live = editor.ObjectForEntity(duplicate);
             expect(state == jEditor::PlacementReadiness::Ready && changed && changed->Parent == group
                 && changed->Local == oldLocal && changed->AssetId == other->Id && changed->MeshLocalTransforms.empty()
-                && doc.Children(duplicate) == children && live && live->RenderObjects.size() == 2
+                && doc.Children(duplicate) == children && live && live->RenderObjects.size() == submeshCount
                 && live->RenderObjects[0]->GeometryDataPtr == replacementModel.RenderObjects[0]->GeometryDataPtr
-                && doc.Find(sourceId)->AssetId == model->Id && doc.UndoLabel() == "Replace model asset"
-                && doc.Undo() && doc.ToJson() == beforeReplacement,
-                "replacing a duplicate swaps live geometry, retains its hierarchy and transform, and undoes once");
+                && doc.Find(sourceId)->AssetId == model->Id && doc.UndoLabel() == "Replace model asset",
+                "replacing a duplicate swaps live geometry and retains its hierarchy and transform");
+
+            const auto beforeInspection = doc.ToJson();
+            frame(ImVec2(1, 1), false);
+            bool clickedSubmesh = false;
+            bool indented = false;
+            const auto* hierarchy = ImGui::FindWindowByName("Hierarchy");
+            auto* rows = hierarchy && !hierarchy->DC.ChildWindows.empty() ? hierarchy->DC.ChildWindows.front() : nullptr;
+            std::optional<ImVec2> expandButton;
+            if (rows && changed)
+            {
+                const auto rowId = rows->GetID(static_cast<int>(duplicate));
+                const auto expandId = ImHashStr("Expand", 0, rowId);
+                const auto modelLabel = changed->Name + "##entity" + std::to_string(duplicate);
+                const auto modelRowId = ImHashStr(modelLabel.c_str(), 0, rowId);
+                const auto submeshId = ImHashStr("Submesh 002", 0, rowId);
+                const auto findRow = [&](ImGuiID id, float x) -> std::optional<ImVec2> {
+                    for (ImVec2 point(x, rows->InnerRect.Min.y + 2); point.y < rows->InnerRect.Max.y; point.y += 5)
+                    {
+                        frame(point, false);
+                        if (context->HoveredId == id) return point;
+                    }
+                    return std::nullopt;
+                };
+                const float rowHeight = ImGui::GetFrameHeight();
+                const float arrowX = rows->DC.CursorStartPos.x + rowHeight * 1.5f;
+                expandButton = findRow(expandId, arrowX);
+                if (expandButton)
+                {
+                    frame(*expandButton, true); frame(*expandButton, false);
+                    const float parentLabelX = arrowX + rowHeight * .5f + ImGui::GetStyle().ItemSpacing.x + 2;
+                    const bool parentAtExpectedDepth = findRow(modelRowId, parentLabelX).has_value();
+                    if (const auto part = findRow(submeshId, rows->InnerRect.GetCenter().x))
+                    {
+                        frame(ImVec2(parentLabelX, part->y), false);
+                        indented = parentAtExpectedDepth && context->HoveredId != submeshId;
+                        frame(*part, false);
+                        frame(*part, true); frame(*part, false);
+                        clickedSubmesh = true;
+                    }
+                }
+            }
+            const auto outlined = editor.GetSelectionRenderObjects();
+            expect(indented, "submesh labels are indented beyond their parent model label");
+            expect(clickedSubmesh && live && live->RenderObjects.size() == submeshCount && outlined.size() == 1
+                && outlined.front() == live->RenderObjects[1] && !doc.SelectedId() && doc.ToJson() == beforeInspection,
+                "expanding a model and clicking its second Hierarchy submesh outlines only that part without editing the scene");
+            if (expandButton && live && live->RenderObjects.size() == submeshCount)
+            {
+                frame(*expandButton, true); frame(*expandButton, false);
+                editor.SelectViewportHit(live->RenderObjects.back(), false);
+                RevealAuthoringSelection(editor);
+                frame(ImVec2(1, 1), false); frame(ImVec2(1, 1), false);
+            }
+            const auto pickedPart = editor.GetSelectedModelSubmesh();
+            expect(pickedPart && pickedPart->Model == duplicate && pickedPart->Index == submeshCount - 1
+                && rows && rows->Scroll.y > 0 && doc.ToJson() == beforeInspection,
+                "a viewport submesh hit opens its collapsed model and scrolls to the clipped Hierarchy row");
+            expect(doc.Undo() && doc.ToJson() == beforeReplacement, "model replacement undoes in one step after submesh inspection");
             editor.SyncDocumentToWorld();
+            expect(!editor.GetSelectedModelSubmesh(), "a replaced mesh identity cannot select a part of the restored model");
             editor.SelectEntity(group);
             expect(editor.GetSelectionRenderObjects().size() == 2,
                 "the selected group outlines the meshes of all visible descendants");
@@ -387,6 +450,27 @@ void CheckViewportPlacement(const std::filesystem::path& directory, Expect expec
             jEditorProjectSettings::Apply(project, editor, error);
         }
         SetAuthoringIntegrationDrawHook({});
+
+#ifdef IMGUI_HAS_DOCK
+        const auto dockState = project.GetRoot() / ".dock-test";
+        std::filesystem::create_directories(dockState);
+        { std::ofstream layout(dockState / "workspace.json"); layout << "{\"docking\":true,\"autoSave\":false}"; }
+        SetAuthoringTestStateDirectory(dockState);
+        frame(idle, false); frame(idle, false);
+        const auto* dockedInspector = ImGui::FindWindowByName("Inspector");
+        const auto dockId = dockedInspector ? dockedInspector->DockId : 0;
+        const auto restoredSize = io.DisplaySize;
+        SetAuthoringWorkspaceVisible(false);
+        io.DisplaySize = ImVec2(1920, 1080);
+        frame(idle, false); frame(idle, false);
+        SetAuthoringWorkspaceVisible(true);
+        frame(idle, false); frame(idle, false);
+        io.DisplaySize = restoredSize;
+        frame(idle, false); frame(idle, false);
+        expect(dockId && dockedInspector->DockIsActive && dockedInspector->DockId == dockId
+            && dockedInspector->Pos.x + dockedInspector->Size.x <= restoredSize.x + 1,
+            "rendering-panel mode and window maximize/restore preserve the inspector dock and fit the restored viewport");
+#endif
     }
     else expect(false, "viewport placement fixture opens through the workspace");
     ShutdownAuthoringWorkspace();

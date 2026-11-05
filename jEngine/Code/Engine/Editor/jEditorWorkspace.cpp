@@ -35,8 +35,18 @@ namespace
 namespace fs = std::filesystem;
 using namespace jEditorAuthoring;
 using Json = nlohmann::json;
+constexpr char AuthoringToolsWindowName[] = "Authoring tools";
 enum class Dialog { None, Save, Open, NewProject, OpenProject, Import, SavePrefab, OpenPrefab, Package };
-struct Row { EntityId Id; int Depth; bool Children; std::string Label; };
+struct Row
+{
+    EntityId Id;
+    int Depth;
+    bool Children;
+    std::string Label;
+    std::optional<size_t> Submesh;
+    int ParentRow;
+    int SubtreeEnd;
+};
 struct AssetPlacement
 {
     std::string Id, Source, Error;
@@ -91,6 +101,7 @@ struct Workspace
     EntityId HierarchyActive = 0, RangeAnchor = 0, RevealHierarchy = 0, RowSelected = 0;
     ImGuiTextFilter EntityFilter, AssetFilter, LogFilter, ShortcutFilter;
     std::set<EntityId> Collapsed;
+    std::map<EntityId, size_t> ExpandedModels;
     std::vector<Row> Rows;
     std::vector<size_t> AssetRows;
     std::vector<std::string> ReimportRequests;
@@ -389,19 +400,60 @@ void AddMenu(jEditor& editor)
         if (ImGui::MenuItem(KindName(kind))) editor.CreateEntity(kind);
     }
 }
-void BuildRows(Document& document)
+size_t ModelSubmeshCount(const jEditor& editor, EntityId id)
+{
+    const auto* object = editor.ObjectForEntity(id);
+    return object ? object->RenderObjects.size() : 0;
+}
+bool IsHierarchyExpanded(const Entity& entity)
+{
+    const auto& s = State();
+    return entity.Kind == EntityKind::Model ? s.ExpandedModels.contains(entity.Id) : !s.Collapsed.contains(entity.Id);
+}
+void SetHierarchyExpanded(const Entity& entity, bool expanded)
+{
+    auto& s = State();
+    if (entity.Kind == EntityKind::Model)
+    {
+        if (expanded) s.ExpandedModels.try_emplace(entity.Id, 0);
+        else s.ExpandedModels.erase(entity.Id);
+    }
+    else if (expanded) s.Collapsed.erase(entity.Id);
+    else s.Collapsed.insert(entity.Id);
+    s.RowRevision = ~uint64_t(0);
+}
+void BuildRows(const jEditor& editor, EntityId selection)
 {
     auto& s = State(); const std::string filter(s.EntityFilter.InputBuf);
-    const auto selected = filter.empty() ? 0 : document.SelectedId();
-    if (s.RowRevision == document.Revision() && s.CachedEntityFilter == filter && s.RowSelected == selected) return;
+    const auto& document = editor.GetDocument();
+    const auto selected = filter.empty() ? 0 : selection;
+    // Model bindings may publish or change after the document's revision has settled.
+    bool submeshesChanged = std::erase_if(s.ExpandedModels, [&](const auto& entry) {
+        const auto* entity = document.Find(entry.first);
+        return !entity || entity->Kind != EntityKind::Model;
+    }) != 0;
+    for (auto& [id, count] : s.ExpandedModels)
+    {
+        const size_t current = ModelSubmeshCount(editor, id);
+        if (count != current)
+        {
+            count = current;
+            submeshesChanged = true;
+        }
+    }
+    if (!submeshesChanged && s.RowRevision == document.Revision() && s.CachedEntityFilter == filter && s.RowSelected == selected) return;
     s.RowRevision = document.Revision();
     s.RowSelected = selected;
     uint64_t signature = std::hash<std::string>{}(filter);
     const auto mix = [&](uint64_t value) { signature ^= value + 0x9e3779b97f4a7c15ull + (signature << 6) + (signature >> 2); };
     mix(selected);
     std::map<EntityId, std::vector<EntityId>> children;
-    for (const auto& [id, entity] : document.Entities()) { mix(id); mix(entity.Parent); mix(std::hash<std::string>{}(entity.Name)); }
+    for (const auto& [id, entity] : document.Entities())
+    {
+        mix(id); mix(entity.Parent); mix(static_cast<uint64_t>(entity.Kind)); mix(std::hash<std::string>{}(entity.Name));
+    }
     for (auto id : s.Collapsed) mix(id);
+    for (const auto& [id, count] : s.ExpandedModels) { mix(id); mix(count); }
     if (s.RowSignature == signature && s.CachedEntityFilter == filter) return;
     s.RowSignature = signature; s.Rows.clear(); s.CachedEntityFilter = filter;
     for (const auto& [id, entity] : document.Entities()) children[entity.Parent].push_back(id);
@@ -409,16 +461,26 @@ void BuildRows(Document& document)
     if (!filter.empty()) for (const auto& [id, e] : document.Entities())
         if (id == selected || s.EntityFilter.PassFilter(e.Name.c_str()))
             for (EntityId at = id; at; ) { matches.insert(at); const auto* p = document.Find(at); at = p ? p->Parent : 0; }
-    std::function<void(EntityId, int)> visit = [&](EntityId parent, int depth)
+    std::function<void(EntityId, int, int)> visit = [&](EntityId parent, int depth, int parentRow)
     {
         for (auto id : children[parent])
         {
             if (!filter.empty() && !matches.count(id)) continue;
             const auto& e = *document.Find(id); const bool hasChildren = !children[id].empty();
-            s.Rows.push_back({id, depth, hasChildren, e.Name + "##entity" + std::to_string(id)});
-            if (hasChildren && (!s.Collapsed.count(id) || !filter.empty())) visit(id, depth + 1);
+            const int row = static_cast<int>(s.Rows.size());
+            s.Rows.push_back({id, depth, hasChildren, e.Name + "##entity" + std::to_string(id), std::nullopt, parentRow, 0});
+            if (hasChildren && (IsHierarchyExpanded(e) || !filter.empty())) visit(id, depth + 1, row);
+            if (const auto model = s.ExpandedModels.find(id); model != s.ExpandedModels.end())
+                for (size_t index = 0; index < model->second; ++index)
+                {
+                    char label[32];
+                    std::snprintf(label, sizeof(label), "Submesh %03zu", index + 1);
+                    const int end = static_cast<int>(s.Rows.size()) + 1;
+                    s.Rows.push_back({id, depth + 1, false, label, index, row, end});
+                }
+            s.Rows[row].SubtreeEnd = static_cast<int>(s.Rows.size());
         }
-    }; visit(0, 0);
+    }; visit(0, 0, -1);
 }
 void SelectHierarchyRow(jEditor& editor, int index)
 {
@@ -426,14 +488,14 @@ void SelectHierarchyRow(jEditor& editor, int index)
     const auto id = s.Rows[index].Id;
     const auto& io = ImGui::GetIO();
     const bool toggle = io.KeyCtrl || io.KeySuper;
-    const auto anchor = std::find_if(s.Rows.begin(), s.Rows.end(), [&](const Row& row) { return row.Id == s.RangeAnchor; });
+    const auto anchor = std::find_if(s.Rows.begin(), s.Rows.end(), [&](const Row& row) { return !row.Submesh && row.Id == s.RangeAnchor; });
     if (io.KeyShift && anchor != s.Rows.end())
     {
         const int first = static_cast<int>(anchor - s.Rows.begin());
         auto selected = toggle ? editor.GetSelectedEntities() : std::vector<EntityId>();
         std::erase(selected, id);
         for (int i = std::min(first, index); i <= std::max(first, index); ++i)
-            if (i != index) selected.push_back(s.Rows[i].Id);
+            if (i != index && !s.Rows[i].Submesh) selected.push_back(s.Rows[i].Id);
         selected.push_back(id);
         editor.SetSelectedEntities(selected);
     }
@@ -442,6 +504,37 @@ void SelectHierarchyRow(jEditor& editor, int index)
         if (toggle) editor.ToggleEntitySelection(id);
         else editor.SelectEntity(id);
         s.RangeAnchor = id;
+    }
+}
+void DrawHierarchyBranches(const std::vector<Row>& rows, int index, bool hasExpander)
+{
+    const auto origin = ImGui::GetCursorScreenPos();
+    const auto& style = ImGui::GetStyle();
+    const float height = ImGui::GetFrameHeight();
+    const float middle = origin.y + height * .5f;
+    const float top = origin.y - style.ItemSpacing.y * .5f;
+    const float bottom = origin.y + height + style.ItemSpacing.y * .5f;
+    const auto color = ImGui::GetColorU32(ImGuiCol_TextDisabled, .7f);
+    auto* draw = ImGui::GetWindowDrawList();
+    const auto& row = rows[index];
+    const int nextRow = index + 1;
+    if (nextRow < static_cast<int>(rows.size()) && rows[nextRow].ParentRow == index)
+    {
+        const float x = origin.x + (row.Depth + .5f) * height;
+        draw->AddLine(ImVec2(x, origin.y + height * .8f), ImVec2(x, bottom), color);
+    }
+    for (int at = index; rows[at].ParentRow >= 0; at = rows[at].ParentRow)
+    {
+        const auto& branch = rows[at];
+        const float x = origin.x + (branch.Depth - .5f) * height;
+        const bool continues = branch.SubtreeEnd < static_cast<int>(rows.size()) && rows[branch.SubtreeEnd].ParentRow == branch.ParentRow;
+        if (at == index)
+        {
+            const float end = origin.x + row.Depth * height + (hasExpander ? 0 : height);
+            draw->AddLine(ImVec2(x, top), ImVec2(x, continues ? bottom : middle), color);
+            draw->AddLine(ImVec2(x, middle), ImVec2(end - 2, middle), color);
+        }
+        else if (continues) draw->AddLine(ImVec2(x, top), ImVec2(x, bottom), color);
     }
 }
 void Hierarchy(jEditor& editor)
@@ -458,38 +551,84 @@ void Hierarchy(jEditor& editor)
             if (payload->DataSize == sizeof(EntityId)) document.Reparent(*static_cast<const EntityId*>(payload->Data), 0);
         ImGui::EndDragDropTarget();
     }
+    auto submesh = editor.GetSelectedModelSubmesh();
     if (s.HierarchyActive != document.SelectedId())
-        s.RangeAnchor = s.RevealHierarchy = document.SelectedId();
+    {
+        s.RangeAnchor = document.SelectedId();
+        if (!s.RevealHierarchy) s.RevealHierarchy = s.RangeAnchor;
+    }
+    std::optional<size_t> revealSubmesh;
     if (s.RevealHierarchy)
     {
+        if (submesh && submesh->Model == s.RevealHierarchy)
+        {
+            revealSubmesh = submesh->Index;
+            const auto* model = document.Find(submesh->Model);
+            if (model && !IsHierarchyExpanded(*model)) SetHierarchyExpanded(*model, true);
+        }
         for (const auto* entity = document.Find(s.RevealHierarchy); entity && entity->Parent; entity = document.Find(entity->Parent))
-            if (s.Collapsed.erase(entity->Parent)) s.RowRevision = ~uint64_t(0);
+            if (const auto* parent = document.Find(entity->Parent); parent && !IsHierarchyExpanded(*parent))
+                SetHierarchyExpanded(*parent, true);
     }
-    BuildRows(document);
-    ImGui::TextDisabled("%zu objects | %zu selected", document.Entities().size(), editor.GetSelectedEntities().size());
+    BuildRows(editor, submesh ? submesh->Model : document.SelectedId());
+    if (submesh) ImGui::TextDisabled("%zu objects | 1 submesh selected", document.Entities().size());
+    else ImGui::TextDisabled("%zu objects | %zu selected", document.Entities().size(), editor.GetSelectedEntities().size());
     ImGui::BeginChild("EntityRows", ImVec2(0, 0), false);
     ImGuiListClipper clip; clip.Begin(static_cast<int>(s.Rows.size()));
+    int revealIndex = -1;
     if (s.RevealHierarchy)
     {
-        const auto row = std::find_if(s.Rows.begin(), s.Rows.end(), [&](const Row& entry) { return entry.Id == s.RevealHierarchy; });
-        if (row != s.Rows.end()) clip.IncludeItemByIndex(static_cast<int>(row - s.Rows.begin()));
+        const auto row = std::find_if(s.Rows.begin(), s.Rows.end(), [&](const Row& entry) {
+            return entry.Id == s.RevealHierarchy && entry.Submesh == revealSubmesh;
+        });
+        if (row != s.Rows.end())
+        {
+            revealIndex = static_cast<int>(row - s.Rows.begin());
+            clip.IncludeItemByIndex(revealIndex);
+        }
     }
+    const float rowHeight = ImGui::GetFrameHeight();
+    const float expanderWidth = rowHeight + ImGui::GetStyle().ItemSpacing.x;
     while (clip.Step()) for (int i = clip.DisplayStart; i < clip.DisplayEnd; ++i)
     {
-        const auto row = s.Rows[i]; const auto* found = document.Find(row.Id); if (!found) continue;
-        const Entity rowEntity = *found; const auto* e = &rowEntity;
-        ImGui::PushID(static_cast<int>(row.Id)); ImGui::Indent(row.Depth * 12.0f);
-        if (row.Children)
+        const auto& row = s.Rows[i]; const auto* found = document.Find(row.Id); if (!found) continue;
+        const bool expandable = row.Children || (!row.Submesh && found->Kind == EntityKind::Model && ModelSubmeshCount(editor, row.Id));
+        DrawHierarchyBranches(s.Rows, i, expandable);
+        const float indent = row.Depth * rowHeight;
+        if (indent > 0) ImGui::Indent(indent);
+        ImGui::PushID(static_cast<int>(row.Id));
+        if (expandable)
         {
-            if (ImGui::ArrowButton("Expand", s.Collapsed.count(row.Id) ? ImGuiDir_Right : ImGuiDir_Down))
-            { if (!s.Collapsed.erase(row.Id)) s.Collapsed.insert(row.Id); s.RowRevision = ~uint64_t(0); }
+            const bool expanded = IsHierarchyExpanded(*found);
+            ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 0, 0, 0));
+            if (ImGui::ArrowButton("Expand", expanded ? ImGuiDir_Down : ImGuiDir_Right)) SetHierarchyExpanded(*found, !expanded);
+            ImGui::PopStyleColor();
             ImGui::SameLine();
         }
+        else ImGui::SetCursorPosX(ImGui::GetCursorPosX() + expanderWidth);
+        if (row.Submesh)
+        {
+            const bool visible = document.IsEffectivelyVisible(row.Id);
+            if (!visible) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(.5f, .5f, .5f, 1));
+            const bool active = submesh && submesh->Model == row.Id && submesh->Index == *row.Submesh;
+            if (ImGui::Selectable(row.Label.c_str(), active, 0, ImVec2(0, rowHeight))
+                && editor.SelectModelSubmesh(row.Id, *row.Submesh))
+            {
+                s.RangeAnchor = 0;
+                submesh = editor.GetSelectedModelSubmesh();
+            }
+            if (i == revealIndex) ImGui::SetScrollHereY();
+            if (!visible) ImGui::PopStyleColor();
+            if (indent > 0) ImGui::Unindent(indent);
+            ImGui::PopID();
+            continue;
+        }
+        const Entity rowEntity = *found; const auto* e = &rowEntity;
         const auto& selected = editor.GetSelectedEntities();
         const bool active = std::find(selected.begin(), selected.end(), row.Id) != selected.end();
         if (!e->Visible) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(.5f, .5f, .5f, 1));
-        if (ImGui::Selectable(row.Label.c_str(), active, 0, ImVec2(0, ImGui::GetFrameHeight()))) SelectHierarchyRow(editor, i);
-        if (row.Id == s.RevealHierarchy) ImGui::SetScrollHereY();
+        if (ImGui::Selectable(row.Label.c_str(), active, 0, ImVec2(0, rowHeight))) SelectHierarchyRow(editor, i);
+        if (i == revealIndex) ImGui::SetScrollHereY();
         if (!e->Visible) ImGui::PopStyleColor();
         if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) editor.FocusSelected(Camera());
         if (!document.IsEffectivelyLocked(row.Id) && ImGui::BeginDragDropSource())
@@ -512,7 +651,8 @@ void Hierarchy(jEditor& editor)
             if (ImGui::MenuItem("Delete", "Delete")) editor.DeleteSelected();
             ImGui::EndPopup();
         }
-        ImGui::Unindent(row.Depth * 12.0f); ImGui::PopID();
+        if (indent > 0) ImGui::Unindent(indent);
+        ImGui::PopID();
     }
     ImGui::EndChild();
     s.RevealHierarchy = 0;
@@ -736,7 +876,7 @@ void MaterialInspector(jEditor& editor, Entity& entity)
         ImGui::TextWrapped("Skin Kelemen interprets Roughness as Beckmann m. Texture diffusion uses UVs and requires its renderer support; these material controls alone do not reproduce the original full Skin pipeline.");
         ImGui::TreePop();
     }
-    if (ImGui::Button("Material graph")) State().ShowTools = true;
+    if (ImGui::Button("Material graph")) SetAuthoringToolsVisible(true);
 }
 bool HasMaterial(EntityKind kind)
 {
@@ -993,6 +1133,13 @@ void MultiInspector(jEditor& editor, std::span<const EntityId> ids)
 void Inspector(jEditor& editor)
 {
     auto& document = editor.GetDocument(); const auto* selected = document.Find(editor.GetSelectedEntityId());
+    if (const auto submesh = editor.GetSelectedModelSubmesh())
+    {
+        ImGui::Text("Submesh %03zu", submesh->Index + 1);
+        ImGui::TextWrapped("%s", document.Find(submesh->Model)->Name.c_str());
+        ImGui::TextDisabled("Read-only submesh");
+        return;
+    }
     if (!selected) { ImGui::TextWrapped("Select an object in Hierarchy or the scene."); return; }
     auto ids = editor.GetSelectedEntities();
     std::erase_if(ids, [&](EntityId id) { return !document.Find(id); });
@@ -1754,6 +1901,7 @@ void Dialogs(jEditor& editor)
 }
 
 bool IsAuthoringWorkspaceVisible() { return State().Visible && !State().Runtime; }
+void SetAuthoringToolsVisible(bool visible) { State().ShowTools = visible; }
 bool IsAuthoringViewportOnly() { return State().ViewportOnly; }
 void RequestAuthoringViewportOnlyToggle()
 {
@@ -1902,7 +2050,11 @@ bool MapAuthoringViewportPoint(double& x, double& y)
     y = (y - s.ViewPosition.y) * SCR_HEIGHT / s.ViewSize.y;
     return x >= 0 && y >= 0 && x < SCR_WIDTH && y < SCR_HEIGHT;
 }
-void RevealAuthoringSelection(const jEditor& editor) { State().RevealHierarchy = editor.GetSelectedEntityId(); }
+void RevealAuthoringSelection(const jEditor& editor)
+{
+    const auto submesh = editor.GetSelectedModelSubmesh();
+    State().RevealHierarchy = submesh ? submesh->Model : editor.GetSelectedEntityId();
+}
 bool OpenAuthoringProject(jEditor& editor, const std::filesystem::path& file, std::string& error)
 {
     auto project = std::make_unique<jEditorProject>(); if (!project->Open(file, error)) return false;
@@ -1922,6 +2074,7 @@ bool OpenAuthoringProject(jEditor& editor, const std::filesystem::path& file, st
     ClearAssetPlacement(editor);
     s.SelectedAsset.clear(); s.FocusAssets = false;
     s.HierarchyActive = s.RangeAnchor = s.RevealHierarchy = 0; s.Collapsed.clear(); s.RowRevision = ~uint64_t(0);
+    s.ExpandedModels.clear();
     jEditorExtensions::Shutdown(editor); jEditorTools::Shutdown();
     editor.ResetWorldBindings(true); editor.SetProjectRoot(project->GetRoot());
     if (g_Engine && g_Editor == &editor) g_Engine->Game.ClearImportedSceneForAuthoring();
@@ -1948,6 +2101,7 @@ bool LoadAuthoringScene(jEditor& editor, const std::filesystem::path& scene, std
     if (!editor.GetDocument().LoadJson(candidate.ToJson(), scene)) { error = editor.GetDocument().LastError(); return false; }
     auto& s = State();
     s.HierarchyActive = s.RangeAnchor = s.RevealHierarchy = 0; s.Collapsed.clear(); s.RowRevision = ~uint64_t(0);
+    s.ExpandedModels.clear();
     editor.SetSelectedEntities({}); Message("Opened scene " + jEditorAssetPath::ToUtf8(scene)); return true;
 }
 void TickAuthoringWorkspace(jEditor& editor, float dt)
@@ -1989,14 +2143,19 @@ void TickAuthoringWorkspace(jEditor& editor, float dt)
     jEditorTools::Tick(editor, dt);
     jEditorExtensions::Tick(editor, dt);
 }
+void KeepAuthoringDockSpaceAlive()
+{
+#ifdef IMGUI_HAS_DOCK
+    const auto dock = State().DockSpaceId;
+    if (dock && (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_DockingEnable))
+        ImGui::DockSpace(dock, ImVec2(), ImGuiDockNodeFlags_KeepAliveOnly | ImGuiDockNodeFlags_PassthruCentralNode);
+#endif
+}
 void UpdateAuthoringViewportOnlyInput(jEditor& editor)
 {
     auto& s = State();
     const auto& io = ImGui::GetIO();
-#ifdef IMGUI_HAS_DOCK
-    if (s.DockSpaceId && (io.ConfigFlags & ImGuiConfigFlags_DockingEnable))
-        ImGui::DockSpace(s.DockSpaceId, ImVec2(), ImGuiDockNodeFlags_KeepAliveOnly | ImGuiDockNodeFlags_PassthruCentralNode);
-#endif
+    KeepAuthoringDockSpaceAlive();
     auto* main = ImGui::GetMainViewport();
     const auto getFocus = ImGui::GetPlatformIO().Platform_GetWindowFocus;
     s.ViewFocused = !io.AppFocusLost && (!getFocus || (main->PlatformHandle && getFocus(main)));
@@ -2084,7 +2243,8 @@ void RenderAuthoringWorkspace(jEditor& editor)
         {
             ImGui::MenuItem("Assets / Console", nullptr, &s.ShowAssets);
             ImGui::MenuItem("Profiler", nullptr, &s.ShowProfiler);
-            ImGui::MenuItem("Material / Animation / Effects / Terrain", nullptr, &s.ShowTools);
+            if (ImGui::MenuItem("Material / Animation / Effects / Terrain", nullptr, s.ShowTools))
+                SetAuthoringToolsVisible(!s.ShowTools);
             if (ImGui::MenuItem("Extensions / hot reload")) jEditorExtensions::SetVisible(editor, true);
             if (ImGui::MenuItem("Project settings")) jEditorProjectSettings::SetVisible(true);
             if (ImGui::MenuItem("Environment / reflections / atmosphere")) jSceneFeatureTools::SetVisible(true);
@@ -2125,8 +2285,10 @@ void RenderAuthoringWorkspace(jEditor& editor)
         AdvanceModelReplacement(editor);
     }
     const auto* vp = ImGui::GetMainViewport(); const float top = ImGui::GetFrameHeight() + 3;
+    bool docked = false;
 #ifdef IMGUI_HAS_DOCK
-    if (s.Docking && jEditorUiRenderer::SupportsDocking())
+    docked = (io.ConfigFlags & ImGuiConfigFlags_DockingEnable) != 0;
+    if (docked)
     {
         const ImGuiID dock = s.DockSpaceId = ImGui::DockSpaceOverViewport(vp, ImGuiDockNodeFlags_PassthruCentralNode);
         if (!s.DocksInitialized || s.ResetLayout)
@@ -2149,7 +2311,6 @@ void RenderAuthoringWorkspace(jEditor& editor)
 #endif
     const float bottom = s.ShowAssets ? std::min(s.BottomHeight, vp->Size.y * .4f) : 0;
     const float left = std::min(s.LeftWidth, vp->Size.x * .26f), right = std::min(s.RightWidth, vp->Size.x * .33f);
-    const bool docked = s.Docking && jEditorUiRenderer::SupportsDocking();
     const auto flags = s.FixedLayout && !docked ? ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse : ImGuiWindowFlags_None;
     const auto condition = (s.FixedLayout || s.ResetLayout) ? ImGuiCond_Always : ImGuiCond_FirstUseEver;
     const auto panel = [&](const char* name, float x, float y, float w, float h, ImGuiWindowFlags extraFlags = ImGuiWindowFlags_None)
@@ -2292,7 +2453,16 @@ void RenderAuthoringWorkspace(jEditor& editor)
     s.PaintTerrainInScene = false;
     if (s.ShowTools)
     {
-        if (ImGui::Begin("Authoring tools", &s.ShowTools))
+#ifdef IMGUI_HAS_DOCK
+        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+        {
+            ImGuiWindowClass windowClass;
+            windowClass.ViewportFlagsOverrideSet = ImGuiViewportFlags_NoAutoMerge;
+            ImGui::SetNextWindowClass(&windowClass);
+        }
+#endif
+        ImGui::SetNextWindowSize(ImVec2(760, 600), ImGuiCond_FirstUseEver);
+        if (ImGui::Begin(AuthoringToolsWindowName, &s.ShowTools, ImGuiWindowFlags_NoDocking))
             s.PaintTerrainInScene = jEditorTools::Render(editor, s.Project.get(), s.Registry.get());
         ImGui::End();
     }
@@ -2323,17 +2493,28 @@ void PrepareAuthoringUiFrame()
 {
 #ifdef IMGUI_HAS_DOCK
     auto& s = State(); auto& io = ImGui::GetIO();
+    // Dear ImGui clears dock nodes when docking is disabled. Keep the authoring
+    // layout alive while F10 temporarily shows the rendering panels.
+    if (!s.Runtime && s.Docking && jEditorUiRenderer::SupportsDocking()) io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    else
+    {
+        io.ConfigFlags &= ~ImGuiConfigFlags_DockingEnable;
+        s.DockSpaceId = 0;
+        s.DocksInitialized = false;
+    }
     if (s.Runtime)
     {
-        io.ConfigFlags &= ~(ImGuiConfigFlags_DockingEnable | ImGuiConfigFlags_ViewportsEnable);
+        io.ConfigFlags &= ~ImGuiConfigFlags_ViewportsEnable;
         io.IniFilename = nullptr;
         return;
     }
-    if (IsAuthoringWorkspaceVisible() && s.Docking && jEditorUiRenderer::SupportsDocking()) io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    else io.ConfigFlags &= ~ImGuiConfigFlags_DockingEnable;
     // Dear ImGui disallows first enabling viewports on its second frame, while
     // a display can wake between those frames. Defer that one transition.
-    const bool enableViewports = IsAuthoringWorkspaceVisible() && s.TestPlatformWindows.value_or(s.PlatformWindows)
+    // Keep the backend active until it processes the tools window's close.
+    const auto* tools = ImGui::FindWindowByName(AuthoringToolsWindowName);
+    const bool toolsViewportAlive = tools && tools->ViewportOwned && tools->Viewport && tools->Viewport->PlatformHandle;
+    const bool enableViewports = IsAuthoringWorkspaceVisible()
+        && s.TestPlatformWindows.value_or(s.PlatformWindows || s.ShowTools || toolsViewportAlive)
         && jEditorUiRenderer::SupportsPlatformWindows()
         && (ImGui::GetFrameCount() != 1 || (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable));
     if (enableViewports) io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;

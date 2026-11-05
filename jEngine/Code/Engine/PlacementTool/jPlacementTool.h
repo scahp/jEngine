@@ -7,6 +7,7 @@
 
 #include "Code/External/IMGUI/ImGuizmo/ImGuizmo.h"
 #include "imgui.h"
+#include <optional>
 
 class jLight;
 class jObject;
@@ -52,6 +53,7 @@ struct PlacedObjectInfo
 	EPlacementLightType LightType = EPlacementLightType::NONE;
 	EPlacementShapeType ShapeType = EPlacementShapeType::NONE;
 	jLight* LightPtr = nullptr;  // Only valid if Type == LIGHT
+	std::optional<float> SourceSphereRadius;
 };
 
 class jPlacementTool
@@ -93,7 +95,7 @@ public:
 	bool ApplySelectedWorldMatrix(const Matrix& before, const Matrix& after);
 
 	// Register a static object (called from jObject::AddObject)
-	void RegisterStaticObject(jObject* obj);
+	void RegisterStaticObject(jObject* obj, std::optional<float> sphereRadius = std::nullopt);
 	void UnregisterStaticObject(jObject* obj);
 	void RegisterLight(jLight* light);
 	void UnregisterLight(jLight* light);

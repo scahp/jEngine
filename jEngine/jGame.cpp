@@ -1583,6 +1583,11 @@ void jGame::ApplyScenePlacementPreset(int32 InIndex)
 		if (!spawnedObject)
 			continue;
 
+#ifdef ENABLE_EDITOR_FEATURES
+		if (g_Editor && objectPlacement.Type == jScenePlacementPreset::EObjectType::Sphere
+			&& std::isfinite(objectPlacement.Radius) && objectPlacement.Radius > 0.0f)
+			g_Editor->Placement.RegisterStaticObject(spawnedObject, objectPlacement.Radius);
+#endif
 		jObject::AddObject(spawnedObject);
 		SceneBrowserLoadedObjects.push_back(spawnedObject);
 	}

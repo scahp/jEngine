@@ -589,6 +589,8 @@ struct jModelUploadSession::Impl
         for (auto& material : data.MeshData->Materials)
             for (auto& texture : material.second->TexData)
             {
+                if (!texture.FilePath.IsValid()) continue;
+
                 const auto found = textures.find(texture.FilePath);
                 if (found == textures.end()) continue;
                 texture.Texture = found->second.get();
