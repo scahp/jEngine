@@ -125,12 +125,16 @@ Json ReadScenePixels(const std::shared_ptr<jTexture>& texture, const fs::path& p
     std::vector<uint8> rgba(size_t(width)*height*4);
     std::set<uint32> colors;
     size_t lit = 0, opaque = 0; int minimum = 255, maximum = 0;
+    uint64 pixelHash = 1469598103934665603ull;
+    std::array<uint64, 3> channelSum{};
     for (uint32 y=0;y<height;++y) for (uint32 x=0;x<width;++x)
     {
         const auto* pixel = mapped+size_t(y)*rowPitch+x*4;
         auto* output = rgba.data()+(size_t(y)*width+x)*4;
         output[0]=pixel[texture->Format==ETextureFormat::BGRA8?2:0];output[1]=pixel[1];
         output[2]=pixel[texture->Format==ETextureFormat::BGRA8?0:2];output[3]=pixel[3];
+        for (int channel = 0; channel < 4; ++channel) { pixelHash ^= output[channel]; pixelHash *= 1099511628211ull; }
+        for (int channel = 0; channel < 3; ++channel) channelSum[channel] += output[channel];
         const int brightest=std::max({int(output[0]),int(output[1]),int(output[2])});
         const int darkest=std::min({int(output[0]),int(output[1]),int(output[2])});
         lit+=brightest>12; opaque+=output[3]>=254;
@@ -162,7 +166,8 @@ Json ReadScenePixels(const std::shared_ptr<jTexture>& texture, const fs::path& p
     const auto pngError=LodePNG_encode32_file(png.string().c_str(),rgba.data(),width,height);
     result.update({{"readback",true},{"width",width},{"height",height},{"litPixels",lit},{"opaquePixels",opaque},
         {"distinctColorsAtMost1024",colors.size()},{"minimumRgb",minimum},{"maximumRgb",maximum},
-        {"pngSaved",pngError==0},{"png",png.generic_string()}});
+        {"pngSaved",pngError==0},{"png",png.generic_string()}, {"pixelHash",std::to_string(pixelHash)},
+        {"meanRgb",{double(channelSum[0])/(size_t(width)*height),double(channelSum[1])/(size_t(width)*height),double(channelSum[2])/(size_t(width)*height)}}});
     return result;
 }
 bool BufferMatches(jBuffer* source, const IStreamParam& expected)
@@ -733,5 +738,26 @@ int RunRendererSwitchGpuTests(const char* outputDirectory)
 #else
     (void)outputDirectory;
     return EXIT_FAILURE;
+#endif
+}
+
+std::string CaptureSceneFeaturePixels(const char* pngPath)
+{
+#ifdef ENABLE_EDITOR_FEATURES
+    return ReadScenePixels(jEditorUiRenderer::AcquireScenePreview(), std::filesystem::path(pngPath),
+        nullptr, Vector::ZeroVector).dump();
+#else
+    (void)pngPath;
+    return "{\"available\":false,\"readback\":false}";
+#endif
+}
+
+std::string CaptureSceneFeatureTexturePixels(const std::shared_ptr<jTexture>& texture, const char* pngPath)
+{
+#ifdef ENABLE_EDITOR_FEATURES
+    return ReadScenePixels(texture, std::filesystem::path(pngPath), nullptr, Vector::ZeroVector).dump();
+#else
+    (void)texture; (void)pngPath;
+    return "{\"available\":false,\"readback\":false}";
 #endif
 }

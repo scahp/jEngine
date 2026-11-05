@@ -97,7 +97,7 @@ public:
     bool IsSceneBrowserRestartRequested() const { return PathTracingSceneBrowser.RestartIndex >= 0; }
     std::vector<std::string> GetSceneBrowserRestartArguments() const;
     void RequestSceneMaterialRefresh() { SceneMaterialRefreshPending = true; }
-    bool IsSceneImportPending() const { return PendingImportId != 0; }
+    bool IsSceneImportPending() const { return PendingImportId != 0 || SceneMaterialRefreshPending; }
     const std::string& GetSceneImportStatus() const { return SceneImportStatus; }
     void CancelSceneImport();
     bool WaitForSceneImportForTesting(uint32 timeoutMilliseconds = 30000);
@@ -140,6 +140,7 @@ private:
     bool SceneRenderPipelineSwitchPending = false;
     std::uint64_t PendingImportId = 0;
     bool SceneMaterialRefreshPending = false;
+    bool SceneMaterialRefreshAfterRaster = false;
     bool RefreshSceneMaterialLibrary(std::string& error);
     std::string PendingImportSceneId;
     std::string SceneImportStatus;

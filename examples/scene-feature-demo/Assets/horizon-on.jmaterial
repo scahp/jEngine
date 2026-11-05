@@ -1,0 +1,227 @@
+{
+  "baseColor": 5,
+  "format": "jEngineMaterial",
+  "horizon": 9,
+  "metallic": 0,
+  "nodes": [
+    {
+      "a": 0,
+      "b": 0,
+      "c": 0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "d": 0,
+      "id": 1,
+      "kind": 5,
+      "parameters": [
+        1.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "semantic": 0,
+      "texture": "",
+      "value": 1.0,
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "a": 0,
+      "b": 0,
+      "c": 0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "d": 0,
+      "id": 2,
+      "kind": 6,
+      "parameters": [
+        1.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "semantic": 1,
+      "texture": "Assets/color.png",
+      "value": 1.0,
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "a": 0,
+      "b": 0,
+      "c": 0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "d": 0,
+      "id": 3,
+      "kind": 6,
+      "parameters": [
+        1.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "semantic": 0,
+      "texture": "Assets/height.png",
+      "value": 1.0,
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "a": 1,
+      "b": 3,
+      "c": 0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "d": 0,
+      "id": 4,
+      "kind": 11,
+      "parameters": [
+        0.0,
+        32.0,
+        6.0,
+        0.0
+      ],
+      "semantic": 0,
+      "texture": "",
+      "value": 1.0,
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "a": 2,
+      "b": 4,
+      "c": 0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "d": 0,
+      "id": 5,
+      "kind": 7,
+      "parameters": [
+        1.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "semantic": 0,
+      "texture": "",
+      "value": 1.0,
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "a": 0,
+      "b": 0,
+      "c": 0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "d": 0,
+      "id": 6,
+      "kind": 6,
+      "parameters": [
+        1.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "semantic": 0,
+      "texture": "Assets/horizon0.png",
+      "value": 1.0,
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "a": 0,
+      "b": 0,
+      "c": 0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "d": 0,
+      "id": 7,
+      "kind": 6,
+      "parameters": [
+        1.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "semantic": 0,
+      "texture": "Assets/horizon1.png",
+      "value": 1.0,
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "a": 0,
+      "b": 0,
+      "c": 0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "d": 0,
+      "id": 8,
+      "kind": 6,
+      "parameters": [
+        1.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "semantic": 0,
+      "texture": "Assets/horizon-ao.png",
+      "value": 1.0,
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "a": 1,
+      "b": 6,
+      "c": 7,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "d": 8,
+      "id": 9,
+      "kind": 14,
+      "parameters": [
+        0.05000000074505806,
+        1.0,
+        1.0,
+        0.0
+      ],
+      "semantic": 0,
+      "texture": "",
+      "value": 1.0,
+      "x": 0.0,
+      "y": 0.0
+    }
+  ],
+  "normal": 0,
+  "roughness": 0,
+  "version": 2
+}

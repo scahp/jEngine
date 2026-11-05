@@ -29,6 +29,7 @@
 #include "jDirectionalLightDrawCommandGenerator.h"
 #include "jGame.h"
 #include "jOptions.h"
+#include "Material/jMaterialMappingShader.h"
 #include "jPointLightDrawCommandGenerator.h"
 #include "jPrimitiveUtil.h"
 #include "jRenderer.h"
@@ -486,10 +487,9 @@ void jRenderer::SetupShadowPass()
         jParallelFor::ParallelForWithTaskPerThread(MaxPassSetupTaskPerThreadCount, jObject::GetShadowCasterRenderObject()
             , [&](size_t InIndex, jRenderObject* InRenderObject)
             {
-                jMaterial* Material = nullptr;
-
-                // todo : Masked material need to set Material for jDrawCommand
-                // iter->MaterialPtr;
+                // Shadow vertices share the material deformation block with
+                // base/picking passes, including neutral data for ordinary meshes.
+                jMaterial* Material = InRenderObject->MaterialPtr ? InRenderObject->MaterialPtr.get() : GDefaultMaterial.get();
 
                 const bool ShouldUseOnePassPointLightShadow = (ViewLight.Light->Type == ELightType::POINT);
                 const jVertexBuffer* OverrideInstanceData = (ShouldUseOnePassPointLightShadow ? jRHI::CubeMapInstanceDataForSixFace.get() : nullptr);
@@ -504,10 +504,7 @@ void jRenderer::SetupShadowPass()
             int32 i = 0;
             for (auto iter : jObject::GetShadowCasterRenderObject())
             {
-                jMaterial* Material = nullptr;
-
-                // todo : Masked material need to set Material for jDrawCommand
-                // iter->MaterialPtr;
+                jMaterial* Material = iter->MaterialPtr ? iter->MaterialPtr.get() : GDefaultMaterial.get();
 
                 const bool ShouldUseOnePassPointLightShadow = (ViewLight.Light->Type == ELightType::POINT);
                 const jVertexBuffer* OverrideInstanceData = (ShouldUseOnePassPointLightShadow ? jRHI::CubeMapInstanceDataForSixFace.get() : nullptr);
@@ -704,24 +701,32 @@ void jRenderer::SetupBasePass()
             {
                 check(UseForwardRenderer);
                 jShaderForwardInstancingVertexShader::ShaderPermutation VertexShaderPermutation;
+                VertexShaderPermutation.SetIndex<jShaderForwardInstancingVertexShader::USE_VERTEX_COLOR>(InRenderObject->GeometryDataPtr && InRenderObject->GeometryDataPtr->HasVertexColor());
+                VertexShaderPermutation.SetIndex<jShaderForwardInstancingVertexShader::USE_VERTEX_BITANGENT>(InRenderObject->GeometryDataPtr && InRenderObject->GeometryDataPtr->HasVertexBiTangent());
                 Shaders.VertexShader = jShaderForwardInstancingVertexShader::CreateShader(VertexShaderPermutation);
 
                 jShaderForwardPixelShader::ShaderPermutation ShaderPermutation;
                 ShaderPermutation.SetIndex<jShaderForwardPixelShader::USE_VARIABLE_SHADING_RATE>(USE_VARIABLE_SHADING_RATE_TIER2);
                 ShaderPermutation.SetIndex<jShaderForwardPixelShader::USE_REVERSEZ>(USE_REVERSEZ_PERSPECTIVE_SHADOW);
-                Shaders.PixelShader = jShaderForwardPixelShader::CreateShader(ShaderPermutation);
+                Shaders.PixelShader = ResolveMaterialMappingShader(
+                    jShaderForwardPixelShader::CreateShader(ShaderPermutation),
+                    InOverrideMaterial ? InOverrideMaterial : InRenderObject->MaterialPtr.get());
                 return Shaders;
             }
 
             if (UseForwardRenderer)
             {
                 jShaderForwardVertexShader::ShaderPermutation VertexShaderPermutation;
+                VertexShaderPermutation.SetIndex<jShaderForwardVertexShader::USE_VERTEX_COLOR>(InRenderObject->GeometryDataPtr && InRenderObject->GeometryDataPtr->HasVertexColor());
+                VertexShaderPermutation.SetIndex<jShaderForwardVertexShader::USE_VERTEX_BITANGENT>(InRenderObject->GeometryDataPtr && InRenderObject->GeometryDataPtr->HasVertexBiTangent());
                 Shaders.VertexShader = jShaderForwardVertexShader::CreateShader(VertexShaderPermutation);
 
                 jShaderForwardPixelShader::ShaderPermutation ShaderPermutation;
                 ShaderPermutation.SetIndex<jShaderForwardPixelShader::USE_VARIABLE_SHADING_RATE>(USE_VARIABLE_SHADING_RATE_TIER2);
                 ShaderPermutation.SetIndex<jShaderForwardPixelShader::USE_REVERSEZ>(USE_REVERSEZ_PERSPECTIVE_SHADOW);
-                Shaders.PixelShader = jShaderForwardPixelShader::CreateShader(ShaderPermutation);
+                Shaders.PixelShader = ResolveMaterialMappingShader(
+                    jShaderForwardPixelShader::CreateShader(ShaderPermutation),
+                    InOverrideMaterial ? InOverrideMaterial : InRenderObject->MaterialPtr.get());
             }
             else
             {
@@ -745,7 +750,8 @@ void jRenderer::SetupBasePass()
                 ShaderPermutationPS.SetIndex<jShaderGBufferPixelShader::USE_SRGB_ALBEDO_TEXTURE>(IsUseSRGBAlbedoTexture);
                 ShaderPermutationPS.SetIndex<jShaderGBufferPixelShader::USE_VARIABLE_SHADING_RATE>(USE_VARIABLE_SHADING_RATE_TIER2);
                 ShaderPermutationPS.SetIndex<jShaderGBufferPixelShader::USE_PBR>(ENABLE_PBR);
-                Shaders.PixelShader = jShaderGBufferPixelShader::CreateShader(ShaderPermutationPS);
+                Shaders.PixelShader = ResolveMaterialMappingShader(
+                    jShaderGBufferPixelShader::CreateShader(ShaderPermutationPS), Material);
             }
             return Shaders;
         };
@@ -1255,6 +1261,7 @@ void jRenderer::Render()
 	SCOPE_CPU_PROFILE(Render);
 
     const bool UseHWRTDirectLighting = IsUseHWRTDirectLighting();
+    bool diffuseGIContributed = false;
 
     {
         SCOPE_CPU_PROFILE(PoolReset);
@@ -1397,7 +1404,9 @@ void jRenderer::Render()
     }
 
     // Apply SSGI
-    if (!UseHWRTDirectLighting && gOptions.UseSSGI && jSceneRenderTarget::SSGI_RT)
+    if (!UseHWRTDirectLighting && !RenderFrameContextPtr->UseForwardRenderer &&
+        gOptions.UseSSGI && jSceneRenderTarget::SSGI_RT &&
+        std::isfinite(gOptions.SSGIIntensity) && gOptions.SSGIIntensity > 0.0f)
     {
         DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "ApplySSGI", Vector4(0.0f, 0.5f, 0.8f, 1.0f));
 
@@ -1468,14 +1477,25 @@ void jRenderer::Render()
             , RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture()->Width / 8 + ((RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture()->Width % 8) ? 1 : 0)
             , RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture()->Height / 8 + ((RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture()->Height % 8) ? 1 : 0)
             , 1);
+        diffuseGIContributed = true;
     }
 
-    if (!UseHWRTDirectLighting)
+    if (!UseHWRTDirectLighting && !RenderFrameContextPtr->UseForwardRenderer)
     {
-        ApplySurfelGI();
+        // Evaluate the call even if SSGI already contributed.
+        diffuseGIContributed = ApplySurfelGI() || diffuseGIContributed;
     }
     
     AtmosphericShadow();
+
+    jSceneFeatures::Settings sceneFeatures;
+    std::string sceneFeatureError;
+    if (jSceneFeatures::ValidateSettings(gOptions.SceneFeatures, sceneFeatures, sceneFeatureError))
+    {
+        sceneFeatures.Environment.Intensity = jSceneFeatures::EffectiveEnvironmentIntensity(
+            sceneFeatures.Environment, diffuseGIContributed);
+        SceneFeaturesPass(sceneFeatures);
+    }
 
     PostProcess();
 

@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "jMaterial.h"
+#include "jMaterialWater.h"
 #include "RHI/jRHI.h"
 #include "Shader/jCommonShaderParameters.h"
 
@@ -78,7 +79,10 @@ jSamplerStateInfo* jMaterial::GetTextureSamplerState(EMaterialTextureType InType
 
 const std::shared_ptr<jShaderBindingInstance>& jMaterial::CreateShaderBindingInstance()
 {
-    if (NeedToUpdateShaderBindingInstance)
+    const bool frameMaterial = Water && Water->Enabled;
+    const uint64 frameNumber = g_rhi->GetCurrentFrameNumber();
+    if (NeedToUpdateShaderBindingInstance || !ShaderBindingInstance || frameMaterial != MappingBindingIsSingleFrame
+        || (frameMaterial && MappingUniformFrame != frameNumber))
     {
         NeedToUpdateShaderBindingInstance = false;
 
@@ -114,13 +118,32 @@ const std::shared_ptr<jShaderBindingInstance>& jMaterial::CreateShaderBindingIns
         Parameters.RMTexture = CreateTextureParameter(EMaterialTextureType::Metallic);
         Parameters.EnvTexture.Texture = GetResolvedTexture(EMaterialTextureType::Env);
         Parameters.EnvTexture.SamplerState = GetTextureSamplerState(EMaterialTextureType::Env);
+        jShaderParameterTexture2D* mappingParameters[] = {&Parameters.MappingTexture0, &Parameters.MappingTexture1,
+            &Parameters.MappingTexture2, &Parameters.MappingTexture3, &Parameters.MappingTexture4, &Parameters.MappingTexture5,
+            &Parameters.MappingTexture6, &Parameters.MappingTexture7};
+        for (size_t i = 0; i < MappingTextures.size(); ++i)
+        {
+            mappingParameters[i]->Texture = MappingTextures[i] ? MappingTextures[i].get() : GWhiteTexture.get();
+            mappingParameters[i]->SamplerState = GetTextureSamplerState(EMaterialTextureType::Albedo);
+        }
+        jMaterialGraphUniformBuffer graphParameters{};
+        for (size_t i = 0; i < MappingValues.size(); ++i) graphParameters.Values[i] = MappingValues[i];
+        graphParameters.OutputOverridesMask = MappingOutputOverridesMask;
+        FillMaterialWaterShaderParameters(Water.get(), graphParameters);
+        MappingUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
+            jNameStatic("MaterialGraphParameters"), frameMaterial ? jLifeTimeType::OneFrame : jLifeTimeType::MultiFrame, sizeof(graphParameters)));
+        MappingUniformBuffer->UpdateBufferData(&graphParameters, sizeof(graphParameters));
+        Parameters.MaterialGraphParam.Buffer = MappingUniformBuffer;
 
         jShaderParameterSet::BuildShaderBindings(Parameters, EShaderAccessStageFlag::ALL_GRAPHICS, ShaderBindingArray, ResourceInlineAllactor);
 
-        if (ShaderBindingInstance)
+        if (ShaderBindingInstance && !MappingBindingIsSingleFrame)
             ShaderBindingInstance->Free();
 
-        ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray, jShaderBindingInstanceType::MultiFrame);
+        MappingBindingIsSingleFrame = frameMaterial;
+        MappingUniformFrame = frameNumber;
+        ShaderBindingInstance = g_rhi->CreateShaderBindingInstance(ShaderBindingArray,
+            frameMaterial ? jShaderBindingInstanceType::SingleFrame : jShaderBindingInstanceType::MultiFrame);
     }
     return ShaderBindingInstance;
 }

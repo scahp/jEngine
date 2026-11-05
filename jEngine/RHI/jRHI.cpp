@@ -236,6 +236,38 @@ void jView::PrepareViewUniformBufferShaderBindingInstance()
         gOptions.ShadowFilterRadiusTexels, shadowFiltering);
     ubo.ShadowFilterParams = Vector4(static_cast<float>(shadowFiltering.Method),
         shadowFiltering.RadiusTexels, 0.0f, 0.0f);
+    jSceneFeatures::Settings sceneFeatures;
+    std::string featureError;
+    jSceneFeatures::ValidateSettings(gOptions.SceneFeatures, sceneFeatures, featureError);
+    for (size_t i = 0; i < sceneFeatures.Environment.Radiance.size(); ++i)
+    {
+        const auto& rgb = sceneFeatures.Environment.Radiance[i];
+        ubo.SHCoefficients[i] = Vector4(rgb[0], rgb[1], rgb[2], 0.0f);
+    }
+    // Only the Forward surface shader consumes this intensity. Deferred decides
+    // diffuse-light ownership after this frame's actual GI composition passes.
+    // Forward has no SSGI/Surfel diffuse contribution to replace environment light.
+    ubo.EnvironmentParams = Vector4(jSceneFeatures::EffectiveEnvironmentIntensity(
+        sceneFeatures.Environment, false), 0.0f, 0.0f, 0.0f);
+    ubo.MaterialLightDirection = Vector4(0, 1, 0, 0);
+    Vector towardEye = Camera->Pos - Camera->Target;
+    const float viewLengthSquared = Vector::DotProduct(towardEye, towardEye);
+    if (std::isfinite(viewLengthSquared) && viewLengthSquared > 1e-12f)
+        towardEye *= 1.0f / std::sqrt(viewLengthSquared);
+    else towardEye = Vector(0, 0, -1);
+    ubo.MaterialViewDirection = Vector4(towardEye, Camera->IsPerspectiveProjection ? 1.0f : 0.0f);
+    for (const auto& viewLight : Lights)
+    {
+        if (!viewLight.Light || viewLight.Light->Type != ELightType::DIRECTIONAL) continue;
+        Vector towardLight = -static_cast<jDirectionalLight*>(viewLight.Light)->GetLightData().Direction;
+        const float lengthSquared = Vector::DotProduct(towardLight, towardLight);
+        if (std::isfinite(lengthSquared) && lengthSquared > 1e-12f)
+        {
+            towardLight *= 1.0f / std::sqrt(lengthSquared);
+            ubo.MaterialLightDirection = Vector4(towardLight, 1.0f);
+        }
+        break;
+    }
 
     ViewUniformBufferPtr = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(jNameStatic("ViewUniformParameters"), jLifeTimeType::OneFrame, sizeof(ubo)));
     ViewUniformBufferPtr->UpdateBufferData(&ubo, sizeof(ubo));

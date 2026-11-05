@@ -247,11 +247,12 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
     }
 
     wchar_t TempStr[256] = { 0, };
-    ETextureFormat GBufferTexFormat[_countof(GBuffer)] = { ETextureFormat::R11G11B10F, ETextureFormat::R11G11B10F, ETextureFormat::RGBA16F, ETextureFormat::R11G11B10F };
+    ETextureFormat GBufferTexFormat[_countof(GBuffer)] = { ETextureFormat::R11G11B10F, ETextureFormat::R11G11B10F, ETextureFormat::RGBA16F, ETextureFormat::R11G11B10F, ETextureFormat::RG16F };
     for (int32 i = 0; i < _countof(GBuffer); ++i)
     {
         const bool UseAsSubpassInput = gOptions.UseSubpass;
-        const bool IsMemoryless = gOptions.UseMemoryless && gOptions.UseSubpass && i != int32(EGBufferType::EMISSIVE);
+        const bool IsMemoryless = gOptions.UseMemoryless && gOptions.UseSubpass
+            && i != int32(EGBufferType::EMISSIVE) && i != 4;
 
         wsprintf(TempStr, TEXT("GBuffer[%d]"), i);
         jRenderTargetInfo Info = {
@@ -264,7 +265,7 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
             .SampleCount = g_rhi->GetSelectedMSAASamples(),
             .IsUseAsSubpassInput = UseAsSubpassInput,
             .IsMemoryless = IsMemoryless,
-            .RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
+            .RTClearValue = i == 4 ? jRTClearValue(1.0f, 1.0f, 0.0f, 0.0f) : jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
             .TextureCreateFlag = ETextureCreateFlag::NONE,
             .ResourceName = jName(TempStr)
         };
@@ -368,6 +369,7 @@ std::shared_ptr<jShaderBindingInstance> jSceneRenderTarget::PrepareGBufferShader
         Parameters.GBuffer1 = { GBuffer[1]->GetTexture() };
         Parameters.GBuffer2 = { GBuffer[2]->GetTexture() };
         Parameters.GBuffer3 = { GBuffer[3]->GetTexture() };
+        Parameters.GBuffer4 = { GBuffer[4]->GetTexture() };
         Parameters.DepthTexture = { DepthPtr->GetTexture() };
         return jShaderParameterSet::CreateShaderBindingInstance(Parameters, EShaderAccessStageFlag::FRAGMENT, jShaderBindingInstanceType::SingleFrame);
     }
@@ -381,6 +383,7 @@ std::shared_ptr<jShaderBindingInstance> jSceneRenderTarget::PrepareGBufferShader
         Parameters.GBuffer1 = { GBuffer[1]->GetTexture(), GBufferSamplerStateInfo };
         Parameters.GBuffer2 = { GBuffer[2]->GetTexture(), GBufferSamplerStateInfo };
         Parameters.GBuffer3 = { GBuffer[3]->GetTexture(), GBufferSamplerStateInfo };
+        Parameters.GBuffer4 = { GBuffer[4]->GetTexture(), GBufferSamplerStateInfo };
         Parameters.DepthTexture = { DepthPtr->GetTexture(), GBufferSamplerStateInfo };
         return jShaderParameterSet::CreateShaderBindingInstance(Parameters, EShaderAccessStageFlag::ALL_GRAPHICS, jShaderBindingInstanceType::SingleFrame);
     }

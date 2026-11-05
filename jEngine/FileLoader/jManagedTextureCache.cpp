@@ -24,6 +24,10 @@ void jImageFileLoader::StoreTextureForImage(const std::shared_ptr<jImageData>& i
 std::shared_ptr<jTexture> jImageFileLoader::LoadTextureOwned(const jName& filename)
 {
     auto image = LoadImageDataFromFile(filename).lock();
+    return LoadPreparedTextureOwned(image);
+}
+std::shared_ptr<jTexture> jImageFileLoader::LoadPreparedTextureOwned(const std::shared_ptr<jImageData>& image)
+{
     if (!image) return {};
     if (auto cached = FindTextureForImage(image)) return cached;
     if (!g_rhi || (GMainThreadID != std::thread::id() && GMainThreadID != std::this_thread::get_id())) return {};

@@ -220,6 +220,44 @@ int RunEditorAuthoringRuntimeTests()
         editor.ReimportAsset("Assets/normal.png");editor.Tick(0,camera.get());
         expect(baseRefreshed&&materialApplications==beforeTextureReimport+2&&document.Revision()==beforeTextureRevision,
             "texture reimport reapplies live base-color and normal material bindings without editing the document");
+        jEditorTools::MaterialGraph mapping;
+        mapping.Nodes = {{1,0,0,jEditorTools::NodeKind::Color,{.2f,.4f,.6f}}};
+        jEditorTools::MaterialNode channel;channel.Id=2;channel.Kind=jEditorTools::NodeKind::Channel;channel.InputA=1;channel.Parameters={1,0,0,0};
+        mapping.Nodes.push_back(channel);mapping.BaseColor=2;
+        std::string mappingError;const std::string mappingPath="Assets/runtime-mapping.jmaterial";
+        const bool mappingSaved=jEditorTools::SaveMaterial(mapping,directory/mappingPath,mappingError);
+        editor.SetRasterSurfacePublicationEnabled(false);
+        const auto guardedWater=editor.CreateEntity(EntityKind::Water,"Ray mode authored water");
+        editor.Tick(0,camera.get());
+        expect(guardedWater&&!editor.ObjectForEntity(guardedWater)&&editor.LastError().find("Water publication requires")!=std::string::npos,
+            "ray mode rejects Water before invoking or allocating its procedural runtime factory");
+        document.Delete(guardedWater);
+        const auto beforeMappingGate=editor.ObjectForEntity(modelId)->RenderObjects[0]->MaterialPtr;
+        model=*document.Find(modelId);model.Material.GraphAsset=mappingPath;model.Material.GraphOverrides.emplace();
+        model.Material.GraphOverrides->BaseColor=true;model.Material.BaseColor={.7f,.2f,.1f};
+        document.Update(model,"Bind compiled graph");editor.Tick(0,camera.get());
+        expect(editor.ObjectForEntity(modelId)->RenderObjects[0]->MaterialPtr==beforeMappingGate
+            &&editor.LastError().find("Mapping material publication requires")!=std::string::npos,
+            "ray mode retains the actual material pointer when a raster-only graph is assigned");
+        editor.SetRasterSurfacePublicationEnabled(true);editor.Tick(0,camera.get());
+        const auto mappedMaterial=editor.ObjectForEntity(modelId)->RenderObjects[0]->MaterialPtr;
+        expect(mappingSaved&&mappedMaterial->MappingProgram&&mappedMaterial->MappingProgram->Active
+            &&mappedMaterial->MappingValues[0].x==.2f
+            &&(mappedMaterial->MappingOutputOverridesMask&jMaterialMapping::OverrideBaseColor)!=0&&!material->MappingProgram,
+            "real owner runtime binding publishes compiled graph values and local output masks without modifying its shared source");
+        const auto mappingRevision=document.Revision();const auto mappingHash=mappedMaterial->MappingProgram?mappedMaterial->MappingProgram->CodeHash:0;
+        mapping.Nodes[0].Color.X=.3f;
+        const bool changedMapping=jEditorTools::SaveMaterial(mapping,directory/mappingPath,mappingError);
+        editor.ReimportAsset(mappingPath);editor.Tick(0,camera.get());
+        const auto reimportedMaterial=editor.ObjectForEntity(modelId)->RenderObjects[0]->MaterialPtr;
+        expect(changedMapping&&reimportedMaterial->MappingProgram&&reimportedMaterial->MappingProgram->CodeHash==mappingHash
+            &&reimportedMaterial->MappingValues[0].x==.3f&&document.Revision()==mappingRevision,
+            "real graph reimport refreshes bound uniform values while reusing shader code and preserving document history");
+        {std::ofstream bad(directory/mappingPath);bad<<"{}";}
+        editor.ReimportAsset(mappingPath);editor.Tick(0,camera.get());
+        expect(editor.ObjectForEntity(modelId)->RenderObjects[0]->MaterialPtr==reimportedMaterial
+            &&!editor.LastError().empty()&&document.Revision()==mappingRevision,
+            "invalid mapped graph reimport keeps the actual last-good runtime material pointer and reports a diagnostic");
         model=*document.Find(modelId);model.Locked=true;document.Update(model,"Lock");editor.SelectEntity(modelId);
         expect(!editor.DuplicateSelected()&&!editor.DeleteSelected(),"locked entity blocks runtime duplicate and deletion commands");
         bool foreignAccepted=true;std::thread foreign([&]{foreignAccepted=editor.SyncDocumentToWorld();});foreign.join();

@@ -42,6 +42,12 @@ SHADERS.update({
     'effect-atmospheric-apply-cs': ('main', 'cs_6_6'),
     'effect-atmospheric-apply-ps': ('main', 'ps_6_6'),
 })
+SHADERS.update({name: ('main', 'cs_6_6') for name in (
+    'scene-environment', 'scene-ppr-clear', 'scene-ppr-projection',
+    'scene-ppr-resolve', 'scene-ppr-resolve-cube', 'scene-atmosphere')})
+SHADERS.update({f'mapping-{recipe}-{path}': ('main', 'ps_6_6')
+                for recipe in ('parallax', 'pom', 'relief', 'horizon', 'interior', 'interior-dual')
+                for path in ('forward', 'gbuffer')})
 
 
 def spirv_layout(path):
@@ -112,6 +118,8 @@ def flatten_includes(text, include_dir, seen):
 def main():
     parser = argparse.ArgumentParser()
     for option in ('engine', 'dxc', 'source', 'output'): parser.add_argument('--' + option, required=True, type=Path)
+    parser.add_argument('--group', choices=['all', 'scene-features'], default='all',
+                        help='Check the selected feature batch without recompiling unrelated shaders.')
     args = parser.parse_args()
     args.engine, args.dxc, args.source, args.output = [v.resolve() for v in (args.engine, args.dxc, args.source, args.output)]
     args.output.mkdir(parents=True, exist_ok=True)
@@ -124,7 +132,10 @@ def main():
             run([args.engine, '--ci-export-shaders', target, api], target / 'export.log', args.source)
             contracts = json.loads((target / 'cpu-layout.json').read_text())
             contracts.update(json.loads((target / 'editor-cpu-layout.json').read_text()))
+            contracts.update(json.loads((target / 'scene-features-cpu-layout.json').read_text()))
             for name, (entry, profile) in SHADERS.items():
+                if args.group == 'scene-features' and not name.startswith(('scene-', 'mapping-')):
+                    continue
                 output = target / (name + ('.spv' if api == 'vulkan' else '.dxil'))
                 flattened = target / (name + '.flattened.hlsl')
                 flattened.write_text(flatten_includes((target / (name + '.hlsl')).read_text(), args.source / 'Resource/Shaders/hlsl', set()))
@@ -141,6 +152,16 @@ def main():
         # Recreate the original regression: valid scalar-layout SPIR-V without
         # the CPU alignment offsets. It must compile, then fail the ABI check.
         control = args.output / 'unaligned-control.hlsl'
+        if args.group == 'scene-features':
+            missing = set(contracts) - checked
+            # Surfel types belong to the other check group; this batch must
+            # reflect the actual shared view, material and scene-feature blocks.
+            missing = {name for name in missing if name in json.loads((args.output / 'vulkan/editor-cpu-layout.json').read_text())
+                       or name in json.loads((args.output / 'vulkan/scene-features-cpu-layout.json').read_text())}
+            if missing: raise ValueError(f'CPU contracts were not reflected: {sorted(missing)}')
+            report.update(success=True, layout_types=sorted(checked), group=args.group)
+            print(f'PASS: {len(report["shaders"])} shader compilations; {len(checked)} CPU/SPIR-V type contracts; no GPU required')
+            return
         original = (args.output / 'vulkan/resolve.flattened.hlsl').read_text()
         control.write_text(re.sub(r'\[\[vk::offset\(\d+\)\]\]', '', original))
         control_spv = args.output / 'unaligned-control.spv'

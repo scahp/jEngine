@@ -8,6 +8,8 @@
 #include "jEditorPackaging.h"
 #include "jEditorAssetPanel.h"
 #include "jEditorProjectSettings.h"
+#include "jEditorWater.h"
+#include "jSceneFeatureTools.h"
 #include "FileLoader/jEditorAssets.h"
 #include "FileLoader/jEditorAssetPath.h"
 #include "FileLoader/jImageFileLoader.h"
@@ -316,7 +318,7 @@ void Vec3Field(Document& document, Entity& entity, const char* label, Vec3& valu
 }
 void AddMenu(jEditor& editor)
 {
-    for (int i = 0; i <= static_cast<int>(EntityKind::Terrain); ++i)
+    for (int i = 0; i <= static_cast<int>(EntityKind::Water); ++i)
     {
         auto kind = static_cast<EntityKind>(i);
         if (kind == EntityKind::Model) continue;
@@ -541,8 +543,11 @@ void Inspector(jEditor& editor)
         ImGui::SameLine(); ImGui::Checkbox("Snap", &editor.Placement.UseSnap);
         if (editor.Placement.UseSnap) ImGui::DragFloat3("Move snap", editor.Placement.TranslationSnap, .1f, .001f, 10000);
     }
-    if (e.Kind == EntityKind::Cube || e.Kind == EntityKind::Sphere || e.Kind == EntityKind::Model || e.Kind == EntityKind::Terrain)
+    if (e.Kind == EntityKind::Cube || e.Kind == EntityKind::Sphere || e.Kind == EntityKind::Model || e.Kind == EntityKind::Terrain || e.Kind == EntityKind::Water)
         if (ImGui::CollapsingHeader("Material", ImGuiTreeNodeFlags_DefaultOpen)) MaterialInspector(editor, e);
+    if (e.Kind == EntityKind::Water)
+        jEditorWater::RenderInspector(editor, e.Id,
+            [&](Entity& candidate, const char* label, bool changed) { FinishProperty(document, candidate, changed, label); });
     if (e.Kind == EntityKind::PointLight || e.Kind == EntityKind::SpotLight || e.Kind == EntityKind::DirectionalLight)
         if (ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen))
         {
@@ -821,6 +826,7 @@ void TickAuthoringWorkspace(jEditor& editor, float dt)
 {
     jModelUploadSession::CollectRetired();
     auto& s = State(); if (s.LoadLayout) LoadLayout();
+    jSceneFeatureTools::Tick(editor, s.Project.get());
     s.FrameTimes[s.FrameOffset++ % s.FrameTimes.size()] = dt * 1000; s.FrameOffset %= s.FrameTimes.size();
     if (s.Registry)
     {
@@ -920,6 +926,7 @@ void RenderAuthoringWorkspace(jEditor& editor)
             ImGui::MenuItem("Material / Animation / Effects / Terrain", nullptr, &s.ShowTools);
             if (ImGui::MenuItem("Extensions / hot reload")) jEditorExtensions::SetVisible(editor, true);
             if (ImGui::MenuItem("Project settings")) jEditorProjectSettings::SetVisible(true);
+            if (ImGui::MenuItem("Environment / reflections / atmosphere")) jSceneFeatureTools::SetVisible(true);
             ImGui::MenuItem("Layout settings", nullptr, &s.ShowSettings);
             if (ImGui::MenuItem("Reset layout")) { s.ResetLayout = true; s.LeftWidth = 245; s.RightWidth = 325; s.BottomHeight = 205; }
             if (ImGui::MenuItem("Save layout")) SaveLayout();
@@ -1065,6 +1072,7 @@ void RenderAuthoringWorkspace(jEditor& editor)
     Dialogs(editor);
     jEditorExtensions::Render(editor);
     jEditorProjectSettings::Render(editor, s.Project.get());
+    jSceneFeatureTools::Render(editor, s.Project.get());
     if (s.IntegrationDraw) s.IntegrationDraw();
     if (s.ViewHovered && !io.WantTextInput && !ImGui::IsAnyItemActive()) io.WantCaptureMouse = false;
     if (s.ViewFocused && !io.WantTextInput && !ImGui::IsAnyItemActive()) io.WantCaptureKeyboard = false;
@@ -1072,6 +1080,7 @@ void RenderAuthoringWorkspace(jEditor& editor)
 }
 void ShutdownAuthoringWorkspace()
 {
+    jSceneFeatureTools::Shutdown();
     auto& s = State(); jEditorAssetPanel::Shutdown(); if (s.Registry) s.Registry->Shutdown();
     if (g_Editor) jEditorExtensions::Shutdown(*g_Editor);
     if (s.Packaging.valid()) s.Packaging.wait();

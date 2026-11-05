@@ -48,6 +48,7 @@ public:
     void ShutdownWorld(); // Idempotent; call before Game/RHI teardown.
 
     void SetAuthoringEnabled(bool enabled);
+    void SetRasterSurfacePublicationEnabled(bool enabled);
     bool IsAuthoringEnabled() const;
     void ProcessInput(float deltaTime, jCamera* camera);
     void SetViewportInputState(bool hovered, bool focused);

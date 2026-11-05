@@ -244,7 +244,14 @@ bool jShader::UpdateShader()
 
 void jShader::Initialize()
 {
-	verify(g_rhi->CreateShaderInternal(this, ShaderInfo));
+    if (!g_rhi->CreateShaderInternal(this, ShaderInfo))
+    {
+        // Backends may allocate a compiled holder before opening all includes.
+        // Do not publish that holder with a zero native shader stage.
+        delete CompiledShader;
+        CompiledShader = nullptr;
+        std::cerr << "Shader creation failed: " << ShaderInfo.GetShaderFilepath().ToStr() << '\n';
+    }
 }
 
 void jShaderDirectionalLightPixelShader::AppendConditionalShaderParameterSets(jShaderParameterBinder& InOutBinder, const ShaderPermutation& InPermutation)

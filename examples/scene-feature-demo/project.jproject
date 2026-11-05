@@ -1,0 +1,15 @@
+{
+  "assetRoot": "Assets",
+  "name": "Scene feature modules",
+  "projectId": "50c5cad4-e8c5-4cfa-8463-1242862414e9",
+  "schemaVersion": 1,
+  "settings": {
+    "render.deferred": "true",
+    "render.environment.enabled": "true",
+    "render.environment.intensity": "1",
+    "render.environment.shAsset": "Assets/environment.jsh",
+    "render.ssgi": "false",
+    "render.surfelgi": "false"
+  },
+  "startupScene": "Scenes/scene-features.jscene"
+}

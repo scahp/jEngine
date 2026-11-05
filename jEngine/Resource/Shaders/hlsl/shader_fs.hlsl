@@ -1,5 +1,8 @@
 #include "common.hlsl"
+// Material shader injection point.
 #include "shadowfiltering.hlsl"
+#include "Features/materialsurface.hlsl"
+#include "Features/environmentlighting.hlsl"
 
 #ifndef USE_VARIABLE_SHADING_RATE
 #define USE_VARIABLE_SHADING_RATE 0
@@ -14,6 +17,7 @@ struct VSOutput
     float4 DirectionalLightShadowPosition : TEXCOORD1;
     float4 SpotLightShadowPosition : TEXCOORD2;
     float4 WorldPos : TEXCOORD3;
+    float3x3 TBN : TEXCOORD4;
 };
 
 struct PushConsts
@@ -124,7 +128,32 @@ float4 main(VSOutput input
 ) : SV_TARGET
 {
     float3 PointLightLit = 0.0f;
-    float3 ViewWorld = normalize(ViewParam.EyeWorld - input.WorldPos.xyz);
+    float3 ViewWorld = ViewParam.MaterialViewDirection.w < 0.5 ?
+        normalize(ViewParam.MaterialViewDirection.xyz) : normalize(ViewParam.EyeWorld - input.WorldPos.xyz);
+    float3 SurfaceNormal = input.Normal;
+    float2 MaterialVisibility = float2(1.0, 1.0);
+    float3 DiffuseColor = DiffuseTexture.Sample(DiffuseTextureSampler, input.TexCoord.xy).xyz;
+    float3 SurfaceBaseColor = DiffuseColor * RenderObjectParam.BaseColorOpacity.rgb;
+    float SurfaceOpacity = RenderObjectParam.BaseColorOpacity.a;
+    float SurfaceMetallic = RenderObjectParam.Metallic;
+#if JE_HAS_MATERIAL_GRAPH
+    JEMaterialContext MappingContext;
+    MappingContext.UV = input.TexCoord;
+    MappingContext.WorldPos = input.WorldPos.xyz;
+    MappingContext.NormalWS = normalize(input.Normal);
+    MappingContext.TBN = input.TBN;
+    MappingContext.ViewDirWS = ViewWorld;
+    const JEMaterialSurface MappedSurface = JE_ResolveMaterial(MappingContext, false);
+    SurfaceBaseColor = MappedSurface.BaseColor.rgb;
+    SurfaceOpacity = MappedSurface.BaseColor.a;
+    SurfaceMetallic = MappedSurface.Metallic;
+    SurfaceNormal = normalize(mul(input.TBN, MappedSurface.NormalTS));
+#if JE_HAS_HORIZON
+    const float2 horizon = saturate(JE_EvaluateHorizon(MappingContext, ViewParam.MaterialLightDirection.xyz));
+    MaterialVisibility.y = horizon.y;
+    if (ViewParam.MaterialLightDirection.w > 0.5) MaterialVisibility.x = horizon.x;
+#endif
+#endif
 
     // Point light shadow map
     float3 LightDir = input.WorldPos.xyz - PointLight.Position;
@@ -138,7 +167,7 @@ float4 main(VSOutput input
             LightDir.xyz, NormalizedDistance - Bias, ViewParam.ShadowFilterParams.y, (int)ViewParam.ShadowFilterParams.x);
         if (Shadow > 0.0f)
         {
-            PointLightLit = Shadow * GetPointLight(PointLight, input.Normal, input.WorldPos.xyz, ViewWorld);
+            PointLightLit = Shadow * GetPointLight(PointLight, SurfaceNormal, input.WorldPos.xyz, ViewWorld);
         }
     }
 
@@ -146,7 +175,7 @@ float4 main(VSOutput input
     float3 DirectionalLightShadowPosition = input.DirectionalLightShadowPosition.xyz / input.DirectionalLightShadowPosition.w;
     DirectionalLightShadowPosition.y = -DirectionalLightShadowPosition.y;
 
-    float3 DirectionalLightLit = GetDirectionalLight(DirectionalLight, input.Normal, ViewWorld);
+    float3 DirectionalLightLit = GetDirectionalLight(DirectionalLight, SurfaceNormal, ViewWorld);
     if (-1.0 <= DirectionalLightShadowPosition.z && DirectionalLightShadowPosition.z <= 1.0)
     {
         const float Bias = 0.01f;
@@ -155,6 +184,11 @@ float4 main(VSOutput input
             ViewParam.ShadowFilterParams.y, (int)ViewParam.ShadowFilterParams.x);
         DirectionalLightLit *= Shadow;
     }
+    const float3 toDirectionalLight = -DirectionalLight.Direction;
+    const float directionalLengthSquared = dot(toDirectionalLight, toDirectionalLight);
+    if (ViewParam.MaterialLightDirection.w > 0.5 && directionalLengthSquared > 1.0e-12 &&
+        dot(toDirectionalLight * rsqrt(directionalLengthSquared), ViewParam.MaterialLightDirection.xyz) > 0.999)
+        DirectionalLightLit *= MaterialVisibility.x;
 
     // Spot light shadow map
     float3 SpotLightShadowPosition = input.SpotLightShadowPosition.xyz / input.SpotLightShadowPosition.w;
@@ -175,15 +209,22 @@ float4 main(VSOutput input
         #endif
         if (Shadow > 0.0f)
         {
-            SpotLightLit = Shadow * GetSpotLight(SpotLight, input.Normal, input.WorldPos.xyz, ViewWorld);
+            SpotLightLit = Shadow * GetSpotLight(SpotLight, SurfaceNormal, input.WorldPos.xyz, ViewWorld);
         }
     }
 
-    float3 DiffuseColor = DiffuseTexture.Sample(DiffuseTextureSampler, input.TexCoord.xy).xyz;// *input.Color.xyz;
-
+#if JE_HAS_MATERIAL_GRAPH
+    float4 color = (1.0 / 3.14) * float4(pushConsts.Color.rgb * SurfaceBaseColor *
+        (PointLightLit + DirectionalLightLit + SpotLightLit), 1.0);
+    color.rgb += RenderObjectParam.EmissiveOverride.xyz;
+    color.a = SurfaceOpacity;
+#else
     float4 color = (1.0 / 3.14) * float4(pushConsts.Color.rgb * DiffuseColor * (PointLightLit + DirectionalLightLit + SpotLightLit), 1.0);
     color.rgb = color.rgb * RenderObjectParam.BaseColorOpacity.rgb + RenderObjectParam.EmissiveOverride.xyz;
     color.a = RenderObjectParam.BaseColorOpacity.a;
+#endif
+    color.rgb += EvaluateSHDiffuse(ViewParam.SHCoefficients, SurfaceNormal, SurfaceBaseColor,
+        SurfaceMetallic, ViewParam.EnvironmentParams.x) * MaterialVisibility.y;
     if (color.a <= frac(dot(input.Pos.xy, float2(0.754877666, 0.569840296)))) discard;
 
 #if USE_VARIABLE_SHADING_RATE

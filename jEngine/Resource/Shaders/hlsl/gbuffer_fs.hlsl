@@ -1,4 +1,6 @@
 #include "common.hlsl"
+// Material shader injection point.
+#include "Features/materialsurface.hlsl"
 
 #ifndef USE_VERTEX_COLOR
 #define USE_VERTEX_COLOR 0
@@ -33,10 +35,11 @@ struct PushConsts
 
 struct FSOutput
 {
-    float3 GBuffer0 : SV_TARGET0;       // OctaNormal.xy
+    float3 GBuffer0 : SV_TARGET0;       // World normal, encoded as RGB*0.5+0.5.
     float3 GBuffer1 : SV_TARGET1;       // Albedo.xyz
     float4 GBuffer2 : SV_TARGET2;       // Velocity.xy, Metallic, Roughness
     float3 GBuffer3 : SV_TARGET3;       // Linear emissive radiance, added once after lighting.
+    float2 GBuffer4 : SV_TARGET4;       // Primary-sun direct visibility, ambient AO.
 };
 
 FSOutput main(VSOutput input
@@ -52,10 +55,12 @@ FSOutput main(VSOutput input
 
 #if USE_ALBEDO_TEXTURE
     color *= DiffuseTexture.Sample(DiffuseTextureSampler, input.TexCoord.xy);
+#if !JE_HAS_MATERIAL_GRAPH
     if (RenderObjectParam.SurfaceFlags == 0 && color.w < 0.5f)
     {
         discard;
     }
+#endif
 
     #if USE_SRGB_ALBEDO_TEXTURE
     // Convert to linear space
@@ -74,6 +79,24 @@ FSOutput main(VSOutput input
 #endif // USE_ALBEDO_TEXTURE
 
     color *= RenderObjectParam.BaseColorOpacity;
+    float2 MaterialVisibility = float2(1.0, 1.0);
+#if JE_HAS_MATERIAL_GRAPH
+    JEMaterialContext MappingContext;
+    MappingContext.UV = input.TexCoord;
+    MappingContext.WorldPos = input.WorldPos.xyz;
+    MappingContext.NormalWS = normalize(input.Normal);
+    MappingContext.TBN = input.TBN;
+    MappingContext.ViewDirWS = ViewParam.MaterialViewDirection.w < 0.5 ?
+        normalize(ViewParam.MaterialViewDirection.xyz) : normalize(ViewParam.EyeWorld - input.WorldPos.xyz);
+    const JEMaterialSurface MappedSurface = JE_ResolveMaterial(MappingContext, USE_SRGB_ALBEDO_TEXTURE != 0);
+    color = MappedSurface.BaseColor;
+    WorldNormal = normalize(mul(input.TBN, MappedSurface.NormalTS));
+#if JE_HAS_HORIZON
+    const float2 horizon = saturate(JE_EvaluateHorizon(MappingContext, ViewParam.MaterialLightDirection.xyz));
+    MaterialVisibility.y = horizon.y;
+    if (ViewParam.MaterialLightDirection.w > 0.5) MaterialVisibility.x = horizon.x;
+#endif
+#endif
     // Deferred surfaces use deterministic coverage for fractional opacity.
     // This keeps depth, shadows and the opaque GBuffer coherent without pretending
     // that the deferred pass provides sorted transparent blending.
@@ -172,6 +195,11 @@ FSOutput main(VSOutput input
     }
 #endif
     
+#if JE_HAS_MATERIAL_GRAPH
+    Metallic = MappedSurface.Metallic;
+    Roughness = MappedSurface.Roughness;
+#endif
+
     //output.GBuffer0.xy = EncodeOctNormal(WorldNormal * 0.5 + 0.5);
     output.GBuffer0.xyz = WorldNormal * 0.5 + 0.5;
     output.GBuffer1.xyz = color.xyz;
@@ -192,6 +220,7 @@ FSOutput main(VSOutput input
     // Metallic, Roughness : [0, 1]
     output.GBuffer2 = float4(Velocity, Metallic, Roughness);
     output.GBuffer3 = max(RenderObjectParam.EmissiveOverride.xyz, 0.0);
+    output.GBuffer4 = MaterialVisibility;
 
     return output;
 }

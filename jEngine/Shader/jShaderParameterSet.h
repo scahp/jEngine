@@ -99,6 +99,12 @@ struct jShaderParameterRWTexture2DFloat
     int32 MipLevel = 0;
 };
 
+struct jShaderParameterRWTexture2DUInt
+{
+    jTexture* Texture = nullptr;
+    int32 MipLevel = 0;
+};
+
 struct jShaderParameterRWTexture2DArray
 {
     jTexture* Texture = nullptr;
@@ -952,6 +958,28 @@ namespace jShaderParameterDetail
     };
 
     template <>
+    struct TShaderParameterTypeHandler<jShaderParameterRWTexture2DUInt>
+    {
+        static constexpr const char* GetHLSLTypeName() { return nullptr; }
+        static void AppendTypeDeclaration(std::string&) {}
+        static void AppendHLSL(std::string& Out, const char* InName, uint32 InSpace, jShaderParameterBindingCursor& InOutCursor)
+        {
+            // Image atomics need a concrete integer format even when the other
+            // storage images use DXC's unknown-image-format SPIR-V option.
+            if (IsUseVulkan()) AppendLine(Out, "[[vk::image_format(\"r32ui\")]]");
+            AppendLine(Out, "RWTexture2D<uint> ", InName, " : register(u", InOutCursor.BindingIndex, ", space", InSpace, ");");
+            ++InOutCursor.BindingIndex;
+        }
+        static void BuildBinding(const jShaderParameterRWTexture2DUInt& InParameter, EShaderAccessStageFlag InShaderAccessStageFlags,
+            jShaderBindingArray& OutBindings, jShaderBindingResourceInlineAllocator& OutAllocator, jShaderParameterBindingCursor& InOutCursor)
+        {
+            check(InParameter.Texture);
+            OutBindings.Add(jShaderBinding::Create((int32)InOutCursor.BindingIndex++, 1, EShaderBindingType::TEXTURE_UAV, InShaderAccessStageFlags,
+                OutAllocator.Alloc<jTextureResource>(InParameter.Texture, nullptr, InParameter.MipLevel)));
+        }
+    };
+
+    template <>
     struct TShaderParameterTypeHandler<jShaderParameterRWTexture2DArray>
     {
         static constexpr const char* GetHLSLTypeName()
@@ -1740,6 +1768,7 @@ public:
 #define SHADER_RW_TEXTURE2D(Name) JSHADER_DECLARE_PARAMETER(__LINE__, jShaderParameterRWTexture2D, Name)
 #define SHADER_RW_TEXTURE2D_FLOAT2(Name) JSHADER_DECLARE_PARAMETER(__LINE__, jShaderParameterRWTexture2DFloat2, Name)
 #define SHADER_RW_TEXTURE2D_FLOAT(Name) JSHADER_DECLARE_PARAMETER(__LINE__, jShaderParameterRWTexture2DFloat, Name)
+#define SHADER_RW_TEXTURE2D_UINT(Name) JSHADER_DECLARE_PARAMETER(__LINE__, jShaderParameterRWTexture2DUInt, Name)
 #define SHADER_RW_TEXTURE2DARRAY(Name) JSHADER_DECLARE_PARAMETER(__LINE__, jShaderParameterRWTexture2DArray, Name)
 #define SHADER_UNIFORM_BUFFER(BufferType, Name) JSHADER_DECLARE_PARAMETER(__LINE__, jShaderParameterUniformBuffer<BufferType>, Name)
 #define SHADER_STRUCTURED_BUFFER(StructType, Name) JSHADER_DECLARE_PARAMETER(__LINE__, jShaderParameterStructuredBuffer<StructType>, Name)

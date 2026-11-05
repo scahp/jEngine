@@ -1,0 +1,535 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-05",
+  "sourceBase": "26eb307d",
+  "platform": {
+    "cpu": "Apple M4",
+    "memoryGiB": 16,
+    "os": "macOS 26.6.2",
+    "api": "Vulkan via stable MoltenVK",
+    "build": "Debug",
+    "nativeValidation": true,
+    "metalValidation": true
+  },
+  "engineSha256": "bb1dc08b1764642cf3a62ce2d9e9bbe52471bbf3a949848a787ddc2641fa4744",
+  "gpu": {
+    "status": "passed",
+    "renderedFrames": 247,
+    "checks": 88,
+    "failures": 0,
+    "validationProblems": [],
+    "checkoutPreferencesPreserved": true
+  },
+  "timingScope": "CPU total-frame latency includes visibility and present; shader/pipeline warmup, captures/readback and asset/project preparation are excluded from measured samples. No GPU-only/FPS or speedup claim.",
+  "profiles": {
+    "atmosphere-on": {
+      "frameCpuMilliseconds": [
+        8.677042,
+        8.693583,
+        8.470791,
+        7.39125,
+        8.494084,
+        8.632583
+      ],
+      "maximumMilliseconds": 8.693583,
+      "meanMilliseconds": 8.393222166666668,
+      "measuredFrames": 6,
+      "medianMilliseconds": 8.5633335,
+      "scope": "Owner-thread ProcessInput, Update (including visibility), Draw, EndOfFrame/present and event polling; excludes PNG/readback and explicit setup/warmup. This is total CPU frame latency, not GPU-only timing.",
+      "simulationDeltaSeconds": 0.016666666666666666,
+      "warmupFramesExcluded": 4
+    },
+    "deferred-features-off": {
+      "frameCpuMilliseconds": [
+        8.684125,
+        7.794708,
+        10.650625,
+        9.449,
+        5.06375,
+        8.008875
+      ],
+      "maximumMilliseconds": 10.650625,
+      "meanMilliseconds": 8.2751805,
+      "measuredFrames": 6,
+      "medianMilliseconds": 8.346499999999999,
+      "scope": "Owner-thread ProcessInput, Update (including visibility), Draw, EndOfFrame/present and event polling; excludes PNG/readback and explicit setup/warmup. This is total CPU frame latency, not GPU-only timing.",
+      "simulationDeltaSeconds": 0.016666666666666666,
+      "warmupFramesExcluded": 4
+    },
+    "deferred-sh-on": {
+      "frameCpuMilliseconds": [
+        7.7115,
+        8.796542,
+        8.703792,
+        7.5475,
+        8.645208,
+        8.7725
+      ],
+      "maximumMilliseconds": 8.796542,
+      "meanMilliseconds": 8.362840333333335,
+      "measuredFrames": 6,
+      "medianMilliseconds": 8.6745,
+      "scope": "Owner-thread ProcessInput, Update (including visibility), Draw, EndOfFrame/present and event polling; excludes PNG/readback and explicit setup/warmup. This is total CPU frame latency, not GPU-only timing.",
+      "simulationDeltaSeconds": 0.016666666666666666,
+      "warmupFramesExcluded": 4
+    },
+    "forward-features-off": {
+      "frameCpuMilliseconds": [
+        8.214125,
+        8.310666,
+        8.283375,
+        8.348417,
+        8.3015,
+        8.384709
+      ],
+      "maximumMilliseconds": 8.384709,
+      "meanMilliseconds": 8.307132000000001,
+      "measuredFrames": 6,
+      "medianMilliseconds": 8.306083000000001,
+      "scope": "Owner-thread ProcessInput, Update (including visibility), Draw, EndOfFrame/present and event polling; excludes PNG/readback and explicit setup/warmup. This is total CPU frame latency, not GPU-only timing.",
+      "simulationDeltaSeconds": 0.016666666666666666,
+      "warmupFramesExcluded": 4
+    },
+    "forward-pom-off": {
+      "frameCpuMilliseconds": [
+        7.672125,
+        8.31325,
+        8.25325,
+        8.245417
+      ],
+      "maximumMilliseconds": 8.31325,
+      "meanMilliseconds": 8.1210105,
+      "measuredFrames": 4,
+      "medianMilliseconds": 8.249333499999999,
+      "scope": "Owner-thread ProcessInput, Update (including visibility), Draw, EndOfFrame/present and event polling; excludes PNG/readback and explicit setup/warmup. This is total CPU frame latency, not GPU-only timing.",
+      "simulationDeltaSeconds": 0.016666666666666666,
+      "warmupFramesExcluded": 3
+    },
+    "forward-pom-on": {
+      "frameCpuMilliseconds": [
+        8.291375,
+        8.398166,
+        8.494417,
+        8.408667
+      ],
+      "maximumMilliseconds": 8.494417,
+      "meanMilliseconds": 8.39815625,
+      "measuredFrames": 4,
+      "medianMilliseconds": 8.403416499999999,
+      "scope": "Owner-thread ProcessInput, Update (including visibility), Draw, EndOfFrame/present and event polling; excludes PNG/readback and explicit setup/warmup. This is total CPU frame latency, not GPU-only timing.",
+      "simulationDeltaSeconds": 0.016666666666666666,
+      "warmupFramesExcluded": 3
+    },
+    "forward-sh-on": {
+      "frameCpuMilliseconds": [
+        8.307166,
+        8.294208,
+        7.260916,
+        8.497208,
+        8.403417,
+        8.391917
+      ],
+      "maximumMilliseconds": 8.497208,
+      "meanMilliseconds": 8.192472,
+      "measuredFrames": 6,
+      "medianMilliseconds": 8.3495415,
+      "scope": "Owner-thread ProcessInput, Update (including visibility), Draw, EndOfFrame/present and event polling; excludes PNG/readback and explicit setup/warmup. This is total CPU frame latency, not GPU-only timing.",
+      "simulationDeltaSeconds": 0.016666666666666666,
+      "warmupFramesExcluded": 4
+    },
+    "forward-water-seek-1_5": {
+      "frameCpuMilliseconds": [
+        8.391208,
+        8.609042,
+        8.400459,
+        8.376
+      ],
+      "maximumMilliseconds": 8.609042,
+      "meanMilliseconds": 8.44417725,
+      "measuredFrames": 4,
+      "medianMilliseconds": 8.3958335,
+      "scope": "Owner-thread ProcessInput, Update (including visibility), Draw, EndOfFrame/present and event polling; excludes PNG/readback and explicit setup/warmup. This is total CPU frame latency, not GPU-only timing.",
+      "simulationDeltaSeconds": 0.0,
+      "warmupFramesExcluded": 3
+    },
+    "forward-water-time-zero": {
+      "frameCpuMilliseconds": [
+        8.595041,
+        7.4155,
+        8.52275,
+        8.431167
+      ],
+      "maximumMilliseconds": 8.595041,
+      "meanMilliseconds": 8.2411145,
+      "measuredFrames": 4,
+      "medianMilliseconds": 8.4769585,
+      "scope": "Owner-thread ProcessInput, Update (including visibility), Draw, EndOfFrame/present and event polling; excludes PNG/readback and explicit setup/warmup. This is total CPU frame latency, not GPU-only timing.",
+      "simulationDeltaSeconds": 0.0,
+      "warmupFramesExcluded": 3
+    },
+    "horizon-off": {
+      "frameCpuMilliseconds": [
+        8.990875,
+        7.61125,
+        8.604625,
+        8.539333
+      ],
+      "maximumMilliseconds": 8.990875,
+      "meanMilliseconds": 8.43652075,
+      "measuredFrames": 4,
+      "medianMilliseconds": 8.571978999999999,
+      "scope": "Owner-thread ProcessInput, Update (including visibility), Draw, EndOfFrame/present and event polling; excludes PNG/readback and explicit setup/warmup. This is total CPU frame latency, not GPU-only timing.",
+      "simulationDeltaSeconds": 0.016666666666666666,
+      "warmupFramesExcluded": 3
+    },
+    "horizon-on": {
+      "frameCpuMilliseconds": [
+        8.622625,
+        8.584708,
+        7.426083,
+        8.529542
+      ],
+      "maximumMilliseconds": 8.622625,
+      "meanMilliseconds": 8.290739499999999,
+      "measuredFrames": 4,
+      "medianMilliseconds": 8.557125,
+      "scope": "Owner-thread ProcessInput, Update (including visibility), Draw, EndOfFrame/present and event polling; excludes PNG/readback and explicit setup/warmup. This is total CPU frame latency, not GPU-only timing.",
+      "simulationDeltaSeconds": 0.016666666666666666,
+      "warmupFramesExcluded": 3
+    },
+    "interior-dual-off": {
+      "frameCpuMilliseconds": [
+        9.036334,
+        7.417542,
+        8.526667,
+        8.560875
+      ],
+      "maximumMilliseconds": 9.036334,
+      "meanMilliseconds": 8.3853545,
+      "measuredFrames": 4,
+      "medianMilliseconds": 8.543771,
+      "scope": "Owner-thread ProcessInput, Update (including visibility), Draw, EndOfFrame/present and event polling; excludes PNG/readback and explicit setup/warmup. This is total CPU frame latency, not GPU-only timing.",
+      "simulationDeltaSeconds": 0.016666666666666666,
+      "warmupFramesExcluded": 3
+    },
+    "interior-dual-on": {
+      "frameCpuMilliseconds": [
+        8.526125,
+        8.497083,
+        7.328917,
+        8.430667
+      ],
+      "maximumMilliseconds": 8.526125,
+      "meanMilliseconds": 8.195698,
+      "measuredFrames": 4,
+      "medianMilliseconds": 8.463875,
+      "scope": "Owner-thread ProcessInput, Update (including visibility), Draw, EndOfFrame/present and event polling; excludes PNG/readback and explicit setup/warmup. This is total CPU frame latency, not GPU-only timing.",
+      "simulationDeltaSeconds": 0.016666666666666666,
+      "warmupFramesExcluded": 3
+    },
+    "interior-off": {
+      "frameCpuMilliseconds": [
+        9.184666,
+        8.477917,
+        7.488542,
+        8.561
+      ],
+      "maximumMilliseconds": 9.184666,
+      "meanMilliseconds": 8.42803125,
+      "measuredFrames": 4,
+      "medianMilliseconds": 8.519458499999999,
+      "scope": "Owner-thread ProcessInput, Update (including visibility), Draw, EndOfFrame/present and event polling; excludes PNG/readback and explicit setup/warmup. This is total CPU frame latency, not GPU-only timing.",
+      "simulationDeltaSeconds": 0.016666666666666666,
+      "warmupFramesExcluded": 3
+    },
+    "interior-on": {
+      "frameCpuMilliseconds": [
+        8.704584,
+        8.567042,
+        8.507584,
+        8.530708
+      ],
+      "maximumMilliseconds": 8.704584,
+      "meanMilliseconds": 8.577479499999999,
+      "measuredFrames": 4,
+      "medianMilliseconds": 8.548875,
+      "scope": "Owner-thread ProcessInput, Update (including visibility), Draw, EndOfFrame/present and event polling; excludes PNG/readback and explicit setup/warmup. This is total CPU frame latency, not GPU-only timing.",
+      "simulationDeltaSeconds": 0.016666666666666666,
+      "warmupFramesExcluded": 3
+    },
+    "parallax-off": {
+      "frameCpuMilliseconds": [
+        7.903625,
+        8.448583,
+        8.636625,
+        7.641875
+      ],
+      "maximumMilliseconds": 8.636625,
+      "meanMilliseconds": 8.157677,
+      "measuredFrames": 4,
+      "medianMilliseconds": 8.176103999999999,
+      "scope": "Owner-thread ProcessInput, Update (including visibility), Draw, EndOfFrame/present and event polling; excludes PNG/readback and explicit setup/warmup. This is total CPU frame latency, not GPU-only timing.",
+      "simulationDeltaSeconds": 0.016666666666666666,
+      "warmupFramesExcluded": 3
+    },
+    "parallax-on": {
+      "frameCpuMilliseconds": [
+        8.605917,
+        8.463667,
+        8.472833,
+        8.474792
+      ],
+      "maximumMilliseconds": 8.605917,
+      "meanMilliseconds": 8.50430225,
+      "measuredFrames": 4,
+      "medianMilliseconds": 8.473812500000001,
+      "scope": "Owner-thread ProcessInput, Update (including visibility), Draw, EndOfFrame/present and event polling; excludes PNG/readback and explicit setup/warmup. This is total CPU frame latency, not GPU-only timing.",
+      "simulationDeltaSeconds": 0.016666666666666666,
+      "warmupFramesExcluded": 3
+    },
+    "pom-off": {
+      "frameCpuMilliseconds": [
+        9.131167,
+        7.506,
+        8.606875,
+        8.531042
+      ],
+      "maximumMilliseconds": 9.131167,
+      "meanMilliseconds": 8.443771,
+      "measuredFrames": 4,
+      "medianMilliseconds": 8.5689585,
+      "scope": "Owner-thread ProcessInput, Update (including visibility), Draw, EndOfFrame/present and event polling; excludes PNG/readback and explicit setup/warmup. This is total CPU frame latency, not GPU-only timing.",
+      "simulationDeltaSeconds": 0.016666666666666666,
+      "warmupFramesExcluded": 3
+    },
+    "pom-on": {
+      "frameCpuMilliseconds": [
+        8.459959,
+        8.60675,
+        8.533583,
+        7.54025
+      ],
+      "maximumMilliseconds": 8.60675,
+      "meanMilliseconds": 8.285135499999999,
+      "measuredFrames": 4,
+      "medianMilliseconds": 8.496770999999999,
+      "scope": "Owner-thread ProcessInput, Update (including visibility), Draw, EndOfFrame/present and event polling; excludes PNG/readback and explicit setup/warmup. This is total CPU frame latency, not GPU-only timing.",
+      "simulationDeltaSeconds": 0.016666666666666666,
+      "warmupFramesExcluded": 3
+    },
+    "ppr-empty-projection-fallback": {
+      "frameCpuMilliseconds": [
+        8.586,
+        7.430667,
+        8.550083,
+        8.521041,
+        8.511417,
+        8.516333
+      ],
+      "maximumMilliseconds": 8.586,
+      "meanMilliseconds": 8.352590166666666,
+      "measuredFrames": 6,
+      "medianMilliseconds": 8.518687,
+      "scope": "Owner-thread ProcessInput, Update (including visibility), Draw, EndOfFrame/present and event polling; excludes PNG/readback and explicit setup/warmup. This is total CPU frame latency, not GPU-only timing.",
+      "simulationDeltaSeconds": 0.016666666666666666,
+      "warmupFramesExcluded": 4
+    },
+    "ppr-project-up": {
+      "frameCpuMilliseconds": [
+        8.685834,
+        7.580833,
+        8.526333,
+        8.552083,
+        8.623584,
+        7.424375
+      ],
+      "maximumMilliseconds": 8.685834,
+      "meanMilliseconds": 8.232173666666666,
+      "measuredFrames": 6,
+      "medianMilliseconds": 8.539207999999999,
+      "scope": "Owner-thread ProcessInput, Update (including visibility), Draw, EndOfFrame/present and event polling; excludes PNG/readback and explicit setup/warmup. This is total CPU frame latency, not GPU-only timing.",
+      "simulationDeltaSeconds": 0.016666666666666666,
+      "warmupFramesExcluded": 4
+    },
+    "relief-off": {
+      "frameCpuMilliseconds": [
+        9.167166,
+        7.445791,
+        8.490667,
+        8.5655
+      ],
+      "maximumMilliseconds": 9.167166,
+      "meanMilliseconds": 8.417281000000001,
+      "measuredFrames": 4,
+      "medianMilliseconds": 8.528083500000001,
+      "scope": "Owner-thread ProcessInput, Update (including visibility), Draw, EndOfFrame/present and event polling; excludes PNG/readback and explicit setup/warmup. This is total CPU frame latency, not GPU-only timing.",
+      "simulationDeltaSeconds": 0.016666666666666666,
+      "warmupFramesExcluded": 3
+    },
+    "relief-on": {
+      "frameCpuMilliseconds": [
+        7.449834,
+        8.480542,
+        8.434,
+        8.437916
+      ],
+      "maximumMilliseconds": 8.480542,
+      "meanMilliseconds": 8.200573,
+      "measuredFrames": 4,
+      "medianMilliseconds": 8.435958,
+      "scope": "Owner-thread ProcessInput, Update (including visibility), Draw, EndOfFrame/present and event polling; excludes PNG/readback and explicit setup/warmup. This is total CPU frame latency, not GPU-only timing.",
+      "simulationDeltaSeconds": 0.016666666666666666,
+      "warmupFramesExcluded": 3
+    },
+    "water-seek-1_5": {
+      "frameCpuMilliseconds": [
+        8.748041,
+        7.972667,
+        8.793333,
+        7.56475,
+        8.733083,
+        8.634334
+      ],
+      "maximumMilliseconds": 8.793333,
+      "meanMilliseconds": 8.407701333333334,
+      "measuredFrames": 6,
+      "medianMilliseconds": 8.683708500000002,
+      "scope": "Owner-thread ProcessInput, Update (including visibility), Draw, EndOfFrame/present and event polling; excludes PNG/readback and explicit setup/warmup. This is total CPU frame latency, not GPU-only timing.",
+      "simulationDeltaSeconds": 0.0,
+      "warmupFramesExcluded": 4
+    },
+    "water-time-zero": {
+      "frameCpuMilliseconds": [
+        7.553417,
+        8.897541,
+        7.587792,
+        8.782709,
+        8.933334,
+        7.9995
+      ],
+      "maximumMilliseconds": 8.933334,
+      "meanMilliseconds": 8.292382166666668,
+      "measuredFrames": 6,
+      "medianMilliseconds": 8.3911045,
+      "scope": "Owner-thread ProcessInput, Update (including visibility), Draw, EndOfFrame/present and event polling; excludes PNG/readback and explicit setup/warmup. This is total CPU frame latency, not GPU-only timing.",
+      "simulationDeltaSeconds": 0.0,
+      "warmupFramesExcluded": 4
+    }
+  },
+  "captures": {
+    "deferred-features-off": {
+      "available": true,
+      "distinctColorsAtMost1024": 613,
+      "height": 720,
+      "litPixels": 441655,
+      "maximumRgb": 138,
+      "meanRgb": [
+        34.91335503472222,
+        35.89893988715278,
+        37.50230251736111
+      ],
+      "minimumRgb": 0,
+      "opaquePixels": 921600,
+      "pixelHash": "10464170751919688010",
+      "png": "../images/scene-features/deferred-features-off.png",
+      "pngSaved": true,
+      "readback": true,
+      "width": 1280
+    },
+    "deferred-sh-on": {
+      "available": true,
+      "distinctColorsAtMost1024": 170,
+      "height": 720,
+      "litPixels": 455946,
+      "maximumRgb": 206,
+      "meanRgb": [
+        51.954448784722224,
+        53.239412977430554,
+        63.55082465277778
+      ],
+      "minimumRgb": 0,
+      "opaquePixels": 921600,
+      "pixelHash": "4045293454642789152",
+      "png": "../images/scene-features/deferred-sh-on.png",
+      "pngSaved": true,
+      "readback": true,
+      "width": 1280
+    },
+    "ppr-project-up": {
+      "available": true,
+      "distinctColorsAtMost1024": 1024,
+      "height": 720,
+      "litPixels": 454800,
+      "maximumRgb": 228,
+      "meanRgb": [
+        50.37386284722222,
+        46.81076280381944,
+        46.72664496527778
+      ],
+      "minimumRgb": 0,
+      "opaquePixels": 921600,
+      "pixelHash": "1350248291065857998",
+      "png": "../images/scene-features/ppr-project-up.png",
+      "pngSaved": true,
+      "readback": true,
+      "width": 1280
+    },
+    "atmosphere-on": {
+      "available": true,
+      "distinctColorsAtMost1024": 1024,
+      "height": 720,
+      "litPixels": 921600,
+      "maximumRgb": 255,
+      "meanRgb": [
+        85.1300802951389,
+        98.55613172743055,
+        111.81841037326389
+      ],
+      "minimumRgb": 20,
+      "opaquePixels": 921600,
+      "pixelHash": "1232999794497074869",
+      "png": "../images/scene-features/atmosphere-on.png",
+      "pngSaved": true,
+      "readback": true,
+      "width": 1280
+    },
+    "pom-on": {
+      "available": true,
+      "distinctColorsAtMost1024": 1024,
+      "height": 720,
+      "litPixels": 455946,
+      "maximumRgb": 206,
+      "meanRgb": [
+        51.99582139756944,
+        50.946630859375,
+        47.77414496527778
+      ],
+      "minimumRgb": 0,
+      "opaquePixels": 921600,
+      "pixelHash": "16778750802454107275",
+      "png": "../images/scene-features/pom-on.png",
+      "pngSaved": true,
+      "readback": true,
+      "width": 1280
+    },
+    "water-seek-1_5": {
+      "available": true,
+      "distinctColorsAtMost1024": 1002,
+      "height": 720,
+      "litPixels": 284673,
+      "maximumRgb": 255,
+      "meanRgb": [
+        15.426421440972222,
+        28.468887803819445,
+        50.501259765625
+      ],
+      "minimumRgb": 0,
+      "opaquePixels": 921600,
+      "pixelHash": "14075237525476313525",
+      "png": "../images/scene-features/water-seek-1_5.png",
+      "pngSaved": true,
+      "readback": true,
+      "width": 1280
+    }
+  }
+}

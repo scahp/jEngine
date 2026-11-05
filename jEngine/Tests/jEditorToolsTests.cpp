@@ -1,6 +1,8 @@
 #include "pch.h"
 #include "Code/Engine/Editor/jEditorTools.h"
 #include "FileLoader/jEditorAssets.h"
+#include "FileLoader/jImageFileLoader.h"
+#include "lodepng.h"
 #include "Scene/jObject.h"
 #include "Scene/jRenderObject.h"
 #include <filesystem>
@@ -91,6 +93,101 @@ int RunEditorToolsTests()
             glassMaterial->Surface && glassMaterial->Surface->Ior == 1.45f &&
             glassMaterial->IsRaytracingAlphaTestEnabled() && object.RenderObjects[2]->MaterialPtr == wall,
             "scene library shares one material across matching source slots and leaves other slots intact");
+    }
+    {
+        MaterialGraph dynamic;
+        dynamic.Nodes = {{1, 0, 0, NodeKind::Color, {.2f, .4f, .6f}}};
+        MaterialNode channel; channel.Id = 2; channel.Kind = NodeKind::Channel; channel.InputA = 1; channel.Parameters = {1, 0, 0, 0};
+        dynamic.Nodes.push_back(channel); dynamic.BaseColor = 2;
+        const auto mapped = fixture / "mapped.jmaterial";
+        MaterialGraph reopened;
+        jMaterialMapping::Program compiled, recompiled;
+        expect(SaveMaterial(dynamic, mapped, error) && LoadMaterial(mapped, reopened, error) && reopened.Version == 2
+            && reopened.Nodes[1].Parameters == channel.Parameters && jMaterialMapping::Compile(dynamic, compiled, error)
+            && jMaterialMapping::Compile(reopened, recompiled, error) && compiled.Hlsl == recompiled.Hlsl && compiled.Values == recompiled.Values,
+            "actual v2 material file preserves typed pins parameters and regenerated program data");
+        PreparedMaterialMapping prepared;
+        expect(PrepareMaterialMapping(fixture, reopened, prepared, error) && prepared.Program && prepared.Program->Active,
+            "texture-free compiled graph prepares its actual runtime material payload without an RHI");
+        auto original = std::make_shared<jMaterial>();
+        auto instance = std::make_shared<jMaterial>(*original);
+        ApplyMaterialMapping(*instance, prepared, jMaterialMapping::OverrideBaseColor);
+        expect(!original->MappingProgram && instance->MappingProgram == prepared.Program && instance->MappingValues[0].x == .2f
+            && instance->MappingOutputOverridesMask == jMaterialMapping::OverrideBaseColor && instance->NeedToUpdateShaderBindingInstance,
+            "compiled material publication binds values and output overrides to a copy without changing its shared source");
+        const auto priorProgram = prepared.Program;
+        auto missing = dynamic;
+        MaterialNode uv; uv.Id = 3; uv.Kind = NodeKind::UV; missing.Nodes.push_back(uv);
+        MaterialNode texture; texture.Id = 4; texture.Kind = NodeKind::TextureObject; texture.Texture = "Assets/missing.png"; missing.Nodes.push_back(texture);
+        MaterialNode sample; sample.Id = 5; sample.Kind = NodeKind::TextureSample; sample.InputA = 4; sample.InputB = 3;
+        missing.Nodes.push_back(sample); missing.BaseColor = 5;
+        expect(!PrepareMaterialMapping(fixture, missing, prepared, error) && prepared.Program == priorProgram && !error.empty(),
+            "real missing mapping asset rejects before replacing the prepared resource set");
+        const auto source = fixture / "mapped.scene";
+        { std::ofstream sidecar(fixture / "mapped.scene.materials.json"); sidecar << R"({"format":"jEngineSceneMaterials","version":1,"materials":{"Mapped":"mapped.jmaterial"}})"; }
+        jObject object;
+        for (int i = 0; i < 2; ++i)
+        {
+            auto* mesh = new jRenderObject(); mesh->MaterialPtr = std::make_shared<jMaterial>();
+            mesh->MaterialPtr->SourceMaterialName = "Mapped"; object.RenderObjects.push_back(mesh);
+        }
+        size_t bound = 0;
+        const auto beforeRayGate = object.RenderObjects[0]->MaterialPtr;
+        bool mappingPending = true;
+        expect(!ApplySceneMaterialLibrary(source, {&object}, bound, error, &mappingPending, false) && !mappingPending
+            && object.RenderObjects[0]->MaterialPtr == beforeRayGate && !beforeRayGate->MappingProgram,
+            "scene library rejects raster-only graph publication in ray mode before any material mutation or pending upload");
+        expect(ApplySceneMaterialLibrary(source, {&object}, bound, error) && bound == 1
+            && object.RenderObjects[0]->MaterialPtr == object.RenderObjects[1]->MaterialPtr
+            && object.RenderObjects[0]->MaterialPtr->MappingProgram && object.RenderObjects[0]->MaterialPtr->MappingProgram->CodeHash == compiled.CodeHash,
+            "real scene material sidecar publishes the compiled program into every matching shared source slot");
+        const auto good = object.RenderObjects[0]->MaterialPtr;
+        { std::ofstream corrupted(mapped); corrupted << R"({"format":"jEngineMaterial","version":2,"nodes":[]})"; }
+        expect(!ApplySceneMaterialLibrary(source, {&object}, bound, error)
+            && object.RenderObjects[0]->MaterialPtr == good && object.RenderObjects[1]->MaterialPtr == good,
+            "invalid mapped scene library reload keeps every prior material binding atomically");
+        const std::array<unsigned char, 16> pixels{0,64,128,16,255,192,32,224,5,127,250,128,90,20,200,255};
+        std::vector<unsigned char> png;
+        const auto dataFile = fixture / "linear-data.png";
+        const bool encoded = LodePNG::encode(png, pixels.data(), 2, 2) == 0;
+        { std::ofstream imageFile(dataFile, std::ios::binary); imageFile.write(reinterpret_cast<const char*>(png.data()), std::streamsize(png.size())); }
+        std::shared_ptr<jImageData> data;
+        expect(encoded && DecodeMaterialDataTexture(dataFile, data, error) && data && !data->sRGB && data->Format == ETextureFormat::RGBA8
+            && data->MipLevel == 1 && !data->CreateMipmapIfPossible && data->ImageBulkData.ImageData.size() == pixels.size()
+            && std::equal(pixels.begin(), pixels.end(), data->ImageBulkData.ImageData.begin()),
+            "actual PNG data decode preserves all four independent linear channels including non-opaque horizon alpha");
+        const auto retainedData = data;
+        { std::ofstream invalid(fixture / "bad-data.png"); invalid << "not a PNG"; }
+        expect(!DecodeMaterialDataTexture(fixture / "bad-data.png", data, error) && data == retainedData,
+            "invalid raw data decode preserves the previous immutable image");
+        if (!g_rhi)
+        {
+            MaterialGraph dataGraph;
+            MaterialNode uv; uv.Id = 1; uv.Kind = NodeKind::UV;
+            MaterialNode texture; texture.Id = 2; texture.Kind = NodeKind::TextureObject; texture.Texture = "linear-data.png";
+            MaterialNode sample; sample.Id = 3; sample.Kind = NodeKind::TextureSample; sample.InputA = 2; sample.InputB = 1;
+            dataGraph.Nodes = {uv, texture, sample}; dataGraph.BaseColor = 3;
+            PreparedMaterialMapping pendingResult = prepared;
+            bool pending = false;
+            const bool firstResult = PrepareMaterialMapping(fixture, dataGraph, pendingResult, error, &pending);
+            expect(!firstResult && pending && pendingResult.Program == prepared.Program && PendingMaterialMappingTextureCount() > 0,
+                "mapping preparation queues actual CPU decode without publishing partial GPU bindings");
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+            while (pending && std::chrono::steady_clock::now() < deadline)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                PrepareMaterialMapping(fixture, dataGraph, pendingResult, error, &pending);
+            }
+            const auto epoch = PollMaterialMappingTexturePreparation();
+            expect(!pending && PendingMaterialMappingTextureCount() == 0 && error.find("initialized rendering device") != std::string::npos
+                && pendingResult.Program == prepared.Program && epoch == PollMaterialMappingTexturePreparation(),
+                "Prepare itself harvests a real completed worker and retains decoded identity until an owner device is available");
+            InvalidateMaterialMappingTextureCache(fixture, "linear-data.png");
+            PrepareMaterialMapping(fixture, dataGraph, pendingResult, error, &pending);
+            CancelMaterialMappingTexturePreparation();
+            expect(pending && PendingMaterialMappingTextureCount() == 0 && pendingResult.Program == prepared.Program,
+                "explicit reimport starts a new decode generation and cancellation never replaces the last-good material");
+        }
     }
     TerrainProperties terrain; terrain.Resolution = 17;
     auto flat = BuildTerrain(terrain);

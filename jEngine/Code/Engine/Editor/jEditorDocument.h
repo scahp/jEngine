@@ -8,6 +8,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include "Renderer/Features/jWaterSimulation.h"
 
 // Authoring data has no runtime pointers and is edited only by its creating thread.
 // Angles are degrees; transforms use T * Rz * Ry * Rx * S, column vectors.
@@ -16,7 +17,7 @@ namespace jEditorAuthoring
 using EntityId = uint64_t;
 constexpr EntityId InvalidEntity = 0;
 
-enum class EntityKind { Empty, Cube, Sphere, Model, PointLight, SpotLight, DirectionalLight, Camera, ParticleEmitter, Terrain };
+enum class EntityKind { Empty, Cube, Sphere, Model, PointLight, SpotLight, DirectionalLight, Camera, ParticleEmitter, Terrain, Water };
 struct Vec3
 {
     float X = 0, Y = 0, Z = 0;
@@ -83,6 +84,20 @@ struct TerrainProperties
     std::vector<float> Heights;
     bool operator==(const TerrainProperties&) const = default;
 };
+struct WaterProperties
+{
+    uint32_t Resolution = 33;
+    float SizeX = 1000, SizeZ = 1000;
+    // A calm four-wave pond preset, in the same world units as this surface.
+    // Runtime shaders currently support at most four waves; CPU queries use
+    // exactly this data and an explicit caller-owned time in seconds.
+    jWaterSimulation::Settings Waves{0.f, {
+        {{1.f, .25f}, 8.f, 400.f, 70.f, .25f, 0.f},
+        {{-.3f, 1.f}, 5.f, 230.f, 45.f, .25f, 1.2f},
+        {{.6f, -.8f}, 3.f, 140.f, 30.f, .2f, 2.4f},
+        {{-1.f, -.5f}, 2.f, 90.f, 20.f, .15f, .6f}}};
+    bool operator==(const WaterProperties&) const = default;
+};
 struct NavigationProperties
 {
     bool Enabled = false;
@@ -106,6 +121,7 @@ struct Entity
     AnimationProperties Animation{};
     ParticleProperties Particles{};
     TerrainProperties Terrain{};
+    WaterProperties Water{};
     NavigationProperties Navigation{};
     bool operator==(const Entity&) const = default;
 };

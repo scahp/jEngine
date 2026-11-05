@@ -1,0 +1,890 @@
+{
+  "entities": [
+    {
+      "animation": {
+        "duration": 1.0,
+        "enabled": false,
+        "keys": [],
+        "loop": true
+      },
+      "assetId": "",
+      "camera": {
+        "farPlane": 10000.0,
+        "nearPlane": 0.10000000149011612,
+        "primary": false,
+        "verticalFovDegrees": 60.0
+      },
+      "id": 5,
+      "kind": "Terrain",
+      "light": {
+        "castShadows": true,
+        "color": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "innerConeDegrees": 20.0,
+        "intensity": 1.0,
+        "outerConeDegrees": 35.0,
+        "range": 1000.0
+      },
+      "locked": false,
+      "material": {
+        "baseColor": [
+          0.25,
+          0.4000000059604645,
+          0.699999988079071
+        ],
+        "baseColorTexture": "",
+        "emissive": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "graphAsset": "Assets/legacy.jmaterial",
+        "graphOverrides": {
+          "baseColor": false,
+          "baseColorTexture": false,
+          "metallic": false,
+          "normalTexture": false,
+          "roughness": false
+        },
+        "metallic": 0.0,
+        "normalTexture": "",
+        "opacity": 1.0,
+        "overrideEnabled": true,
+        "roughness": 0.5
+      },
+      "meshLocalTransforms": [],
+      "name": "Reflector and mapping surface",
+      "navigation": {
+        "agentHeight": 180.0,
+        "agentRadius": 25.0,
+        "cellSize": 50.0,
+        "enabled": false,
+        "maxSlopeDegrees": 45.0
+      },
+      "parent": 0,
+      "particles": {
+        "color": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "enabled": true,
+        "gravity": [
+          0.0,
+          -98.0,
+          0.0
+        ],
+        "lifetime": 2.0,
+        "maxParticles": 1024,
+        "seed": 1,
+        "size": 5.0,
+        "spawnRate": 30.0,
+        "speed": 100.0
+      },
+      "sourceAsset": "",
+      "terrain": {
+        "heights": [],
+        "resolution": 33,
+        "sizeX": 650.0,
+        "sizeZ": 700.0
+      },
+      "transform": {
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotationDegrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "visible": true
+    },
+    {
+      "animation": {
+        "duration": 1.0,
+        "enabled": false,
+        "keys": [],
+        "loop": true
+      },
+      "assetId": "",
+      "camera": {
+        "farPlane": 10000.0,
+        "nearPlane": 0.10000000149011612,
+        "primary": false,
+        "verticalFovDegrees": 60.0
+      },
+      "id": 6,
+      "kind": "Cube",
+      "light": {
+        "castShadows": true,
+        "color": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "innerConeDegrees": 20.0,
+        "intensity": 1.0,
+        "outerConeDegrees": 35.0,
+        "range": 1000.0
+      },
+      "locked": false,
+      "material": {
+        "baseColor": [
+          0.8999999761581421,
+          0.07999999821186066,
+          0.02500000037252903
+        ],
+        "baseColorTexture": "",
+        "emissive": [
+          0.03999999910593033,
+          0.0,
+          0.0
+        ],
+        "graphAsset": "",
+        "metallic": 0.0,
+        "normalTexture": "",
+        "opacity": 1.0,
+        "overrideEnabled": true,
+        "roughness": 0.30000001192092896
+      },
+      "meshLocalTransforms": [],
+      "name": "Red reflection source",
+      "navigation": {
+        "agentHeight": 180.0,
+        "agentRadius": 25.0,
+        "cellSize": 50.0,
+        "enabled": false,
+        "maxSlopeDegrees": 45.0
+      },
+      "parent": 0,
+      "particles": {
+        "color": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "enabled": true,
+        "gravity": [
+          0.0,
+          -98.0,
+          0.0
+        ],
+        "lifetime": 2.0,
+        "maxParticles": 1024,
+        "seed": 1,
+        "size": 5.0,
+        "spawnRate": 30.0,
+        "speed": 100.0
+      },
+      "sourceAsset": "",
+      "terrain": {
+        "heights": [],
+        "resolution": 17,
+        "sizeX": 1000.0,
+        "sizeZ": 1000.0
+      },
+      "transform": {
+        "position": [
+          35.0,
+          90.0,
+          100.0
+        ],
+        "rotationDegrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          4.0,
+          4.0,
+          4.0
+        ]
+      },
+      "visible": true
+    },
+    {
+      "animation": {
+        "duration": 1.0,
+        "enabled": false,
+        "keys": [],
+        "loop": true
+      },
+      "assetId": "",
+      "camera": {
+        "farPlane": 10000.0,
+        "nearPlane": 0.10000000149011612,
+        "primary": false,
+        "verticalFovDegrees": 60.0
+      },
+      "id": 7,
+      "kind": "Cube",
+      "light": {
+        "castShadows": true,
+        "color": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "innerConeDegrees": 20.0,
+        "intensity": 1.0,
+        "outerConeDegrees": 35.0,
+        "range": 1000.0
+      },
+      "locked": false,
+      "material": {
+        "baseColor": [
+          0.03500000014901161,
+          0.1599999964237213,
+          0.8999999761581421
+        ],
+        "baseColorTexture": "",
+        "emissive": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "graphAsset": "",
+        "metallic": 0.0,
+        "normalTexture": "",
+        "opacity": 1.0,
+        "overrideEnabled": true,
+        "roughness": 0.30000001192092896
+      },
+      "meshLocalTransforms": [],
+      "name": "Blue reflection source",
+      "navigation": {
+        "agentHeight": 180.0,
+        "agentRadius": 25.0,
+        "cellSize": 50.0,
+        "enabled": false,
+        "maxSlopeDegrees": 45.0
+      },
+      "parent": 0,
+      "particles": {
+        "color": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "enabled": true,
+        "gravity": [
+          0.0,
+          -98.0,
+          0.0
+        ],
+        "lifetime": 2.0,
+        "maxParticles": 1024,
+        "seed": 1,
+        "size": 5.0,
+        "spawnRate": 30.0,
+        "speed": 100.0
+      },
+      "sourceAsset": "",
+      "terrain": {
+        "heights": [],
+        "resolution": 17,
+        "sizeX": 1000.0,
+        "sizeZ": 1000.0
+      },
+      "transform": {
+        "position": [
+          -115.0,
+          65.0,
+          35.0
+        ],
+        "rotationDegrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          3.0,
+          3.0,
+          3.0
+        ]
+      },
+      "visible": true
+    },
+    {
+      "animation": {
+        "duration": 1.0,
+        "enabled": false,
+        "keys": [],
+        "loop": true
+      },
+      "assetId": "",
+      "camera": {
+        "farPlane": 10000.0,
+        "nearPlane": 0.10000000149011612,
+        "primary": false,
+        "verticalFovDegrees": 60.0
+      },
+      "id": 8,
+      "kind": "DirectionalLight",
+      "light": {
+        "castShadows": true,
+        "color": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "innerConeDegrees": 20.0,
+        "intensity": 1.5,
+        "outerConeDegrees": 35.0,
+        "range": 1000.0
+      },
+      "locked": false,
+      "material": {
+        "baseColor": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "baseColorTexture": "",
+        "emissive": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "graphAsset": "",
+        "metallic": 0.0,
+        "normalTexture": "",
+        "opacity": 1.0,
+        "overrideEnabled": false,
+        "roughness": 0.5
+      },
+      "meshLocalTransforms": [],
+      "name": "Primary sun",
+      "navigation": {
+        "agentHeight": 180.0,
+        "agentRadius": 25.0,
+        "cellSize": 50.0,
+        "enabled": false,
+        "maxSlopeDegrees": 45.0
+      },
+      "parent": 0,
+      "particles": {
+        "color": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "enabled": true,
+        "gravity": [
+          0.0,
+          -98.0,
+          0.0
+        ],
+        "lifetime": 2.0,
+        "maxParticles": 1024,
+        "seed": 1,
+        "size": 5.0,
+        "spawnRate": 30.0,
+        "speed": 100.0
+      },
+      "sourceAsset": "",
+      "terrain": {
+        "heights": [],
+        "resolution": 17,
+        "sizeX": 1000.0,
+        "sizeZ": 1000.0
+      },
+      "transform": {
+        "position": [
+          1031.650146484375,
+          58.33164978027344,
+          -8.033090591430664
+        ],
+        "rotationDegrees": [
+          55.0,
+          -20.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "visible": true
+    },
+    {
+      "animation": {
+        "duration": 1.0,
+        "enabled": false,
+        "keys": [],
+        "loop": true
+      },
+      "assetId": "",
+      "camera": {
+        "farPlane": 10000.0,
+        "nearPlane": 0.10000000149011612,
+        "primary": false,
+        "verticalFovDegrees": 60.0
+      },
+      "id": 9,
+      "kind": "PointLight",
+      "light": {
+        "castShadows": true,
+        "color": [
+          0.25,
+          0.550000011920929,
+          1.0
+        ],
+        "innerConeDegrees": 20.0,
+        "intensity": 1800.0,
+        "outerConeDegrees": 35.0,
+        "range": 1200.0
+      },
+      "locked": false,
+      "material": {
+        "baseColor": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "baseColorTexture": "",
+        "emissive": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "graphAsset": "",
+        "metallic": 0.0,
+        "normalTexture": "",
+        "opacity": 1.0,
+        "overrideEnabled": false,
+        "roughness": 0.5
+      },
+      "meshLocalTransforms": [],
+      "name": "Water point shadow light",
+      "navigation": {
+        "agentHeight": 180.0,
+        "agentRadius": 25.0,
+        "cellSize": 50.0,
+        "enabled": false,
+        "maxSlopeDegrees": 45.0
+      },
+      "parent": 0,
+      "particles": {
+        "color": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "enabled": true,
+        "gravity": [
+          0.0,
+          -98.0,
+          0.0
+        ],
+        "lifetime": 2.0,
+        "maxParticles": 1024,
+        "seed": 1,
+        "size": 5.0,
+        "spawnRate": 30.0,
+        "speed": 100.0
+      },
+      "sourceAsset": "",
+      "terrain": {
+        "heights": [],
+        "resolution": 17,
+        "sizeX": 1000.0,
+        "sizeZ": 1000.0
+      },
+      "transform": {
+        "position": [
+          -150.0,
+          180.0,
+          -130.0
+        ],
+        "rotationDegrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "visible": true
+    },
+    {
+      "animation": {
+        "duration": 1.0,
+        "enabled": false,
+        "keys": [],
+        "loop": true
+      },
+      "assetId": "",
+      "camera": {
+        "farPlane": 5000.0,
+        "nearPlane": 1.0,
+        "primary": true,
+        "verticalFovDegrees": 60.0
+      },
+      "id": 10,
+      "kind": "Camera",
+      "light": {
+        "castShadows": true,
+        "color": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "innerConeDegrees": 20.0,
+        "intensity": 1.0,
+        "outerConeDegrees": 35.0,
+        "range": 1000.0
+      },
+      "locked": false,
+      "material": {
+        "baseColor": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "baseColorTexture": "",
+        "emissive": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "graphAsset": "",
+        "metallic": 0.0,
+        "normalTexture": "",
+        "opacity": 1.0,
+        "overrideEnabled": false,
+        "roughness": 0.5
+      },
+      "meshLocalTransforms": [],
+      "name": "Fixture camera",
+      "navigation": {
+        "agentHeight": 180.0,
+        "agentRadius": 25.0,
+        "cellSize": 50.0,
+        "enabled": false,
+        "maxSlopeDegrees": 45.0
+      },
+      "parent": 0,
+      "particles": {
+        "color": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "enabled": true,
+        "gravity": [
+          0.0,
+          -98.0,
+          0.0
+        ],
+        "lifetime": 2.0,
+        "maxParticles": 1024,
+        "seed": 1,
+        "size": 5.0,
+        "spawnRate": 30.0,
+        "speed": 100.0
+      },
+      "sourceAsset": "",
+      "terrain": {
+        "heights": [],
+        "resolution": 17,
+        "sizeX": 1000.0,
+        "sizeZ": 1000.0
+      },
+      "transform": {
+        "position": [
+          0.0,
+          190.0,
+          -420.0
+        ],
+        "rotationDegrees": [
+          19.179006576538086,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "visible": true
+    },
+    {
+      "animation": {
+        "duration": 1.0,
+        "enabled": false,
+        "keys": [],
+        "loop": true
+      },
+      "assetId": "",
+      "camera": {
+        "farPlane": 10000.0,
+        "nearPlane": 0.10000000149011612,
+        "primary": false,
+        "verticalFovDegrees": 60.0
+      },
+      "id": 11,
+      "kind": "Water",
+      "light": {
+        "castShadows": true,
+        "color": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "innerConeDegrees": 20.0,
+        "intensity": 1.0,
+        "outerConeDegrees": 35.0,
+        "range": 1000.0
+      },
+      "locked": false,
+      "material": {
+        "baseColor": [
+          0.04500000178813934,
+          0.23999999463558197,
+          0.6499999761581421
+        ],
+        "baseColorTexture": "",
+        "emissive": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "graphAsset": "",
+        "metallic": 0.0,
+        "normalTexture": "",
+        "opacity": 1.0,
+        "overrideEnabled": true,
+        "roughness": 0.18000000715255737
+      },
+      "meshLocalTransforms": [],
+      "name": "Animated heightfield water",
+      "navigation": {
+        "agentHeight": 180.0,
+        "agentRadius": 25.0,
+        "cellSize": 50.0,
+        "enabled": false,
+        "maxSlopeDegrees": 45.0
+      },
+      "parent": 0,
+      "particles": {
+        "color": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "enabled": true,
+        "gravity": [
+          0.0,
+          -98.0,
+          0.0
+        ],
+        "lifetime": 2.0,
+        "maxParticles": 1024,
+        "seed": 1,
+        "size": 5.0,
+        "spawnRate": 30.0,
+        "speed": 100.0
+      },
+      "sourceAsset": "",
+      "terrain": {
+        "heights": [],
+        "resolution": 17,
+        "sizeX": 1000.0,
+        "sizeZ": 1000.0
+      },
+      "transform": {
+        "position": [
+          0.0,
+          5.0,
+          -70.0
+        ],
+        "rotationDegrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "visible": false,
+      "water": {
+        "baseHeight": 0.0,
+        "resolution": 33,
+        "sizeX": 400.0,
+        "sizeZ": 360.0,
+        "waves": [
+          {
+            "amplitude": 8.0,
+            "direction": [
+              1.0,
+              0.25
+            ],
+            "phaseRadians": 0.0,
+            "speed": 70.0,
+            "steepness": 0.25,
+            "wavelength": 400.0
+          },
+          {
+            "amplitude": 5.0,
+            "direction": [
+              -0.30000001192092896,
+              1.0
+            ],
+            "phaseRadians": 1.2000000476837158,
+            "speed": 45.0,
+            "steepness": 0.25,
+            "wavelength": 230.0
+          },
+          {
+            "amplitude": 3.0,
+            "direction": [
+              0.6000000238418579,
+              -0.800000011920929
+            ],
+            "phaseRadians": 2.4000000953674316,
+            "speed": 30.0,
+            "steepness": 0.20000000298023224,
+            "wavelength": 140.0
+          },
+          {
+            "amplitude": 2.0,
+            "direction": [
+              -1.0,
+              -0.5
+            ],
+            "phaseRadians": 0.6000000238418579,
+            "speed": 20.0,
+            "steepness": 0.15000000596046448,
+            "wavelength": 90.0
+          }
+        ]
+      }
+    },
+    {
+      "animation": {
+        "duration": 1.0,
+        "enabled": false,
+        "keys": [],
+        "loop": true
+      },
+      "assetId": "",
+      "camera": {
+        "farPlane": 10000.0,
+        "nearPlane": 0.10000000149011612,
+        "primary": false,
+        "verticalFovDegrees": 60.0
+      },
+      "id": 12,
+      "kind": "Cube",
+      "light": {
+        "castShadows": true,
+        "color": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "innerConeDegrees": 20.0,
+        "intensity": 1.0,
+        "outerConeDegrees": 35.0,
+        "range": 1000.0
+      },
+      "locked": false,
+      "material": {
+        "baseColor": [
+          1.0,
+          0.0,
+          1.0
+        ],
+        "baseColorTexture": "",
+        "emissive": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "graphAsset": "",
+        "metallic": 0.0,
+        "normalTexture": "",
+        "opacity": 1.0,
+        "overrideEnabled": true,
+        "roughness": 0.5
+      },
+      "meshLocalTransforms": [],
+      "name": "Occluded pick control",
+      "navigation": {
+        "agentHeight": 180.0,
+        "agentRadius": 25.0,
+        "cellSize": 50.0,
+        "enabled": false,
+        "maxSlopeDegrees": 45.0
+      },
+      "parent": 0,
+      "particles": {
+        "color": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "enabled": true,
+        "gravity": [
+          0.0,
+          -98.0,
+          0.0
+        ],
+        "lifetime": 2.0,
+        "maxParticles": 1024,
+        "seed": 1,
+        "size": 5.0,
+        "spawnRate": 30.0,
+        "speed": 100.0
+      },
+      "sourceAsset": "",
+      "terrain": {
+        "heights": [],
+        "resolution": 17,
+        "sizeX": 1000.0,
+        "sizeZ": 1000.0
+      },
+      "transform": {
+        "position": [
+          -0.850823700428009,
+          -67.9715576171875,
+          -97.5059814453125
+        ],
+        "rotationDegrees": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          0.4000000059604645,
+          0.4000000059604645,
+          0.4000000059604645
+        ]
+      },
+      "visible": true
+    }
+  ],
+  "format": "jEngineScene",
+  "name": "Untitled",
+  "version": 1
+}

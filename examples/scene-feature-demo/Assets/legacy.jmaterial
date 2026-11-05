@@ -1,0 +1,25 @@
+{
+  "baseColor": 1,
+  "format": "jEngineMaterial",
+  "metallic": 0,
+  "nodes": [
+    {
+      "a": 0,
+      "b": 0,
+      "color": [
+        0.25,
+        0.4000000059604645,
+        0.699999988079071
+      ],
+      "id": 1,
+      "kind": 0,
+      "texture": "",
+      "value": 1.0,
+      "x": 0.0,
+      "y": 0.0
+    }
+  ],
+  "normal": 0,
+  "roughness": 0,
+  "version": 1
+}

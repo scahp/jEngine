@@ -26,14 +26,16 @@ float4 main(VSOutput input
     float4 color = 0;
 
 #if USE_SUBPASS
-    float2 GBufferData0 = GBuffer0.SubpassLoad();
+    float3 GBufferData0 = GBuffer0.SubpassLoad().xyz;
     float3 GBufferData1 = GBuffer1.SubpassLoad();
     float4 GBufferData2 = GBuffer2.SubpassLoad();
+    float2 MaterialVisibility = GBuffer4.SubpassLoad().xy;
     float DepthValue = DepthTexture.SubpassLoad();
 #else   // USE_SUBPASS
     float3 GBufferData0 = GBuffer0.Sample(GBuffer0Sampler, input.TexCoord);
     float3 GBufferData1 = GBuffer1.Sample(GBuffer1Sampler, input.TexCoord);
     float4 GBufferData2 = GBuffer2.Sample(GBuffer2Sampler, input.TexCoord);
+    float2 MaterialVisibility = GBuffer4.Sample(GBuffer4Sampler, input.TexCoord).xy;
     float DepthValue = DepthTexture.Sample(DepthTextureSampler, input.TexCoord).x;
 #endif  // USE_SUBPASS
 
@@ -63,6 +65,14 @@ float4 main(VSOutput input
             ViewParam.ShadowFilterParams.y, (int)ViewParam.ShadowFilterParams.x);
     }
 #endif // USE_SHADOW_MAP
+
+    // The material horizon was baked/evaluated for the primary directional
+    // light. Other directional lights keep their own unmodified visibility.
+    const float3 toThisLight = -DirectionalLight.Direction;
+    const float directionLengthSquared = dot(toThisLight, toThisLight);
+    if (ViewParam.MaterialLightDirection.w > 0.5 && directionLengthSquared > 1.0e-12 &&
+        dot(toThisLight * rsqrt(directionLengthSquared), ViewParam.MaterialLightDirection.xyz) > 0.999)
+        Lit *= saturate(MaterialVisibility.x);
 
     float3 L = -DirectionalLight.Direction;
     float3 N = WorldNormal;

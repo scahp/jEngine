@@ -20,6 +20,11 @@ int RunModelUploadCpuTests();
 int RunEditorExtensionTests();
 int RunEditorProjectSettingsTests();
 int RunModelImportSettingsTests();
+int RunSceneFeatureCpuTests();
+int RunSceneFeatureTests();
+int RunMaterialMappingTests();
+int RunEditorWaterTests();
+int RunSceneFeatureProjectTests();
 
 int RunCpuSelfTests()
 {
@@ -65,6 +70,11 @@ int RunCpuSelfTests()
     failures += RunEditorExtensionTests();
     failures += RunEditorProjectSettingsTests();
     failures += RunModelImportSettingsTests();
+    failures += RunSceneFeatureCpuTests();
+    failures += RunSceneFeatureTests();
+    failures += RunMaterialMappingTests();
+    failures += RunEditorWaterTests();
+    failures += RunSceneFeatureProjectTests();
     std::cout << "CPU checks: " << (failures ? "FAILED" : "PASSED") << std::endl;
     return failures ? EXIT_FAILURE : EXIT_SUCCESS;
 }

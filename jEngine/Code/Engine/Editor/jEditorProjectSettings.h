@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <string>
+#include "Renderer/Features/jSceneFeatureSettings.h"
 
 class jEditor;
 class jEditorProject;
@@ -18,6 +19,8 @@ namespace jEditorProjectSettings
 // (0..8), render.surfelgi.inline.rays (1..16); render.shadow.filter (0=existing,
 // 1=Poisson PCF), render.shadow.radiusTexels (finite 0..4); input.camera.forward/back/left/
 // right/up/down (portable single key names). Unknown setting entries are preserved.
+// Scene features use render.environment.*, render.ppr.* and render.atmosphere.*;
+// the codecs below share their strict scalar/vector/path validation.
 bool Validate(const jEditorProjectConfig& config, std::string& error,
     const std::filesystem::path& projectRoot = {});
 bool Validate(const jEditorProject& project, std::string& error);
@@ -27,6 +30,13 @@ bool Apply(const jEditorProject& project, jEditor& editor, std::string& error);
 // Unknown settings from the current project survive candidate omission.
 bool Save(jEditorProject& project, jEditor& editor, const jEditorProjectConfig& candidate,
     std::string& error);
+// Shared scene-feature codecs. Read validates paths/loads only the bounded .jsh
+// coefficient asset when a root is supplied; raw HDR projection is never here.
+// Both functions are transactional and preserve unrelated settings.
+bool ReadSceneFeatures(const jEditorProjectConfig& config, const std::filesystem::path& projectRoot,
+    jSceneFeatures::Settings& output, std::string& shAsset, std::string& error);
+bool WriteSceneFeatures(jEditorProjectConfig& config, const jSceneFeatures::Settings& input,
+    const std::string& shAsset, std::string& error);
 void SetVisible(bool visible);
 bool IsVisible();
 void Render(jEditor& editor, jEditorProject* project);

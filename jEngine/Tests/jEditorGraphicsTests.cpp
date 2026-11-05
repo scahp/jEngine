@@ -3,6 +3,8 @@
 #include "Shader/jCommonShaderParameters.h"
 #include "Shader/jLightingShaderParameters.h"
 #include "Renderer/Features/jShadowFiltering.h"
+#include "RHI/jRHI.h"
+#include "Shader/jShader.h"
 #include <cmath>
 #include <limits>
 
@@ -13,12 +15,47 @@ int RunEditorGraphicsTests()
     int failures = 0;
     auto expect = [&](bool pass, const char* label)
     { std::cout << (pass ? "PASS " : "FAIL ") << label << '\n'; failures += !pass; };
+    {
+        // Reproduce a backend allocating its native holder, then failing to
+        // open a shader include. A partial holder must never reach a pipeline.
+        struct PartialCompiled : jCompiledShader
+        {
+            int& Destroyed;
+            explicit PartialCompiled(int& destroyed) : Destroyed(destroyed) {}
+            ~PartialCompiled() override { ++Destroyed; }
+        };
+        struct FailingCompiler : jRHI
+        {
+            int& Destroyed;
+            explicit FailingCompiler(int& destroyed) : Destroyed(destroyed) {}
+            bool CreateShaderInternal(jShader* shader, const jShaderInfo&) const override
+            { shader->CompiledShader = new PartialCompiled(Destroyed); return false; }
+        };
+        int destroyed = 0;
+        FailingCompiler backend(destroyed);
+        auto* previous = g_rhi;
+        g_rhi = &backend;
+        jShaderInfo info;
+        info.SetShaderFilepath(jNameStatic("expected-missing-include-regression.hlsl"));
+        jShader shader(info);
+        shader.Initialize();
+        g_rhi = previous;
+        expect(shader.GetCompiledShader() == nullptr && destroyed == 1,
+            "failed shader initialization destroys its partial native stage before pipeline publication");
+    }
     expect(sizeof(RenderObjectUniformBuffer) == 192 && offsetof(RenderObjectUniformBuffer, BaseColorOpacity) == 144 &&
         offsetof(RenderObjectUniformBuffer, EmissiveOverride) == 160 && offsetof(RenderObjectUniformBuffer, SurfaceFlags) == 176 &&
         offsetof(RenderObjectUniformBuffer, IndexElementSize) == 184 && offsetof(RenderObjectUniformBuffer, SurfacePadding) == 188,
         "material and geometry UBO keeps its 192-byte layout with explicit index width");
-    expect(sizeof(ViewUniformBuffer) == 368 && offsetof(ViewUniformBuffer, ShadowFilterParams) == 352,
-        "shared view filter settings use the same aligned 16-byte block on CPU and GPU");
+    expect(sizeof(ViewUniformBuffer) == 560 && offsetof(ViewUniformBuffer, ShadowFilterParams) == 352
+        && offsetof(ViewUniformBuffer, SHCoefficients) == 368
+        && offsetof(ViewUniformBuffer, MaterialViewDirection) == 544,
+        "shared view preserves existing offsets and adds aligned environment/material context");
+    expect(sizeof(jMaterialGraphUniformBuffer) == 1184
+        && offsetof(jMaterialGraphUniformBuffer, OutputOverridesMask) == 1024
+        && offsetof(jMaterialGraphUniformBuffer, WaterWavesA) == 1040
+        && offsetof(jMaterialGraphUniformBuffer, WaterControl) == 1168,
+        "mapping constants and water waves share an aligned material block");
     jShadowFiltering::Settings filtering;
     expect(jShadowFiltering::TryMakeSettings(1, 4.0f, filtering) &&
         filtering.Method == jShadowFiltering::Mode::Poisson16 && filtering.RadiusTexels == 4.0f,
@@ -125,7 +162,8 @@ int ExportEditorGraphicsShaderFixtures(const char* directory, bool vulkan)
             jShaderParameterSet::GenerateHLSL<jSpotLightShaderParameters>(1) + sceneTextures +
             "\n#include \"spotlight_fs.hlsl\"\n");
         const std::string shadowPrefix = "#define COMPUTE_SHADER 0\n#define PIXEL_SHADER 0\n#include \"common.hlsl\"\n" +
-            jShaderParameterSet::GenerateHLSL<jRenderObjectShaderParameters>(1);
+            jShaderParameterSet::GenerateHLSL<jRenderObjectShaderParameters>(1) +
+            jShaderParameterSet::GenerateHLSL<jMaterialShaderParameters>(2);
         write("editor-shadow-vs", shadowPrefix + jShaderParameterSet::GenerateHLSL<jDirectionalLightOnlyShaderParameters>(0) +
             "\n#include \"shadow_vs.hlsl\"\n");
         write("editor-shadow-instancing-vs", shadowPrefix + jShaderParameterSet::GenerateHLSL<jDirectionalLightOnlyShaderParameters>(0) +
@@ -149,6 +187,13 @@ int ExportEditorGraphicsShaderFixtures(const char* directory, bool vulkan)
         contract << "}},\"ViewUniformBuffer\":{\"size\":" << sizeof(ViewUniformBuffer) << ",\"fields\":{";
         first = true;
         for (const auto& field : ViewUniformBuffer::GetShaderUniformBufferFieldMembers())
+        {
+            if (!first) contract << ',';
+            first = false; contract << '"' << field.Name << "\":" << field.ByteOffset;
+        }
+        contract << "}},\"jMaterialGraphUniformBuffer\":{\"size\":" << sizeof(jMaterialGraphUniformBuffer) << ",\"fields\":{";
+        first = true;
+        for (const auto& field : jMaterialGraphUniformBuffer::GetShaderUniformBufferFieldMembers())
         {
             if (!first) contract << ',';
             first = false; contract << '"' << field.Name << "\":" << field.ByteOffset;

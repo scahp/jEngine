@@ -61,6 +61,9 @@ public:
     std::shared_ptr<jTexture> FindTextureForImage(const std::shared_ptr<jImageData>& imageData);
     void StoreTextureForImage(const std::shared_ptr<jImageData>& imageData, const std::shared_ptr<jTexture>& texture);
     std::shared_ptr<jTexture> LoadTextureOwned(const jName& filename);
+    // Upload an immutable CPU-prepared image with a weak identity cache. The
+    // caller retains the decoded lease while a material owns the GPU lease.
+    std::shared_ptr<jTexture> LoadPreparedTextureOwned(const std::shared_ptr<jImageData>& imageData);
     void InvalidateImageData(const jName& filename);
     struct Stats
     {

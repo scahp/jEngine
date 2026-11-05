@@ -1,5 +1,6 @@
 #pragma once
 #include "Math/Vector.h"
+#include "Renderer/Features/jSceneFeatureSettings.h"
 
 enum class EDenoiser : int32
 {
@@ -41,6 +42,7 @@ struct jOptions
     bool UseDeferredRenderer;
     int32 ShadowFilterMode;
     float ShadowFilterRadiusTexels;
+    jSceneFeatures::Settings SceneFeatures;
     bool UseHWRTDirectLighting;
     int32 HWRTDirectLightingMode;
     int32 HWRTDebugViewMode;

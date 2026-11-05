@@ -28,12 +28,23 @@ constexpr std::array<Action, 6> Actions{{
 constexpr std::array<const char*, 10> RenderKeys{{"render.deferred", "render.surfelgi", "render.surfelgi.inline",
     "render.ssgi", "render.bloom", "render.vsync", "render.surfelgi.intensity", "render.surfelgi.inline.rays",
     "render.shadow.filter", "render.shadow.radiusTexels"}};
+constexpr const char* SceneKeys[] = {
+    "render.environment.enabled", "render.environment.intensity", "render.environment.combineGI", "render.environment.shAsset",
+    "render.ppr.enabled", "render.ppr.fillHoles", "render.ppr.plane", "render.ppr.thickness", "render.ppr.normalThreshold",
+    "render.ppr.intensity", "render.ppr.roughness", "render.ppr.edgeFade", "render.ppr.fallbackLod", "render.ppr.fallbackRadiance",
+    "render.atmosphere.enabled", "render.atmosphere.intensity", "render.atmosphere.metersPerUnit", "render.atmosphere.groundHeight",
+    "render.atmosphere.heightMeters", "render.atmosphere.maxDistanceMeters", "render.atmosphere.rayleighHeight",
+    "render.atmosphere.mieHeight", "render.atmosphere.rayleigh", "render.atmosphere.mie", "render.atmosphere.anisotropy",
+    "render.atmosphere.sun", "render.atmosphere.solar", "render.atmosphere.viewSamples", "render.atmosphere.lightSamples",
+    "render.atmosphere.useSceneLight"};
 struct Prepared
 {
     bool Deferred, SurfelGI, Inline, SSGI, Bloom, VSync = false;
     float Intensity;
     int Rays;
     jShadowFiltering::Settings ShadowFilter;
+    jSceneFeatures::Settings SceneFeatures;
+    std::string EnvironmentAsset;
     std::map<std::string, EInputKey> Bindings;
     Prepared()
     {
@@ -42,6 +53,7 @@ struct Prepared
         Inline = defaults.SurfelGIInlineRayEnable; SSGI = defaults.UseSSGI; Bloom = defaults.BloomEyeAdaptation;
         Intensity = defaults.SurfelGIIntensity; Rays = defaults.SurfelGIInlineRayCount;
         jShadowFiltering::TryMakeSettings(defaults.ShadowFilterMode, defaults.ShadowFilterRadiusTexels, ShadowFilter);
+        SceneFeatures = defaults.SceneFeatures;
         for (const auto& action : Actions) Bindings.emplace(action.Name, action.Default);
     }
 };
@@ -71,6 +83,7 @@ const Action* FindAction(const char* name)
 bool KnownKey(const std::string& key)
 {
     if (std::find(RenderKeys.begin(), RenderKeys.end(), key) != RenderKeys.end()) return true;
+    if (std::find(std::begin(SceneKeys), std::end(SceneKeys), key) != std::end(SceneKeys)) return true;
     for (const auto& action : Actions) if (key == std::string("input.") + action.Name) return true;
     return false;
 }
@@ -104,7 +117,7 @@ bool ValidUtf8(const std::string& text)
     }
     return true;
 }
-bool Prepare(const jEditorProjectConfig& config, Prepared& prepared, std::string& error)
+bool Prepare(const jEditorProjectConfig& config, Prepared& prepared, std::string& error, const fs::path& root = {})
 {
     error.clear();
     if (config.Name.empty() || config.Name.size() > 256 || config.Name.find('\0') != std::string::npos || !ValidUtf8(config.Name))
@@ -152,6 +165,7 @@ bool Prepare(const jEditorProjectConfig& config, Prepared& prepared, std::string
     }
     if (!jShadowFiltering::TryMakeSettings(shadowMode, shadowRadius, prepared.ShadowFilter))
     { error = "Shadow filtering requires render.shadow.filter 0 or 1 and finite render.shadow.radiusTexels from 0 to 4"; return false; }
+    if (!ReadSceneFeatures(config, root, prepared.SceneFeatures, prepared.EnvironmentAsset, error)) return false;
     std::map<EInputKey, std::string> used;
     for (const auto& action : Actions)
     {
@@ -195,6 +209,7 @@ void Publish(Prepared&& prepared)
     gOptions.UseDeferredRenderer = prepared.Deferred;
     gOptions.ShadowFilterMode = static_cast<int>(prepared.ShadowFilter.Method);
     gOptions.ShadowFilterRadiusTexels = prepared.ShadowFilter.RadiusTexels;
+    gOptions.SceneFeatures = prepared.SceneFeatures;
     gOptions.UseSurfelGI = prepared.SurfelGI;
     gOptions.SurfelGIInlineRayEnable = prepared.Inline && GSupportInlineRaytracing;
     gOptions.UseSSGI = prepared.SSGI;
@@ -254,6 +269,157 @@ std::vector<EInputKey> BindableKeys()
 }
 } // namespace
 
+namespace
+{
+bool FeatureFloat(const std::map<std::string,std::string>& values, const char* key, float& out, std::string& error)
+{
+    const auto found=values.find(key); if(found==values.end())return true;
+    const auto& text=found->second;
+    float candidate=0;
+    const auto parsed=std::from_chars(text.data(),text.data()+text.size(),candidate);
+    if(text.empty() || text.size()>256 || parsed.ec!=std::errc() || parsed.ptr!=text.data()+text.size() || !std::isfinite(candidate))
+    {error=std::string(key)+" must be a finite number without trailing text";return false;}
+    out=candidate;return true;
+}
+bool FeatureUnsigned(const std::map<std::string,std::string>& values,const char* key,std::uint32_t& out,std::string& error)
+{
+    const auto found=values.find(key);if(found==values.end())return true;
+    const auto& text=found->second;std::uint32_t candidate=0;
+    const auto parsed=std::from_chars(text.data(),text.data()+text.size(),candidate);
+    if(text.empty() || text.size()>32 || parsed.ec!=std::errc() || parsed.ptr!=text.data()+text.size())
+    {error=std::string(key)+" must be an unsigned integer";return false;}
+    out=candidate;return true;
+}
+template<std::size_t N> bool FeatureVector(const std::map<std::string,std::string>& values,const char* key,
+    std::array<float,N>& out,std::string& error)
+{
+    const auto found=values.find(key);if(found==values.end())return true;
+    const auto& text=found->second;
+    if(text.empty() || text.size()>512){error=std::string(key)+" vector exceeds text limits";return false;}
+    std::array<float,N> candidate{};std::size_t begin=0;
+    for(std::size_t i=0;i<N;++i)
+    {
+        const auto end=text.find(',',begin);
+        if((i+1<N && end==std::string::npos) || (i+1==N && end!=std::string::npos))
+        {error=std::string(key)+" requires exactly "+std::to_string(N)+" comma-separated numbers";return false;}
+        const auto limit=end==std::string::npos?text.size():end;
+        const auto parsed=std::from_chars(text.data()+begin,text.data()+limit,candidate[i]);
+        if(begin==limit || parsed.ec!=std::errc() || parsed.ptr!=text.data()+limit || !std::isfinite(candidate[i]))
+        {error=std::string(key)+" contains an invalid vector component";return false;}
+        begin=limit+1;
+    }
+    out=candidate;return true;
+}
+std::string FeatureText(float value)
+{
+    char text[64]{};
+    const auto result=std::to_chars(text,text+sizeof(text),value,std::chars_format::general,std::numeric_limits<float>::max_digits10);
+    if(result.ec!=std::errc())throw std::runtime_error("Cannot encode scene feature number");
+    return std::string(text,result.ptr);
+}
+template<std::size_t N> std::string FeatureText(const std::array<float,N>& values)
+{
+    std::string text;
+    for(std::size_t i=0;i<N;++i){if(i)text+=',';text+=FeatureText(values[i]);}
+    return text;
+}
+bool FeatureAssetPath(const std::string& value,const fs::path& root,std::string& error)
+{
+    if(value.empty())return true;
+    if(value.size()>4096 || !ValidUtf8(value) || value.find('\\')!=std::string::npos
+        || std::any_of(value.begin(),value.end(),[](unsigned char c){return c<0x20 || c==0x7f;}))
+    {error="Environment SH asset must be a portable project-relative .jsh path";return false;}
+    const auto relative=jEditorAssetPath::FromUtf8(value);
+    if(relative.extension()!=".jsh"){error="Environment SH asset must use .jsh";return false;}
+    return bool(jEditorProject::ResolveSafe(root.empty()?fs::current_path():root,relative,error,!root.empty()));
+}
+}
+
+bool ReadSceneFeatures(const jEditorProjectConfig& config,const fs::path& root,
+    jSceneFeatures::Settings& output,std::string& shAsset,std::string& error)
+{
+    error.clear();
+    try
+    {
+        jSceneFeatures::Settings candidate;
+        std::string asset;
+        const auto& values=config.Settings;
+        auto& e=candidate.Environment;auto& p=candidate.Reflection;auto& a=candidate.Atmosphere;
+        if(!Boolean(values,"render.environment.enabled",e.Enabled,error)
+            || !Boolean(values,"render.environment.combineGI",e.CombineWithDiffuseGI,error)
+            || !Boolean(values,"render.ppr.enabled",p.Enabled,error) || !Boolean(values,"render.ppr.fillHoles",p.FillHoles,error)
+            || !Boolean(values,"render.atmosphere.enabled",a.Enabled,error)
+            || !Boolean(values,"render.atmosphere.useSceneLight",a.UseSceneDirectionalLight,error)
+            || !FeatureFloat(values,"render.environment.intensity",e.Intensity,error)
+            || !FeatureFloat(values,"render.ppr.thickness",p.PlaneThickness,error)
+            || !FeatureFloat(values,"render.ppr.normalThreshold",p.NormalThreshold,error)
+            || !FeatureFloat(values,"render.ppr.intensity",p.Intensity,error)
+            || !FeatureFloat(values,"render.ppr.roughness",p.RoughnessThreshold,error)
+            || !FeatureFloat(values,"render.ppr.edgeFade",p.EdgeFade,error)
+            || !FeatureFloat(values,"render.ppr.fallbackLod",p.FallbackRoughnessLod,error)
+            || !FeatureVector(values,"render.ppr.plane",p.Plane,error)
+            || !FeatureVector(values,"render.ppr.fallbackRadiance",p.FallbackRadiance,error)
+            || !FeatureFloat(values,"render.atmosphere.intensity",a.Intensity,error)
+            || !FeatureFloat(values,"render.atmosphere.metersPerUnit",a.MetersPerWorldUnit,error)
+            || !FeatureFloat(values,"render.atmosphere.groundHeight",a.GroundHeight,error)
+            || !FeatureFloat(values,"render.atmosphere.heightMeters",a.AtmosphereHeightMeters,error)
+            || !FeatureFloat(values,"render.atmosphere.maxDistanceMeters",a.MaxDistanceMeters,error)
+            || !FeatureFloat(values,"render.atmosphere.rayleighHeight",a.RayleighScaleHeightMeters,error)
+            || !FeatureFloat(values,"render.atmosphere.mieHeight",a.MieScaleHeightMeters,error)
+            || !FeatureFloat(values,"render.atmosphere.anisotropy",a.MieAnisotropy,error)
+            || !FeatureVector(values,"render.atmosphere.rayleigh",a.RayleighScattering,error)
+            || !FeatureVector(values,"render.atmosphere.mie",a.MieScattering,error)
+            || !FeatureVector(values,"render.atmosphere.sun",a.SunDirection,error)
+            || !FeatureVector(values,"render.atmosphere.solar",a.SolarIrradiance,error)
+            || !FeatureUnsigned(values,"render.atmosphere.viewSamples",a.ViewSamples,error)
+            || !FeatureUnsigned(values,"render.atmosphere.lightSamples",a.LightSamples,error))return false;
+        if(const auto found=values.find("render.environment.shAsset");found!=values.end())asset=found->second;
+        if(!FeatureAssetPath(asset,root,error))return false;
+        if(!asset.empty() && !root.empty())
+        {
+            const auto path=jEditorProject::ResolveSafe(root,asset,error,true);
+            if(!path || !jEnvironmentLighting::LoadAsset(*path,e.Radiance,error))return false;
+        }
+        jSceneFeatures::Settings validated;
+        if(!jSceneFeatures::ValidateSettings(candidate,validated,error))return false;
+        output=validated;shAsset=std::move(asset);return true;
+    }
+    catch(const std::exception& exception){error=exception.what();return false;}
+}
+
+bool WriteSceneFeatures(jEditorProjectConfig& config,const jSceneFeatures::Settings& input,
+    const std::string& shAsset,std::string& error)
+{
+    try
+    {
+        jSceneFeatures::Settings checked;
+        if(!jSceneFeatures::ValidateSettings(input,checked,error) || !FeatureAssetPath(shAsset,{},error))return false;
+        auto candidate=config.Settings;
+        const auto boolean=[&](const char* key,bool value){candidate[key]=value?"true":"false";};
+        const auto scalar=[&](const char* key,float value){candidate[key]=FeatureText(value);};
+        const auto vector=[&](const char* key,const auto& value){candidate[key]=FeatureText(value);};
+        const auto& e=checked.Environment;const auto& p=checked.Reflection;const auto& a=checked.Atmosphere;
+        boolean("render.environment.enabled",e.Enabled);boolean("render.environment.combineGI",e.CombineWithDiffuseGI);
+        scalar("render.environment.intensity",e.Intensity);candidate["render.environment.shAsset"]=shAsset;
+        boolean("render.ppr.enabled",p.Enabled);boolean("render.ppr.fillHoles",p.FillHoles);vector("render.ppr.plane",p.Plane);
+        scalar("render.ppr.thickness",p.PlaneThickness);scalar("render.ppr.normalThreshold",p.NormalThreshold);
+        scalar("render.ppr.intensity",p.Intensity);scalar("render.ppr.roughness",p.RoughnessThreshold);
+        scalar("render.ppr.edgeFade",p.EdgeFade);scalar("render.ppr.fallbackLod",p.FallbackRoughnessLod);
+        vector("render.ppr.fallbackRadiance",p.FallbackRadiance);
+        boolean("render.atmosphere.enabled",a.Enabled);boolean("render.atmosphere.useSceneLight",a.UseSceneDirectionalLight);
+        scalar("render.atmosphere.intensity",a.Intensity);scalar("render.atmosphere.metersPerUnit",a.MetersPerWorldUnit);
+        scalar("render.atmosphere.groundHeight",a.GroundHeight);scalar("render.atmosphere.heightMeters",a.AtmosphereHeightMeters);
+        scalar("render.atmosphere.maxDistanceMeters",a.MaxDistanceMeters);scalar("render.atmosphere.rayleighHeight",a.RayleighScaleHeightMeters);
+        scalar("render.atmosphere.mieHeight",a.MieScaleHeightMeters);scalar("render.atmosphere.anisotropy",a.MieAnisotropy);
+        vector("render.atmosphere.rayleigh",a.RayleighScattering);vector("render.atmosphere.mie",a.MieScattering);
+        vector("render.atmosphere.sun",a.SunDirection);vector("render.atmosphere.solar",a.SolarIrradiance);
+        candidate["render.atmosphere.viewSamples"]=std::to_string(a.ViewSamples);
+        candidate["render.atmosphere.lightSamples"]=std::to_string(a.LightSamples);
+        config.Settings=std::move(candidate);error.clear();return true;
+    }
+    catch(const std::exception& exception){error=exception.what();return false;}
+}
+
 const char* KeyName(EInputKey key)
 {
     static constexpr const char* letters[] = {"A","B","C","D","E","F","G","H","I","J","K","L","M",
@@ -283,7 +449,7 @@ bool ParseKey(const std::string& name, EInputKey& key)
 bool Validate(const jEditorProjectConfig& config, std::string& error, const fs::path& root)
 {
     Prepared prepared;
-    return Prepare(config, prepared, error) && ValidatePaths(config, root, error);
+    return Prepare(config, prepared, error, root) && ValidatePaths(config, root, error);
 }
 bool Validate(const jEditorProject& project, std::string& error)
 {
@@ -296,7 +462,7 @@ bool Apply(const jEditorProject& project, jEditor& editor, std::string& error)
     if (!Owner()) { error = "Project settings must apply on the editor owner thread"; return false; }
     Prepared prepared;
     if (project.GetRoot().empty()) { error = "No project is open"; return false; }
-    if (!Prepare(project.GetConfig(), prepared, error) || !ValidatePaths(project.GetConfig(), project.GetRoot(), error)) return false;
+    if (!Prepare(project.GetConfig(), prepared, error, project.GetRoot()) || !ValidatePaths(project.GetConfig(), project.GetRoot(), error)) return false;
     Publish(std::move(prepared)); error.clear(); return true;
 }
 bool Save(jEditorProject& project, jEditor& editor, const jEditorProjectConfig& candidate, std::string& error)
@@ -311,7 +477,7 @@ bool Save(jEditorProject& project, jEditor& editor, const jEditorProjectConfig& 
     for (const auto& [key, value] : project.GetConfig().Settings)
         if (!KnownKey(key)) proposed.EditConfig().Settings.emplace(key, value);
     Prepared prepared;
-    if (!Prepare(proposed.GetConfig(), prepared, error) || !ValidatePaths(proposed.GetConfig(), proposed.GetRoot(), error)) return false;
+    if (!Prepare(proposed.GetConfig(), prepared, error, proposed.GetRoot()) || !ValidatePaths(proposed.GetConfig(), proposed.GetRoot(), error)) return false;
     try { if (!proposed.Save(error)) return false; }
     catch (const std::exception& exception) { error = exception.what(); return false; }
     project = std::move(proposed); Publish(std::move(prepared)); error.clear(); return true;
@@ -344,7 +510,7 @@ void Render(jEditor& editor, jEditorProject* project)
     if (!project || project->GetRoot().empty()) { ImGui::TextWrapped("Create or open a project to edit renderer defaults, camera keys and the startup scene."); ImGui::End(); return; }
     if (!state.Initialized || state.Draft.Id != project->GetConfig().Id || (!state.Changed && !SameConfig(state.Original, project->GetConfig()))) LoadDraft(*project);
     Prepared requested; std::string draftError;
-    const bool validValues = Prepare(state.Draft, requested, draftError);
+    const bool validValues = Prepare(state.Draft, requested, draftError, project->GetRoot());
     const auto projectText = project->GetProjectFile().generic_u8string();
     ImGui::TextWrapped("%s", reinterpret_cast<const char*>(projectText.c_str()));
     ImGui::TextDisabled("Changes take effect only after Save and Apply.");

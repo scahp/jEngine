@@ -1045,6 +1045,11 @@ bool jEditorPackager::Build(const jEditorPackageRequest& request, jEditorPackage
         };
         References references;
         if (!SourceReferences(root, FromUtf8(scene), references, error)) return false;
+        // Environment lighting is a project-level runtime dependency, rather
+        // than an entity texture reference inside the startup scene.
+        if (const auto environment = project.GetConfig().Settings.find("render.environment.shAsset");
+            environment != project.GetConfig().Settings.end() && !environment->second.empty())
+            if (!includePath(environment->second)) return false;
         for (const auto& path : references.Paths) if (!includePath(path)) return false;
         pending.insert(pending.end(), references.Ids.begin(), references.Ids.end());
         if (const auto* sceneAsset = registry.FindBySourcePath(scene)) pending.push_back(sceneAsset->Id);

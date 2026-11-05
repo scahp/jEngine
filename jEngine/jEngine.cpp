@@ -113,6 +113,7 @@ void jEngine::Update(float deltaTime)
 #ifdef ENABLE_EDITOR_FEATURES
     if (g_Editor)
     {
+        g_Editor->SetRasterSurfacePublicationEnabled(!Game.IsUsingPathTracingRenderer());
         TickAuthoringWorkspace(*g_Editor, deltaTime);
         g_Editor->Tick(deltaTime, Game.MainCamera);
     }

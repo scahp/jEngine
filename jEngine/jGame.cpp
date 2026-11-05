@@ -20,6 +20,8 @@
 #include "FileLoader/jAssetImportService.h"
 #include "Scene/jMeshObject.h"
 #include "Material/jMaterial.h"
+#include "Material/jMaterialMapping.h"
+#include "Material/jMaterialWater.h"
 #include "FileLoader/jImageFileLoader.h"
 #include "Renderer/jSceneRenderTargets.h"    // temp
 #ifdef _WIN32
@@ -690,8 +692,20 @@ bool jGame::CanSwitchSceneRenderPipeline(ESceneRenderPipeline target, std::strin
         reason = "A renderer switch is already queued for the next frame.";
         return false;
     }
+    if (target == ESceneRenderPipeline::PathTracing)
+        for (const auto* object : jObject::GetStaticRenderObject())
+        {
+            if (!object || !object->MaterialPtr) continue;
+            const auto& material = *object->MaterialPtr;
+            if ((material.MappingProgram && material.MappingProgram->Active)
+                || (material.Water && material.Water->Enabled))
+            {
+                reason = "Material mapping nodes and animated water currently require Forward or Deferred rendering.";
+                return false;
+            }
+        }
     if (target == GetActiveSceneRenderPipeline()) return true;
-    if (PendingImportId || PathTracingSceneBrowser.PendingLoadIndex >= 0 || PathTracingSceneBrowser.RestartIndex >= 0
+    if (PendingImportId || SceneMaterialRefreshPending || PathTracingSceneBrowser.PendingLoadIndex >= 0 || PathTracingSceneBrowser.RestartIndex >= 0
 #ifdef ENABLE_EDITOR_FEATURES
         || (g_Editor && g_Editor->PendingImportCount() != 0)
 #endif
@@ -818,6 +832,11 @@ void jGame::ProcessSceneRenderPipelineSwitch()
     }
     PathTracingSceneBrowser.ActiveRenderPipeline = target;
     gOptions.UseDeferredRenderer = target == ESceneRenderPipeline::Deferred;
+    if (target != ESceneRenderPipeline::PathTracing && SceneMaterialRefreshAfterRaster)
+    {
+        SceneMaterialRefreshAfterRaster = false;
+        SceneMaterialRefreshPending = true;
+    }
     jConsole::Get().Log(std::string("Renderer switched to ") + GetSceneRenderPipelineNameInternal(target) + ".");
 }
 
@@ -942,7 +961,16 @@ bool jGame::RefreshSceneMaterialLibrary(std::string& error)
     const auto& scene = PathTracingSceneBrowser.Scenes[index];
     const auto& objects = gPathTracingScene ? gPathTracingScene->SpawnObjects : SceneBrowserLoadedObjects;
     size_t slots = 0;
-    if (!jEditorTools::ApplySceneMaterialLibrary(scene.FilePath, objects, slots, error)) return false;
+    bool mappingPending = false;
+    if (!jEditorTools::ApplySceneMaterialLibrary(scene.FilePath, objects, slots, error, &mappingPending,
+        !IsUsingPathTracingRenderer()))
+    {
+        SceneMaterialRefreshPending = mappingPending;
+        SceneMaterialRefreshAfterRaster = !mappingPending && IsUsingPathTracingRenderer();
+        return false;
+    }
+    SceneMaterialRefreshPending = false;
+    SceneMaterialRefreshAfterRaster = false;
     if (slots) ++gSelectedSceneIndex;
     return true;
 }
@@ -962,12 +990,19 @@ bool jGame::WaitForSceneImportForTesting(uint32 timeoutMilliseconds)
     const auto pending = PathTracingSceneBrowser.PendingLoadIndex;
     if (pending >= 0 && pending < static_cast<int32>(PathTracingSceneBrowser.Scenes.size()))
         expected = PathTracingSceneBrowser.Scenes[pending].SceneId;
-    if (expected.empty()) return true;
+    if (expected.empty() && !SceneMaterialRefreshPending) return true;
+    if (expected.empty() && PathTracingSceneBrowser.ActiveIndex >= 0)
+        expected = PathTracingSceneBrowser.Scenes[PathTracingSceneBrowser.ActiveIndex].SceneId;
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMilliseconds);
     do
     {
         ProcessSceneImports();
-        if (!PendingImportId && PathTracingSceneBrowser.PendingLoadIndex < 0)
+        if (SceneMaterialRefreshPending)
+        {
+            std::string materialError;
+            RefreshSceneMaterialLibrary(materialError);
+        }
+        if (!PendingImportId && !SceneMaterialRefreshPending && PathTracingSceneBrowser.PendingLoadIndex < 0)
         {
             const auto index = FindPathTracingSceneIndexById(expected);
             return index >= 0 && index == PathTracingSceneBrowser.ActiveIndex;
@@ -1605,8 +1640,19 @@ void jGame::LoadPathTracingSceneByIndex(int32 InIndex, bool InRebuildRaytracingS
     std::string materialError;
     size_t materialSlots = 0;
     const auto& materialObjects = usePathTracingSceneLoader ? gPathTracingScene->SpawnObjects : SceneBrowserLoadedObjects;
-    if (!jEditorTools::ApplySceneMaterialLibrary(sceneDesc.FilePath, materialObjects, materialSlots, materialError))
-        jConsole::Get().LogError("Scene materials: " + materialError);
+    bool mappingPending = false;
+    // A source library can be edited while PT is active, independently of the
+    // editor document. Keep its last-good native material until a raster switch.
+    const bool willUsePathTracing = sceneDesc.RenderPipeline == ESceneRenderPipeline::PathTracing
+        && GSupportRaytracing && g_rhi->RaytracingScene;
+    SceneMaterialRefreshAfterRaster = false;
+    if (!jEditorTools::ApplySceneMaterialLibrary(sceneDesc.FilePath, materialObjects, materialSlots, materialError,
+        &mappingPending, !willUsePathTracing))
+    {
+        SceneMaterialRefreshPending = mappingPending;
+        SceneMaterialRefreshAfterRaster = !mappingPending && willUsePathTracing;
+        if (!mappingPending) jConsole::Get().LogError("Scene materials: " + materialError);
+    }
     else if (materialSlots)
         std::cout << "Scene materials: " << sceneDesc.SceneId << " bound " << materialSlots << " shared graphs" << std::endl;
 
@@ -1800,7 +1846,8 @@ void jGame::Update(float deltaTime)
     if (std::exchange(SceneMaterialRefreshPending, false))
     {
         std::string error;
-        if (!RefreshSceneMaterialLibrary(error)) jConsole::Get().LogError("Scene materials: " + error);
+        if (!RefreshSceneMaterialLibrary(error) && !SceneMaterialRefreshPending)
+            jConsole::Get().LogError("Scene materials: " + error);
     }
 	SCOPE_DEBUG_EVENT(g_rhi, "Game::Update");
 
@@ -1890,6 +1937,8 @@ void jGame::SyncRaytracingScene()
 void jGame::ClearImportedSceneForAuthoring()
 {
     SceneRenderPipelineSwitchPending = false;
+    SceneMaterialRefreshPending = false;
+    SceneMaterialRefreshAfterRaster = false;
     CancelSceneImport();
     if (g_rhi) g_rhi->Flush();
     if (gPathTracingScene) { gPathTracingScene->ClearSceneFor_jEngine(this); delete gPathTracingScene; gPathTracingScene = nullptr; }

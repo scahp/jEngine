@@ -55,6 +55,13 @@ set_source_files_properties(${RECAST_SOURCES} PROPERTIES SKIP_PRECOMPILE_HEADERS
 
 target_compile_definitions(jEngine PRIVATE JENGINE_DXC_EXECUTABLE="${JENGINE_DXC_EXECUTABLE}")
 set_source_files_properties(jEngine/External/xxHash/xxhash.c jEngine/Tests/jEffectsAuditTests.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+set_source_files_properties(
+  jEngine/Renderer/Features/jEnvironmentLighting.cpp
+  jEngine/Renderer/Features/jHorizonMapping.cpp
+  jEngine/Renderer/Features/jWaterSimulation.cpp
+  jEngine/Tests/jSceneFeatureCpuTests.cpp
+  jEngine/Tests/jSceneFeatureTests.cpp
+  PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 
 include(CTest)
 if(BUILD_TESTING)

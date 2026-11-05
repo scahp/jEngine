@@ -4,10 +4,13 @@
 #include "Scene/jObject.h"
 #include "Scene/jRenderObject.h"
 #include "Scene/jCamera.h"
+#include "Material/jMaterial.h"
 #include "Shader/jCommonShaderParameters.h"
 #include "Shader/jShader.h"
 #include "RHI/jRHIUtil.h"
+#include "RHI/jRenderTargetPool.h"
 #include "jOptions.h"
+#include <cstdlib>
 
 #ifdef ENABLE_EDITOR_FEATURES
 #include "Code/Engine/jEditor.h"
@@ -19,7 +22,8 @@ struct jShaderHitObjectVertexShader : public jShader
 {
     DECLARE_SHADER_PARAMETER_SETS(
         jViewShaderParameters,
-        jRenderObjectShaderParameters)
+        jRenderObjectShaderParameters,
+        jMaterialShaderParameters)
 
     using ShaderPermutation = jPermutation<>;
     ShaderPermutation Permutation;
@@ -38,7 +42,8 @@ struct jShaderHitObjectPixelShader : public jShader
 {
     DECLARE_SHADER_PARAMETER_SETS(
         jViewShaderParameters,
-        jRenderObjectShaderParameters)
+        jRenderObjectShaderParameters,
+        jMaterialShaderParameters)
 
     using ShaderPermutation = jPermutation<>;
     ShaderPermutation Permutation;
@@ -120,6 +125,13 @@ void jRenderer::HitObjectPass()
 		// 2. Setup render pass
 		const jRTClearValue ClearColor = jRTClearValue(0.0f, 0.0f, 0.0f, 0.0f);
 		const jRTClearValue ClearDepth = jRTClearValue(1.0f, 0);
+        // An independent, one-frame depth target selects the nearest surface
+        // regardless of draw order, main-pass MSAA or memoryless attachments.
+        auto pickDepth = jRenderTargetPool::GetRenderTargetForOneFrame({
+            .Type = ETextureType::TEXTURE_2D, .Format = ETextureFormat::D32,
+            .Width = SCR_WIDTH, .Height = SCR_HEIGHT, .SampleCount = EMSAASamples::COUNT_1,
+            .RTClearValue = ClearDepth, .ResourceName = jNameStatic("EditorPickDepth")});
+        if (!pickDepth || !pickDepth->GetTexture()) return;
 
 		jAttachment colorAttachment = {
 			.RenderTargetPtr = jSceneRenderTarget::HitObject_RT,
@@ -131,12 +143,12 @@ void jRenderer::HitObjectPass()
 		};
 
 		jAttachment depthAttachment = {
-			.RenderTargetPtr = RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr,
-			.LoadStoreOp = EAttachmentLoadStoreOp::LOAD_DONTCARE,
-			.StencilLoadStoreOp = EAttachmentLoadStoreOp::LOAD_DONTCARE,
+			.RenderTargetPtr = pickDepth,
+			.LoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE,
+			.StencilLoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_DONTCARE,
 			.RTClearValue = ClearDepth,
-			.InitialLayout = RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetLayout(),
-			.FinalLayout = EResourceLayout::DEPTH_STENCIL_READ_ONLY
+			.InitialLayout = EResourceLayout::UNDEFINED,
+			.FinalLayout = EResourceLayout::DEPTH_STENCIL_ATTACHMENT
 		};
 
 		jRenderPassInfo renderPassInfo;
@@ -149,14 +161,14 @@ void jRenderer::HitObjectPass()
 		subpass.Initialize(0, 1, EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT, EPipelineStageMask::FRAGMENT_SHADER_BIT);
 		subpass.OutputColorAttachments.push_back(0);
 		subpass.OutputDepthAttachment = DepthAttachmentIndex;
-		subpass.DepthAttachmentReadOnly = true;
+		subpass.DepthAttachmentReadOnly = false;
 		renderPassInfo.Subpasses.push_back(subpass);
 
 		jRenderPass* HitObjectRenderPass = g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
 
 		// 3. Setup pipeline state
 		jRasterizationStateInfo* RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)1, true, 0.2f, false, false>::Create();
-		auto DepthStencilState = TDepthStencilStateInfo<false, false, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
+		auto DepthStencilState = TDepthStencilStateInfo<true, true, ECompareOp::LEQUAL, false, false, 0.0f, 1.0f>::Create();
 		auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
 
 		jPipelineStateFixedInfo HitObjectPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, DepthStencilState, BlendingState
@@ -169,11 +181,12 @@ void jRenderer::HitObjectPass()
 
 		// 5. Transition layouts
 		g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::HitObject_RT->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
-		g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::DEPTH_STENCIL_READ_ONLY);
+		g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), pickDepth->GetTexture(), EResourceLayout::DEPTH_STENCIL_ATTACHMENT);
 
 		// 6. Create draw commands for static render objects and pickable debug billboards.
 		int32 NumHitObjectRenderObjects = static_cast<int32>(jObject::GetStaticRenderObject().size());
-		for (auto* debugObject : jObject::GetDebugObject())
+        const bool pickDebugObjects = gOptions.ShowDebugObject;
+		if (pickDebugObjects) for (auto* debugObject : jObject::GetDebugObject())
 		{
 			NumHitObjectRenderObjects += static_cast<int32>(debugObject->RenderObjects.size());
 		}
@@ -182,20 +195,31 @@ void jRenderer::HitObjectPass()
 		HitObjectDrawCommands.resize(NumHitObjectRenderObjects);
 
 		int32 i = 0;
+
+        // Picking has a fixed view/object/material layout in both raster
+        // renderers. Forward light groups must not shift its object bindings.
+        const auto preparePick = [&](jDrawCommand& draw, jRenderObject* object)
+        {
+            auto* material = object->MaterialPtr ? object->MaterialPtr.get() : GDefaultMaterial.get();
+            jShaderBindingInstanceGroup bindings;
+            bindings.Add(View.ViewUniformBufferShaderBindingInstance);
+            bindings.Add(object->CreateShaderBindingInstance());
+            bindings.Add(material->CreateShaderBindingInstance());
+            new (&draw) jDrawCommand(RenderFrameContextPtr, &View, object, HitObjectRenderPass,
+                HitObjectShader, &HitObjectPipelineStateFixed, material, bindings, nullptr,
+                nullptr, 0, EDrawCommandBindingMode::Manual);
+            draw.PrepareToDraw(false);
+        };
 		for (auto iter : jObject::GetStaticRenderObject())
 		{
-			new (&HitObjectDrawCommands[i]) jDrawCommand(RenderFrameContextPtr, &View, iter, HitObjectRenderPass
-				, HitObjectShader, &HitObjectPipelineStateFixed, nullptr, jShaderBindingInstanceArray(), nullptr);
-			HitObjectDrawCommands[i].PrepareToDraw(false);
+            preparePick(HitObjectDrawCommands[i], iter);
 			++i;
 		}
-		for (auto* debugObject : jObject::GetDebugObject())
+		if (pickDebugObjects) for (auto* debugObject : jObject::GetDebugObject())
 		{
 			for (auto* renderObject : debugObject->RenderObjects)
 			{
-				new (&HitObjectDrawCommands[i]) jDrawCommand(RenderFrameContextPtr, &View, renderObject, HitObjectRenderPass
-					, HitObjectShader, &HitObjectPipelineStateFixed, nullptr, jShaderBindingInstanceArray(), nullptr);
-				HitObjectDrawCommands[i].PrepareToDraw(false);
+                preparePick(HitObjectDrawCommands[i], renderObject);
 				++i;
 			}
 		}
@@ -220,6 +244,7 @@ void jRenderer::ReadbackHitObject()
 {
 	static constexpr uint32 HitObjectReadbackRowPitch = 256;
 	static constexpr uint64 HitObjectReadbackBufferSize = HitObjectReadbackRowPitch;
+    static constexpr uint64 HitObjectReadbackPlacementAlignment = 512;
 
 	// Transition HitObject_RT to TRANSFER_SRC for copy
 	g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer()
@@ -234,7 +259,7 @@ void jRenderer::ReadbackHitObject()
 
 	if (!ReadbackBuffer || ReadbackBuffer->GetBufferSize() < HitObjectReadbackBufferSize)
 	{
-		ReadbackBuffer = g_rhi->CreateRawBuffer(HitObjectReadbackBufferSize, 0
+		ReadbackBuffer = g_rhi->CreateRawBuffer(HitObjectReadbackBufferSize, HitObjectReadbackPlacementAlignment
 			, EBufferCreateFlag::Readback
 			, EResourceLayout::TRANSFER_DST
 			, nullptr
@@ -252,7 +277,16 @@ void jRenderer::ReadbackHitObject()
 	g_rhi->CopyTextureRegionToBuffer(RenderFrameContextPtr->GetActiveCommandBuffer()
 		, jSceneRenderTarget::HitObject_RT->GetTexture()
 		, copyRegion
-		, ReadbackBuffer.get());
+		, ReadbackBuffer.get(), ReadbackBuffer->GetOffset());
+
+    if (IsUseVulkan())
+    {
+        VkMemoryBarrier host{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+        host.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        host.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
+        vkCmdPipelineBarrier((VkCommandBuffer)RenderFrameContextPtr->GetActiveCommandBuffer()->GetHandle(),
+            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 1, &host, 0, nullptr, 0, nullptr);
+    }
 
 	// Submit command buffer and wait until copy is complete before mapping
 	RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, true);
@@ -270,6 +304,13 @@ void jRenderer::ReadbackHitObject()
 			(jRenderObjectID(MappedPtr[3]) << 24);
 
 		ReadbackBuffer->Unmap();
+
+        if (const auto* trace = std::getenv("JENGINE_TEST_SCENE_FEATURES"); trace && trace[0] == '1')
+            std::cout << "SCENE_FEATURE_PICK frame=" << g_rhi->GetCurrentFrameNumber()
+                << " forward=" << RenderFrameContextPtr->UseForwardRenderer
+                << " x=" << PickMouseX << " y=" << PickMouseY
+                << " readback_offset=" << ReadbackBuffer->GetOffset()
+                << " render_object_id=" << renderObjectID << std::endl;
 
 #ifdef ENABLE_EDITOR_FEATURES
 		if (g_Editor)

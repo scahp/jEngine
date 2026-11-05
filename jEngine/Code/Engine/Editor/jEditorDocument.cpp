@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "jEditorDocument.h"
+#include "jEditorWater.h"
 #include "External/PathTracingDataLoader/json.hpp"
 
 #include <algorithm>
@@ -260,6 +261,7 @@ bool ValidateEntity(const Entity& entity, std::string& error)
         || (!entity.Terrain.Heights.empty() && entity.Terrain.Heights.size() != resolution * resolution)) return reject("Invalid terrain grid");
     for (float height : entity.Terrain.Heights)
         if (!Number(height, -1e6f, 1e6f)) return reject("Invalid terrain height");
+    if (!jEditorWater::Validate(entity.Water, error)) return false;
     if (!Number(entity.Navigation.CellSize, 1e-3f, 1e6f) || !Number(entity.Navigation.AgentRadius, 0, 1e6f)
         || !Number(entity.Navigation.AgentHeight, 1e-3f, 1e6f) || !Number(entity.Navigation.MaxSlopeDegrees, 0, 89.9f))
         return reject("Invalid navigation properties");
@@ -325,6 +327,7 @@ size_t StateBytes(const SceneState& state)
         bytes += sizeof(Entity) + 128 + entity.Name.capacity() + entity.SourceAsset.capacity() + entity.AssetId.capacity()
             + entity.Material.BaseColorTexture.capacity() + entity.Material.NormalTexture.capacity() + entity.Material.GraphAsset.capacity()
             + entity.Animation.Keys.capacity() * sizeof(AnimationKeyframe) + entity.Terrain.Heights.capacity() * sizeof(float)
+            + entity.Water.Waves.Waves.capacity() * sizeof(jWaterSimulation::Wave)
             + entity.MeshLocalTransforms.capacity() * sizeof(Transform);
     }
     return bytes;
@@ -346,7 +349,7 @@ Json Encode(const Entity& e)
     if (const auto& overrides = e.Material.GraphOverrides)
         material["graphOverrides"] = {{"baseColor", overrides->BaseColor}, {"baseColorTexture", overrides->BaseColorTexture},
             {"metallic", overrides->Metallic}, {"roughness", overrides->Roughness}, {"normalTexture", overrides->NormalTexture}};
-    return {{"id", e.Id}, {"parent", e.Parent}, {"kind", KindName(e.Kind)}, {"name", e.Name}, {"visible", e.Visible},
+    Json result{{"id", e.Id}, {"parent", e.Parent}, {"kind", KindName(e.Kind)}, {"name", e.Name}, {"visible", e.Visible},
         {"locked", e.Locked}, {"transform", Encode(e.Local)}, {"sourceAsset", e.SourceAsset}, {"assetId", e.AssetId}, {"meshLocalTransforms", std::move(meshes)},
         {"material", std::move(material)},
         {"light", {{"color", Encode(e.Light.Color)}, {"intensity", e.Light.Intensity}, {"range", e.Light.Range},
@@ -360,6 +363,18 @@ Json Encode(const Entity& e)
         {"terrain", {{"resolution", e.Terrain.Resolution}, {"sizeX", e.Terrain.SizeX}, {"sizeZ", e.Terrain.SizeZ}, {"heights", e.Terrain.Heights}}},
         {"navigation", {{"enabled", e.Navigation.Enabled}, {"cellSize", e.Navigation.CellSize}, {"agentRadius", e.Navigation.AgentRadius},
             {"agentHeight", e.Navigation.AgentHeight}, {"maxSlopeDegrees", e.Navigation.MaxSlopeDegrees}}}};
+    // Keep unchanged v1 documents byte-shape compatible for non-water defaults.
+    if (e.Kind == EntityKind::Water || e.Water != WaterProperties{})
+    {
+        Json waves = Json::array();
+        for (const auto& wave : e.Water.Waves.Waves)
+            waves.push_back({{"direction", Json::array({wave.Direction[0], wave.Direction[1]})},
+                {"amplitude", wave.Amplitude}, {"wavelength", wave.Wavelength}, {"speed", wave.Speed},
+                {"steepness", wave.Steepness}, {"phaseRadians", wave.PhaseRadians}});
+        result["water"] = {{"resolution", e.Water.Resolution}, {"sizeX", e.Water.SizeX},
+            {"sizeZ", e.Water.SizeZ}, {"baseHeight", e.Water.Waves.BaseHeight}, {"waves", std::move(waves)}};
+    }
+    return result;
 }
 std::string Serialize(const SceneState& state, const char* format = "jEngineScene", EntityId root = InvalidEntity,
     const std::vector<EntityId>* selectionRoots = nullptr)
@@ -420,12 +435,12 @@ Transform DecodeTransform(const Json& value)
 Entity DecodeEntity(const Json& j)
 {
     ObjectKeys(j, {"id", "parent", "kind", "name", "visible", "locked", "transform", "sourceAsset", "assetId", "meshLocalTransforms",
-        "material", "light", "camera", "animation", "particles", "terrain", "navigation"});
+        "material", "light", "camera", "animation", "particles", "terrain", "navigation"}, "water");
     Entity e;
     e.Id = Unsigned(j.at("id")); e.Parent = Unsigned(j.at("parent"));
     const std::string kind = String(j.at("kind"));
     bool known = false;
-    for (int i = 0; i <= int(EntityKind::Terrain); ++i)
+    for (int i = 0; i <= int(EntityKind::Water); ++i)
         if (kind == KindName(EntityKind(i))) { e.Kind = EntityKind(i); known = true; break; }
     if (!known) throw std::runtime_error("Unknown entity kind");
     e.Name = String(j.at("name")); e.Visible = Boolean(j.at("visible")); e.Locked = Boolean(j.at("locked"));
@@ -475,6 +490,29 @@ Entity DecodeEntity(const Json& j)
     e.Terrain.Resolution = Unsigned32(t.at("resolution")); e.Terrain.SizeX = Float(t.at("sizeX")); e.Terrain.SizeZ = Float(t.at("sizeZ"));
     if (!t.at("heights").is_array() || t.at("heights").size() > 129 * 129) throw std::runtime_error("Terrain height limit exceeded");
     for (const auto& height : t.at("heights")) e.Terrain.Heights.push_back(Float(height));
+    if (const auto it = j.find("water"); it != j.end())
+    {
+        ObjectKeys(*it, {"resolution", "sizeX", "sizeZ", "baseHeight", "waves"});
+        e.Water.Resolution = Unsigned32(it->at("resolution"));
+        e.Water.SizeX = Float(it->at("sizeX")); e.Water.SizeZ = Float(it->at("sizeZ"));
+        e.Water.Waves.BaseHeight = Float(it->at("baseHeight"));
+        const auto& waves = it->at("waves");
+        if (!waves.is_array() || waves.size() > jEditorWater::MaximumGpuWaves)
+            throw std::runtime_error("Water wave limit exceeded");
+        e.Water.Waves.Waves.clear();
+        for (const auto& value : waves)
+        {
+            ObjectKeys(value, {"direction", "amplitude", "wavelength", "speed", "steepness", "phaseRadians"});
+            const auto& direction = value.at("direction");
+            if (!direction.is_array() || direction.size() != 2) throw std::runtime_error("Water direction requires two components");
+            jWaterSimulation::Wave wave;
+            wave.Direction = {Float(direction[0]), Float(direction[1])};
+            wave.Amplitude = Float(value.at("amplitude")); wave.Wavelength = Float(value.at("wavelength"));
+            wave.Speed = Float(value.at("speed")); wave.Steepness = Float(value.at("steepness"));
+            wave.PhaseRadians = Float(value.at("phaseRadians"));
+            e.Water.Waves.Waves.push_back(wave);
+        }
+    }
     const auto& n = j.at("navigation");
     ObjectKeys(n, {"enabled", "cellSize", "agentRadius", "agentHeight", "maxSlopeDegrees"});
     e.Navigation.Enabled = Boolean(n.at("enabled")); e.Navigation.CellSize = Float(n.at("cellSize"));
@@ -765,6 +803,7 @@ const char* KindName(EntityKind kind)
     case EntityKind::Camera: return "Camera";
     case EntityKind::ParticleEmitter: return "ParticleEmitter";
     case EntityKind::Terrain: return "Terrain";
+    case EntityKind::Water: return "Water";
     default: return nullptr;
     }
 }

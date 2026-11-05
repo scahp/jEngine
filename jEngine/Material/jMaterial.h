@@ -1,11 +1,14 @@
 ﻿#pragma once
 #include "RHI/jRHIType.h"
+#include "jMaterialMapping.h"
 #include <optional>
 #include <string>
 
 struct jTexture;
 struct jShaderBindingInstance;
 struct jSamplerStateInfo;
+struct jMaterialWaterState;
+struct IUniformBufferBlock;
 
 struct jMaterialData
 {
@@ -84,6 +87,14 @@ public:
     std::shared_ptr<jMaterialData> MaterialDataPtr;
     std::string SourceMaterialName;
     std::optional<jSurfaceShading> Surface;
+    std::shared_ptr<const jMaterialMapping::Program> MappingProgram;
+    std::array<Vector4, jMaterialMapping::MaximumValues> MappingValues{};
+    std::array<std::shared_ptr<jTexture>, jMaterialMapping::MaximumTextures> MappingTextures{};
+    uint32 MappingOutputOverridesMask = 0;
+    std::shared_ptr<IUniformBufferBlock> MappingUniformBuffer;
+    std::shared_ptr<jMaterialWaterState> Water;
+    uint64 MappingUniformFrame = ~uint64(0);
+    bool MappingBindingIsSingleFrame = false;
 
     // Authored instances clone before editing; imported prototypes stay shared.
     bool UseMaterialProperties = false;

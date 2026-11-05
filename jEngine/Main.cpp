@@ -101,6 +101,14 @@ namespace
 int RunCpuSelfTests();
 int RunEditorGraphicsTests();
 int RunEditorProjectSettingsTests();
+int RunSceneFeatureCpuTests();
+int RunSceneFeatureTests();
+int RunMaterialMappingTests();
+int RunEditorWaterTests();
+int RunSceneFeatureProjectTests();
+int RunEditorToolsTests();
+int RunEditorAuthoringRuntimeTests();
+int RunSceneFeatureIntegrationGpuTests(const char* directory);
 int RunModelUploadGpuTests();
 int RunEditorParticleMaterialGpuTests();
 int RunLogBenchmark();
@@ -110,6 +118,8 @@ int ExportSurfelGIShaderFixtures(const char* directory, bool vulkan);
 int ExportPostProcessShaderFixtures(const char* directory, bool vulkan);
 int ExportAOEffectShaderFixtures(const char* directory, bool vulkan);
 int ExportEditorGraphicsShaderFixtures(const char* directory, bool vulkan);
+int ExportSceneFeatureShaderFixtures(const char* directory, bool vulkan);
+int ExportMaterialMappingShaderFixtures(const char* directory, bool vulkan);
 
 int main(int argc, char** argv)
 {
@@ -147,7 +157,14 @@ int main(int argc, char** argv)
         }
         const int graphics = RunEditorGraphicsTests();
         const int settings = RunEditorProjectSettingsTests();
-        return graphics || settings ? EXIT_FAILURE : EXIT_SUCCESS;
+        const int sceneCpu = RunSceneFeatureCpuTests();
+        const int sceneSettings = RunSceneFeatureTests();
+        const int mapping = RunMaterialMappingTests();
+        const int water = RunEditorWaterTests();
+        const int project = RunSceneFeatureProjectTests();
+        const int tools = RunEditorToolsTests();
+        const int runtime = RunEditorAuthoringRuntimeTests();
+        return graphics || settings || sceneCpu || sceneSettings || mapping || water || project || tools || runtime ? EXIT_FAILURE : EXIT_SUCCESS;
     }
     if (argc == 2 && std::strcmp(argv[1], "--ci-log-benchmark") == 0) return RunLogBenchmark();
     if (argc >= 2 && (std::strcmp(argv[1], "--benchmark-assets") == 0 || std::strcmp(argv[1], "--benchmark-editor") == 0))
@@ -172,26 +189,30 @@ int main(int argc, char** argv)
         if (ExportSurfelGIShaderFixtures(argv[2], vulkan) != EXIT_SUCCESS) return EXIT_FAILURE;
         if (ExportPostProcessShaderFixtures(argv[2], vulkan) != EXIT_SUCCESS) return EXIT_FAILURE;
         if (ExportAOEffectShaderFixtures(argv[2], vulkan) != EXIT_SUCCESS) return EXIT_FAILURE;
-        return ExportEditorGraphicsShaderFixtures(argv[2], vulkan);
+        if (ExportEditorGraphicsShaderFixtures(argv[2], vulkan) != EXIT_SUCCESS) return EXIT_FAILURE;
+        if (ExportSceneFeatureShaderFixtures(argv[2], vulkan) != EXIT_SUCCESS) return EXIT_FAILURE;
+        return ExportMaterialMappingShaderFixtures(argv[2], vulkan);
     }
 
     // Validate external input before creating a window, GPU resources or worker threads.
-    std::string editorFlowDirectory, rendererSwitchDirectory;
+    std::string editorFlowDirectory, rendererSwitchDirectory, sceneFeaturesDirectory;
     for (int i = 1; i < argc; ++i)
     {
         const bool rendererSwitch = std::strcmp(argv[i], "--ci-renderer-switch") == 0;
-        if (!rendererSwitch && std::strcmp(argv[i], "--ci-editor-flow") != 0) continue;
-        auto& directory = rendererSwitch ? rendererSwitchDirectory : editorFlowDirectory;
+        const bool sceneFeatures = std::strcmp(argv[i], "--ci-scene-features") == 0;
+        if (!rendererSwitch && !sceneFeatures && std::strcmp(argv[i], "--ci-editor-flow") != 0) continue;
+        auto& directory = sceneFeatures ? sceneFeaturesDirectory : rendererSwitch ? rendererSwitchDirectory : editorFlowDirectory;
         if (!directory.empty() || ++i == argc || !argv[i][0] || argv[i][0] == '-')
-        { std::cerr << "Usage: --ci-editor-flow|--ci-renderer-switch <owned-output-directory> [-vulkan|-dx12]" << std::endl; return EXIT_FAILURE; }
+        { std::cerr << "Usage: --ci-editor-flow|--ci-renderer-switch|--ci-scene-features <owned-output-directory> [-vulkan|-dx12]" << std::endl; return EXIT_FAILURE; }
         try { directory = jEditorAssetPath::ToUtf8(std::filesystem::absolute(jEditorAssetPath::FromUtf8(argv[i]))); }
         catch (const std::exception& error) { std::cerr << error.what() << std::endl; return EXIT_FAILURE; }
     }
-    if ((!editorFlowDirectory.empty() && !rendererSwitchDirectory.empty()) ||
-        ((!editorFlowDirectory.empty() || !rendererSwitchDirectory.empty()) && gCommandLineArgument.HasArgument("--ci-editor-gpu")))
+    if ((int(!editorFlowDirectory.empty()) + int(!rendererSwitchDirectory.empty()) + int(!sceneFeaturesDirectory.empty()) > 1) ||
+        ((!editorFlowDirectory.empty() || !rendererSwitchDirectory.empty() || !sceneFeaturesDirectory.empty()) && gCommandLineArgument.HasArgument("--ci-editor-gpu")))
     { std::cerr << "Select only one editor GPU test" << std::endl; return EXIT_FAILURE; }
     if (!editorFlowDirectory.empty()) SetAuthoringTestStateDirectory(jEditorAssetPath::FromUtf8(editorFlowDirectory) / "workspace-state");
     if (!rendererSwitchDirectory.empty()) SetAuthoringTestStateDirectory(jEditorAssetPath::FromUtf8(rendererSwitchDirectory) / "workspace-state");
+    if (!sceneFeaturesDirectory.empty()) SetAuthoringTestStateDirectory(jEditorAssetPath::FromUtf8(sceneFeaturesDirectory) / "workspace-state");
     std::string authoringError;
     if (!ConfigureEditorStartup(argc, argv, authoringError)) { std::cerr << authoringError << std::endl; return EXIT_FAILURE; }
     std::string browserScene, browserLoader;
@@ -219,7 +240,7 @@ int main(int argc, char** argv)
     }
     bool waitForTestScene = false;
     if (!ReadEngineBoolean("JENGINE_TEST_WAIT_FOR_SCENE", waitForTestScene)) return EXIT_FAILURE;
-    if (gCommandLineArgument.HasArgument("--ci-editor-gpu") || !editorFlowDirectory.empty() || !rendererSwitchDirectory.empty()) waitForTestScene = true;
+    if (gCommandLineArgument.HasArgument("--ci-editor-gpu") || !editorFlowDirectory.empty() || !rendererSwitchDirectory.empty() || !sceneFeaturesDirectory.empty()) waitForTestScene = true;
     if (!ReadEngineBoolean("JENGINE_SURFEL_GI", gOptions.UseSurfelGI)
         || !ReadEngineBoolean("JENGINE_INLINE_RAY", gOptions.SurfelGIInlineRayEnable))
         return EXIT_FAILURE;
@@ -345,6 +366,12 @@ int main(int argc, char** argv)
         g_Engine->Release(); g_rhi->ReleaseRHI(); glfwTerminate(); return EXIT_FAILURE;
     }
 #endif
+    if (!sceneFeaturesDirectory.empty())
+    {
+        const int failures = RunSceneFeatureIntegrationGpuTests(sceneFeaturesDirectory.c_str());
+        g_Engine->Release(); g_rhi->ReleaseRHI(); glfwTerminate();
+        return failures ? EXIT_FAILURE : EXIT_SUCCESS;
+    }
     if (!rendererSwitchDirectory.empty())
     {
         const int failures = RunRendererSwitchGpuTests(rendererSwitchDirectory.c_str());

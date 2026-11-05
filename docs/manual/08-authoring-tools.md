@@ -33,10 +33,10 @@
 | `Color` | 상수 RGB |
 | `Scalar` | 상수 수치 |
 | `Texture` | 프로젝트 상대 경로의 색 텍스처 |
-| `Multiply` | 상수끼리 곱하거나 색 텍스처 하나에 상수 색을 곱함 |
-| `Add` | 상수끼리 더함 |
+| `Multiply` | 수치 입력을 곱함. 새 텍스처는 `Texture Sample` 결과를 연결 |
+| `Add` | 수치 입력을 더함. 핀의 벡터 차원이 호환되어야 함 |
 
-**② `New node → Add node`**로 노드를 추가하고 **③ `Out`**을 연산 노드의 `A`/`B`나 `Material Output`의 핀에 끌어 연결합니다. 출력 핀을 클릭해 연결할 노드를 선택하거나 연결을 끊을 수도 있습니다. `Base Color`는 색상과 텍스처를, `Normal`은 Texture 노드의 노멀맵을, `Metallic`과 `Roughness`는 수치 값을 받습니다. Texture를 쓰면 `Texture path`에 프로젝트 파일 경로를 넣으세요. 순환 연결, 없는 노드 참조, 텍스처 둘의 혼합, 텍스처 더하기, 텍스처 Metallic/Roughness 출력은 거부됩니다.
+**② `New node → Add node`**로 노드를 추가하고 **③ `Out`**을 연산 노드의 `A`/`B`나 `Material Output`의 핀에 끌어 연결합니다. 출력 핀을 클릭해 연결할 노드를 선택하거나 연결을 끊을 수도 있습니다. `Base Color`는 색상과 샘플링 결과를, `Normal`은 `Sample Normal`의 결과 또는 기존 Texture 노멀맵을 받습니다. `Metallic`·`Roughness`에는 수치나 `Channel` 출력을 연결합니다. 새 UV·Texture Object/Sample·Parallax/POM·Relief·Interior·Horizon 노드의 핀과 사용법은 [노드 재질의 매핑](material-mapping.md)을 참고하세요. 텍스처 객체는 샘플링한 뒤 연산하며 순환·없는 참조·잘못된 타입은 거부됩니다.
 
 프로젝트에 등록된 PNG, JPEG, BMP, TGA, HDR 이미지는 `Texture` 노드와 Inspector의 Base Color·Normal 텍스처 슬롯에 썸네일이 표시됩니다. 썸네일에 커서를 올리면 큰 미리보기와 파일 경로를 확인할 수 있습니다.
 

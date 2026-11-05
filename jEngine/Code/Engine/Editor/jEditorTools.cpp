@@ -18,6 +18,8 @@
 #include "DetourNavMeshBuilder.h"
 #include "DetourNavMeshQuery.h"
 #include <fstream>
+#include <span>
+#include "stb_image.h"
 
 namespace jEditorTools
 {
@@ -217,6 +219,27 @@ bool EvaluateMaterial(const MaterialGraph& graph, MaterialProperties& material, 
     error.clear();
     if (graph.Nodes.empty() || graph.Nodes.size() > MaxMaterialNodes) { error = "A material needs 1..256 nodes"; return false; }
     if (graph.Surface && !ValidSurface(*graph.Surface)) { error = "Invalid material surface value or texture path"; return false; }
+    if (graph.Horizon || std::any_of(graph.Nodes.begin(), graph.Nodes.end(), [](const auto& node) { return node.Kind > NodeKind::Add; }))
+    {
+        jMaterialMapping::Program program;
+        if (!jMaterialMapping::Compile(graph, program, error)) return false;
+        auto result = material;
+        result.BaseColor = {1, 1, 1}; result.BaseColorTexture.clear();
+        if (graph.Normal)
+        {
+            const auto node = std::find_if(graph.Nodes.begin(), graph.Nodes.end(), [&](const auto& value) { return value.Id == graph.Normal; });
+            result.NormalTexture = node != graph.Nodes.end() && node->Kind == NodeKind::Texture ? node->Texture : std::string{};
+        }
+        else result.NormalTexture.clear();
+        const auto constant = [&](uint32_t id, float& value)
+        {
+            const auto node = std::find_if(graph.Nodes.begin(), graph.Nodes.end(), [&](const auto& current) { return current.Id == id; });
+            if (node != graph.Nodes.end() && node->Kind == NodeKind::Scalar) value = std::clamp(node->Scalar, 0.0f, 1.0f);
+        };
+        constant(graph.Metallic, result.Metallic); constant(graph.Roughness, result.Roughness);
+        if (graph.Surface) { result.Emissive = graph.Surface->Emission; result.Opacity = graph.Surface->Opacity; }
+        result.OverrideEnabled = true; material = std::move(result); return true;
+    }
     MaterialEvaluator evaluator(graph);
     for (const auto& node : graph.Nodes)
     {
@@ -260,10 +283,17 @@ bool SaveMaterial(const MaterialGraph& graph, const std::filesystem::path& file,
 {
     MaterialProperties checked; if (!EvaluateMaterial(graph, checked, error)) return false;
     Json nodes = Json::array();
-    for (const auto& n : graph.Nodes) nodes.push_back({{"id", n.Id}, {"kind", int(n.Kind)}, {"a", n.InputA}, {"b", n.InputB}, {"color", {n.Color.X, n.Color.Y, n.Color.Z}}, {"value", n.Scalar}, {"x", n.X}, {"y", n.Y}, {"texture", n.Texture}});
-    Json json{{"format", "jEngineMaterial"}, {"version", 1}, {"nodes", nodes}, {"baseColor", graph.BaseColor},
+    const bool dynamic = graph.Horizon || std::any_of(graph.Nodes.begin(), graph.Nodes.end(), [](const auto& node) { return node.Kind > NodeKind::Add; });
+    for (const auto& n : graph.Nodes)
+    {
+        Json node{{"id", n.Id}, {"kind", int(n.Kind)}, {"a", n.InputA}, {"b", n.InputB}, {"color", {n.Color.X, n.Color.Y, n.Color.Z}}, {"value", n.Scalar}, {"x", n.X}, {"y", n.Y}, {"texture", n.Texture}};
+        if (dynamic) { node["c"] = n.InputC; node["d"] = n.InputD; node["parameters"] = n.Parameters; node["semantic"] = uint32_t(n.Semantic); }
+        nodes.push_back(std::move(node));
+    }
+    Json json{{"format", "jEngineMaterial"}, {"version", dynamic ? 2 : 1}, {"nodes", nodes}, {"baseColor", graph.BaseColor},
         {"metallic", graph.Metallic}, {"roughness", graph.Roughness}, {"normal", graph.Normal}};
     if (graph.Surface) json["surface"] = WriteSurface(*graph.Surface);
+    if (dynamic) json["horizon"] = graph.Horizon;
     return Write(file, json.dump(2), error);
 }
 bool LoadMaterial(const std::filesystem::path& file, MaterialGraph& graph, std::string& error)
@@ -272,16 +302,44 @@ bool LoadMaterial(const std::filesystem::path& file, MaterialGraph& graph, std::
     {
         if (std::filesystem::file_size(file) > 1024 * 1024) throw std::runtime_error("Material graph exceeds 1 MiB");
         std::ifstream in(file); Json json; in >> json;
-        if (json.at("format") != "jEngineMaterial" || json.at("version") != 1 || !json.at("nodes").is_array() || json.at("nodes").size() > MaxMaterialNodes) throw std::runtime_error("Unsupported material graph");
-        MaterialGraph result; result.BaseColor = json.at("baseColor").get<uint32_t>(); result.Metallic = json.at("metallic").get<uint32_t>(); result.Roughness = json.at("roughness").get<uint32_t>();
-        result.Normal = json.value("normal", uint32_t{0});
+        const auto version = json.at("version");
+        if (json.at("format") != "jEngineMaterial" || !version.is_number_integer() || (version != 1 && version != 2)
+            || !json.at("nodes").is_array() || json.at("nodes").size() > MaxMaterialNodes) throw std::runtime_error("Unsupported material graph");
+        const auto id = [](const Json& value)
+        {
+            if (!value.is_number_integer() || value.get<int64_t>() < 0 || value.get<uint64_t>() >= UINT32_MAX)
+                throw std::runtime_error("Material IDs must be bounded unsigned integers");
+            return value.get<uint32_t>();
+        };
+        MaterialGraph result; result.Version = version.get<uint32_t>();
+        result.BaseColor = id(json.at("baseColor")); result.Metallic = id(json.at("metallic")); result.Roughness = id(json.at("roughness"));
+        result.Normal = json.contains("normal") ? id(json.at("normal")) : 0;
+        result.Horizon = json.contains("horizon") ? id(json.at("horizon")) : 0;
         if (const auto surface = json.find("surface"); surface != json.end()) result.Surface = ReadSurface(*surface);
         for (const auto& j : json.at("nodes"))
         {
-            MaterialNode node; node.Id = j.at("id").get<uint32_t>(); node.Kind = NodeKind(j.at("kind").get<int>());
-            node.InputA = j.at("a").get<uint32_t>(); node.InputB = j.at("b").get<uint32_t>();
+            const auto& kind = j.at("kind");
+            if (!kind.is_number_integer() || kind.get<int64_t>() < 0 || kind.get<int64_t>() > int(NodeKind::Horizon))
+                throw std::runtime_error("Material node kind must be a supported integer enum");
+            MaterialNode node; node.Id = id(j.at("id")); node.Kind = NodeKind(kind.get<int>());
+            if (result.Version == 1 && node.Kind > NodeKind::Add) throw std::runtime_error("New material nodes require graph version 2");
+            node.InputA = id(j.at("a")); node.InputB = id(j.at("b"));
+            if (!j.at("color").is_array() || j.at("color").size() != 3) throw std::runtime_error("Material color requires exactly three numbers");
             node.Color = {j.at("color").at(0).get<float>(), j.at("color").at(1).get<float>(), j.at("color").at(2).get<float>()};
-            node.Scalar = j.at("value").get<float>(); node.X = j.at("x").get<float>(); node.Y = j.at("y").get<float>(); node.Texture = j.at("texture").get<std::string>(); result.Nodes.push_back(node);
+            node.Scalar = j.at("value").get<float>(); node.X = j.at("x").get<float>(); node.Y = j.at("y").get<float>(); node.Texture = j.at("texture").get<std::string>();
+            if (result.Version >= 2)
+            {
+                node.InputC = j.contains("c") ? id(j.at("c")) : 0; node.InputD = j.contains("d") ? id(j.at("d")) : 0;
+                if (j.contains("parameters"))
+                {
+                    if (!j["parameters"].is_array() || j["parameters"].size() != 4) throw std::runtime_error("Material parameters require exactly four numbers");
+                    node.Parameters = j["parameters"].get<std::array<float, 4>>();
+                }
+                if (j.contains("semantic") && (!j["semantic"].is_number_integer() || j["semantic"].get<int64_t>() < 0 || j["semantic"].get<int64_t>() > 2))
+                    throw std::runtime_error("Material texture semantic must be a supported integer enum");
+                node.Semantic = jMaterialMapping::TextureSemantic(j.value("semantic", 0u));
+            }
+            result.Nodes.push_back(node);
         }
         MaterialProperties checked; if (!EvaluateMaterial(result, checked, error)) return false;
         graph = std::move(result); return true;
@@ -289,9 +347,300 @@ bool LoadMaterial(const std::filesystem::path& file, MaterialGraph& graph, std::
     catch (const std::exception& e) { error = e.what(); return false; }
 }
 
-bool ApplySceneMaterialLibrary(const std::filesystem::path& source, const std::vector<jObject*>& objects,
-    size_t& appliedSlots, std::string& error)
+bool DecodeMaterialDataTexture(const std::filesystem::path& file, std::shared_ptr<jImageData>& output, std::string& error)
 {
+    try
+    {
+        constexpr uintmax_t maxFileBytes = 32 * 1024 * 1024;
+        const auto bytes = std::filesystem::file_size(file);
+        if (!bytes || bytes > maxFileBytes) { error = "Mapping data file must contain 1..32 MiB"; return false; }
+        std::ifstream input(file, std::ios::binary); std::vector<stbi_uc> encoded(static_cast<size_t>(bytes));
+        if (!input.read(reinterpret_cast<char*>(encoded.data()), std::streamsize(encoded.size())))
+        { error = "Cannot read complete mapping data file"; return false; }
+        int width = 0, height = 0, channels = 0;
+        if (!stbi_info_from_memory(encoded.data(), int(encoded.size()), &width, &height, &channels)
+            || width <= 0 || height <= 0 || width > 8192 || height > 8192 || uint64_t(width) * height > 16 * 1024 * 1024)
+        { error = "Mapping data image exceeds 16M texels / 8192 per axis or is invalid"; return false; }
+        std::unique_ptr<stbi_uc, void(*)(void*)> pixels(stbi_load_from_memory(encoded.data(), int(encoded.size()), &width, &height, &channels, 4), stbi_image_free);
+        if (!pixels) { error = "Mapping data image decode failed"; return false; }
+        auto image = std::make_shared<jImageData>();
+        image->Filename = jName(jEditorAssetPath::ToUtf8(file)); image->Width = width; image->Height = height;
+        image->sRGB = false; image->Format = ETextureFormat::RGBA8; image->FormatType = EFormatType::UNSIGNED_BYTE;
+        image->MipLevel = 1; image->LayerCount = 1; image->CreateMipmapIfPossible = false;
+        const size_t size = size_t(width) * size_t(height) * 4;
+        image->ImageBulkData.ImageData.assign(pixels.get(), pixels.get() + size);
+        image->ImageBulkData.SubresourceFootprints.resize(1);
+        auto& footprint = image->ImageBulkData.SubresourceFootprints[0];
+        footprint.Width = width; footprint.Height = height; footprint.RowPitch = width * 4;
+        footprint.Depth = 0; footprint.MipLevel = 0; footprint.Offset = 0;
+        output = std::move(image); error.clear(); return true;
+    }
+    catch (const std::exception& exception) { error = exception.what(); return false; }
+}
+namespace
+{
+constexpr size_t MappingCacheBytes = 128 * 1024 * 1024, MappingCacheEntries = 64, MappingWorkerCount = 2;
+struct MappingImageResult { std::shared_ptr<jImageData> Image; std::string Error; uint64_t Generation = 0; };
+struct MappingImageEntry
+{
+    std::filesystem::path Path;
+    std::filesystem::file_time_type Modified{};
+    uintmax_t FileBytes = 0;
+    uint64_t Generation = 1, Touch = 0;
+    bool Waiting = false, Failed = false;
+    std::future<MappingImageResult> Future;
+    std::shared_ptr<jImageData> Image;
+    std::string Error;
+};
+struct MappingImageGroup { std::vector<std::string> Keys; std::chrono::steady_clock::time_point Touch; };
+struct MappingImageCache
+{
+    std::map<std::string, MappingImageEntry> Entries;
+    std::map<std::string, MappingImageGroup> Groups;
+    std::vector<std::future<MappingImageResult>> Retired;
+    uint64_t Epoch = 1, Clock = 0;
+};
+MappingImageCache& MappingImages() { static MappingImageCache cache; return cache; }
+bool MappingKeyPinned(const std::string& key)
+{
+    for (const auto& [name, group] : MappingImages().Groups)
+        if (std::find(group.Keys.begin(), group.Keys.end(), key) != group.Keys.end()) return true;
+    return false;
+}
+size_t MappingDecodedBytes()
+{
+    size_t bytes = 0;
+    for (const auto& [key, entry] : MappingImages().Entries) if (entry.Image) bytes += entry.Image->ImageBulkData.ImageData.size();
+    return bytes;
+}
+bool MappingMakeRoom(size_t bytes, bool newEntry, const std::string& protectedKey = {})
+{
+    auto& cache = MappingImages();
+    while (MappingDecodedBytes() + bytes > MappingCacheBytes || cache.Entries.size() + size_t(newEntry) > MappingCacheEntries)
+    {
+        auto victim = cache.Entries.end();
+        for (auto entry = cache.Entries.begin(); entry != cache.Entries.end(); ++entry)
+            if (entry->first != protectedKey && !entry->second.Future.valid() && !entry->second.Waiting && !MappingKeyPinned(entry->first)
+                && (victim == cache.Entries.end() || entry->second.Touch < victim->second.Touch)) victim = entry;
+        if (victim == cache.Entries.end()) return false;
+        cache.Entries.erase(victim);
+    }
+    return true;
+}
+void MappingRemoveGroups(const std::string& key)
+{
+    std::erase_if(MappingImages().Groups, [&](const auto& pair)
+    { return std::find(pair.second.Keys.begin(), pair.second.Keys.end(), key) != pair.second.Keys.end(); });
+}
+void MappingStartJobs()
+{
+    auto& cache = MappingImages(); size_t active = cache.Retired.size();
+    for (const auto& [key, entry] : cache.Entries) active += entry.Future.valid();
+    for (auto& [key, entry] : cache.Entries)
+    {
+        if (active >= MappingWorkerCount) break;
+        if (!entry.Waiting || entry.Future.valid()) continue;
+        const auto path = entry.Path; const auto generation = entry.Generation;
+        entry.Waiting = false;
+        try
+        {
+            entry.Future = std::async(std::launch::async, [path, generation]
+            {
+                MappingImageResult result; result.Generation = generation;
+                DecodeMaterialDataTexture(path, result.Image, result.Error); return result;
+            });
+        }
+        catch (const std::exception& exception)
+        { entry.Failed = true; entry.Error = exception.what(); MappingRemoveGroups(key); ++cache.Epoch; continue; }
+        ++active;
+    }
+}
+bool MappingHasActiveWork()
+{
+    const auto& cache = MappingImages();
+    if (!cache.Retired.empty()) return true;
+    for (const auto& [key, entry] : cache.Entries) if (entry.Waiting || entry.Future.valid()) return true;
+    return false;
+}
+bool IsRawMappingTexture(const jMaterialMapping::TextureBinding& texture, const std::filesystem::path& path)
+{
+    if (texture.Semantic == jMaterialMapping::TextureSemantic::Color) return false;
+    auto extension = path.extension().string();
+    std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+    return extension == ".png" || extension == ".tga" || extension == ".bmp";
+}
+}
+uint64_t PollMaterialMappingTexturePreparation()
+{
+    auto& cache = MappingImages();
+    for (auto it = cache.Retired.begin(); it != cache.Retired.end();)
+        if (it->wait_for(std::chrono::seconds(0)) == std::future_status::ready) { try { it->get(); } catch (...) {} it = cache.Retired.erase(it); ++cache.Epoch; }
+        else ++it;
+    const auto now = std::chrono::steady_clock::now();
+    std::erase_if(cache.Groups, [&](const auto& group) { return now - group.second.Touch > std::chrono::seconds(30); });
+    for (auto& [key, entry] : cache.Entries)
+    {
+        if (!entry.Future.valid() || entry.Future.wait_for(std::chrono::seconds(0)) != std::future_status::ready) continue;
+        MappingImageResult result;
+        try { result = entry.Future.get(); }
+        catch (const std::exception& exception) { result.Error = exception.what(); result.Generation = entry.Generation; }
+        ++cache.Epoch;
+        std::error_code ec; const auto bytes = std::filesystem::file_size(entry.Path, ec);
+        const auto modified = ec ? std::filesystem::file_time_type{} : std::filesystem::last_write_time(entry.Path, ec);
+        if (result.Generation != entry.Generation || (!ec && (bytes != entry.FileBytes || modified != entry.Modified)))
+        {
+            ++entry.Generation; entry.FileBytes = bytes; entry.Modified = modified; entry.Waiting = true; continue;
+        }
+        if (!result.Image) { entry.Failed = true; entry.Error = result.Error; MappingRemoveGroups(key); continue; }
+        // Current groups are pinned until all their source images are ready.
+        // Reject an oversized working set rather than endlessly evict/redecode it.
+        const size_t size = result.Image->ImageBulkData.ImageData.size();
+        if (!MappingMakeRoom(size, false, key))
+        { entry.Failed = true; entry.Error = "Mapping data preparation exceeds its 128 MiB / 64-entry budget; reduce data-map resolution"; MappingRemoveGroups(key); continue; }
+        entry.Image = std::move(result.Image); entry.Failed = false; entry.Error.clear();
+    }
+    MappingStartJobs(); return cache.Epoch;
+}
+size_t PendingMaterialMappingTextureCount()
+{
+    std::set<std::string> pending;
+    const auto& cache = MappingImages();
+    for (const auto& [key, entry] : cache.Entries) if (entry.Waiting || entry.Future.valid()) pending.insert(key);
+    for (const auto& [name, group] : cache.Groups)
+        for (const auto& key : group.Keys) if (!cache.Entries.contains(key)) pending.insert(key);
+    return pending.size();
+}
+void InvalidateMaterialMappingTextureCache(const std::filesystem::path& root, const std::string& source)
+{
+    auto& cache = MappingImages();
+    try
+    {
+        const auto sourcePath = jEditorAssetPath::FromUtf8(source);
+        std::error_code ec; const auto path = std::filesystem::weakly_canonical(sourcePath.is_absolute() ? sourcePath : root / sourcePath, ec);
+        if (ec) return;
+        const auto key = jEditorAssetPath::ToUtf8(path);
+        const auto found = cache.Entries.find(key);
+        if (found != cache.Entries.end())
+        {
+            if (found->second.Future.valid()) cache.Retired.push_back(std::move(found->second.Future));
+            cache.Entries.erase(found); MappingRemoveGroups(key); ++cache.Epoch;
+        }
+    }
+    catch (...) {}
+}
+void CancelMaterialMappingTexturePreparation()
+{
+    auto& cache = MappingImages();
+    for (auto& [key, entry] : cache.Entries) if (entry.Future.valid()) cache.Retired.push_back(std::move(entry.Future));
+    cache.Entries.clear(); cache.Groups.clear(); ++cache.Epoch;
+}
+
+bool PrepareMaterialMapping(const std::filesystem::path& root, const MaterialGraph& graph,
+    PreparedMaterialMapping& output, std::string& error, bool* pending)
+{
+    if (pending) *pending = false;
+    if (GMainThreadID != std::thread::id() && GMainThreadID != std::this_thread::get_id())
+    { error = "Mapping texture resources must prepare on the engine owner thread"; return false; }
+    try
+    {
+    jMaterialMapping::Program program;
+    if (!jMaterialMapping::Compile(graph, program, error)) return false;
+    PreparedMaterialMapping prepared;
+    if (program.Active)
+    {
+        std::array<std::filesystem::path, jMaterialMapping::MaximumTextures> paths;
+        std::array<std::shared_ptr<jImageData>, jMaterialMapping::MaximumTextures> images;
+        std::vector<std::string> keys; std::string groupKey;
+        for (size_t i = 0; i < program.Textures.size(); ++i)
+        {
+            const auto path = jEditorProject::ResolveSafe(root, jEditorAssetPath::FromUtf8(program.Textures[i].Path), error, true);
+            if (!path) return false;
+            paths[i] = *path;
+            if (IsRawMappingTexture(program.Textures[i], *path))
+            { keys.push_back(jEditorAssetPath::ToUtf8(*path)); groupKey += keys.back() + '\n'; }
+        }
+        auto& cache = MappingImages();
+        if (!keys.empty())
+        {
+            if (cache.Groups.size() >= MappingCacheEntries && !cache.Groups.contains(groupKey))
+            {
+                if (MappingHasActiveWork()) { if (pending) *pending = true; error = "Mapping data preparation queue is busy"; }
+                else error = "Mapping data preparation exceeds 64 pending groups; cancel stale preparation and retry";
+                return false;
+            }
+            cache.Groups[groupKey] = {keys, std::chrono::steady_clock::now()};
+        }
+        PollMaterialMappingTexturePreparation();
+        bool waiting = false;
+        for (size_t i = 0; i < program.Textures.size(); ++i)
+        {
+            if (!IsRawMappingTexture(program.Textures[i], paths[i])) continue;
+            const auto key = jEditorAssetPath::ToUtf8(paths[i]);
+            const auto bytes = std::filesystem::file_size(paths[i]); const auto modified = std::filesystem::last_write_time(paths[i]);
+            auto found = cache.Entries.find(key);
+            if (found != cache.Entries.end() && (found->second.FileBytes != bytes || found->second.Modified != modified))
+            {
+                if (found->second.Future.valid()) cache.Retired.push_back(std::move(found->second.Future));
+                cache.Entries.erase(found); found = cache.Entries.end(); ++cache.Epoch;
+            }
+            if (found == cache.Entries.end())
+            {
+                if (!MappingMakeRoom(0, true))
+                {
+                    if (!MappingHasActiveWork())
+                    { cache.Groups.erase(groupKey); error = "Mapping data preparation exceeds its pinned 64-entry budget; reduce the working set or retry"; return false; }
+                    waiting = true; continue;
+                }
+                MappingImageEntry entry; entry.Path = paths[i]; entry.FileBytes = bytes; entry.Modified = modified; entry.Waiting = true;
+                found = cache.Entries.emplace(key, std::move(entry)).first;
+            }
+            auto& entry = found->second; entry.Touch = ++cache.Clock;
+            if (entry.Failed) { error = entry.Error + ": " + program.Textures[i].Path; cache.Groups.erase(groupKey); return false; }
+            if (!entry.Image) { waiting = true; continue; }
+            images[i] = entry.Image;
+        }
+        MappingStartJobs();
+        if (waiting) { if (pending) *pending = true; error = "Preparing linear mapping data textures on CPU"; return false; }
+        for (size_t i = 0; i < program.Textures.size(); ++i)
+        {
+            if (!g_rhi) { cache.Groups.erase(groupKey); error = "Material mapping textures require an initialized rendering device"; return false; }
+            auto& loader = jImageFileLoader::GetInstance();
+            auto texture = images[i] ? loader.LoadPreparedTextureOwned(images[i]) : loader.LoadTextureOwned(jName(jEditorAssetPath::ToUtf8(paths[i])));
+            if (!texture) { cache.Groups.erase(groupKey); error = "Could not load mapping texture " + program.Textures[i].Path; return false; }
+            prepared.Textures[i] = std::move(texture);
+        }
+        cache.Groups.erase(groupKey);
+        prepared.Program = std::make_shared<jMaterialMapping::Program>(std::move(program));
+    }
+    output = std::move(prepared); error.clear(); return true;
+    }
+    catch (const std::exception& exception) { error = exception.what(); return false; }
+}
+void ApplyMaterialMapping(jMaterial& material, const PreparedMaterialMapping& prepared, uint32_t overrideMask)
+{
+    material.MappingProgram = prepared.Program; material.MappingTextures = prepared.Textures;
+    for (size_t i = 0; i < material.MappingValues.size(); ++i)
+    {
+        const auto value = prepared.Program ? prepared.Program->Values[i] : std::array<float, 4>{};
+        material.MappingValues[i] = Vector4(value[0], value[1], value[2], value[3]);
+    }
+    material.MappingOutputOverridesMask = prepared.Program ? overrideMask : 0;
+    material.NeedToUpdateShaderBindingInstance = true; ++material.Revision;
+}
+uint32_t MaterialMappingOverrides(const MaterialProperties& material)
+{
+    using namespace jMaterialMapping;
+    const auto& flags = material.GraphOverrides;
+    if (!flags) return 0;
+    return (flags->BaseColor ? OverrideBaseColor : 0u) | (flags->NormalTexture ? OverrideNormal : 0u)
+        | (flags->Metallic ? OverrideMetallic : 0u) | (flags->Roughness ? OverrideRoughness : 0u)
+        | (flags->BaseColorTexture ? OverrideBaseColorTexture : 0u);
+}
+
+bool ApplySceneMaterialLibrary(const std::filesystem::path& source, const std::vector<jObject*>& objects,
+    size_t& appliedSlots, std::string& error, bool* pending, bool allowRasterOnly)
+{
+    if (pending) *pending = false;
     appliedSlots = 0;
     error.clear();
     try
@@ -305,7 +654,7 @@ bool ApplySceneMaterialLibrary(const std::filesystem::path& source, const std::v
             auto& destination = target.TexData[int(slot)];
             destination.Texture = nullptr;
             if (relative.empty()) return true;
-            const auto path = jEditorProject::ResolveSafe(root, relative, error, true);
+            const auto path = jEditorProject::ResolveSafe(root, jEditorAssetPath::FromUtf8(relative), error, true);
             if (!path) return false;
             destination.FilePath = jName(jEditorAssetPath::ToUtf8(*path));
             auto texture = jImageFileLoader::GetInstance().LoadTextureOwned(destination.FilePath);
@@ -327,10 +676,18 @@ bool ApplySceneMaterialLibrary(const std::filesystem::path& source, const std::v
                 auto& target = resolved[original->SourceMaterialName];
                 if (!target)
                 {
-                    const auto path = jEditorProject::ResolveSafe(root, match->get<std::string>(), error, true);
+                    const auto path = jEditorProject::ResolveSafe(root, jEditorAssetPath::FromUtf8(match->get<std::string>()), error, true);
                     MaterialGraph graph;
                     MaterialProperties properties;
                     if (!path || !LoadMaterial(*path, graph, error) || !EvaluateMaterial(graph, properties, error)) return false;
+                    if (!allowRasterOnly)
+                    {
+                        jMaterialMapping::Program required;
+                        if (!jMaterialMapping::Compile(graph, required, error)) return false;
+                        if (required.Active) { error = "Mapping materials require Deferred or Forward; original scene materials were retained."; return false; }
+                    }
+                    PreparedMaterialMapping mapping;
+                    if (!PrepareMaterialMapping(root, graph, mapping, error, pending)) return false;
                     if (const auto mesh = std::dynamic_pointer_cast<jMeshMaterial>(original)) target = std::make_shared<jMeshMaterial>(*mesh);
                     else target = std::make_shared<jMaterial>(*original);
                     target->ShaderBindingInstance.reset();
@@ -340,6 +697,7 @@ bool ApplySceneMaterialLibrary(const std::filesystem::path& source, const std::v
                     target->Emissive = Vector(properties.Emissive.X, properties.Emissive.Y, properties.Emissive.Z);
                     target->MetallicFactor = properties.Metallic;
                     target->RoughnessFactor = properties.Roughness;
+                    ApplyMaterialMapping(*target, mapping, 0);
                     const auto surface = graph.Surface.value_or(MaterialGraph::SurfaceProperties{});
                     target->Surface = surface.Shading;
                     target->bRaytracingAlphaTest = surface.Shading.AlphaMode == jSurfaceAlphaMode::Mask;
@@ -389,6 +747,8 @@ bool PrepareMaterialThumbnail(const std::filesystem::path& root, const std::file
     MaterialGraph graph;
     MaterialProperties material;
     if (!LoadMaterial(file, graph, diagnostic) || !EvaluateMaterial(graph, material, diagnostic)) return false;
+    if (graph.Horizon || std::any_of(graph.Nodes.begin(), graph.Nodes.end(), [](const auto& node) { return node.Kind > NodeKind::Add; }))
+        diagnostic = "Basic CPU preview; mapped graph shading is evaluated in the Scene viewport.";
 
     const auto loadMap = [&](const std::string& source, const char* label, jEditorThumbnail& image)
     {
@@ -746,7 +1106,52 @@ void GraphHistory()
     auto& s = Tools(); s.Undo.push_back(s.Graph); if (s.Undo.size() > 64) s.Undo.erase(s.Undo.begin()); s.Redo.clear();
 }
 constexpr float MaterialNodeWidth = 165;
-constexpr float MaterialNodeHeight(NodeKind kind) { return kind == NodeKind::Texture ? 108.f : 82.f; }
+const char* MaterialNodeName(NodeKind kind)
+{
+    static const char* names[] = {"Color", "Scalar", "Texture", "Multiply", "Add", "UV", "Texture Object", "Texture Sample",
+        "Sample Normal", "Channel", "Parallax", "POM", "Relief", "Interior", "Horizon"};
+    const auto index = int(kind);
+    return index >= 0 && index < int(std::size(names)) ? names[index] : "Invalid";
+}
+struct MaterialInputPin { const char* Label; uint32_t MaterialNode::*Source; };
+std::span<const MaterialInputPin> MaterialInputs(NodeKind kind)
+{
+    static const MaterialInputPin arithmetic[] = {{"A", &MaterialNode::InputA}, {"B", &MaterialNode::InputB}};
+    static const MaterialInputPin sample[] = {{"Texture", &MaterialNode::InputA}, {"UV", &MaterialNode::InputB}};
+    static const MaterialInputPin channel[] = {{"Value", &MaterialNode::InputA}};
+    static const MaterialInputPin mapping[] = {{"UV", &MaterialNode::InputA}, {"Height", &MaterialNode::InputB}};
+    static const MaterialInputPin interior[] = {{"UV", &MaterialNode::InputA}, {"Color", &MaterialNode::InputB},
+        {"Depth?", &MaterialNode::InputC}, {"Backdrop?", &MaterialNode::InputD}};
+    static const MaterialInputPin horizon[] = {{"UV", &MaterialNode::InputA}, {"Layer 0", &MaterialNode::InputB},
+        {"Layer 1", &MaterialNode::InputC}, {"AO", &MaterialNode::InputD}};
+    switch (kind)
+    {
+    case NodeKind::Add: case NodeKind::Multiply: return arithmetic;
+    case NodeKind::TextureSample: case NodeKind::TextureSampleNormal: return sample;
+    case NodeKind::Channel: return channel;
+    case NodeKind::Parallax: case NodeKind::POM: case NodeKind::Relief: return mapping;
+    case NodeKind::Interior: return interior;
+    case NodeKind::Horizon: return horizon;
+    default: return {};
+    }
+}
+float MaterialNodeHeight(NodeKind kind)
+{
+    if (kind == NodeKind::Texture || kind == NodeKind::TextureObject) return 108.f;
+    if (kind <= NodeKind::Add) return 82.f;
+    return std::max(82.f, 64.f + float(MaterialInputs(kind).size()) * 25.f);
+}
+bool MaterialUVKind(NodeKind kind)
+{ return kind == NodeKind::UV || kind == NodeKind::Parallax || kind == NodeKind::POM || kind == NodeKind::Relief; }
+bool AcceptMaterialInput(NodeKind destination, uint32_t MaterialNode::*input, NodeKind source)
+{
+    if (destination == NodeKind::TextureSample || destination == NodeKind::TextureSampleNormal)
+        return input == &MaterialNode::InputA ? source == NodeKind::TextureObject : MaterialUVKind(source) || source == NodeKind::Add || source == NodeKind::Multiply;
+    if (destination == NodeKind::Parallax || destination == NodeKind::POM || destination == NodeKind::Relief
+        || destination == NodeKind::Interior || destination == NodeKind::Horizon)
+        return input == &MaterialNode::InputA ? MaterialUVKind(source) || source == NodeKind::Add || source == NodeKind::Multiply : source == NodeKind::TextureObject;
+    return source != NodeKind::TextureObject && source != NodeKind::Horizon;
+}
 constexpr float MaterialPinY(int index) { return 41.f + float(index) * 25.f; }
 constexpr struct MaterialOutputPin
 {
@@ -754,8 +1159,15 @@ constexpr struct MaterialOutputPin
     uint32_t MaterialGraph::*Source;
 } MaterialOutputPins[] = {
     {"Base Color", &MaterialGraph::BaseColor}, {"Normal", &MaterialGraph::Normal},
-    {"Metallic", &MaterialGraph::Metallic}, {"Roughness", &MaterialGraph::Roughness}
+    {"Metallic", &MaterialGraph::Metallic}, {"Roughness", &MaterialGraph::Roughness}, {"Horizon", &MaterialGraph::Horizon}
 };
+bool AcceptMaterialOutput(const MaterialOutputPin& pin, NodeKind kind)
+{
+    if (pin.Source == &MaterialGraph::Horizon) return kind == NodeKind::Horizon;
+    if (pin.Source == &MaterialGraph::Normal)
+        return kind == NodeKind::Texture || kind == NodeKind::TextureSampleNormal || kind == NodeKind::Color || kind == NodeKind::Multiply || kind == NodeKind::Add;
+    return kind != NodeKind::Horizon && kind != NodeKind::TextureObject && !MaterialUVKind(kind);
+}
 
 uint32_t DroppedMaterialNode()
 {
@@ -782,7 +1194,7 @@ void DrawMaterialLink(ImDrawList& draw, const ImVec2& origin, const ImVec2& inpu
 void DrawMaterialOutput(ImDrawList& draw, const ImVec2& position)
 {
     auto& s = Tools();
-    const ImVec2 end(position.x + MaterialNodeWidth, position.y + MaterialPinY(3) + 16);
+    const ImVec2 end(position.x + MaterialNodeWidth, position.y + MaterialPinY(int(std::size(MaterialOutputPins)) - 1) + 16);
     draw.AddRectFilled(position, end, IM_COL32(42, 47, 55, 255), 5);
     draw.AddRect(position, end, IM_COL32(110, 130, 160, 255), 5);
     draw.AddRectFilled(position, ImVec2(end.x, position.y + 23), IM_COL32(46, 89, 135, 255), 5, ImDrawFlags_RoundCornersTop);
@@ -792,16 +1204,15 @@ void DrawMaterialOutput(ImDrawList& draw, const ImVec2& position)
     {
         const auto& pin = MaterialOutputPins[i];
         auto& output = s.Graph.*pin.Source;
-        const bool normal = pin.Source == &MaterialGraph::Normal;
         ImGui::PushID(pin.Label);
         ImGui::SetCursorScreenPos(ImVec2(position.x + 3, position.y + MaterialPinY(i) - 10));
         if (ImGui::Button(pin.Label, ImVec2(91, 20))) ImGui::OpenPopup("Connect");
         if (const auto dropped = DroppedMaterialNode(); dropped && dropped != output)
         {
             const auto source = std::find_if(s.Graph.Nodes.begin(), s.Graph.Nodes.end(), [dropped](const auto& node) { return node.Id == dropped; });
-            if (source != s.Graph.Nodes.end() && (!normal || source->Kind == NodeKind::Texture))
+            if (source != s.Graph.Nodes.end() && AcceptMaterialOutput(pin, source->Kind))
             { GraphHistory(); output = dropped; s.Error.clear(); }
-            else if (normal) s.Error = "Normal output requires a Texture node";
+            else s.Error = "This node type is incompatible with the selected material output";
         }
         ImGui::SameLine();
         const auto source = output ? "#" + std::to_string(output) : std::string("None");
@@ -810,7 +1221,7 @@ void DrawMaterialOutput(ImDrawList& draw, const ImVec2& position)
         {
             if (ImGui::Selectable("Disconnect", output == 0) && output) { GraphHistory(); output = 0; }
             for (const auto& node : s.Graph.Nodes)
-                if ((!normal || node.Kind == NodeKind::Texture) &&
+                if (AcceptMaterialOutput(pin, node.Kind) &&
                     ImGui::Selectable(("Node " + std::to_string(node.Id)).c_str(), output == node.Id) && output != node.Id)
                 { GraphHistory(); output = node.Id; s.Error.clear(); }
             ImGui::EndPopup();
@@ -833,6 +1244,13 @@ void FormatMaterialValue(char* text, size_t size, const MaterialValue& value, in
 
 void DrawMaterialValue(ImDrawList& draw, const ImVec2& position, const MaterialNode& node, MaterialEvaluator& evaluator)
 {
+    if (node.Kind > NodeKind::Add)
+    {
+        const char* type = node.Kind == NodeKind::TextureObject ? "Texture2D asset" : node.Kind == NodeKind::Horizon ? "GPU visibility + AO"
+            : MaterialUVKind(node.Kind) ? "GPU float2 UV" : node.Kind == NodeKind::Channel ? "GPU scalar" : "GPU sampled color";
+        draw.AddText(ImVec2(position.x + 7, position.y + MaterialNodeHeight(node.Kind) - 19), IM_COL32(170, 190, 210, 255), type);
+        return;
+    }
     const bool arithmetic = node.Kind == NodeKind::Multiply || node.Kind == NodeKind::Add;
     const ImVec2 min(position.x + (arithmetic ? 34.f : 8.f), position.y + 56.f);
     const ImVec2 max(position.x + MaterialNodeWidth - 8.f, position.y + 76.f);
@@ -908,10 +1326,21 @@ void GraphUI(jEditor& editor, Entity e, const jEditorProject* project, const jEd
 {
     auto& s = Tools();
     const bool library = !s.SceneMaterialRoot.empty();
-    ImGui::TextWrapped("Drag Out to A/B or a Material Output pin. Click a Material Output pin to choose or disconnect its source.");
-    static int addKind = 0; ImGui::Combo("New node", &addKind, "Color\0Scalar\0Texture\0Multiply\0Add\0");
+    ImGui::TextWrapped("Drag Out to a typed input or Material Output pin. Click an input to choose or disconnect its source.");
+    static int addKind = 0; ImGui::Combo("New node", &addKind,
+        "Color\0Scalar\0Texture\0Multiply\0Add\0UV\0Texture Object\0Texture Sample\0Sample Normal\0Channel\0Parallax\0POM\0Relief\0Interior\0Horizon\0");
     ImGui::BeginDisabled(s.Graph.Nodes.size() >= MaxMaterialNodes);
-    if (ImGui::Button("Add node")) { GraphHistory(); MaterialNode node; node.Id = s.NextNode++; node.Kind = NodeKind(addKind); node.X = 20 + float(s.Graph.Nodes.size() % 3) * 185; node.Y = 20 + float(s.Graph.Nodes.size() / 3) * 130; s.Graph.Nodes.push_back(node); }
+    if (ImGui::Button("Add node"))
+    {
+        GraphHistory(); MaterialNode node; node.Id = s.NextNode++; node.Kind = NodeKind(addKind);
+        node.X = 20 + float(s.Graph.Nodes.size() % 3) * 185; node.Y = 20 + float(s.Graph.Nodes.size() / 3) * 180;
+        if (node.Kind == NodeKind::Channel) node.Parameters = {0, 0, 0, 0};
+        if (node.Kind == NodeKind::Parallax) node.Parameters = {.05f, 4, 0, 0};
+        if (node.Kind == NodeKind::POM || node.Kind == NodeKind::Relief) node.Parameters = {.05f, 32, 6, 0};
+        if (node.Kind == NodeKind::Interior) node.Parameters = {1, 1, 1, 1};
+        if (node.Kind == NodeKind::Horizon) node.Parameters = {.05f, 1, 1, 0};
+        s.Graph.Nodes.push_back(node);
+    }
     ImGui::EndDisabled();
     ImGui::SameLine(); if (ImGui::Button("Undo graph") && !s.Undo.empty()) { s.Redo.push_back(s.Graph); s.Graph = s.Undo.back(); s.Undo.pop_back(); }
     ImGui::SameLine(); if (ImGui::Button("Redo graph") && !s.Redo.empty()) { s.Undo.push_back(s.Graph); s.Graph = s.Redo.back(); s.Redo.pop_back(); }
@@ -920,16 +1349,15 @@ void GraphUI(jEditor& editor, Entity e, const jEditorProject* project, const jEd
     ImGui::BeginChild("MaterialCanvas", ImVec2(0, 390), true, ImGuiWindowFlags_HorizontalScrollbar);
     const auto origin = ImGui::GetCursorScreenPos(); auto* draw = ImGui::GetWindowDrawList();
     ImVec2 output(origin.x + 230, origin.y + 20);
-    float canvasBottom = output.y + MaterialPinY(3) + 28;
+    float canvasBottom = output.y + MaterialPinY(int(std::size(MaterialOutputPins)) - 1) + 28;
     for (const auto& node : s.Graph.Nodes)
     {
         output.x = std::max(output.x, origin.x + node.X + MaterialNodeWidth + 64);
         canvasBottom = std::max(canvasBottom, origin.y + node.Y + MaterialNodeHeight(node.Kind) + 12);
-        if (node.Kind == NodeKind::Multiply || node.Kind == NodeKind::Add)
+        for (size_t input = 0; input < MaterialInputs(node.Kind).size(); ++input)
         {
             const float x = origin.x + node.X, y = origin.y + node.Y;
-            DrawMaterialLink(*draw, origin, ImVec2(x, y + MaterialPinY(0)), node.InputA);
-            DrawMaterialLink(*draw, origin, ImVec2(x, y + MaterialPinY(1)), node.InputB);
+            DrawMaterialLink(*draw, origin, ImVec2(x, y + MaterialPinY(int(input))), node.*MaterialInputs(node.Kind)[input].Source);
         }
     }
     for (int i = 0; i < int(std::size(MaterialOutputPins)); ++i)
@@ -941,28 +1369,42 @@ void GraphUI(jEditor& editor, Entity e, const jEditorProject* project, const jEd
         const ImVec2 end(p.x + MaterialNodeWidth, p.y + MaterialNodeHeight(node.Kind));
         draw->AddRectFilled(p, end, IM_COL32(42, 47, 55, 255), 5);
         draw->AddRect(p, end, IM_COL32(110, 130, 160, 255), 5);
-        ImGui::SetCursorScreenPos(p); if (ImGui::Button(("Node " + std::to_string(node.Id)).c_str(), ImVec2(MaterialNodeWidth, 23))) s.SelectedNode = node.Id;
+        ImGui::SetCursorScreenPos(p); if (ImGui::Button((std::string(MaterialNodeName(node.Kind)) + " #" + std::to_string(node.Id)).c_str(), ImVec2(MaterialNodeWidth, 23))) s.SelectedNode = node.Id;
         if (ImGui::IsItemActivated()) GraphHistory();
         if (ImGui::IsItemActive() && ImGui::IsMouseDragging(0))
         {
             node.X = std::max(0.f, node.X + ImGui::GetIO().MouseDelta.x);
             node.Y = std::max(0.f, node.Y + ImGui::GetIO().MouseDelta.y);
         }
-        if (node.Kind == NodeKind::Multiply || node.Kind == NodeKind::Add)
+        for (size_t input = 0; input < MaterialInputs(node.Kind).size(); ++input)
         {
-            for (int input = 0; input < 2; ++input)
+            const auto& pin = MaterialInputs(node.Kind)[input];
+            auto& source = node.*pin.Source;
+            ImGui::PushID(int(input));
+            ImGui::SetCursorScreenPos(ImVec2(p.x + 3, p.y + MaterialPinY(int(input)) - 10));
+            if (ImGui::Button(pin.Label, ImVec2(node.Kind <= NodeKind::Add ? 24.f : 74.f, 20))) ImGui::OpenPopup("Input source");
+            if (const auto dropped = DroppedMaterialNode(); dropped && dropped != source)
             {
-                ImGui::SetCursorScreenPos(ImVec2(p.x + 3, p.y + MaterialPinY(input) - 10));
-                ImGui::Button(input ? "B" : "A", ImVec2(24, 20));
-                auto& source = input ? node.InputB : node.InputA;
-                if (const auto dropped = DroppedMaterialNode(); dropped && dropped != source) { GraphHistory(); source = dropped; }
+                const auto candidate = std::find_if(s.Graph.Nodes.begin(), s.Graph.Nodes.end(), [dropped](const auto& value) { return value.Id == dropped; });
+                if (candidate != s.Graph.Nodes.end() && dropped != node.Id && AcceptMaterialInput(node.Kind, pin.Source, candidate->Kind))
+                { GraphHistory(); source = dropped; s.Error.clear(); }
+                else s.Error = "Incompatible material pin types";
             }
+            if (ImGui::BeginPopup("Input source"))
+            {
+                if (ImGui::Selectable("Disconnect", source == 0) && source) { GraphHistory(); source = 0; }
+                for (const auto& candidate : s.Graph.Nodes)
+                    if (candidate.Id != node.Id && AcceptMaterialInput(node.Kind, pin.Source, candidate.Kind)
+                        && ImGui::Selectable((std::string(MaterialNodeName(candidate.Kind)) + " #" + std::to_string(candidate.Id)).c_str(), source == candidate.Id)
+                        && source != candidate.Id) { GraphHistory(); source = candidate.Id; s.Error.clear(); }
+                ImGui::EndPopup();
+            }
+            ImGui::PopID();
         }
         ImGui::SetCursorScreenPos(ImVec2(p.x + MaterialNodeWidth - 33, p.y + MaterialPinY(0) - 10)); ImGui::Button("Out", ImVec2(30, 20));
         if (ImGui::BeginDragDropSource()) { ImGui::SetDragDropPayload("JENGINE_MATERIAL_NODE", &node.Id, sizeof(node.Id)); ImGui::Text("Output %u", node.Id); ImGui::EndDragDropSource(); }
-        static const char* kinds[] = {"Color", "Scalar", "Texture", "Multiply", "Add"};
-        draw->AddText(ImVec2(p.x + 35, p.y + (node.Kind == NodeKind::Texture ? 65.f : 34.f)), IM_COL32_WHITE, kinds[int(node.Kind)]);
-        if (node.Kind == NodeKind::Texture)
+        if (node.Kind <= NodeKind::Add) draw->AddText(ImVec2(p.x + 35, p.y + (node.Kind == NodeKind::Texture ? 65.f : 34.f)), IM_COL32_WHITE, MaterialNodeName(node.Kind));
+        if (node.Kind == NodeKind::Texture || node.Kind == NodeKind::TextureObject)
         {
             ImGui::SetCursorScreenPos(ImVec2(p.x + 103, p.y + 55));
             jEditorAssetPanel::RenderTexturePreview(project, registry, node.Texture, ImVec2(53, 46));
@@ -980,20 +1422,75 @@ void GraphUI(jEditor& editor, Entity e, const jEditorProject* project, const jEd
     {
         ImGui::Text("Selected node %u", node->Id);
         const auto before = s.Graph;
+        bool activated = false;
+        const auto track = [&] { activated |= ImGui::IsItemActivated(); };
         if (node->Kind == NodeKind::Color) ImGui::ColorEdit3("Node color", &node->Color.X);
         if (node->Kind == NodeKind::Scalar) ImGui::DragFloat("Node value", &node->Scalar, .01f);
-        if (node->Kind == NodeKind::Texture) { char path[512]; std::snprintf(path, sizeof(path), "%s", node->Texture.c_str()); if (ImGui::InputText("Texture path", path, sizeof(path))) node->Texture = path; }
-        if (node->Kind != NodeKind::Multiply && node->Kind != NodeKind::Add && ImGui::IsItemActivated()) { s.Undo.push_back(before); if (s.Undo.size() > 64) s.Undo.erase(s.Undo.begin()); s.Redo.clear(); }
+        if (node->Kind == NodeKind::Color || node->Kind == NodeKind::Scalar) track();
+        if (node->Kind == NodeKind::Texture || node->Kind == NodeKind::TextureObject)
+        {
+            char path[512]; std::snprintf(path, sizeof(path), "%s", node->Texture.c_str()); if (ImGui::InputText("Texture path", path, sizeof(path))) node->Texture = path; track();
+            if (node->Kind == NodeKind::TextureObject)
+            {
+                int semantic = int(node->Semantic);
+                if (ImGui::Combo("Texture data", &semantic, "Linear (height / data)\0Color (sRGB)\0Normal (linear)\0")) node->Semantic = jMaterialMapping::TextureSemantic(semantic);
+                track();
+                ImGui::TextWrapped("Color samples use this encoding. Height, depth, Horizon and normal inputs always read linear data.");
+            }
+        }
+        auto& parameters = node->Parameters;
+        if (node->Kind == NodeKind::UV)
+        {
+            ImGui::DragFloat2("UV scale", parameters.data(), .01f, -10000, 10000); track();
+            ImGui::DragFloat2("UV offset", parameters.data() + 2, .01f, -10000, 10000); track();
+        }
+        if (node->Kind == NodeKind::Channel)
+        { int channel = int(parameters[0]); if (ImGui::SliderInt("Channel (RGBA)", &channel, 0, 3)) parameters[0] = float(channel); track(); }
+        if (node->Kind == NodeKind::TextureSampleNormal)
+        { bool flip = parameters[0] > .5f; if (ImGui::Checkbox("Flip normal Y", &flip)) parameters[0] = flip ? 1.f : 0.f; track(); }
+        if (node->Kind == NodeKind::Parallax || node->Kind == NodeKind::POM || node->Kind == NodeKind::Relief)
+        {
+            ImGui::SliderFloat("Height / depth scale", &parameters[0], 0, 1); track();
+            int steps = int(parameters[1]); if (ImGui::SliderInt("Bounded steps", &steps, 1, 128)) parameters[1] = float(steps); track();
+            if (node->Kind != NodeKind::Parallax)
+            { int refinements = int(parameters[2]); if (ImGui::SliderInt("Refinements", &refinements, 0, 8)) parameters[2] = float(refinements); track(); }
+            bool mode = parameters[3] > .5f;
+            if (ImGui::Checkbox(node->Kind == NodeKind::Relief ? "Dual depth (R front / G back)" : "Flip height V", &mode)) parameters[3] = mode ? 1.f : 0.f;
+            track();
+        }
+        if (node->Kind == NodeKind::Interior)
+        {
+            ImGui::DragFloat2("Room tiling", parameters.data(), .1f, .01f, 256); track();
+            ImGui::SliderFloat("Room depth", &parameters[2], .001f, 64); track();
+            ImGui::SliderFloat("Room ambient", &parameters[3], 0, 4); track();
+            ImGui::TextWrapped("Connect Depth for RG dual-depth relief; Backdrop is optional. This is a raster material illusion, not room geometry.");
+        }
+        if (node->Kind == NodeKind::Horizon)
+        {
+            ImGui::SliderFloat("Softness (radians)", &parameters[0], .001f, PI * .5f); track();
+            ImGui::SliderFloat("Ambient occlusion strength", &parameters[1], 0, 1); track();
+            ImGui::SliderFloat("Horizon angle scale", &parameters[2], 0, 4); track();
+            ImGui::TextWrapped("Connect baked Layer 0, Layer 1 and AO textures. Horizon visibility is a separate output; it is never multiplied into albedo.");
+        }
+        if (activated) { s.Undo.push_back(before); if (s.Undo.size() > 64) s.Undo.erase(s.Undo.begin()); s.Redo.clear(); }
         if (ImGui::Button("Remove node"))
         {
             GraphHistory();
             for (const auto& pin : MaterialOutputPins)
                 if (s.Graph.*pin.Source == node->Id) s.Graph.*pin.Source = 0;
+            for (auto& current : s.Graph.Nodes)
+                for (const auto& pin : MaterialInputs(current.Kind))
+                    if (current.*pin.Source == node->Id) current.*pin.Source = 0;
             s.Graph.Nodes.erase(node);
             s.SelectedNode = 0;
         }
     }
     if (s.Graph.Surface) SurfaceSettings(*s.Graph.Surface);
+    if (std::any_of(s.Graph.Nodes.begin(), s.Graph.Nodes.end(), [](const auto& value) { return value.Kind > NodeKind::Add; }))
+    {
+        ImGui::TextWrapped("Mapping nodes render in Deferred / Forward. Path Tracing and HWRT material evaluation do not support these nodes.");
+        if (g_Engine && g_Engine->Game.IsUsingPathTracingRenderer()) ImGui::TextColored(ImVec4(1,.75f,.25f,1), "Switch to Deferred / Forward to preview this graph.");
+    }
     if (library)
     {
         ImGui::TextWrapped("%s", s.GraphPath);
@@ -1018,6 +1515,8 @@ void GraphUI(jEditor& editor, Entity e, const jEditorProject* project, const jEd
         if (s.AssignedGraphHasNormal) defaults.NormalTexture.clear();
         if (path && EvaluateMaterial(s.Graph, defaults, s.Error) && SaveMaterial(s.Graph, *path, s.Error))
         {
+            const bool dynamic = s.Graph.Horizon || std::any_of(s.Graph.Nodes.begin(), s.Graph.Nodes.end(), [](const auto& value) { return value.Kind > NodeKind::Add; });
+            if (dynamic && !e.Material.GraphOverrides) e.Material.GraphOverrides.emplace();
             if (e.Material.GraphOverrides) InheritMaterialGraph(e.Material, defaults);
             else e.Material = std::move(defaults);
             e.Material.OverrideEnabled = true;
@@ -1275,5 +1774,12 @@ void Tick(jEditor& editor, float dt)
     if (!std::isfinite(dt) || dt < 0) return;
     s.Time = editor.PlayTime();
 }
-void Shutdown() { Tools() = ToolState{}; }
+void Shutdown()
+{
+    CancelMaterialMappingTexturePreparation();
+    auto& retired = MappingImages().Retired;
+    for (auto& future : retired) if (future.valid()) { try { future.get(); } catch (...) {} }
+    retired.clear();
+    Tools() = ToolState{};
+}
 }
