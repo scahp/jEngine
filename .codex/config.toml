@@ -1,14 +1,6 @@
-# Project-scoped development skills. Models and permissions follow the host.
-[plugins."jaeho-game-studio@jengine-tools"]
-enabled = true
+# Codex agent paths; shared definitions live in the studio submodule.
 
 # BEGIN JAEHOGAMESTUDIO REFERENCES
-[plugins."jaeho-game-studio@jaeho-personal"]
-enabled = false
-
-[plugins."jaeho-game-studio@jaeho-studio"]
-enabled = false
-
 [agents.jgs-core]
 description = "엔진의 플랫폼 추상화와 공통 실행 기반을 개발한다."
 config_file = "../tools/JaehoGameStudio/codex-agents/jgs-core.toml"

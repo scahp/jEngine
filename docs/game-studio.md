@@ -43,8 +43,10 @@ project is trusted; open a new session after changing role registrations.
 
 ## Load the plugin
 
-Codex agent roles use `config_file` paths in `.codex/config.toml`. Plugin skills
-use the marketplace registration:
+Plugin locations are registered only in `.agents/plugins/marketplace.json`.
+Installation stores activation in the normal Codex user settings. The project
+`.codex/config.toml` contains only the seven custom-agent path registrations;
+the agent definitions remain in the submodule. Install the plugin skills with:
 
 ```sh
 codex plugin marketplace add .
