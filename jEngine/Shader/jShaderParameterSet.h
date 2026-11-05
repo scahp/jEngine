@@ -34,6 +34,18 @@ struct jShaderParameterTexture2DSRV
     int32 MipLevel = 0;
 };
 
+// Multisample images have no sampler and must be read with an explicit sample
+// index. A distinct type keeps generated HLSL and native descriptor ABI aligned.
+struct jShaderParameterTexture2DMS
+{
+    jTexture* Texture = nullptr;
+};
+
+struct jShaderParameterDepth2DMS
+{
+    jTexture* Texture = nullptr;
+};
+
 struct jShaderParameterTextureCube
 {
     jTexture* Texture = nullptr;
@@ -94,6 +106,20 @@ struct jShaderParameterRWTexture2DFloat2
 };
 
 struct jShaderParameterRWTexture2DFloat
+{
+    jTexture* Texture = nullptr;
+    int32 MipLevel = 0;
+};
+
+// Explicit storage-image format. The generic float UAV remains usable for
+// R16F history images; R32F writers can avoid formatless-write capabilities.
+struct jShaderParameterRWTexture2DR32F
+{
+    jTexture* Texture = nullptr;
+    int32 MipLevel = 0;
+};
+
+struct jShaderParameterRWTexture2DUInt
 {
     jTexture* Texture = nullptr;
     int32 MipLevel = 0;
@@ -652,6 +678,42 @@ namespace jShaderParameterDetail
     };
 
     template <>
+    struct TShaderParameterTypeHandler<jShaderParameterTexture2DMS>
+    {
+        static constexpr const char* GetHLSLTypeName() { return nullptr; }
+        static void AppendTypeDeclaration(std::string&) {}
+        static void AppendHLSL(std::string& out, const char* name, uint32 space, jShaderParameterBindingCursor& cursor)
+        {
+            AppendLine(out, "Texture2DMS<float4> ", name, " : register(t", cursor.BindingIndex++, ", space", space, ");");
+        }
+        static void BuildBinding(const jShaderParameterTexture2DMS& parameter, EShaderAccessStageFlag flags,
+            jShaderBindingArray& bindings, jShaderBindingResourceInlineAllocator& allocator, jShaderParameterBindingCursor& cursor)
+        {
+            check(parameter.Texture);
+            bindings.Add(jShaderBinding::Create((int32)cursor.BindingIndex++, 1, EShaderBindingType::TEXTURE_SRV,
+                flags, allocator.Alloc<jTextureResource>(parameter.Texture, nullptr)));
+        }
+    };
+
+    template <>
+    struct TShaderParameterTypeHandler<jShaderParameterDepth2DMS>
+    {
+        static constexpr const char* GetHLSLTypeName() { return nullptr; }
+        static void AppendTypeDeclaration(std::string&) {}
+        static void AppendHLSL(std::string& out, const char* name, uint32 space, jShaderParameterBindingCursor& cursor)
+        {
+            AppendLine(out, "Texture2DMS<float> ", name, " : register(t", cursor.BindingIndex++, ", space", space, ");");
+        }
+        static void BuildBinding(const jShaderParameterDepth2DMS& parameter, EShaderAccessStageFlag flags,
+            jShaderBindingArray& bindings, jShaderBindingResourceInlineAllocator& allocator, jShaderParameterBindingCursor& cursor)
+        {
+            check(parameter.Texture);
+            bindings.Add(jShaderBinding::Create((int32)cursor.BindingIndex++, 1, EShaderBindingType::TEXTURE_SRV,
+                flags, allocator.Alloc<jTextureResource>(parameter.Texture, nullptr)));
+        }
+    };
+
+    template <>
     struct TShaderParameterTypeHandler<jShaderParameterTextureCube>
     {
         static constexpr const char* GetHLSLTypeName()
@@ -948,6 +1010,49 @@ namespace jShaderParameterDetail
             check(InParameter.Texture);
             OutBindings.Add(jShaderBinding::Create((int32)InOutCursor.BindingIndex++, 1, EShaderBindingType::TEXTURE_UAV, InShaderAccessStageFlags
                 , OutAllocator.Alloc<jTextureResource>(InParameter.Texture, nullptr, InParameter.MipLevel)));
+        }
+    };
+
+    template <>
+    struct TShaderParameterTypeHandler<jShaderParameterRWTexture2DR32F>
+    {
+        static constexpr const char* GetHLSLTypeName() { return nullptr; }
+        static void AppendTypeDeclaration(std::string&) {}
+
+        static void AppendHLSL(std::string& Out, const char* InName, uint32 InSpace, jShaderParameterBindingCursor& InOutCursor)
+        {
+            if (IsUseVulkan()) AppendLine(Out, "[[vk::image_format(\"r32f\")]]");
+            AppendLine(Out, "RWTexture2D<float> ", InName, " : register(u", InOutCursor.BindingIndex, ", space", InSpace, ");");
+            ++InOutCursor.BindingIndex;
+        }
+
+        static void BuildBinding(const jShaderParameterRWTexture2DR32F& InParameter, EShaderAccessStageFlag InShaderAccessStageFlags
+            , jShaderBindingArray& OutBindings, jShaderBindingResourceInlineAllocator& OutAllocator, jShaderParameterBindingCursor& InOutCursor)
+        {
+            TShaderParameterTypeHandler<jShaderParameterRWTexture2DFloat>::BuildBinding(
+                { InParameter.Texture, InParameter.MipLevel }, InShaderAccessStageFlags, OutBindings, OutAllocator, InOutCursor);
+        }
+    };
+
+    template <>
+    struct TShaderParameterTypeHandler<jShaderParameterRWTexture2DUInt>
+    {
+        static constexpr const char* GetHLSLTypeName() { return nullptr; }
+        static void AppendTypeDeclaration(std::string&) {}
+        static void AppendHLSL(std::string& Out, const char* InName, uint32 InSpace, jShaderParameterBindingCursor& InOutCursor)
+        {
+            // Image atomics need a concrete integer format even when the other
+            // storage images use DXC's unknown-image-format SPIR-V option.
+            if (IsUseVulkan()) AppendLine(Out, "[[vk::image_format(\"r32ui\")]]");
+            AppendLine(Out, "RWTexture2D<uint> ", InName, " : register(u", InOutCursor.BindingIndex, ", space", InSpace, ");");
+            ++InOutCursor.BindingIndex;
+        }
+        static void BuildBinding(const jShaderParameterRWTexture2DUInt& InParameter, EShaderAccessStageFlag InShaderAccessStageFlags,
+            jShaderBindingArray& OutBindings, jShaderBindingResourceInlineAllocator& OutAllocator, jShaderParameterBindingCursor& InOutCursor)
+        {
+            check(InParameter.Texture);
+            OutBindings.Add(jShaderBinding::Create((int32)InOutCursor.BindingIndex++, 1, EShaderBindingType::TEXTURE_UAV, InShaderAccessStageFlags,
+                OutAllocator.Alloc<jTextureResource>(InParameter.Texture, nullptr, InParameter.MipLevel)));
         }
     };
 
@@ -1729,6 +1834,8 @@ public:
 #define SHADER_PARAMETER(ParameterType, Name) JSHADER_DECLARE_PARAMETER(__LINE__, ParameterType, Name)
 #define SHADER_TEXTURE2D(Name) JSHADER_DECLARE_PARAMETER(__LINE__, jShaderParameterTexture2D, Name)
 #define SHADER_TEXTURE2D_SRV(Name) JSHADER_DECLARE_PARAMETER(__LINE__, jShaderParameterTexture2DSRV, Name)
+#define SHADER_TEXTURE2D_MS(Name) JSHADER_DECLARE_PARAMETER(__LINE__, jShaderParameterTexture2DMS, Name)
+#define SHADER_DEPTH2D_MS(Name) JSHADER_DECLARE_PARAMETER(__LINE__, jShaderParameterDepth2DMS, Name)
 #define SHADER_TEXTURECUBE(Name) JSHADER_DECLARE_PARAMETER(__LINE__, jShaderParameterTextureCube, Name)
 #define SHADER_TEXTURECUBE_SRV(Name) JSHADER_DECLARE_PARAMETER(__LINE__, jShaderParameterTextureCubeSRV, Name)
 #define SHADER_TEXTURE2D_COMPARISON(Name) JSHADER_DECLARE_PARAMETER(__LINE__, jShaderParameterTexture2DComparison, Name)
@@ -1740,6 +1847,8 @@ public:
 #define SHADER_RW_TEXTURE2D(Name) JSHADER_DECLARE_PARAMETER(__LINE__, jShaderParameterRWTexture2D, Name)
 #define SHADER_RW_TEXTURE2D_FLOAT2(Name) JSHADER_DECLARE_PARAMETER(__LINE__, jShaderParameterRWTexture2DFloat2, Name)
 #define SHADER_RW_TEXTURE2D_FLOAT(Name) JSHADER_DECLARE_PARAMETER(__LINE__, jShaderParameterRWTexture2DFloat, Name)
+#define SHADER_RW_TEXTURE2D_R32F(Name) JSHADER_DECLARE_PARAMETER(__LINE__, jShaderParameterRWTexture2DR32F, Name)
+#define SHADER_RW_TEXTURE2D_UINT(Name) JSHADER_DECLARE_PARAMETER(__LINE__, jShaderParameterRWTexture2DUInt, Name)
 #define SHADER_RW_TEXTURE2DARRAY(Name) JSHADER_DECLARE_PARAMETER(__LINE__, jShaderParameterRWTexture2DArray, Name)
 #define SHADER_UNIFORM_BUFFER(BufferType, Name) JSHADER_DECLARE_PARAMETER(__LINE__, jShaderParameterUniformBuffer<BufferType>, Name)
 #define SHADER_STRUCTURED_BUFFER(StructType, Name) JSHADER_DECLARE_PARAMETER(__LINE__, jShaderParameterStructuredBuffer<StructType>, Name)

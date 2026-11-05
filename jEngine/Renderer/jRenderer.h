@@ -5,6 +5,9 @@
 class jView;
 struct jSceneRenderTarget;
 struct jRenderFrameContext;
+namespace jSceneFeatures { struct Settings; }
+namespace jAdvancedShadows { class Frame; }
+namespace jHiZOcclusion { class Frame; }
 
 // Light 별로 렌더링할 정보들을 갖고 있는 객체
 struct jShadowDrawInfo
@@ -73,13 +76,15 @@ public:
     bool HWRTInlineDirectLightingPass();
 
     virtual void AtmosphericShadow();
+    void SceneFeaturesPass(const jSceneFeatures::Settings& settings);
     
     virtual void AOPass();
     virtual void SSGIPass();
     virtual void SSGIAccumulatePass();
     virtual void SurfelGIPass();
     virtual void SurfelGIResolvePass();
-    virtual void ApplySurfelGI();
+    // True only when valid, positive-intensity diffuse GI was recorded this frame.
+    virtual bool ApplySurfelGI();
     virtual std::shared_ptr<jTexture> SSAO();
     virtual std::shared_ptr<jTexture> RTAO();
     virtual std::shared_ptr<jTexture> Denoise(const std::shared_ptr<jTexture>& InTexture, const char* InDenoiser, int32 InKernelSize, float InKernelSigma, float InBilateralSigma);
@@ -95,7 +100,15 @@ public:
     std::future<void> BasePassSetupCompleteEvent;
 
     std::vector<jShadowDrawInfo> ShadowDrawInfo;
+    std::shared_ptr<jAdvancedShadows::Frame> AdvancedShadowFrame;
+    std::shared_ptr<jHiZOcclusion::Frame> HiZOcclusionFrame;
+    bool ResolveMultisampleScene();
+    bool DecodeSkinPostNormals();
+    void SubsurfacePass();
     std::vector<jDrawCommand> BasePasses;
+    std::vector<std::shared_ptr<IUniformBufferBlock>> ForwardLightUniformBuffers;
+    std::vector<std::shared_ptr<jShaderBindingInstance>> ForwardLightBindings;
+    std::vector<std::pair<jTexture*, float>> ForwardNeutralShadowClears;
 
     jRenderPass* BaseRenderPass = nullptr;
 

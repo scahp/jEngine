@@ -459,6 +459,7 @@ public:
 	virtual jCommandBufferManager* GetComputeCommandBufferManager() const { return nullptr; }
 	virtual jCommandBufferManager* GetCopyCommandBufferManager() const { return nullptr; }
 	virtual EMSAASamples GetSelectedMSAASamples() const { return EMSAASamples::COUNT_1; }
+    virtual EMSAASamples SelectMSAASamples(uint32 InRequestedSamples) { return EMSAASamples::COUNT_1; }
 
 	// ResourceBarrier
 	virtual void TransitionLayout(jCommandBuffer* commandBuffer, jTexture* texture, EResourceLayout newLayout) const { }
@@ -825,4 +826,3 @@ public:
 #define DEBUG_EVENT_NAME(Name, Line) Name##Line
 #define DEBUG_EVENT(RenderFrameContextPtr, Name) jGPUDebugEvent DEBUG_EVENT_NAME(DebugEvent_, __LINE__)(RenderFrameContextPtr->GetActiveCommandBuffer(), Name);
 #define DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, Name, ColorVec4) jGPUDebugEvent DEBUG_EVENT_NAME(DebugEvent_, __LINE__)(RenderFrameContextPtr->GetActiveCommandBuffer(), Name, ColorVec4);
-

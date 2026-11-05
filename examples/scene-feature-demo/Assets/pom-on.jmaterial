@@ -1,0 +1,131 @@
+{
+  "baseColor": 5,
+  "format": "jEngineMaterial",
+  "horizon": 0,
+  "metallic": 0,
+  "nodes": [
+    {
+      "a": 0,
+      "b": 0,
+      "c": 0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "d": 0,
+      "id": 1,
+      "kind": 5,
+      "parameters": [
+        1.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "semantic": 0,
+      "texture": "",
+      "value": 1.0,
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "a": 0,
+      "b": 0,
+      "c": 0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "d": 0,
+      "id": 2,
+      "kind": 6,
+      "parameters": [
+        1.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "semantic": 1,
+      "texture": "Assets/color.png",
+      "value": 1.0,
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "a": 0,
+      "b": 0,
+      "c": 0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "d": 0,
+      "id": 3,
+      "kind": 6,
+      "parameters": [
+        1.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "semantic": 0,
+      "texture": "Assets/height.png",
+      "value": 1.0,
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "a": 1,
+      "b": 3,
+      "c": 0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "d": 0,
+      "id": 4,
+      "kind": 11,
+      "parameters": [
+        0.18000000715255737,
+        32.0,
+        6.0,
+        0.0
+      ],
+      "semantic": 0,
+      "texture": "",
+      "value": 1.0,
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "a": 2,
+      "b": 4,
+      "c": 0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "d": 0,
+      "id": 5,
+      "kind": 7,
+      "parameters": [
+        1.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "semantic": 0,
+      "texture": "",
+      "value": 1.0,
+      "x": 0.0,
+      "y": 0.0
+    }
+  ],
+  "normal": 0,
+  "roughness": 0,
+  "version": 2
+}

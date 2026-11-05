@@ -1,6 +1,7 @@
 ﻿#include "pch.h"
 #include "jDirectionalLight.h"
 #include "Shader/jLightingShaderParameters.h"
+#include "Renderer/jAdvancedShadowPass.h"
 
 jDirectionalLight::jDirectionalLight() : jLight(ELightType::DIRECTIONAL)
 {
@@ -72,6 +73,7 @@ const std::shared_ptr<jShaderBindingInstance>& jDirectionalLight::PrepareShaderB
             jDirectionalLightShaderParameters Parameters;
             Parameters.DirectionalLight.Buffer = LightDataUniformBlockPtr;
             Parameters.DirectionalLightShadowMap = { InShadowMap ? InShadowMap : GWhiteTexture.get(), ShadowSamplerStateInfo };
+            jAdvancedShadows::SetDefaultBindings(Parameters);
             ShaderBindingInstanceWithShadowMap = jShaderParameterSet::CreateShaderBindingInstance(Parameters, EShaderAccessStageFlag::ALL_GRAPHICS, jShaderBindingInstanceType::MultiFrame);
         }
     }
@@ -85,10 +87,8 @@ void jDirectionalLight::Update(float deltaTime)
 
     check(Camera);
     Camera->SetEulerAngle(Vector::GetEulerAngleFrom(LightData.Direction));
-    Camera->UpdateCamera();
-
-    // Need dirty check
     jLightUtil::MakeDirectionalLightViewInfo(Camera->Pos, Camera->Target, Camera->Up, LightData.Direction);
+    Camera->UpdateCamera();
     const Matrix VP = (Camera->Projection * Camera->View);
     if (LightData.ShadowVP != VP)
     {
@@ -130,4 +130,3 @@ void jDirectionalLight::SetIntensity(float InIntensity)
         NeedToUpdateShaderBindingInstance = true;
     }
 }
-

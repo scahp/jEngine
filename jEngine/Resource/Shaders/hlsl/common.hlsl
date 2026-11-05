@@ -33,6 +33,11 @@ struct ViewUniformBuffer
     float3 EyeWorld;
     float padding0;
     float4 ScreenRect;
+    float4 ShadowFilterParams;
+    float4 SHCoefficients[9];
+    float4 ForwardSurfaceParams;
+    float4 MaterialLightDirection;
+    float4 MaterialViewDirection;
 };
 #endif
 

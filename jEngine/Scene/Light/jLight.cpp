@@ -17,13 +17,18 @@ namespace jLightUtil
 	{
 		outPos = Vector(-jDirectionalLight::SM_PosDist) * direction;
 		outTarget = Vector::ZeroVector;
-		outUp = outPos + Vector(0.0f, 1.0f, 0.0f);
+        // Looking exactly along world Y must not use a parallel up vector.
+        const Vector up = std::abs(direction.GetNormalize().DotProduct(Vector::UpVector)) > .99f
+            ? Vector(0.f, 0.f, 1.f) : Vector::UpVector;
+		outUp = outPos + up;
 	}
 
 	void MakeDirectionalLightViewInfoWithPos(Vector& outTarget, Vector& outUp, const Vector& pos, const Vector& direction)
 	{
 		outTarget = pos + direction;
-		outUp = pos + Vector(0.0f, 1.0f, 0.0f);
+        const Vector up = std::abs(direction.GetNormalize().DotProduct(Vector::UpVector)) > .99f
+            ? Vector(0.f, 0.f, 1.f) : Vector::UpVector;
+		outUp = pos + up;
 	}
 
 	//jShadowMapData* CreateCascadeShadowMap(const Vector& direction, const Vector&)

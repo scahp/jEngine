@@ -276,6 +276,26 @@ xcopy /y /i "$(JEngineDxcDirectory)\dxil.dll" "$(OutDir)"</Command>
     <ClInclude Include="Shader\jAOShaderParameters.h" />
     <ClInclude Include="Shader\jCommonShaderParameters.h" />
     <ClInclude Include="Shader\jLightingShaderParameters.h" />
+    <ClInclude Include="Renderer\Features\jAdvancedShadowSettings.h" />
+    <ClInclude Include="Renderer\Features\jAdvancedShadowMath.h" />
+    <ClInclude Include="Renderer\jAdvancedShadowPass.h" />
+    <ClInclude Include="Shader\jAdvancedShadowShaderParameters.h" />
+    <ClInclude Include="Tests\jAdvancedShadowIntegrationTests.h" />
+    <ClInclude Include="Renderer\Features\jShadowFiltering.h" />
+    <ClInclude Include="Code\Engine\Editor\jEditorWater.h" />
+    <ClInclude Include="Code\Engine\Editor\jSceneFeatureTools.h" />
+    <ClInclude Include="Material\jMaterialMapping.h" />
+    <ClInclude Include="Material\jMaterialMappingShader.h" />
+    <ClInclude Include="Material\jMaterialWater.h" />
+    <ClInclude Include="Renderer\Features\jEnvironmentLighting.h" />
+    <ClInclude Include="Renderer\Features\jHorizonMapping.h" />
+    <ClInclude Include="Renderer\Features\jWaterSimulation.h" />
+    <ClInclude Include="Tests\jSceneFeatureCpuTests.h" />
+    <ClInclude Include="Tests\jSceneFeatureProjectTests.h" />
+    <ClInclude Include="Tests\jMaterialMappingTests.h" />
+    <ClInclude Include="Tests\jEditorWaterTests.h" />
+    <ClInclude Include="Tests\jSceneFeatureIntegrationTests.h" />
+    <ClInclude Include="Renderer\Features\jSceneFeatureSettings.h" />
     <ClInclude Include="Shader\jShader.h" />
     <ClInclude Include="Shader\jShaderParameterSet.h" />
     <ClInclude Include="Shader\Spirv\jSpirvHelper.h" />
@@ -414,6 +434,41 @@ xcopy /y /i "$(JEngineDxcDirectory)\dxil.dll" "$(OutDir)"</Command>
     <ClCompile Include="Tests\jEditorDocumentTests.cpp"></ClCompile>
     <ClCompile Include="Tests\jEditorAuthoringRuntimeTests.cpp"></ClCompile>
     <ClCompile Include="Tests\jEditorGraphicsTests.cpp"></ClCompile>
+    <ClCompile Include="Code\Engine\Editor\jEditorWater.cpp"></ClCompile>
+    <ClCompile Include="Code\Engine\Editor\jSceneFeatureTools.cpp"></ClCompile>
+    <ClCompile Include="Material\jMaterialMapping.cpp"></ClCompile>
+    <ClCompile Include="Material\jMaterialMappingShader.cpp"></ClCompile>
+    <ClCompile Include="Material\jMaterialWater.cpp"></ClCompile>
+    <ClCompile Include="Renderer\Features\jEnvironmentLighting.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="Renderer\Features\jHorizonMapping.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="Renderer\Features\jWaterSimulation.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="Renderer\jRenderer_SceneFeatures.cpp"></ClCompile>
+    <ClCompile Include="Tests\jSceneFeatureCpuTests.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="Tests\jSceneFeatureTests.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="Tests\jSceneFeatureProjectTests.cpp"></ClCompile>
+    <ClCompile Include="Tests\jMaterialMappingTests.cpp"></ClCompile>
+    <ClCompile Include="Tests\jEditorWaterTests.cpp"></ClCompile>
+    <ClCompile Include="Tests\jSceneFeatureIntegrationTests.cpp"></ClCompile>
+    <ClCompile Include="Tests\jAdvancedShadowIntegrationTests.cpp"></ClCompile>
+    <ClCompile Include="Renderer\jAdvancedShadowPass.cpp"></ClCompile>
+    <ClCompile Include="Renderer\Features\jAdvancedShadowMath.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="Renderer\Features\jHiZOcclusionMath.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="Renderer\Features\jSkinShadingMath.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="Renderer\Features\jSubsurfaceDiffusion.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="Renderer\Features\jTextureSubsurfaceMath.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="Renderer\jHiZOcclusionPass.cpp"></ClCompile>
+    <ClCompile Include="Renderer\jRenderer_RasterFeatures.cpp"></ClCompile>
+    <ClCompile Include="Renderer\jSkinShading.cpp"></ClCompile>
+    <ClCompile Include="Renderer\jSubsurfacePass.cpp"></ClCompile>
+    <ClCompile Include="Renderer\jTextureSubsurfacePass.cpp"></ClCompile>
+    <ClCompile Include="Tests\jHiZOcclusionIntegrationTests.cpp"></ClCompile>
+    <ClCompile Include="Tests\jHiZOcclusionTests.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="Tests\jMultisampleIntegrationTests.cpp"></ClCompile>
+    <ClCompile Include="Tests\jSkinShadingTests.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="Tests\jSubsurfaceDiffusionTests.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ClCompile Include="Tests\jSubsurfaceHumanIntegrationTests.cpp"></ClCompile>
+    <ClCompile Include="Tests\jSubsurfaceIntegrationGpuTests.cpp"></ClCompile>
+    <ClCompile Include="Tests\jTextureSubsurfaceTests.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
     <ClCompile Include="External\recastnavigation\Recast\Source\RecastMeshDetail.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
     <ClCompile Include="External\recastnavigation\Recast\Source\Recast.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
     <ClCompile Include="External\recastnavigation\Recast\Source\RecastArea.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
@@ -438,6 +493,7 @@ xcopy /y /i "$(JEngineDxcDirectory)\dxil.dll" "$(OutDir)"</Command>
     <ClCompile Include="Code\Engine\Editor\jEditorProjectSettings.cpp"></ClCompile>
     <ClCompile Include="Tests\jEditorExtensionTests.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
     <ClCompile Include="Tests\jEditorIntegrationTests.cpp"></ClCompile>
+    <ClCompile Include="Tests\jViewportToolbarTests.cpp"></ClCompile>
     <ClCompile Include="Tests\jEditorProjectSettingsTests.cpp"></ClCompile>
     <ClCompile Include="Tests\jModelImportSettingsTests.cpp"></ClCompile>
     <ClCompile Include="Tests\jModelUploadTests.cpp"></ClCompile>
@@ -962,6 +1018,14 @@ xcopy /y /i "$(JEngineDxcDirectory)\dxil.dll" "$(OutDir)"</Command>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <FileType>Document</FileType>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resource\Shaders\hlsl\Features\advancedshadows.hlsl" />
+    <None Include="Resource\Shaders\hlsl\Features\advancedshadowlighting.hlsl" />
+    <None Include="Resource\Shaders\hlsl\advanced_shadow_vs.hlsl" />
+    <None Include="Resource\Shaders\hlsl\advanced_shadow_fs.hlsl" />
+    <None Include="Resource\Shaders\hlsl\advanced_shadow_cs.hlsl" />
+    <None Include="Resource\Shaders\hlsl\advanced_shadow_volume_mask.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

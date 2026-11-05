@@ -99,6 +99,25 @@ namespace
 }
 
 int RunCpuSelfTests();
+int RunEditorGraphicsTests();
+int RunEditorProjectSettingsTests();
+int RunSceneFeatureCpuTests();
+int RunSceneFeatureTests();
+int RunMaterialMappingTests();
+int RunEditorWaterTests();
+int RunSceneFeatureProjectTests();
+int RunEditorToolsTests();
+int RunEditorAuthoringRuntimeTests();
+int RunSceneFeatureIntegrationGpuTests(const char* directory);
+int RunAdvancedShadowIntegrationGpuTests(const char* directory);
+int RunSubsurfaceIntegrationGpuTests(const char* directory);
+int RunSubsurfaceHumanIntegrationGpuTests(const char* directory);
+int RunRasterVisibilityIntegrationGpuTests(const char* directory);
+int RunSubsurfaceDiffusionTests();
+int RunHiZOcclusionTests();
+int RunSkinShadingTests();
+int RunTextureSubsurfaceTests();
+namespace jAdvancedShadows { int RunAdapterTests(); }
 int RunModelUploadGpuTests();
 int RunEditorParticleMaterialGpuTests();
 int RunLogBenchmark();
@@ -108,6 +127,8 @@ int ExportSurfelGIShaderFixtures(const char* directory, bool vulkan);
 int ExportPostProcessShaderFixtures(const char* directory, bool vulkan);
 int ExportAOEffectShaderFixtures(const char* directory, bool vulkan);
 int ExportEditorGraphicsShaderFixtures(const char* directory, bool vulkan);
+int ExportSceneFeatureShaderFixtures(const char* directory, bool vulkan);
+int ExportMaterialMappingShaderFixtures(const char* directory, bool vulkan);
 
 int main(int argc, char** argv)
 {
@@ -136,6 +157,29 @@ int main(int argc, char** argv)
 #endif
     gCommandLineArgument.Init(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "--ci-cpu") == 0) return RunCpuSelfTests();
+    if (argc >= 2 && std::strcmp(argv[1], "--ci-rendering-features") == 0)
+    {
+        if (argc != 2)
+        {
+            std::cerr << "Usage: --ci-rendering-features" << std::endl;
+            return EXIT_FAILURE;
+        }
+        const int graphics = RunEditorGraphicsTests();
+        const int settings = RunEditorProjectSettingsTests();
+        const int sceneCpu = RunSceneFeatureCpuTests();
+        const int sceneSettings = RunSceneFeatureTests();
+        const int mapping = RunMaterialMappingTests();
+        const int water = RunEditorWaterTests();
+        const int project = RunSceneFeatureProjectTests();
+        const int tools = RunEditorToolsTests();
+        const int runtime = RunEditorAuthoringRuntimeTests();
+        const int shadows = jAdvancedShadows::RunAdapterTests();
+        const int subsurface = RunSubsurfaceDiffusionTests();
+        const int hiz = RunHiZOcclusionTests();
+        const int skin = RunSkinShadingTests();
+        const int textureSubsurface = RunTextureSubsurfaceTests();
+        return graphics || settings || sceneCpu || sceneSettings || mapping || water || project || tools || runtime || shadows || subsurface || hiz || skin || textureSubsurface ? EXIT_FAILURE : EXIT_SUCCESS;
+    }
     if (argc == 2 && std::strcmp(argv[1], "--ci-log-benchmark") == 0) return RunLogBenchmark();
     if (argc >= 2 && (std::strcmp(argv[1], "--benchmark-assets") == 0 || std::strcmp(argv[1], "--benchmark-editor") == 0))
     {
@@ -159,22 +203,38 @@ int main(int argc, char** argv)
         if (ExportSurfelGIShaderFixtures(argv[2], vulkan) != EXIT_SUCCESS) return EXIT_FAILURE;
         if (ExportPostProcessShaderFixtures(argv[2], vulkan) != EXIT_SUCCESS) return EXIT_FAILURE;
         if (ExportAOEffectShaderFixtures(argv[2], vulkan) != EXIT_SUCCESS) return EXIT_FAILURE;
-        return ExportEditorGraphicsShaderFixtures(argv[2], vulkan);
+        if (ExportEditorGraphicsShaderFixtures(argv[2], vulkan) != EXIT_SUCCESS) return EXIT_FAILURE;
+        if (ExportSceneFeatureShaderFixtures(argv[2], vulkan) != EXIT_SUCCESS) return EXIT_FAILURE;
+        return ExportMaterialMappingShaderFixtures(argv[2], vulkan);
     }
 
     // Validate external input before creating a window, GPU resources or worker threads.
-    std::string editorFlowDirectory;
+    std::string editorFlowDirectory, rendererSwitchDirectory, sceneFeaturesDirectory, advancedShadowsDirectory, subsurfaceDirectory, rasterVisibilityDirectory, subsurfaceHumanDirectory;
     for (int i = 1; i < argc; ++i)
     {
-        if (std::strcmp(argv[i], "--ci-editor-flow") != 0) continue;
-        if (!editorFlowDirectory.empty() || ++i == argc || !argv[i][0] || argv[i][0] == '-')
-        { std::cerr << "Usage: --ci-editor-flow <owned-output-directory> [-vulkan|-dx12]" << std::endl; return EXIT_FAILURE; }
-        try { editorFlowDirectory = jEditorAssetPath::ToUtf8(std::filesystem::absolute(jEditorAssetPath::FromUtf8(argv[i]))); }
+        const bool rendererSwitch = std::strcmp(argv[i], "--ci-renderer-switch") == 0;
+        const bool sceneFeatures = std::strcmp(argv[i], "--ci-scene-features") == 0;
+        const bool advancedShadows = std::strcmp(argv[i], "--ci-advanced-shadows") == 0;
+        const bool subsurface = std::strcmp(argv[i], "--ci-subsurface") == 0;
+        const bool subsurfaceHuman = std::strcmp(argv[i], "--ci-subsurface-human") == 0;
+        const bool rasterVisibility = std::strcmp(argv[i], "--ci-raster-visibility") == 0;
+        if (!subsurfaceHuman && !subsurface && !rasterVisibility && !rendererSwitch && !sceneFeatures && !advancedShadows && std::strcmp(argv[i], "--ci-editor-flow") != 0) continue;
+        auto& directory = subsurfaceHuman ? subsurfaceHumanDirectory : subsurface ? subsurfaceDirectory : rasterVisibility ? rasterVisibilityDirectory : advancedShadows ? advancedShadowsDirectory : sceneFeatures ? sceneFeaturesDirectory : rendererSwitch ? rendererSwitchDirectory : editorFlowDirectory;
+        if (!directory.empty() || ++i == argc || !argv[i][0] || argv[i][0] == '-')
+        { std::cerr << "Usage: --ci-editor-flow|--ci-renderer-switch|--ci-scene-features|--ci-advanced-shadows <owned-output-directory> [-vulkan|-dx12]" << std::endl; return EXIT_FAILURE; }
+        try { directory = jEditorAssetPath::ToUtf8(std::filesystem::absolute(jEditorAssetPath::FromUtf8(argv[i]))); }
         catch (const std::exception& error) { std::cerr << error.what() << std::endl; return EXIT_FAILURE; }
     }
-    if (!editorFlowDirectory.empty() && gCommandLineArgument.HasArgument("--ci-editor-gpu"))
+    if ((int(!editorFlowDirectory.empty()) + int(!rendererSwitchDirectory.empty()) + int(!sceneFeaturesDirectory.empty()) + int(!advancedShadowsDirectory.empty()) + int(!subsurfaceDirectory.empty()) + int(!rasterVisibilityDirectory.empty()) + int(!subsurfaceHumanDirectory.empty()) > 1) ||
+        ((!editorFlowDirectory.empty() || !rendererSwitchDirectory.empty() || !sceneFeaturesDirectory.empty() || !advancedShadowsDirectory.empty() || !subsurfaceDirectory.empty() || !rasterVisibilityDirectory.empty() || !subsurfaceHumanDirectory.empty()) && gCommandLineArgument.HasArgument("--ci-editor-gpu")))
     { std::cerr << "Select only one editor GPU test" << std::endl; return EXIT_FAILURE; }
     if (!editorFlowDirectory.empty()) SetAuthoringTestStateDirectory(jEditorAssetPath::FromUtf8(editorFlowDirectory) / "workspace-state");
+    if (!rendererSwitchDirectory.empty()) SetAuthoringTestStateDirectory(jEditorAssetPath::FromUtf8(rendererSwitchDirectory) / "workspace-state");
+    if (!sceneFeaturesDirectory.empty()) SetAuthoringTestStateDirectory(jEditorAssetPath::FromUtf8(sceneFeaturesDirectory) / "workspace-state");
+    if (!advancedShadowsDirectory.empty()) SetAuthoringTestStateDirectory(jEditorAssetPath::FromUtf8(advancedShadowsDirectory) / "workspace-state");
+    if (!subsurfaceDirectory.empty()) SetAuthoringTestStateDirectory(jEditorAssetPath::FromUtf8(subsurfaceDirectory) / "workspace-state");
+    if (!rasterVisibilityDirectory.empty()) SetAuthoringTestStateDirectory(jEditorAssetPath::FromUtf8(rasterVisibilityDirectory) / "workspace-state");
+    if (!subsurfaceHumanDirectory.empty()) SetAuthoringTestStateDirectory(jEditorAssetPath::FromUtf8(subsurfaceHumanDirectory) / "workspace-state");
     std::string authoringError;
     if (!ConfigureEditorStartup(argc, argv, authoringError)) { std::cerr << authoringError << std::endl; return EXIT_FAILURE; }
     std::string browserScene, browserLoader;
@@ -202,7 +262,7 @@ int main(int argc, char** argv)
     }
     bool waitForTestScene = false;
     if (!ReadEngineBoolean("JENGINE_TEST_WAIT_FOR_SCENE", waitForTestScene)) return EXIT_FAILURE;
-    if (gCommandLineArgument.HasArgument("--ci-editor-gpu") || !editorFlowDirectory.empty()) waitForTestScene = true;
+    if (gCommandLineArgument.HasArgument("--ci-editor-gpu") || !editorFlowDirectory.empty() || !rendererSwitchDirectory.empty() || !sceneFeaturesDirectory.empty() || !advancedShadowsDirectory.empty() || !subsurfaceDirectory.empty() || !rasterVisibilityDirectory.empty() || !subsurfaceHumanDirectory.empty()) waitForTestScene = true;
     if (!ReadEngineBoolean("JENGINE_SURFEL_GI", gOptions.UseSurfelGI)
         || !ReadEngineBoolean("JENGINE_INLINE_RAY", gOptions.SurfelGIInlineRayEnable))
         return EXIT_FAILURE;
@@ -328,6 +388,32 @@ int main(int argc, char** argv)
         g_Engine->Release(); g_rhi->ReleaseRHI(); glfwTerminate(); return EXIT_FAILURE;
     }
 #endif
+    if (!subsurfaceDirectory.empty() || !rasterVisibilityDirectory.empty() || !subsurfaceHumanDirectory.empty())
+    {
+        const int failures = !subsurfaceHumanDirectory.empty() ? RunSubsurfaceHumanIntegrationGpuTests(subsurfaceHumanDirectory.c_str())
+            : !subsurfaceDirectory.empty() ? RunSubsurfaceIntegrationGpuTests(subsurfaceDirectory.c_str())
+            : RunRasterVisibilityIntegrationGpuTests(rasterVisibilityDirectory.c_str());
+        g_Engine->Release(); g_rhi->ReleaseRHI(); glfwTerminate();
+        return failures ? EXIT_FAILURE : EXIT_SUCCESS;
+    }
+    if (!advancedShadowsDirectory.empty())
+    {
+        const int failures = RunAdvancedShadowIntegrationGpuTests(advancedShadowsDirectory.c_str());
+        g_Engine->Release(); g_rhi->ReleaseRHI(); glfwTerminate();
+        return failures ? EXIT_FAILURE : EXIT_SUCCESS;
+    }
+    if (!sceneFeaturesDirectory.empty())
+    {
+        const int failures = RunSceneFeatureIntegrationGpuTests(sceneFeaturesDirectory.c_str());
+        g_Engine->Release(); g_rhi->ReleaseRHI(); glfwTerminate();
+        return failures ? EXIT_FAILURE : EXIT_SUCCESS;
+    }
+    if (!rendererSwitchDirectory.empty())
+    {
+        const int failures = RunRendererSwitchGpuTests(rendererSwitchDirectory.c_str());
+        g_Engine->Release(); g_rhi->ReleaseRHI(); glfwTerminate();
+        return failures ? EXIT_FAILURE : EXIT_SUCCESS;
+    }
     if (!editorFlowDirectory.empty())
     {
         const int failures = RunEditorAuthoringGpuTests(editorFlowDirectory.c_str());

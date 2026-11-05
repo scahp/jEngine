@@ -1,0 +1,12 @@
+{
+  "assetRoot": "Assets",
+  "name": "Advanced shadow modules",
+  "projectId": "a16f87e7-314c-4c77-9107-4e463dcc7ab1",
+  "schemaVersion": 1,
+  "settings": {
+    "render.deferred": "true",
+    "render.ssgi": "false",
+    "render.surfelgi": "false"
+  },
+  "startupScene": "Scenes/deferred-csm4.jscene"
+}

@@ -116,6 +116,9 @@ struct jSubpass
 
 struct jRenderPassInfo
 {
+    // Explicit depth/stencil producer-consumer ordering between passes which
+    // reuse an attachment without changing its layout (e.g. z-fail volumes).
+    bool SynchronizeDepthStencil = false;
     std::vector<jAttachment> Attachments;
     jAttachment ResolveAttachment;
     std::vector<jSubpass> Subpasses;
@@ -129,6 +132,7 @@ struct jRenderPassInfo
     FORCEINLINE size_t GetHash() const
     {
         int64 Hash = 0;
+        Hash = XXH64(uint32(SynchronizeDepthStencil), Hash);
         for(const auto& iter : Attachments)
         {
             Hash = XXH64(iter.GetHash(), Hash);

@@ -1,4 +1,14 @@
 #include "common.hlsl"
+// Material shader injection point.
+#include "Features/materialsurface.hlsl"
+#include "Features/skinnormalpacking.hlsl"
+
+#ifndef USE_SKIN_MATERIAL
+#define USE_SKIN_MATERIAL 0
+#endif
+#ifndef USE_SKIN_UV
+#define USE_SKIN_UV 0
+#endif
 
 #ifndef USE_VERTEX_COLOR
 #define USE_VERTEX_COLOR 0
@@ -33,10 +43,27 @@ struct PushConsts
 
 struct FSOutput
 {
-    float3 GBuffer0 : SV_TARGET0;       // OctaNormal.xy
-    float3 GBuffer1 : SV_TARGET1;       // Albedo.xyz
+#if USE_SKIN_MATERIAL
+    float4 GBuffer0 : SV_TARGET0;       // Geometric/pore oct-normal pairs.
+    float4 GBuffer1 : SV_TARGET1;       // Albedo.rgb, model/transport flags.
+#else
+    float3 GBuffer0 : SV_TARGET0;
+    float3 GBuffer1 : SV_TARGET1;
+#endif
     float4 GBuffer2 : SV_TARGET2;       // Velocity.xy, Metallic, Roughness
     float3 GBuffer3 : SV_TARGET3;       // Linear emissive radiance, added once after lighting.
+#if USE_SKIN_MATERIAL
+    float4 GBuffer4 : SV_TARGET4;       // Visibility, AO, pre-scatter exponent, rho_s.
+#else
+    float2 GBuffer4 : SV_TARGET4;
+#endif
+#if USE_SUBSURFACE
+    float4 SubsurfaceMask : SV_TARGET5;
+    float4 DiffuseLighting : SV_TARGET6;
+#endif
+#if USE_SKIN_UV
+    float4 SkinUV : SV_TARGET7;
+#endif
 };
 
 FSOutput main(VSOutput input
@@ -52,10 +79,12 @@ FSOutput main(VSOutput input
 
 #if USE_ALBEDO_TEXTURE
     color *= DiffuseTexture.Sample(DiffuseTextureSampler, input.TexCoord.xy);
+#if !JE_HAS_MATERIAL_GRAPH
     if (RenderObjectParam.SurfaceFlags == 0 && color.w < 0.5f)
     {
         discard;
     }
+#endif
 
     #if USE_SRGB_ALBEDO_TEXTURE
     // Convert to linear space
@@ -74,6 +103,24 @@ FSOutput main(VSOutput input
 #endif // USE_ALBEDO_TEXTURE
 
     color *= RenderObjectParam.BaseColorOpacity;
+    float2 MaterialVisibility = float2(1.0, 1.0);
+#if JE_HAS_MATERIAL_GRAPH
+    JEMaterialContext MappingContext;
+    MappingContext.UV = input.TexCoord;
+    MappingContext.WorldPos = input.WorldPos.xyz;
+    MappingContext.NormalWS = normalize(input.Normal);
+    MappingContext.TBN = input.TBN;
+    MappingContext.ViewDirWS = ViewParam.MaterialViewDirection.w < 0.5 ?
+        normalize(ViewParam.MaterialViewDirection.xyz) : normalize(ViewParam.EyeWorld - input.WorldPos.xyz);
+    const JEMaterialSurface MappedSurface = JE_ResolveMaterial(MappingContext, USE_SRGB_ALBEDO_TEXTURE != 0);
+    color = MappedSurface.BaseColor;
+    WorldNormal = normalize(mul(input.TBN, MappedSurface.NormalTS));
+#if JE_HAS_HORIZON
+    const float2 horizon = saturate(JE_EvaluateHorizon(MappingContext, ViewParam.MaterialLightDirection.xyz));
+    MaterialVisibility.y = horizon.y;
+    if (ViewParam.MaterialLightDirection.w > 0.5) MaterialVisibility.x = horizon.x;
+#endif
+#endif
     // Deferred surfaces use deterministic coverage for fractional opacity.
     // This keeps depth, shadows and the opaque GBuffer coherent without pretending
     // that the deferred pass provides sorted transparent blending.
@@ -172,8 +219,29 @@ FSOutput main(VSOutput input
     }
 #endif
     
+#if JE_HAS_MATERIAL_GRAPH
+    Metallic = MappedSurface.Metallic;
+    Roughness = MappedSurface.Roughness;
+#endif
+
     //output.GBuffer0.xy = EncodeOctNormal(WorldNormal * 0.5 + 0.5);
+    uint skinFlags = (uint)MaterialGraphParam.MaterialSkinParameters.x;
+    float specularWeight = MaterialGraphParam.MaterialSkinParameters.y;
+    float diffuseOcclusion = MaterialGraphParam.MaterialSkinParameters.z;
+    float preScatterWeight = MaterialGraphParam.MaterialSkinParameters.w;
+#if JE_HAS_MATERIAL_GRAPH
+    skinFlags = MappedSurface.ShadingFlags;
+    specularWeight = MappedSurface.SpecularWeight;
+    diffuseOcclusion = MappedSurface.DiffuseOcclusion;
+    preScatterWeight = MappedSurface.PreScatterWeight;
+#endif
+#if USE_SKIN_MATERIAL
+    const float3 postNormal = (skinFlags & 255u) == 1u ? normalize(input.Normal) : WorldNormal;
+    output.GBuffer0 = float4(JE_SkinOctEncode(postNormal), JE_SkinOctEncode(WorldNormal));
+    output.GBuffer1.a = (float)skinFlags;
+#else
     output.GBuffer0.xyz = WorldNormal * 0.5 + 0.5;
+#endif
     output.GBuffer1.xyz = color.xyz;
     
     float2 PrevScreenPosUV = (input.PrevPos.xy / input.PrevPos.w);
@@ -192,6 +260,33 @@ FSOutput main(VSOutput input
     // Metallic, Roughness : [0, 1]
     output.GBuffer2 = float4(Velocity, Metallic, Roughness);
     output.GBuffer3 = max(RenderObjectParam.EmissiveOverride.xyz, 0.0);
+#if USE_SKIN_MATERIAL
+    output.GBuffer4 = float4(MaterialVisibility.x, MaterialVisibility.y * saturate(diffuseOcclusion),
+        saturate(preScatterWeight), clamp(specularWeight, 0.0, 8.0));
+#else
+    output.GBuffer4 = MaterialVisibility;
+#endif
+#if USE_SUBSURFACE
+    float weight = MaterialGraphParam.MaterialSubsurfaceColorWeight.a;
+    float3 scatterColor = MaterialGraphParam.MaterialSubsurfaceColorWeight.rgb;
+    float thickness = MaterialGraphParam.MaterialSubsurfaceParameters.x;
+    uint profile = (uint)clamp(MaterialGraphParam.MaterialSubsurfaceParameters.y, 0.0, 7.0);
+#if JE_HAS_MATERIAL_GRAPH
+    weight = MappedSurface.SubsurfaceWeight;
+    scatterColor = MappedSurface.SubsurfaceColor;
+    thickness = MappedSurface.SubsurfaceThickness;
+    profile = MappedSurface.SubsurfaceProfile;
+#endif
+#if USE_SKIN_UV
+    if ((skinFlags & 255u) == 1u && ((skinFlags >> 8u) & 255u) == 1u &&
+        RenderObjectParam.RenderObjectID > 0u && RenderObjectParam.RenderObjectID < 1048576u)
+        output.SkinUV = float4(input.TexCoord, RenderObjectParam.RenderObjectID & 1023u,
+            RenderObjectParam.RenderObjectID >> 10u);
+#endif
+    const float3 mask = saturate(weight) * saturate(scatterColor) * (1.0 - saturate(Metallic));
+    output.SubsurfaceMask = float4(mask, any(mask > 0.0) && thickness > 0.0 ? min(profile, 7u) + 1.0 : 0.0);
+    output.DiffuseLighting = float4(0.0, 0.0, 0.0, max(thickness, 0.0));
+#endif
 
     return output;
 }

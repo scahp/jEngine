@@ -78,6 +78,11 @@ public:
 	const char* GetActivePathTracingSceneName() const;
 	const char* GetSceneRenderPipelineName(int32 InIndex) const;
 	const char* GetActiveSceneRenderPipelineName() const;
+    // Owner-thread API. Requests only queue work; Update applies it before Draw.
+    ESceneRenderPipeline GetActiveSceneRenderPipeline() const;
+    bool CanSwitchSceneRenderPipeline(ESceneRenderPipeline target, std::string& reason) const;
+    bool RequestSceneRenderPipeline(ESceneRenderPipeline target, std::string& reason);
+    bool IsSceneRenderPipelineSwitchPending() const { return SceneRenderPipelineSwitchPending; }
 	const char* GetSceneRecommendedLoaderName(int32 InIndex) const;
 	const char* GetSelectedPathTracingSceneLoaderName() const;
 	const char* GetActivePathTracingSceneLoaderName() const;
@@ -92,7 +97,7 @@ public:
     bool IsSceneBrowserRestartRequested() const { return PathTracingSceneBrowser.RestartIndex >= 0; }
     std::vector<std::string> GetSceneBrowserRestartArguments() const;
     void RequestSceneMaterialRefresh() { SceneMaterialRefreshPending = true; }
-    bool IsSceneImportPending() const { return PendingImportId != 0; }
+    bool IsSceneImportPending() const { return PendingImportId != 0 || SceneMaterialRefreshPending; }
     const std::string& GetSceneImportStatus() const { return SceneImportStatus; }
     void CancelSceneImport();
     bool WaitForSceneImportForTesting(uint32 timeoutMilliseconds = 30000);
@@ -123,17 +128,25 @@ private:
 	void ApplyScenePlacementPreset(int32 InIndex);
 	void ClearSceneBrowserLoadedObjects();
 	void ClearSceneBrowserLoadedLights();
+    void EnsureSceneBrowserRasterPreviewLights();
+    void ClearSceneBrowserRasterPreviewLights();
 	int32 FindPathTracingSceneIndexById(const std::string& InSceneId) const;
 	void LoadPathTracingSceneByIndex(int32 InIndex, bool InRebuildRaytracingScene, jMeshObject* preparedModel = nullptr);
     void ProcessSceneImports();
+    void ProcessSceneRenderPipelineSwitch();
 
     std::unique_ptr<jAssetImportService> AssetImports;
+    ESceneRenderPipeline PendingSceneRenderPipeline = ESceneRenderPipeline::Deferred;
+    bool SceneRenderPipelineSwitchPending = false;
     std::uint64_t PendingImportId = 0;
     bool SceneMaterialRefreshPending = false;
+    bool SceneMaterialRefreshAfterRaster = false;
     bool RefreshSceneMaterialLibrary(std::string& error);
     std::string PendingImportSceneId;
     std::string SceneImportStatus;
 	jPathTracingSceneBrowserState PathTracingSceneBrowser;
 	std::vector<jObject*> SceneBrowserLoadedObjects;
 	std::vector<jLight*> SceneBrowserLoadedLights;
+    // Temporary raster approximations of legacy analytic emitters, never authored.
+    std::vector<jLight*> SceneBrowserRasterPreviewLights;
 };

@@ -4,6 +4,8 @@
 #include "Code/Engine/jEditor.h"
 #include "FileLoader/jImageFileLoader.h"
 #include "Material/jMaterial.h"
+#include "Material/jMaterialWater.h"
+#include "jEditorWater.h"
 #include "Scene/jObject.h"
 #include "Scene/jMeshObject.h"
 #include "Scene/jRenderObject.h"
@@ -245,6 +247,8 @@ public:
     ParticleSimulation Simulation;
     bool ParticleEmitter = false;
     float LastPlayTime = 0;
+    std::optional<WaterProperties> Water;
+    std::shared_ptr<jMaterialWaterState> WaterState;
 };
 struct MaterialState
 {
@@ -338,7 +342,7 @@ struct Adapter
             }
             material->bRaytracingAlphaTest = true;
             if (render->MaterialPtr && !render->MaterialPtr->IsRaytracingAlphaTestEnabled() &&
-                g_rhi->RaytracingScene && render->IsSupportRaytracing())
+                g_rhi && g_rhi->RaytracingScene && render->IsSupportRaytracing())
                 g_rhi->RaytracingScene->MarkBLASDirty(render);
             render->MaterialPtr = std::move(material);
         }
@@ -366,7 +370,19 @@ void Install(jEditor& editor)
         auto object = std::make_shared<ProceduralObject>();
         Mesh mesh;
         jRenderObject* render = nullptr;
-        if (entity.Kind == EntityKind::Terrain)
+        if (entity.Kind == EntityKind::Water)
+        {
+            if (!jEditorWater::Validate(entity.Water, error)) return {};
+            TerrainProperties grid;
+            grid.Resolution = entity.Water.Resolution;
+            grid.SizeX = entity.Water.SizeX; grid.SizeZ = entity.Water.SizeZ;
+            if (!BuildTerrainMesh(grid, mesh, error)) return {};
+            object->Water = entity.Water;
+            object->WaterState = std::make_shared<jMaterialWaterState>();
+            object->WaterState->Settings = entity.Water.Waves;
+            render = new jRenderObject();
+        }
+        else if (entity.Kind == EntityKind::Terrain)
         {
             if (!BuildTerrainMesh(entity.Terrain, mesh, error)) return {};
             object->Terrain = entity.Terrain; render = new jRenderObject();
@@ -389,6 +405,19 @@ void Install(jEditor& editor)
         g_rhi->Flush();
         render->CreateRenderObject(geometry);
         render->MaterialPtr = GDefaultMaterial; render->IsTwoSided = object->ParticleEmitter;
+        if (object->WaterState)
+        {
+            render->MaterialPtr = std::make_shared<jMaterial>(*GDefaultMaterial);
+            render->MaterialPtr->ShaderBindingInstance.reset();
+            render->MaterialPtr->NeedToUpdateShaderBindingInstance = true;
+            render->MaterialPtr->Water = object->WaterState;
+            jWaterSimulation::Bounds bounds;
+            if (jWaterSimulation::ConservativeBounds(entity.Water.Waves,
+                {-entity.Water.SizeX * .5f, -entity.Water.SizeZ * .5f},
+                {entity.Water.SizeX * .5f, entity.Water.SizeZ * .5f}, bounds, error))
+                object->BoundBox = {Vector(bounds.Min[0], bounds.Min[1], bounds.Min[2]),
+                    Vector(bounds.Max[0], bounds.Max[1], bounds.Max[2])};
+        }
         object->AddRenderObject(render); object->RenderObjectGeometryDataPtr = render->GeometryDataPtr;
         error.clear(); return object;
     }, [](const Entity& entity, jObject& base, float deltaTime, float playTime)
@@ -396,6 +425,47 @@ void Install(jEditor& editor)
         auto* object = dynamic_cast<ProceduralObject*>(&base);
         if (!object || object->RenderObjects.empty()) return;
         auto* render = object->RenderObjects[0];
+        if (object->Water && object->WaterState)
+        {
+            if (entity.Kind != EntityKind::Water) return;
+            if (*object->Water != entity.Water)
+            {
+                std::string error;
+                if (!jEditorWater::Validate(entity.Water, error)) return;
+                const bool topologyChanged = object->Water->Resolution != entity.Water.Resolution
+                    || object->Water->SizeX != entity.Water.SizeX || object->Water->SizeZ != entity.Water.SizeZ;
+                if (topologyChanged)
+                {
+                    TerrainProperties grid; grid.Resolution = entity.Water.Resolution;
+                    grid.SizeX = entity.Water.SizeX; grid.SizeZ = entity.Water.SizeZ;
+                    Mesh mesh;
+                    if (!BuildTerrainMesh(grid, mesh, error)) return;
+                    g_rhi->Flush();
+                    auto geometry = UploadMesh(mesh);
+                    if (!geometry || !geometry->VertexBufferPtr || !geometry->VertexBuffer_PositionOnlyPtr) return;
+                    g_rhi->Flush();
+                    render->GeometryDataPtr = geometry; object->RenderObjectGeometryDataPtr = geometry;
+                    render->BottomLevelASBuffer.reset(); render->ScratchASBuffer.reset();
+                    if (g_rhi->RaytracingScene) g_rhi->RaytracingScene->MarkBLASDirty(render);
+                }
+                object->WaterState->Settings = entity.Water.Waves;
+                *object->Water = entity.Water;
+                jWaterSimulation::Bounds bounds;
+                if (jWaterSimulation::ConservativeBounds(entity.Water.Waves,
+                    {-entity.Water.SizeX * .5f, -entity.Water.SizeZ * .5f},
+                    {entity.Water.SizeX * .5f, entity.Water.SizeZ * .5f}, bounds, error))
+                    object->BoundBox = {Vector(bounds.Min[0], bounds.Min[1], bounds.Min[2]),
+                        Vector(bounds.Max[0], bounds.Max[1], bounds.Max[2])};
+                if (render->MaterialPtr) render->MaterialPtr->NeedToUpdateShaderBindingInstance = true;
+            }
+            object->WaterState->TimeSeconds = playTime;
+            if (render->MaterialPtr && render->MaterialPtr->Water != object->WaterState)
+            {
+                render->MaterialPtr->Water = object->WaterState;
+                render->MaterialPtr->NeedToUpdateShaderBindingInstance = true;
+            }
+            return;
+        }
         if (!object->ParticleEmitter)
         {
             if (object->Terrain == entity.Terrain) return;

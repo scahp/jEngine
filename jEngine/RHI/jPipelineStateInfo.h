@@ -514,12 +514,16 @@ struct jPipelineStateInfo
         PipelineType = EPipelineType::RayTracing;
     }
     jPipelineStateInfo(const jPipelineStateInfo& InPipelineState)
-        : PipelineStateFixed(InPipelineState.PipelineStateFixed), GraphicsShader(InPipelineState.GraphicsShader), ComputeShader(InPipelineState.ComputeShader), RaytracingShaders(InPipelineState.RaytracingShaders)
+        : FixedStateSnapshot(InPipelineState.FixedStateSnapshot ? InPipelineState.FixedStateSnapshot :
+            (InPipelineState.PipelineStateFixed ? std::make_shared<jPipelineStateFixedInfo>(*InPipelineState.PipelineStateFixed) : nullptr))
+        , PipelineStateFixed(FixedStateSnapshot.get()), GraphicsShader(InPipelineState.GraphicsShader), ComputeShader(InPipelineState.ComputeShader), RaytracingShaders(InPipelineState.RaytracingShaders)
         , PipelineType(InPipelineState.PipelineType), VertexBufferArray(InPipelineState.VertexBufferArray), RenderPass(InPipelineState.RenderPass), ShaderBindingLayoutArray(InPipelineState.ShaderBindingLayoutArray)
         , PushConstant(InPipelineState.PushConstant), Hash(InPipelineState.Hash), SubpassIndex(InPipelineState.SubpassIndex), RaytracingPipelineData(InPipelineState.RaytracingPipelineData)
     {}
-    jPipelineStateInfo(jPipelineStateInfo&& InPipelineState) noexcept
-        : PipelineStateFixed(InPipelineState.PipelineStateFixed), GraphicsShader(InPipelineState.GraphicsShader), ComputeShader(InPipelineState.ComputeShader), RaytracingShaders(InPipelineState.RaytracingShaders)
+    jPipelineStateInfo(jPipelineStateInfo&& InPipelineState)
+        : FixedStateSnapshot(InPipelineState.FixedStateSnapshot ? InPipelineState.FixedStateSnapshot :
+            (InPipelineState.PipelineStateFixed ? std::make_shared<jPipelineStateFixedInfo>(*InPipelineState.PipelineStateFixed) : nullptr))
+        , PipelineStateFixed(FixedStateSnapshot.get()), GraphicsShader(InPipelineState.GraphicsShader), ComputeShader(InPipelineState.ComputeShader), RaytracingShaders(InPipelineState.RaytracingShaders)
         , PipelineType(InPipelineState.PipelineType), VertexBufferArray(InPipelineState.VertexBufferArray), RenderPass(InPipelineState.RenderPass), ShaderBindingLayoutArray(InPipelineState.ShaderBindingLayoutArray)
         , PushConstant(InPipelineState.PushConstant), Hash(InPipelineState.Hash), SubpassIndex(InPipelineState.SubpassIndex), RaytracingPipelineData(InPipelineState.RaytracingPipelineData)
     {}
@@ -538,6 +542,9 @@ struct jPipelineStateInfo
     jVertexBufferArray VertexBufferArray;
     jShaderBindingLayoutArray ShaderBindingLayoutArray;
     const jPushConstant* PushConstant;
+    // Pool copies freeze the compound state once on a cache miss. Stack-local
+    // setup state may then expire without invalidating draws or hot reload.
+    std::shared_ptr<const jPipelineStateFixedInfo> FixedStateSnapshot;
     const jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
     int32 SubpassIndex = 0;
 

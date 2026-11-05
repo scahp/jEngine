@@ -7,6 +7,8 @@ struct VSInput
     [[vk::location(1)]] uint LayerIndex : BLENDINDICES0;
 };
 
+#include "Features/materialvertex.hlsl"
+
 struct VSOutput
 {
     float4 Pos : SV_POSITION;
@@ -19,6 +21,9 @@ struct VSOutput
 VSOutput main(VSInput input)
 {
     VSOutput output = (VSOutput)0;
+
+    float3 waterNormal = float3(0, 1, 0), waterTangent = float3(1, 0, 0);
+    JE_DeformWater(input.Position, waterNormal, waterTangent);
 
     output.LayerIndex = input.LayerIndex;
     output.Opacity = RenderObjectParam.BaseColorOpacity.a;

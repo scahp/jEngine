@@ -1240,4 +1240,20 @@
       <Filter>Resource\Shaders\hlsl</Filter>
     </None>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Renderer\Features\jAdvancedShadowSettings.h" />
+    <ClInclude Include="Renderer\Features\jAdvancedShadowMath.h" />
+    <ClInclude Include="Renderer\jAdvancedShadowPass.h" />
+    <ClInclude Include="Shader\jAdvancedShadowShaderParameters.h" />
+    <ClInclude Include="Tests\jAdvancedShadowIntegrationTests.h" />
+    <ClCompile Include="Renderer\Features\jAdvancedShadowMath.cpp" />
+    <ClCompile Include="Renderer\jAdvancedShadowPass.cpp" />
+    <ClCompile Include="Tests\jAdvancedShadowIntegrationTests.cpp" />
+    <None Include="Resource\Shaders\hlsl\Features\advancedshadows.hlsl" />
+    <None Include="Resource\Shaders\hlsl\Features\advancedshadowlighting.hlsl" />
+    <None Include="Resource\Shaders\hlsl\advanced_shadow_vs.hlsl" />
+    <None Include="Resource\Shaders\hlsl\advanced_shadow_fs.hlsl" />
+    <None Include="Resource\Shaders\hlsl\advanced_shadow_cs.hlsl" />
+    <None Include="Resource\Shaders\hlsl\advanced_shadow_volume_mask.hlsl" />
+  </ItemGroup>
 </Project>

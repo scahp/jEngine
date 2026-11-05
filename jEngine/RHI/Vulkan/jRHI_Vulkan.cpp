@@ -1294,7 +1294,10 @@ std::shared_ptr<jRenderTarget> jRHI_Vulkan::CreateRenderTarget(const jRenderTarg
 	if (hasDepthAttachment)
 		TextureCreateFlag |= ETextureCreateFlag::DSV;
 	else
-		TextureCreateFlag |= ETextureCreateFlag::RTV | ETextureCreateFlag::UAV;
+	{
+		TextureCreateFlag |= ETextureCreateFlag::RTV;
+        if (info.SampleCount == EMSAASamples::COUNT_1) TextureCreateFlag |= ETextureCreateFlag::UAV;
+    }
 	
 	if (info.IsUseAsSubpassInput)
 		TextureCreateFlag |= ETextureCreateFlag::SubpassInput;
@@ -1307,7 +1310,14 @@ std::shared_ptr<jRenderTarget> jRHI_Vulkan::CreateRenderTarget(const jRenderTarg
 	switch (info.Type)
 	{
 	case ETextureType::TEXTURE_2D:
-		TexturePtr = g_rhi->Create2DTexture<jTexture_Vulkan>(info.Width, info.Height, 1, mipLevels, info.Format, TextureCreateFlag, EResourceLayout::GENERAL);
+        if (info.SampleCount != EMSAASamples::COUNT_1)
+            TexturePtr = jBufferUtil_Vulkan::Create2DTexture(info.Width, info.Height, 1,
+                static_cast<VkSampleCountFlagBits>(info.SampleCount), textureFormat, VK_IMAGE_TILING_OPTIMAL,
+                GetImageUsageFlags(TextureCreateFlag), GetMemoryPropertyFlagBits(TextureCreateFlag),
+                static_cast<VkImageCreateFlagBits>(0), VK_IMAGE_LAYOUT_UNDEFINED);
+        else
+		    TexturePtr = g_rhi->Create2DTexture<jTexture_Vulkan>(info.Width, info.Height, 1, mipLevels, info.Format, TextureCreateFlag, EResourceLayout::GENERAL);
+        if (!TexturePtr || !TexturePtr->Image) return nullptr;
 		imageViewForMipMap[0] = TexturePtr->View;
 		
 		check(mipLevels > 0);
@@ -1317,7 +1327,14 @@ std::shared_ptr<jRenderTarget> jRHI_Vulkan::CreateRenderTarget(const jRenderTarg
 		}
 		break;
 	case ETextureType::TEXTURE_2D_ARRAY:
-        TexturePtr = g_rhi->Create2DTexture<jTexture_Vulkan>(info.Width, info.Height, info.LayerCount, mipLevels, info.Format, TextureCreateFlag, EResourceLayout::GENERAL);
+        if (info.SampleCount != EMSAASamples::COUNT_1)
+            TexturePtr = jBufferUtil_Vulkan::CreateTexture2DArray(info.Width, info.Height, info.LayerCount, 1,
+                static_cast<VkSampleCountFlagBits>(info.SampleCount), textureFormat, VK_IMAGE_TILING_OPTIMAL,
+                GetImageUsageFlags(TextureCreateFlag), GetMemoryPropertyFlagBits(TextureCreateFlag),
+                static_cast<VkImageCreateFlagBits>(0), VK_IMAGE_LAYOUT_UNDEFINED);
+        else
+            TexturePtr = g_rhi->Create2DTexture<jTexture_Vulkan>(info.Width, info.Height, info.LayerCount, mipLevels, info.Format, TextureCreateFlag, EResourceLayout::GENERAL);
+        if (!TexturePtr || !TexturePtr->Image) return nullptr;
         imageViewForMipMap[0] = TexturePtr->View;
 
         check(mipLevels > 0);
@@ -1328,6 +1345,7 @@ std::shared_ptr<jRenderTarget> jRHI_Vulkan::CreateRenderTarget(const jRenderTarg
 		break;
 	case ETextureType::TEXTURE_CUBE:
 		check(info.LayerCount == 6);
+        if (info.SampleCount != EMSAASamples::COUNT_1) return nullptr;
 		TexturePtr = g_rhi->CreateCubeTexture<jTexture_Vulkan>(info.Width, info.Height, mipLevels, info.Format, TextureCreateFlag, EResourceLayout::GENERAL);
 
 		// Create for Shader Resource (TextureCube)
@@ -1485,7 +1503,29 @@ void jRHI_Vulkan::DrawIndirect(const std::shared_ptr<jRenderFrameContext>& InRen
 #endif // USE_RESOURCE_BARRIER_BATCHER
 	
 	vkCmdDrawIndirect((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), (VkBuffer)buffer->GetHandle()
-        , startIndex * sizeof(VkDrawIndirectCommand), drawCount, sizeof(VkDrawIndirectCommand));
+        , static_cast<jBuffer_Vulkan*>(buffer)->GetOffset() + startIndex * sizeof(VkDrawIndirectCommand), drawCount, sizeof(VkDrawIndirectCommand));
+}
+
+EMSAASamples jRHI_Vulkan::SelectMSAASamples(uint32 requested)
+{
+    SelectedMSAASamples = EMSAASamples::COUNT_1;
+    if (requested != 2 && requested != 4) return SelectedMSAASamples;
+    // Check the formats actually used by deferred MRTs, rather than only the
+    // device-wide colour/depth intersection. No multisampled storage images.
+    constexpr ETextureFormat formats[] = {ETextureFormat::R11G11B10F,
+        ETextureFormat::RGBA16F, ETextureFormat::RG16F, ETextureFormat::D24_S8};
+    for (const auto format : formats)
+    {
+        const bool depth = format == ETextureFormat::D24_S8;
+        VkImageFormatProperties properties{};
+        const auto usage = VK_IMAGE_USAGE_SAMPLED_BIT | (depth
+            ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+        if (vkGetPhysicalDeviceImageFormatProperties(PhysicalDevice, GetVulkanTextureFormat(format),
+            VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL, usage, 0, &properties) != VK_SUCCESS ||
+            !(properties.sampleCounts & requested)) return SelectedMSAASamples;
+    }
+    SelectedMSAASamples = static_cast<EMSAASamples>(requested);
+    return SelectedMSAASamples;
 }
 
 void jRHI_Vulkan::DrawElementsIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext
@@ -1500,7 +1540,7 @@ void jRHI_Vulkan::DrawElementsIndirect(const std::shared_ptr<jRenderFrameContext
 #endif // USE_RESOURCE_BARRIER_BATCHER
 
 	vkCmdDrawIndexedIndirect((VkCommandBuffer)InRenderFrameContext->GetActiveCommandBuffer()->GetHandle(), (VkBuffer)buffer->GetHandle()
-		, startIndex * sizeof(VkDrawIndexedIndirectCommand), drawCount, sizeof(VkDrawIndexedIndirectCommand));
+		, static_cast<jBuffer_Vulkan*>(buffer)->GetOffset() + startIndex * sizeof(VkDrawIndexedIndirectCommand), drawCount, sizeof(VkDrawIndexedIndirectCommand));
 }
 
 void jRHI_Vulkan::DispatchCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ) const
@@ -1826,6 +1866,9 @@ std::shared_ptr<jRenderFrameContext> jRHI_Vulkan::BeginRenderFrame()
 	renderFrameContextPtr->FrameIndex = CurrentFrameIndex;
 	renderFrameContextPtr->SceneRenderTargetPtr = std::make_shared<jSceneRenderTarget>();
 	renderFrameContextPtr->SceneRenderTargetPtr->Create(Swapchain->GetSwapchainImage(CurrentFrameIndex), &jLight::GetLights());
+    renderFrameContextPtr->UseSubpass = renderFrameContextPtr->SceneRenderTargetPtr->UseSubpass;
+    renderFrameContextPtr->UseSubsurface = bool(renderFrameContextPtr->SceneRenderTargetPtr->SubsurfaceMask);
+    renderFrameContextPtr->HasSkinMaterials = renderFrameContextPtr->SceneRenderTargetPtr->HasSkinMaterials;
 	renderFrameContextPtr->CurrentWaitSemaphore = acquiredSemaphore;
 	jProfileGPUBeginFrame(renderFrameContextPtr);
 
@@ -2518,7 +2561,9 @@ std::shared_ptr<jBuffer> jRHI_Vulkan::CreateBufferInternal(uint64 InSize, uint64
 std::shared_ptr<jBuffer> jRHI_Vulkan::CreateStructuredBuffer(uint64 InSize, uint64 InAlignment, uint64 InStride
 	, EBufferCreateFlag InBufferCreateFlag, EResourceLayout InInitialState, const void* InData /*= nullptr*/, uint64 InDataSize /*= 0*/ , jName InResourceName /*= jName()*/) const
 {
-	return CreateBufferInternal(InSize, InAlignment, InBufferCreateFlag, InInitialState, InData, InDataSize, InResourceName);
+    // Both StructuredBuffer SRVs and RWStructuredBuffer UAVs use a Vulkan
+    // storage-buffer descriptor, including host-visible read-only uploads.
+	return CreateBufferInternal(InSize, InAlignment, InBufferCreateFlag | EBufferCreateFlag::UAV, InInitialState, InData, InDataSize, InResourceName);
 }
 
 std::shared_ptr<jBuffer> jRHI_Vulkan::CreateRawBuffer(uint64 InSize, uint64 InAlignment, EBufferCreateFlag InBufferCreateFlag

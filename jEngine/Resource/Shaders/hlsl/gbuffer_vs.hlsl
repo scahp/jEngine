@@ -26,6 +26,8 @@ struct VSInput
     [[vk::location((3+USE_VERTEX_COLOR+USE_VERTEX_BITANGENT))]] float2 TexCoord : TEXCOORD0;
 };
 
+#include "Features/materialvertex.hlsl"
+
 struct VSOutput
 {
     float4 Pos : SV_POSITION;
@@ -44,6 +46,8 @@ struct VSOutput
 VSOutput main(VSInput input)
 {
     VSOutput output = (VSOutput) 0;
+
+    JE_DeformWater(input.Position, input.Normal, input.Tangent);
     
     output.LocalPos = input.Position;
     output.WorldPos = mul(RenderObjectParam.M, float4(input.Position, 1.0));
@@ -60,21 +64,26 @@ VSOutput main(VSInput input)
 #else
     output.TexCoord = input.TexCoord;
 #endif
-    output.Normal = mul((float3x3)RenderObjectParam.M, input.Normal);
+    output.Normal = normalize(mul(input.Normal, (float3x3)RenderObjectParam.InvM));
     
-#if USE_ALBEDO_TEXTURE
     #if USE_VERTEX_BITANGENT
     float3 Bitangent = input.Bitangent;
     #else
     float3 Bitangent = cross(input.Normal, input.Tangent);
     #endif // USE_VERTEX_BITANGENT
+    // Heightfield V grows toward local +Z; imported meshes retain their authored
+    // bitangent sign whenever water deformation is disabled.
+    if (MaterialGraphParam.WaterControl.x > 0.5) Bitangent = -cross(input.Normal, input.Tangent);
 
-    float3 T = normalize(mul((float3x3)RenderObjectParam.M, input.Tangent).xyz);
-    float3 B = normalize(mul((float3x3)RenderObjectParam.M, Bitangent).xyz);
-    float3 N = normalize(mul((float3x3)RenderObjectParam.M, input.Normal).xyz);
+    float3 N = output.Normal;
+    float3 T = mul((float3x3)RenderObjectParam.M, input.Tangent).xyz;
+    float3 B = mul((float3x3)RenderObjectParam.M, Bitangent).xyz;
+    T -= N * dot(T, N);
+    if (dot(T, T) < 1.0e-12) T = cross(abs(N.y) < 0.99 ? float3(0, 1, 0) : float3(1, 0, 0), N);
+    T = normalize(T);
+    B = normalize(cross(N, T)) * (dot(cross(N, T), B) < 0.0 ? -1.0 : 1.0);
     output.TBN = float3x3(T, B, N);
     output.TBN = transpose(output.TBN);
-#endif
 
     return output;
 }

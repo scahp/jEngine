@@ -201,6 +201,11 @@ public:
 	ComPtr<IDXGIAdapter3> Adapter;
 	ComPtr<ID3D12Device5> Device;
     ComPtr<ID3D12CommandSignature> DispatchComputeCommandSignature;
+    ComPtr<ID3D12CommandSignature> DrawCommandSignature;
+    ComPtr<ID3D12CommandSignature> DrawIndexedCommandSignature;
+    EMSAASamples SelectedMSAASamples = EMSAASamples::COUNT_1;
+    virtual EMSAASamples GetSelectedMSAASamples() const override { return SelectedMSAASamples; }
+    virtual EMSAASamples SelectMSAASamples(uint32 InRequestedSamples) override;
     uint32 Options = 0;
 	ComPtr<IDXGIFactory5> Factory;
 

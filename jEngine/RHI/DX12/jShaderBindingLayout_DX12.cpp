@@ -356,7 +356,7 @@ ID3D12RootSignature* jShaderBindingLayout_DX12::CreateRootSignatureInternal(size
         // RootSignature 생성
         D3D12_ROOT_SIGNATURE_DESC1 rootSignatureDesc = {};
         rootSignatureDesc.NumParameters = (uint32)DescriptorExtractor.RootParameters.size();
-        rootSignatureDesc.pParameters = &DescriptorExtractor.RootParameters[0];
+        rootSignatureDesc.pParameters = DescriptorExtractor.RootParameters.data();
         rootSignatureDesc.NumStaticSamplers = 0;
         rootSignatureDesc.pStaticSamplers = nullptr;
         rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
@@ -384,14 +384,12 @@ ID3D12RootSignature* jShaderBindingLayout_DX12::CreateRootSignatureInternal(size
 
 ID3D12RootSignature* jShaderBindingLayout_DX12::CreateRootSignature(const jShaderBindingInstanceArray& InBindingInstanceArray, EShaderAccessStageFlag InShaderAccessStageFlag)
 {
-    if (InBindingInstanceArray.NumOfData <= 0)
-        return nullptr;
-
     size_t hash = 0;
     for (int32 i = 0; i < InBindingInstanceArray.NumOfData; ++i)
     {
         jShaderBindingLayoutArray::GetHash(hash, i, InBindingInstanceArray[i]->ShaderBindingsLayouts);
     }
+    hash = XXH64(InBindingInstanceArray.NumOfData, hash);
 
     return CreateRootSignatureInternal(hash, [&InBindingInstanceArray](jRootParameterExtractor& OutRootParameterExtractor)
         {
@@ -401,10 +399,7 @@ ID3D12RootSignature* jShaderBindingLayout_DX12::CreateRootSignature(const jShade
 
 ID3D12RootSignature* jShaderBindingLayout_DX12::CreateRootSignature(const jShaderBindingLayoutArray& InBindingLayoutArray, EShaderAccessStageFlag InShaderAccessStageFlag)
 {
-    if (InBindingLayoutArray.NumOfData <= 0)
-        return nullptr;
-
-    const size_t hash = InBindingLayoutArray.GetHash();
+    const size_t hash = XXH64(InBindingLayoutArray.NumOfData, InBindingLayoutArray.GetHash());
 
     return CreateRootSignatureInternal(hash, [&InBindingLayoutArray](jRootParameterExtractor& OutRootParameterExtractor)
         {

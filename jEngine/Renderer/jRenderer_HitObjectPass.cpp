@@ -4,11 +4,13 @@
 #include "Scene/jObject.h"
 #include "Scene/jRenderObject.h"
 #include "Scene/jCamera.h"
+#include "Material/jMaterial.h"
 #include "Shader/jCommonShaderParameters.h"
 #include "Shader/jShader.h"
 #include "RHI/jRHIUtil.h"
 #include "RHI/jRenderTargetPool.h"
 #include "jOptions.h"
+#include <cstdlib>
 
 #ifdef ENABLE_EDITOR_FEATURES
 #include "Code/Engine/jEditor.h"
@@ -22,7 +24,8 @@ struct jShaderHitObjectVertexShader : public jShader
 {
     DECLARE_SHADER_PARAMETER_SETS(
         jViewShaderParameters,
-        jRenderObjectShaderParameters)
+        jRenderObjectShaderParameters,
+        jMaterialShaderParameters)
 
     using ShaderPermutation = jPermutation<>;
     ShaderPermutation Permutation;
@@ -41,7 +44,8 @@ struct jShaderHitObjectPixelShader : public jShader
 {
     DECLARE_SHADER_PARAMETER_SETS(
         jViewShaderParameters,
-        jRenderObjectShaderParameters)
+        jRenderObjectShaderParameters,
+        jMaterialShaderParameters)
 
     using ShaderPermutation = jPermutation<>;
     ShaderPermutation Permutation;
@@ -92,7 +96,7 @@ bool DrawObjectIds(const std::shared_ptr<jRenderFrameContext>& frame, const jVie
     const std::shared_ptr<jRenderTarget>& target, std::span<jRenderObject* const> objects,
     const std::shared_ptr<jRenderTarget>& depth = {})
 {
-    if (!view.ViewUniformBufferShaderBindingInstance) return false;
+    if (!target || !target->GetTexture() || !view.ViewUniformBufferShaderBindingInstance) return false;
     auto* command = frame->GetActiveCommandBuffer();
     const int32 width = target->Info.Width, height = target->Info.Height;
     const auto colorLayout = EResourceLayout::COLOR_ATTACHMENT;
@@ -117,7 +121,7 @@ bool DrawObjectIds(const std::shared_ptr<jRenderFrameContext>& frame, const jVie
         pass.Attachments.push_back({
             .RenderTargetPtr = depth,
             .LoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE,
-            .StencilLoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE,
+            .StencilLoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_DONTCARE,
             .RTClearValue = depth->Info.RTClearValue,
             .InitialLayout = depthLayout,
             .FinalLayout = depthLayout
@@ -141,16 +145,20 @@ bool DrawObjectIds(const std::shared_ptr<jRenderFrameContext>& frame, const jVie
     shader.PixelShader = jShaderHitObjectPixelShader::CreateShader({});
     if (!shader.VertexShader || !shader.PixelShader) return false;
 
-    // The ID shaders use the view and object sets even in forward rendering.
-    jView cameraView;
-    cameraView.ViewUniformBufferShaderBindingInstance = view.ViewUniformBufferShaderBindingInstance;
+    // Keep a fixed view, object, and material layout across both raster pipelines.
     std::vector<jDrawCommand> draws;
     draws.reserve(objects.size());
     for (auto* object : objects)
     {
         if (!object || !object->GeometryDataPtr || !object->GeometryDataPtr->VertexBufferPtr) continue;
-        draws.emplace_back(frame, &cameraView, object, renderPass, shader, &pipeline, nullptr,
-            jShaderBindingInstanceArray(), nullptr);
+        auto* material = object->MaterialPtr ? object->MaterialPtr.get() : GDefaultMaterial.get();
+        if (!material) continue;
+        jShaderBindingInstanceGroup bindings;
+        bindings.Add(view.ViewUniformBufferShaderBindingInstance);
+        bindings.Add(object->CreateShaderBindingInstance());
+        bindings.Add(material->CreateShaderBindingInstance());
+        draws.emplace_back(frame, &view, object, renderPass, shader, &pipeline, material, bindings, nullptr,
+            nullptr, 0, EDrawCommandBindingMode::Manual);
         draws.back().PrepareToDraw(false);
     }
     command->FlushBarrierBatch();
@@ -179,7 +187,7 @@ void IRenderer::HitObjectPass()
         return;
     }
     auto& placement = g_Editor->Placement;
-    const bool authoring = IsAuthoringWorkspaceVisible();
+    const bool authoring = IsAuthoringWorkspaceVisible() && !g_Editor->GetDocument().IsPlaying();
     bool toggleSelection = false;
     if (placement.bPickRequested)
     {
@@ -190,19 +198,28 @@ void IRenderer::HitObjectPass()
     }
     if (!bObjectPickRequested) return;
     bObjectPickRequested = false;
-    if (authoring && g_Editor->GetDocument().IsPlaying()) return;
 
     SCOPE_CPU_PROFILE(HitObjectPass);
-    auto target = ObjectIdTarget(SCR_WIDTH, SCR_HEIGHT, jNameStatic("HitObject_RT"));
+    auto& target = jSceneRenderTarget::HitObject_RT;
+    if (!target || target->Info.Width != SCR_WIDTH || target->Info.Height != SCR_HEIGHT)
+        target = g_rhi->CreateRenderTarget({
+            .Format = ETextureFormat::RGBA8,
+            .Width = SCR_WIDTH,
+            .Height = SCR_HEIGHT,
+            .RTClearValue = jRTClearValue(0.f, 0.f, 0.f, 0.f),
+            .TextureCreateFlag = ETextureCreateFlag::RTV | ETextureCreateFlag::TransferSrc,
+            .ResourceName = jNameStatic("HitObject_RT")
+        });
     auto depth = jRenderTargetPool::GetRenderTargetForOneFrame({
-        .Format = ETextureFormat::D24_S8,
+        .Format = ETextureFormat::D32,
         .Width = SCR_WIDTH,
         .Height = SCR_HEIGHT,
         .RTClearValue = jRTClearValue(1.f, 0),
         .ResourceName = jNameStatic("HitObjectDepth_RT")
     });
+    if (!depth || !depth->GetTexture()) return;
     auto objects = jObject::GetStaticRenderObject();
-    if (!authoring || gOptions.ShowDebugObject)
+    if (gOptions.ShowDebugObject)
         for (const auto* debug : jObject::GetDebugObject())
             if (debug->Visible) objects.insert(objects.end(), debug->RenderObjects.begin(), debug->RenderObjects.end());
     bool drawn;
@@ -219,10 +236,10 @@ void IRenderer::ReadbackHitObject(const std::shared_ptr<jRenderTarget>& target, 
 #ifdef ENABLE_EDITOR_FEATURES
     // DX12 requires a 256-byte aligned row pitch even for a 1x1 region.
     static constexpr uint32 rowPitch = 256;
-    static std::shared_ptr<jBuffer> readback;
-    if (!readback)
-        readback = g_rhi->CreateRawBuffer(rowPitch, 0, EBufferCreateFlag::Readback, EResourceLayout::TRANSFER_DST,
-            nullptr, rowPitch, jNameStatic("HitObject_ReadbackBuffer"));
+    static constexpr uint64 placementAlignment = 512;
+    // The synchronous copy lets the buffer lease end before device shutdown.
+    const auto readback = g_rhi->CreateRawBuffer(rowPitch, placementAlignment, EBufferCreateFlag::Readback,
+        EResourceLayout::TRANSFER_DST, nullptr, rowPitch, jNameStatic("HitObject_ReadbackBuffer"));
     if (!readback) return;
 
     auto* command = RenderFrameContextPtr->GetActiveCommandBuffer();
@@ -233,7 +250,15 @@ void IRenderer::ReadbackHitObject(const std::shared_ptr<jRenderTarget>& target, 
     region.Y = Clamp(PickMouseY, 0, target->Info.Height - 1);
     region.Width = region.Height = 1;
     region.DestRowPitchOverride = rowPitch;
-    g_rhi->CopyTextureRegionToBuffer(command, target->GetTexture(), region, readback.get());
+    g_rhi->CopyTextureRegionToBuffer(command, target->GetTexture(), region, readback.get(), readback->GetOffset());
+    if (IsUseVulkan())
+    {
+        VkMemoryBarrier host{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+        host.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        host.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
+        vkCmdPipelineBarrier((VkCommandBuffer)command->GetHandle(), VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_HOST_BIT, 0, 1, &host, 0, nullptr, 0, nullptr);
+    }
     RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, true);
     RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
 
@@ -242,6 +267,17 @@ void IRenderer::ReadbackHitObject(const std::shared_ptr<jRenderTarget>& target, 
     const jRenderObjectID objectId = jRenderObjectID(bytes[0]) | (jRenderObjectID(bytes[1]) << 8) |
         (jRenderObjectID(bytes[2]) << 16) | (jRenderObjectID(bytes[3]) << 24);
     readback->Unmap();
+#ifdef _WIN32
+    char trace[2]{};
+    if (GetEnvironmentVariableA("JENGINE_TEST_SCENE_FEATURES", trace, sizeof(trace)) == 1 && trace[0] == '1')
+#else
+    if (const auto* trace = std::getenv("JENGINE_TEST_SCENE_FEATURES"); trace && trace[0] == '1')
+#endif
+        std::cout << "SCENE_FEATURE_PICK frame=" << g_rhi->GetCurrentFrameNumber()
+            << " forward=" << RenderFrameContextPtr->UseForwardRenderer
+            << " x=" << PickMouseX << " y=" << PickMouseY
+            << " readback_offset=" << readback->GetOffset()
+            << " render_object_id=" << objectId << std::endl;
     auto* picked = objectId ? jRenderObject::FindRenderObjectByID(objectId) : nullptr;
     if (authoring)
     {

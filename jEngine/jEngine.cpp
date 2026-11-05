@@ -5,6 +5,7 @@
 #include "RHI/jRenderTargetPool.h"
 #include "RHI/jFrameBufferPool.h"
 #include "jCommandlineArgument.h"
+#include "Scene/jObject.h"
 
 #ifdef ENABLE_EDITOR_FEATURES
 #include "Code/Engine/jEditor.h"
@@ -117,10 +118,14 @@ void jEngine::Update(float deltaTime)
 #ifdef ENABLE_EDITOR_FEATURES
     if (g_Editor)
     {
+        g_Editor->SetRasterSurfacePublicationEnabled(!Game.IsUsingPathTracingRenderer());
         TickAuthoringWorkspace(*g_Editor, deltaTime);
         g_Editor->Tick(deltaTime, Game.MainCamera);
     }
 #endif
+    // Authoring can change caster membership after Game.Update's dirty-state flush.
+    // Publish those flags before either renderer takes its scene snapshot.
+    jObject::FlushDirtyState();
     Game.SyncRaytracingScene();
 
 	jShader::StartAndRunCheckUpdateShaderThread();

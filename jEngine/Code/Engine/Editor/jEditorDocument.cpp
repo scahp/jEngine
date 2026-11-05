@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "jEditorDocument.h"
+#include "jEditorWater.h"
 #include "External/PathTracingDataLoader/json.hpp"
 
 #include <algorithm>
@@ -231,9 +232,41 @@ bool ValidateEntity(const Entity& entity, std::string& error)
     if (!VectorNumber(entity.Material.BaseColor, 0, 1) || !VectorNumber(entity.Material.Emissive, 0, 1e6f)
         || !Number(entity.Material.Metallic, 0, 1) || !Number(entity.Material.Roughness, 0, 1) || !Number(entity.Material.Opacity, 0, 1))
         return reject("Invalid material properties");
+    if (!Number(entity.Material.SubsurfaceWeight, 0, 1) || !VectorNumber(entity.Material.SubsurfaceColor, 0, 1)
+        || !Number(entity.Material.SubsurfaceThicknessWorld, 0, 10000) || entity.Material.SubsurfaceProfile > 7)
+        return reject("Subsurface requires weight/color 0..1, thickness 0..10000 world units and profile 0..7");
+    if (entity.Material.GraphOverrides && !entity.Material.SubsurfaceOverrideEnabled)
+    {
+        const auto& flags = *entity.Material.GraphOverrides;
+        if (flags.SubsurfaceWeight || flags.SubsurfaceColor || flags.SubsurfaceThickness || flags.SubsurfaceProfile)
+            return reject("Subsurface graph overrides require explicit authored subsurface data");
+    }
+    if (uint32_t(entity.Material.ShadingModel) > 1 || uint32_t(entity.Material.SubsurfaceSpace) > 1
+        || !Number(entity.Material.SpecularWeight, 0, 8) || !Number(entity.Material.DiffuseOcclusion, 0, 1)
+        || !Number(entity.Material.PreScatterWeight, 0, 1))
+        return reject("Skin material requires valid model/space, specular weight 0..8 and occlusion/pre-scatter 0..1");
+    if (entity.Material.GraphOverrides && !entity.Material.SkinOverrideEnabled)
+    {
+        const auto& flags = *entity.Material.GraphOverrides;
+        if (flags.ShadingModel || flags.SubsurfaceSpace || flags.SpecularWeight || flags.DiffuseOcclusion || flags.PreScatterWeight)
+            return reject("Skin graph overrides require explicit authored skin data");
+    }
+    if (entity.ShadowCaster && entity.Kind != EntityKind::Cube && entity.Kind != EntityKind::Sphere
+        && entity.Kind != EntityKind::Model && entity.Kind != EntityKind::ParticleEmitter
+        && entity.Kind != EntityKind::Terrain && entity.Kind != EntityKind::Water)
+        return reject("Shadow casting overrides require a renderable object; lights use Light.CastShadows");
     if (!VectorNumber(entity.Light.Color, 0, 1e6f) || !Number(entity.Light.Intensity, 0, 1e9f)
         || !Number(entity.Light.Range, 1e-4f, 1e8f) || !Number(entity.Light.InnerConeDegrees, 0, 89.9f)
         || !Number(entity.Light.OuterConeDegrees, entity.Light.InnerConeDegrees, 89.9f)) return reject("Invalid light properties");
+    if (entity.Light.ShadowOverride)
+    {
+        using K = jAdvancedShadows::LightKind;
+        const auto kind = entity.Kind == EntityKind::DirectionalLight ? K::Directional
+            : entity.Kind == EntityKind::PointLight ? K::Point : K::Spot;
+        if (entity.Kind != EntityKind::DirectionalLight && entity.Kind != EntityKind::PointLight && entity.Kind != EntityKind::SpotLight)
+            return reject("Shadow overrides require a directional, point or spot light");
+        if (!jAdvancedShadows::ValidateForLight(*entity.Light.ShadowOverride, kind, error)) return false;
+    }
     if (!Number(entity.Camera.VerticalFovDegrees, 1, 179) || !Number(entity.Camera.NearPlane, 1e-4f, 1e8f)
         || !Number(entity.Camera.FarPlane, 1e-4f, 1e9f) || entity.Camera.FarPlane <= entity.Camera.NearPlane) return reject("Invalid camera properties");
     if (!Number(entity.Animation.Duration, 1e-4f, 86400) || entity.Animation.Keys.size() > MaxAnimationKeys)
@@ -260,6 +293,7 @@ bool ValidateEntity(const Entity& entity, std::string& error)
         || (!entity.Terrain.Heights.empty() && entity.Terrain.Heights.size() != resolution * resolution)) return reject("Invalid terrain grid");
     for (float height : entity.Terrain.Heights)
         if (!Number(height, -1e6f, 1e6f)) return reject("Invalid terrain height");
+    if (!jEditorWater::Validate(entity.Water, error)) return false;
     if (!Number(entity.Navigation.CellSize, 1e-3f, 1e6f) || !Number(entity.Navigation.AgentRadius, 0, 1e6f)
         || !Number(entity.Navigation.AgentHeight, 1e-3f, 1e6f) || !Number(entity.Navigation.MaxSlopeDegrees, 0, 89.9f))
         return reject("Invalid navigation properties");
@@ -325,6 +359,7 @@ size_t StateBytes(const SceneState& state)
         bytes += sizeof(Entity) + 128 + entity.Name.capacity() + entity.SourceAsset.capacity() + entity.AssetId.capacity()
             + entity.Material.BaseColorTexture.capacity() + entity.Material.NormalTexture.capacity() + entity.Material.GraphAsset.capacity()
             + entity.Animation.Keys.capacity() * sizeof(AnimationKeyframe) + entity.Terrain.Heights.capacity() * sizeof(float)
+            + entity.Water.Waves.Waves.capacity() * sizeof(jWaterSimulation::Wave)
             + entity.MeshLocalTransforms.capacity() * sizeof(Transform);
     }
     return bytes;
@@ -333,6 +368,16 @@ Json Encode(const Vec3& value) { return Json::array({value.X, value.Y, value.Z})
 Json Encode(const Transform& value)
 {
     return {{"position", Encode(value.Position)}, {"rotationDegrees", Encode(value.RotationDegrees)}, {"scale", Encode(value.Scale)}};
+}
+Json EncodeShadow(const jAdvancedShadows::Settings& s)
+{
+    return {{"projection", std::uint32_t(s.DirectionalProjection)}, {"pointProjection", std::uint32_t(s.PointProjection)},
+        {"representation", std::uint32_t(s.Method)}, {"resolution", s.MapResolution}, {"cascadeCount", s.CascadeCount},
+        {"splitLambda", s.SplitLambda}, {"maxDistance", s.MaxDistance}, {"cascadeStabilize", s.CascadeStabilize},
+        {"casterPadding", s.CasterPadding}, {"positiveExponent", s.PositiveExponent}, {"negativeExponent", s.NegativeExponent},
+        {"minimumVariance", s.MinimumVariance}, {"bleedReduction", s.BleedReduction}, {"blurRadius", s.BlurRadius},
+        {"deepOpacityMultiplier", s.DeepOpacityMultiplier}, {"deepTauMax", s.DeepTauMax}, {"deepMaxDistance", s.DeepMaxDistance},
+        {"volumeMaxTriangles", s.VolumeMaxTriangles}, {"volumeRange", s.VolumeRange}};
 }
 Json Encode(const Entity& e)
 {
@@ -344,9 +389,23 @@ Json Encode(const Entity& e)
         {"metallic", e.Material.Metallic}, {"roughness", e.Material.Roughness}, {"opacity", e.Material.Opacity},
         {"baseColorTexture", e.Material.BaseColorTexture}, {"normalTexture", e.Material.NormalTexture}, {"graphAsset", e.Material.GraphAsset}};
     if (const auto& overrides = e.Material.GraphOverrides)
+    {
         material["graphOverrides"] = {{"baseColor", overrides->BaseColor}, {"baseColorTexture", overrides->BaseColorTexture},
             {"metallic", overrides->Metallic}, {"roughness", overrides->Roughness}, {"normalTexture", overrides->NormalTexture}};
-    return {{"id", e.Id}, {"parent", e.Parent}, {"kind", KindName(e.Kind)}, {"name", e.Name}, {"visible", e.Visible},
+        if (overrides->SubsurfaceWeight || overrides->SubsurfaceColor || overrides->SubsurfaceThickness || overrides->SubsurfaceProfile)
+            material["graphOverrides"]["subsurface"] = {{"weight", overrides->SubsurfaceWeight}, {"color", overrides->SubsurfaceColor},
+                {"thickness", overrides->SubsurfaceThickness}, {"profile", overrides->SubsurfaceProfile}};
+        if (overrides->ShadingModel || overrides->SubsurfaceSpace || overrides->SpecularWeight || overrides->DiffuseOcclusion || overrides->PreScatterWeight)
+            material["graphOverrides"]["skin"] = {{"shadingModel", overrides->ShadingModel}, {"subsurfaceSpace", overrides->SubsurfaceSpace},
+                {"specularWeight", overrides->SpecularWeight}, {"diffuseOcclusion", overrides->DiffuseOcclusion}, {"preScatterWeight", overrides->PreScatterWeight}};
+    }
+    if (e.Material.SubsurfaceOverrideEnabled)
+        material["subsurface"] = {{"weight", e.Material.SubsurfaceWeight}, {"color", Encode(e.Material.SubsurfaceColor)},
+            {"thicknessWorld", e.Material.SubsurfaceThicknessWorld}, {"profile", e.Material.SubsurfaceProfile}};
+    if (e.Material.SkinOverrideEnabled)
+        material["skin"] = {{"shadingModel", uint32_t(e.Material.ShadingModel)}, {"subsurfaceSpace", uint32_t(e.Material.SubsurfaceSpace)},
+            {"specularWeight", e.Material.SpecularWeight}, {"diffuseOcclusion", e.Material.DiffuseOcclusion}, {"preScatterWeight", e.Material.PreScatterWeight}};
+    Json result{{"id", e.Id}, {"parent", e.Parent}, {"kind", KindName(e.Kind)}, {"name", e.Name}, {"visible", e.Visible},
         {"locked", e.Locked}, {"transform", Encode(e.Local)}, {"sourceAsset", e.SourceAsset}, {"assetId", e.AssetId}, {"meshLocalTransforms", std::move(meshes)},
         {"material", std::move(material)},
         {"light", {{"color", Encode(e.Light.Color)}, {"intensity", e.Light.Intensity}, {"range", e.Light.Range},
@@ -360,6 +419,20 @@ Json Encode(const Entity& e)
         {"terrain", {{"resolution", e.Terrain.Resolution}, {"sizeX", e.Terrain.SizeX}, {"sizeZ", e.Terrain.SizeZ}, {"heights", e.Terrain.Heights}}},
         {"navigation", {{"enabled", e.Navigation.Enabled}, {"cellSize", e.Navigation.CellSize}, {"agentRadius", e.Navigation.AgentRadius},
             {"agentHeight", e.Navigation.AgentHeight}, {"maxSlopeDegrees", e.Navigation.MaxSlopeDegrees}}}};
+    if (e.Light.ShadowOverride) result["light"]["shadow"] = EncodeShadow(*e.Light.ShadowOverride);
+    if (e.ShadowCaster) result["shadowCaster"] = *e.ShadowCaster;
+    // Keep unchanged v1 documents byte-shape compatible for non-water defaults.
+    if (e.Kind == EntityKind::Water || e.Water != WaterProperties{})
+    {
+        Json waves = Json::array();
+        for (const auto& wave : e.Water.Waves.Waves)
+            waves.push_back({{"direction", Json::array({wave.Direction[0], wave.Direction[1]})},
+                {"amplitude", wave.Amplitude}, {"wavelength", wave.Wavelength}, {"speed", wave.Speed},
+                {"steepness", wave.Steepness}, {"phaseRadians", wave.PhaseRadians}});
+        result["water"] = {{"resolution", e.Water.Resolution}, {"sizeX", e.Water.SizeX},
+            {"sizeZ", e.Water.SizeZ}, {"baseHeight", e.Water.Waves.BaseHeight}, {"waves", std::move(waves)}};
+    }
+    return result;
 }
 std::string Serialize(const SceneState& state, const char* format = "jEngineScene", EntityId root = InvalidEntity,
     const std::vector<EntityId>* selectionRoots = nullptr)
@@ -371,9 +444,11 @@ std::string Serialize(const SceneState& state, const char* format = "jEngineScen
     if (selectionRoots) result["roots"] = *selectionRoots;
     return result.dump(2) + "\n";
 }
-void ObjectKeys(const Json& json, std::initializer_list<const char*> keys, const char* optionalKey = nullptr)
+void ObjectKeys(const Json& json, std::initializer_list<const char*> keys, const char* optionalKey = nullptr,
+    const char* secondOptionalKey = nullptr, const char* thirdOptionalKey = nullptr)
 {
-    if (!json.is_object() || json.size() != keys.size() + (optionalKey && json.contains(optionalKey)))
+    if (!json.is_object() || json.size() != keys.size() + (optionalKey && json.contains(optionalKey))
+        + (secondOptionalKey && json.contains(secondOptionalKey)) + (thirdOptionalKey && json.contains(thirdOptionalKey)))
         throw std::runtime_error("Unexpected or missing JSON fields");
     for (const char* key : keys)
         if (!json.contains(key)) throw std::runtime_error(std::string("Missing JSON field: ") + key);
@@ -407,6 +482,25 @@ bool Boolean(const Json& value)
     if (!value.is_boolean()) throw std::runtime_error("Expected JSON boolean");
     return value.get<bool>();
 }
+jAdvancedShadows::Settings DecodeShadow(const Json& j)
+{
+    ObjectKeys(j, {"projection", "pointProjection", "representation", "resolution", "cascadeCount", "splitLambda", "maxDistance",
+        "cascadeStabilize", "casterPadding", "positiveExponent", "negativeExponent", "minimumVariance", "bleedReduction",
+        "blurRadius", "deepOpacityMultiplier", "deepTauMax", "deepMaxDistance", "volumeMaxTriangles", "volumeRange"});
+    jAdvancedShadows::Settings s;
+    s.DirectionalProjection = jAdvancedShadows::Projection(Unsigned32(j.at("projection")));
+    s.PointProjection = jAdvancedShadows::PointProjection(Unsigned32(j.at("pointProjection")));
+    s.Method = jAdvancedShadows::Representation(Unsigned32(j.at("representation")));
+    s.MapResolution = Unsigned32(j.at("resolution")); s.CascadeCount = Unsigned32(j.at("cascadeCount"));
+    s.SplitLambda = Float(j.at("splitLambda")); s.MaxDistance = Float(j.at("maxDistance"));
+    s.CascadeStabilize = Boolean(j.at("cascadeStabilize")); s.CasterPadding = Float(j.at("casterPadding"));
+    s.PositiveExponent = Float(j.at("positiveExponent")); s.NegativeExponent = Float(j.at("negativeExponent"));
+    s.MinimumVariance = Float(j.at("minimumVariance")); s.BleedReduction = Float(j.at("bleedReduction"));
+    s.BlurRadius = Unsigned32(j.at("blurRadius")); s.DeepOpacityMultiplier = Float(j.at("deepOpacityMultiplier"));
+    s.DeepTauMax = Float(j.at("deepTauMax")); s.DeepMaxDistance = Float(j.at("deepMaxDistance"));
+    s.VolumeMaxTriangles = Unsigned32(j.at("volumeMaxTriangles")); s.VolumeRange = Float(j.at("volumeRange"));
+    return s;
+}
 Vec3 DecodeVec(const Json& value)
 {
     if (!value.is_array() || value.size() != 3) throw std::runtime_error("Expected three vector components");
@@ -420,38 +514,71 @@ Transform DecodeTransform(const Json& value)
 Entity DecodeEntity(const Json& j)
 {
     ObjectKeys(j, {"id", "parent", "kind", "name", "visible", "locked", "transform", "sourceAsset", "assetId", "meshLocalTransforms",
-        "material", "light", "camera", "animation", "particles", "terrain", "navigation"});
+        "material", "light", "camera", "animation", "particles", "terrain", "navigation"}, "water", "shadowCaster");
     Entity e;
     e.Id = Unsigned(j.at("id")); e.Parent = Unsigned(j.at("parent"));
     const std::string kind = String(j.at("kind"));
     bool known = false;
-    for (int i = 0; i <= int(EntityKind::Terrain); ++i)
+    for (int i = 0; i <= int(EntityKind::Water); ++i)
         if (kind == KindName(EntityKind(i))) { e.Kind = EntityKind(i); known = true; break; }
     if (!known) throw std::runtime_error("Unknown entity kind");
     e.Name = String(j.at("name")); e.Visible = Boolean(j.at("visible")); e.Locked = Boolean(j.at("locked"));
+    if (const auto shadow = j.find("shadowCaster"); shadow != j.end()) e.ShadowCaster = Boolean(*shadow);
     e.Local = DecodeTransform(j.at("transform")); e.SourceAsset = String(j.at("sourceAsset")); e.AssetId = String(j.at("assetId"));
     const auto& meshes = j.at("meshLocalTransforms");
     if (!meshes.is_array() || meshes.size() > 65536) throw std::runtime_error("Mesh transform limit exceeded");
     for (const auto& mesh : meshes) e.MeshLocalTransforms.push_back(DecodeTransform(mesh));
     const auto& m = j.at("material");
-    ObjectKeys(m, {"overrideEnabled", "baseColor", "emissive", "metallic", "roughness", "opacity", "baseColorTexture", "normalTexture", "graphAsset"}, "graphOverrides");
+    ObjectKeys(m, {"overrideEnabled", "baseColor", "emissive", "metallic", "roughness", "opacity", "baseColorTexture", "normalTexture", "graphAsset"}, "graphOverrides", "subsurface", "skin");
     e.Material.OverrideEnabled = Boolean(m.at("overrideEnabled"));
     e.Material.BaseColor = DecodeVec(m.at("baseColor")); e.Material.Emissive = DecodeVec(m.at("emissive"));
     e.Material.Metallic = Float(m.at("metallic")); e.Material.Roughness = Float(m.at("roughness")); e.Material.Opacity = Float(m.at("opacity"));
     e.Material.BaseColorTexture = String(m.at("baseColorTexture")); e.Material.NormalTexture = String(m.at("normalTexture")); e.Material.GraphAsset = String(m.at("graphAsset"));
     if (const auto it = m.find("graphOverrides"); it != m.end())
     {
-        ObjectKeys(*it, {"baseColor", "baseColorTexture", "metallic", "roughness"}, "normalTexture");
+        ObjectKeys(*it, {"baseColor", "baseColorTexture", "metallic", "roughness"}, "normalTexture", "subsurface", "skin");
         // Older scenes stored any explicit normal path as a local slot.
         const auto normal = it->find("normalTexture");
         e.Material.GraphOverrides = MaterialGraphOverrides{Boolean(it->at("baseColor")), Boolean(it->at("baseColorTexture")),
             Boolean(it->at("metallic")), Boolean(it->at("roughness")),
             normal == it->end() ? !e.Material.NormalTexture.empty() : Boolean(*normal)};
+        if (const auto sss = it->find("subsurface"); sss != it->end())
+        {
+            ObjectKeys(*sss, {"weight", "color", "thickness", "profile"});
+            auto& flags = *e.Material.GraphOverrides;
+            flags.SubsurfaceWeight = Boolean(sss->at("weight")); flags.SubsurfaceColor = Boolean(sss->at("color"));
+            flags.SubsurfaceThickness = Boolean(sss->at("thickness")); flags.SubsurfaceProfile = Boolean(sss->at("profile"));
+        }
+        if (const auto skin = it->find("skin"); skin != it->end())
+        {
+            ObjectKeys(*skin, {"shadingModel", "subsurfaceSpace", "specularWeight", "diffuseOcclusion", "preScatterWeight"});
+            auto& flags = *e.Material.GraphOverrides;
+            flags.ShadingModel = Boolean(skin->at("shadingModel")); flags.SubsurfaceSpace = Boolean(skin->at("subsurfaceSpace"));
+            flags.SpecularWeight = Boolean(skin->at("specularWeight")); flags.DiffuseOcclusion = Boolean(skin->at("diffuseOcclusion"));
+            flags.PreScatterWeight = Boolean(skin->at("preScatterWeight"));
+        }
+    }
+    if (const auto sss = m.find("subsurface"); sss != m.end())
+    {
+        ObjectKeys(*sss, {"weight", "color", "thicknessWorld", "profile"});
+        e.Material.SubsurfaceOverrideEnabled = true;
+        e.Material.SubsurfaceWeight = Float(sss->at("weight")); e.Material.SubsurfaceColor = DecodeVec(sss->at("color"));
+        e.Material.SubsurfaceThicknessWorld = Float(sss->at("thicknessWorld")); e.Material.SubsurfaceProfile = Unsigned32(sss->at("profile"));
+    }
+    if (const auto skin = m.find("skin"); skin != m.end())
+    {
+        ObjectKeys(*skin, {"shadingModel", "subsurfaceSpace", "specularWeight", "diffuseOcclusion", "preScatterWeight"});
+        e.Material.SkinOverrideEnabled = true;
+        e.Material.ShadingModel = jMaterialMapping::ShadingModel(Unsigned32(skin->at("shadingModel")));
+        e.Material.SubsurfaceSpace = jMaterialMapping::SubsurfaceSpace(Unsigned32(skin->at("subsurfaceSpace")));
+        e.Material.SpecularWeight = Float(skin->at("specularWeight")); e.Material.DiffuseOcclusion = Float(skin->at("diffuseOcclusion"));
+        e.Material.PreScatterWeight = Float(skin->at("preScatterWeight"));
     }
     const auto& l = j.at("light");
-    ObjectKeys(l, {"color", "intensity", "range", "innerConeDegrees", "outerConeDegrees", "castShadows"});
+    ObjectKeys(l, {"color", "intensity", "range", "innerConeDegrees", "outerConeDegrees", "castShadows"}, "shadow");
     e.Light.Color = DecodeVec(l.at("color")); e.Light.Intensity = Float(l.at("intensity")); e.Light.Range = Float(l.at("range"));
     e.Light.InnerConeDegrees = Float(l.at("innerConeDegrees")); e.Light.OuterConeDegrees = Float(l.at("outerConeDegrees")); e.Light.CastShadows = Boolean(l.at("castShadows"));
+    if (const auto shadow = l.find("shadow"); shadow != l.end()) e.Light.ShadowOverride = DecodeShadow(*shadow);
     const auto& c = j.at("camera");
     ObjectKeys(c, {"verticalFovDegrees", "nearPlane", "farPlane", "primary"});
     e.Camera.VerticalFovDegrees = Float(c.at("verticalFovDegrees")); e.Camera.NearPlane = Float(c.at("nearPlane"));
@@ -475,6 +602,29 @@ Entity DecodeEntity(const Json& j)
     e.Terrain.Resolution = Unsigned32(t.at("resolution")); e.Terrain.SizeX = Float(t.at("sizeX")); e.Terrain.SizeZ = Float(t.at("sizeZ"));
     if (!t.at("heights").is_array() || t.at("heights").size() > 129 * 129) throw std::runtime_error("Terrain height limit exceeded");
     for (const auto& height : t.at("heights")) e.Terrain.Heights.push_back(Float(height));
+    if (const auto it = j.find("water"); it != j.end())
+    {
+        ObjectKeys(*it, {"resolution", "sizeX", "sizeZ", "baseHeight", "waves"});
+        e.Water.Resolution = Unsigned32(it->at("resolution"));
+        e.Water.SizeX = Float(it->at("sizeX")); e.Water.SizeZ = Float(it->at("sizeZ"));
+        e.Water.Waves.BaseHeight = Float(it->at("baseHeight"));
+        const auto& waves = it->at("waves");
+        if (!waves.is_array() || waves.size() > jEditorWater::MaximumGpuWaves)
+            throw std::runtime_error("Water wave limit exceeded");
+        e.Water.Waves.Waves.clear();
+        for (const auto& value : waves)
+        {
+            ObjectKeys(value, {"direction", "amplitude", "wavelength", "speed", "steepness", "phaseRadians"});
+            const auto& direction = value.at("direction");
+            if (!direction.is_array() || direction.size() != 2) throw std::runtime_error("Water direction requires two components");
+            jWaterSimulation::Wave wave;
+            wave.Direction = {Float(direction[0]), Float(direction[1])};
+            wave.Amplitude = Float(value.at("amplitude")); wave.Wavelength = Float(value.at("wavelength"));
+            wave.Speed = Float(value.at("speed")); wave.Steepness = Float(value.at("steepness"));
+            wave.PhaseRadians = Float(value.at("phaseRadians"));
+            e.Water.Waves.Waves.push_back(wave);
+        }
+    }
     const auto& n = j.at("navigation");
     ObjectKeys(n, {"enabled", "cellSize", "agentRadius", "agentHeight", "maxSlopeDegrees"});
     e.Navigation.Enabled = Boolean(n.at("enabled")); e.Navigation.CellSize = Float(n.at("cellSize"));
@@ -765,6 +915,7 @@ const char* KindName(EntityKind kind)
     case EntityKind::Camera: return "Camera";
     case EntityKind::ParticleEmitter: return "ParticleEmitter";
     case EntityKind::Terrain: return "Terrain";
+    case EntityKind::Water: return "Water";
     default: return nullptr;
     }
 }

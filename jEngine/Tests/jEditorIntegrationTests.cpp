@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "jEditorIntegrationTests.h"
+#include "jViewportToolbarTests.h"
 #ifdef ENABLE_EDITOR_FEATURES
 #include "Code/Engine/jEditor.h"
 #include "Code/Engine/Editor/jEditorWorkspace.h"
@@ -13,6 +14,8 @@
 #include "Scene/Light/jLight.h"
 #include "Material/jMaterial.h"
 #include "RHI/Vulkan/jBufferUtil_Vulkan.h"
+#include "RHI/jRaytracingScene.h"
+#include "External/IMGUI/imgui_internal.h"
 #ifdef _WIN32
 #include "RHI/DX12/jBufferUtil_DX12.h"
 #include "RHI/DX12/jTexture_DX12.h"
@@ -27,6 +30,8 @@
 #include <fstream>
 #include <iomanip>
 #include <sstream>
+#include <cmath>
+#include <limits>
 
 namespace
 {
@@ -177,12 +182,16 @@ Json ReadScenePixels(const std::shared_ptr<jTexture>& texture, const fs::path& p
     std::vector<uint8> rgba(size_t(width)*height*4);
     std::set<uint32> colors;
     size_t lit = 0, opaque = 0, outline = 0; int minimum = 255, maximum = 0;
+    uint64 pixelHash = 1469598103934665603ull;
+    std::array<uint64, 3> channelSum{};
     for (uint32 y=0;y<height;++y) for (uint32 x=0;x<width;++x)
     {
         const auto* pixel = mapped+size_t(y)*rowPitch+x*4;
         auto* output = rgba.data()+(size_t(y)*width+x)*4;
         output[0]=pixel[texture->Format==ETextureFormat::BGRA8?2:0];output[1]=pixel[1];
         output[2]=pixel[texture->Format==ETextureFormat::BGRA8?0:2];output[3]=pixel[3];
+        for (int channel = 0; channel < 4; ++channel) { pixelHash ^= output[channel]; pixelHash *= 1099511628211ull; }
+        for (int channel = 0; channel < 3; ++channel) channelSum[channel] += output[channel];
         const int brightest=std::max({int(output[0]),int(output[1]),int(output[2])});
         const int darkest=std::min({int(output[0]),int(output[1]),int(output[2])});
         lit+=brightest>12; opaque+=output[3]>=254;
@@ -215,7 +224,8 @@ Json ReadScenePixels(const std::shared_ptr<jTexture>& texture, const fs::path& p
     const bool pngSaved = !png.empty() && LodePNG_encode32_file(png.string().c_str(), rgba.data(), width, height) == 0;
     result.update({{"readback",true},{"width",width},{"height",height},{"litPixels",lit},{"opaquePixels",opaque},
         {"distinctColorsAtMost1024",colors.size()},{"minimumRgb",minimum},{"maximumRgb",maximum},
-        {"outlinePixels", outline}, {"pngSaved",pngSaved},{"png",png.generic_string()}});
+        {"outlinePixels",outline},{"pngSaved",pngSaved},{"png",png.generic_string()},{"pixelHash",std::to_string(pixelHash)},
+        {"meanRgb",{double(channelSum[0])/(size_t(width)*height),double(channelSum[1])/(size_t(width)*height),double(channelSum[2])/(size_t(width)*height)}}});
     return result;
 }
 bool BufferMatches(jBuffer* source, const IStreamParam& expected)
@@ -710,5 +720,314 @@ int RunEditorAuthoringGpuTests(const char* outputDirectory)
     (void)outputDirectory;
     std::cerr << "Editor GPU workflow requires ENABLE_EDITOR_FEATURES" << std::endl;
     return EXIT_FAILURE;
+#endif
+}
+
+int RunRendererSwitchGpuTests(const char* outputDirectory)
+{
+#ifdef ENABLE_EDITOR_FEATURES
+    using Pipeline = jGame::ESceneRenderPipeline;
+    Json report{{"checks", Json::array()}, {"captures", Json::array()}};
+    fs::path output;
+    int failures = 0;
+    uint32 rendered = 0;
+    const bool oldWorkspace = IsAuthoringWorkspaceVisible();
+    const auto oldKeys = g_KeyState;
+    const auto oldMouse = g_MouseState;
+    const auto expect = [&](bool pass, const char* name) {
+        report["checks"].push_back({{"name", name}, {"pass", pass}, {"frame", rendered}});
+        std::cout << (pass ? "PASS " : "FAIL ") << "renderer switch: " << name << std::endl;
+        failures += !pass;
+    };
+    const auto frame = [&] {
+        if (++rendered > 180) throw std::runtime_error("Renderer switch test exceeded 180 frames");
+        ResetAllKeyState(); ResetMouseAllState();
+        g_timeDeltaSecond = 1.f / 60.f;
+        g_Engine->ProcessInput(g_timeDeltaSecond);
+        g_rhi->IncrementFrameNumber();
+        g_Engine->Update(g_timeDeltaSecond);
+        g_Engine->Draw(); g_Engine->EndOfFrame();
+#ifdef _WIN32
+        if (IsUseDX12())
+        {
+            MSG message{};
+            while (PeekMessage(&message, nullptr, 0, 0, PM_REMOVE))
+            { TranslateMessage(&message); DispatchMessage(&message); }
+        }
+        else
+#endif
+            glfwPollEvents();
+    };
+    const auto frames = [&](uint32 count) { while (count--) frame(); };
+    const auto moveMouse = [&](const ImVec2& point) {
+        if (IsUseVulkan())
+        {
+            auto* window = static_cast<GLFWwindow*>(g_rhi->GetWindow());
+            int x = 0, y = 0;
+            if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) glfwGetWindowPos(window, &x, &y);
+            glfwSetCursorPos(window, point.x - x, point.y - y);
+        }
+        ImGui::GetIO().AddMousePosEvent(point.x, point.y);
+    };
+    const auto click = [&](const ImVec2& point) {
+        moveMouse(point); frame();
+        ImGui::GetIO().AddMouseButtonEvent(0, true); frame();
+        ImGui::GetIO().AddMouseButtonEvent(0, false); frame();
+    };
+    const auto popup = [&]() -> ImGuiWindow* {
+        auto* context = ImGui::GetCurrentContext();
+        if (!context || context->OpenPopupStack.empty()) return nullptr;
+        return context->OpenPopupStack.back().Window;
+    };
+    const auto openCombo = [&] {
+        float x = 0, y = 0, width = 0, height = 0;
+        if (!GetAuthoringRendererControlRect(x, y, width, height))
+            throw std::runtime_error("Viewport renderer control is not visible");
+        click(ImVec2(x + width * .5f, y + height * .5f));
+        // Combo popups use their opening frame to calculate the automatic size.
+        frame();
+        if (!popup()) throw std::runtime_error("Actual renderer combo click did not open its popup");
+    };
+    try
+    {
+        if (!outputDirectory || !*outputDirectory || !g_Engine || !g_Editor || !g_rhi || !ImGui::GetCurrentContext())
+            throw std::runtime_error("Renderer switch test requires initialized engine/UI and an owned output directory");
+        output = fs::absolute(jEditorAssetPath::FromUtf8(outputDirectory)); fs::create_directories(output);
+        auto& game = g_Engine->Game;
+        auto& editor = *g_Editor;
+        SetAuthoringWorkspaceVisible(true); frames(3);
+        std::string reason;
+        expect(!game.RequestSceneRenderPipeline(static_cast<Pipeline>(999), reason) && !reason.empty(),
+            "invalid renderer request is rejected with a reason");
+        expect(game.RequestSceneRenderPipeline(Pipeline::Deferred, reason), "initial Deferred request is accepted");
+        frames(3);
+        if (game.GetActiveSceneRenderPipeline() != Pipeline::Deferred) throw std::runtime_error("Cannot enter initial Deferred renderer");
+        auto* camera = game.MainCamera;
+        if (!camera) throw std::runtime_error("Camera is missing");
+        const auto cameraPosition = camera->Pos, cameraTarget = camera->Target, cameraUp = camera->Up;
+        const float fov = camera->FOVRad;
+        const auto selection = editor.GetSelectedEntities();
+        const auto document = editor.GetDocument().ToJson();
+        const bool dirty = editor.GetDocument().IsDirty();
+        const auto objects = jObject::GetStaticRenderObject();
+        std::vector<jRenderObjectGeometryData*> geometry;
+        std::vector<jMaterial*> materials;
+        for (const auto* object : objects)
+        { geometry.push_back(object->GeometryDataPtr.get()); materials.push_back(object->MaterialPtr.get()); }
+        const bool pathSupported = game.CanSwitchSceneRenderPipeline(Pipeline::PathTracing, reason);
+        report["pathTracingSupported"] = pathSupported;
+        report["pathTracingReason"] = reason;
+        if (!pathSupported)
+            expect(!game.RequestSceneRenderPipeline(Pipeline::PathTracing, reason) && !reason.empty()
+                && game.GetActiveSceneRenderPipeline() == Pipeline::Deferred,
+                "unsupported path tracing keeps the current renderer");
+        const Pipeline targets[] = {Pipeline::PathTracing, Pipeline::Deferred, Pipeline::Forward, Pipeline::PathTracing};
+        uint32 step = 0;
+        for (const auto target : targets)
+        {
+            if (target == Pipeline::PathTracing && !pathSupported) continue;
+            const auto before = game.GetActiveSceneRenderPipeline();
+            if (before == target) continue;
+            const auto previousPathOutput = g_rhi->RaytracingScene
+                ? g_rhi->RaytracingScene->RaytracingOutputPtr : std::shared_ptr<jTexture>{};
+            openCombo();
+            expect(!IsAuthoringViewportHovered() && !IsAuthoringViewportFocused(),
+                "renderer toolbar popup does not own scene camera or picking input");
+            float x = 0, y = 0, width = 0, height = 0;
+            if (!GetAuthoringRendererChoiceRect(static_cast<int>(target), x, y, width, height))
+                throw std::runtime_error("Requested renderer choice is missing from the actual popup");
+            click(ImVec2(x + width * .5f, y + height * .5f));
+            expect(game.GetActiveSceneRenderPipeline() == before && game.IsSceneRenderPipelineSwitchPending(),
+                "actual popup selection queues the switch without changing an in-flight renderer");
+            expect(game.RequestSceneRenderPipeline(target, reason)
+                && !game.RequestSceneRenderPipeline(before, reason) && !reason.empty(),
+                "a queued switch merges duplicate requests and rejects a conflicting request");
+            frame();
+            expect(game.GetActiveSceneRenderPipeline() == target && !game.IsSceneRenderPipelineSwitchPending(),
+                "requested renderer becomes active at the next frame boundary");
+            if (game.GetActiveSceneRenderPipeline() != target)
+                throw std::runtime_error(std::string("Unexpected active renderer: ") + game.GetActiveSceneRenderPipelineName());
+            if (target == Pipeline::PathTracing)
+                expect(g_rhi->RaytracingScene->RaytracingOutputPtr
+                    && g_rhi->RaytracingScene->RaytracingOutputPtr != previousPathOutput,
+                    "path tracing entry recreates accumulation storage, including re-entry");
+            frames(3);
+            bool sameBindings = objects == jObject::GetStaticRenderObject();
+            for (size_t i = 0; sameBindings && i < objects.size(); ++i)
+                sameBindings = objects[i]->GeometryDataPtr.get() == geometry[i] && objects[i]->MaterialPtr.get() == materials[i];
+            expect(sameBindings, "switch preserves the live geometry and material instances without reimporting");
+            expect(camera->Pos.IsNearlyEqual(cameraPosition) && camera->Target.IsNearlyEqual(cameraTarget)
+                && camera->Up.IsNearlyEqual(cameraUp) && std::abs(camera->FOVRad - fov) < .00001f,
+                "switch and toolbar clicks preserve the camera");
+            expect(selection == editor.GetSelectedEntities() && dirty == editor.GetDocument().IsDirty()
+                && document == editor.GetDocument().ToJson(),
+                "switch preserves selection, authored scene and unsaved state");
+            const auto capture = ReadScenePixels(jEditorUiRenderer::AcquireScenePreview(),
+                output / (std::to_string(++step) + "-scene.png"), nullptr, Vector::ZeroVector);
+            report["captures"].push_back({{"renderer", game.GetActiveSceneRenderPipelineName()}, {"pixels", capture}});
+            expect(capture.value("readback", false) && capture.value("pngSaved", false)
+                && capture.value("litPixels", size_t(0)) > 1000 && capture.value("distinctColorsAtMost1024", size_t(0)) > 32,
+                "active renderer produces a nonblack textured scene through the real GPU");
+        }
+        // The normal swapchain capture hook records frame 60, including the
+        // actual open selector. The separate captures above exclude editor UI.
+        if (g_rhi->GetCurrentFrameNumber() < 56)
+            frames(56 - g_rhi->GetCurrentFrameNumber());
+        openCombo();
+        frames(3);
+        expect(popup() != nullptr, "renderer choices remain visible in the viewport capture");
+        ImGui::GetIO().AddKeyEvent(ImGuiKey_Escape, true); frame();
+        ImGui::GetIO().AddKeyEvent(ImGuiKey_Escape, false); frame();
+        const int gizmoFailures = RunViewportToolbarGizmoGpuTests(output, frame);
+        expect(gizmoFailures == 0, "releasing a gizmo over the toolbar preserves Undo, Save and Play availability");
+        if (pathSupported && !objects.empty() && objects.front()->GeometryDataPtr)
+        {
+            game.RequestSceneRenderPipeline(Pipeline::Deferred, reason); frame();
+            g_rhi->Flush();
+            auto& geometryData = *objects.front()->GeometryDataPtr;
+            const auto indexBuffer = geometryData.IndexBufferPtr;
+            geometryData.IndexBufferPtr.reset();
+            const bool rejected = !game.CanSwitchSceneRenderPipeline(Pipeline::PathTracing, reason);
+            geometryData.IndexBufferPtr = indexBuffer;
+            expect(rejected && !reason.empty() && game.GetActiveSceneRenderPipeline() == Pipeline::Deferred,
+                "unsupported non-indexed geometry is rejected before any GPU switch");
+        }
+        editor.ResetWorldBindings(false); game.ClearImportedSceneForAuthoring(); editor.GetDocument().NewScene();
+        expect(!game.CanSwitchSceneRenderPipeline(Pipeline::PathTracing, reason) && !reason.empty()
+            && !game.RequestSceneRenderPipeline(Pipeline::PathTracing, reason)
+            && !game.IsSceneRenderPipelineSwitchPending(),
+            "an empty scene disables path tracing and keeps a raster renderer");
+    }
+    catch (const std::exception& error)
+    { ++failures; report["exception"] = error.what(); std::cerr << "FAIL renderer switch: " << error.what() << std::endl; }
+    if (ImGui::GetCurrentContext()) ImGui::GetIO().AddMouseButtonEvent(0, false);
+    SetAuthoringWorkspaceVisible(oldWorkspace); g_KeyState = oldKeys; g_MouseState = oldMouse;
+    report["renderedFrames"] = rendered; report["failureCount"] = failures;
+    report["status"] = failures ? "failed" : "passed";
+    if (!output.empty()) Write(output / "renderer-switch-gpu-report.json", report.dump(2) + "\n");
+    std::cout << "Renderer switch GPU workflow: " << rendered << " actual frames, " << failures << " failures" << std::endl;
+    return failures ? EXIT_FAILURE : EXIT_SUCCESS;
+#else
+    (void)outputDirectory;
+    return EXIT_FAILURE;
+#endif
+}
+
+std::string CaptureSceneFeaturePixels(const char* pngPath)
+{
+#ifdef ENABLE_EDITOR_FEATURES
+    return ReadScenePixels(jEditorUiRenderer::AcquireScenePreview(), std::filesystem::path(pngPath),
+        nullptr, Vector::ZeroVector).dump();
+#else
+    (void)pngPath;
+    return "{\"available\":false,\"readback\":false}";
+#endif
+}
+
+std::string CaptureSceneFeatureTexturePixels(const std::shared_ptr<jTexture>& texture, const char* pngPath)
+{
+#ifdef ENABLE_EDITOR_FEATURES
+    return ReadScenePixels(texture, std::filesystem::path(pngPath), nullptr, Vector::ZeroVector).dump();
+#else
+    (void)texture; (void)pngPath;
+    return "{\"available\":false,\"readback\":false}";
+#endif
+}
+
+bool ReadSceneFeatureTextureFloats(const std::shared_ptr<jTexture>& texture,
+    std::vector<float>& rgba, uint32_t& width, uint32_t& height, std::string& error)
+{
+#ifdef ENABLE_EDITOR_FEATURES
+    if (!texture || !texture->Width || !texture->Height || texture->Width > 4096 || texture->Height > 4096
+        || (texture->Format != ETextureFormat::RGBA32F && texture->Format != ETextureFormat::RGBA16F))
+    { error = "Float readback requires a bounded RGBA32F/RGBA16F color texture"; return false; }
+    const bool half = texture->Format == ETextureFormat::RGBA16F;
+    const uint32 channels = 4, componentBytes = half ? 2 : 4;
+    const uint32 sourceWidth = texture->Width, sourceHeight = texture->Height;
+    uint32 rowPitch = sourceWidth * channels * componentBytes;
+    uint64 size = uint64(rowPitch) * sourceHeight;
+#ifdef _WIN32
+    D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint{};
+    if (IsUseDX12())
+    {
+        const auto description = static_cast<jTexture_DX12*>(texture.get())->Texture->Get()->GetDesc();
+        uint32 rows = 0; uint64 rowBytes = 0;
+        g_rhi_dx12->Device->GetCopyableFootprints(&description, 0, 1, 0, &footprint, &rows, &rowBytes, &size);
+        rowPitch = footprint.Footprint.RowPitch;
+    }
+#endif
+    // Synchronous verification only. This wait is outside timed frame samples
+    // and is never used by a production shadow pass.
+    g_rhi->Flush();
+    auto buffer = g_rhi->CreateRawBuffer(size, 512, EBufferCreateFlag::Readback,
+        IsUseVulkan() ? EResourceLayout::UNDEFINED : EResourceLayout::TRANSFER_DST);
+    if (!buffer || !buffer->GetHandle()) { error = "Float readback buffer allocation failed"; return false; }
+    auto* command = g_rhi->BeginSingleTimeCommands();
+    if (!command) { error = "Float readback command allocation failed"; return false; }
+    const auto previous = texture->GetLayout();
+    g_rhi->TransitionLayout(command, texture.get(), EResourceLayout::TRANSFER_SRC);
+    g_rhi->TransitionLayout(command, buffer.get(), EResourceLayout::TRANSFER_DST);
+    command->FlushBarrierBatch();
+    if (IsUseVulkan())
+    {
+        const auto native = static_cast<jCommandBuffer_Vulkan*>(command)->GetRef();
+        VkBufferImageCopy copy{};
+        copy.bufferOffset = buffer->GetOffset();
+        copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+        copy.imageExtent = {sourceWidth, sourceHeight, 1};
+        vkCmdCopyImageToBuffer(native, static_cast<jTexture_Vulkan*>(texture.get())->Image,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, static_cast<jBuffer_Vulkan*>(buffer.get())->Buffer, 1, &copy);
+        VkBufferMemoryBarrier barrier{VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT; barrier.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED; barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.buffer = static_cast<jBuffer_Vulkan*>(buffer.get())->Buffer;
+        barrier.offset = buffer->GetOffset(); barrier.size = size;
+        vkCmdPipelineBarrier(native, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT,
+            0, 0, nullptr, 1, &barrier, 0, nullptr);
+    }
+#ifdef _WIN32
+    else
+    {
+        D3D12_TEXTURE_COPY_LOCATION source{}, destination{};
+        source.pResource = static_cast<ID3D12Resource*>(texture->GetHandle());
+        source.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+        destination.pResource = static_cast<ID3D12Resource*>(buffer->GetHandle());
+        destination.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+        destination.PlacedFootprint = footprint;
+        destination.PlacedFootprint.Offset += buffer->GetOffset();
+        static_cast<jCommandBuffer_DX12*>(command)->Get()->CopyTextureRegion(&destination, 0, 0, 0, &source, nullptr);
+    }
+#endif
+    g_rhi->TransitionLayout(command, texture.get(), previous);
+    command->FlushBarrierBatch();
+    g_rhi->EndSingleTimeCommands(command);
+    const auto* mapped = static_cast<const uint8*>(buffer->Map());
+    if (!mapped) { error = "Float readback mapping failed"; return false; }
+    std::vector<float> result(std::size_t(sourceWidth) * sourceHeight * channels);
+    for (uint32 y = 0; y < sourceHeight; ++y)
+        for (uint32 x = 0; x < sourceWidth; ++x)
+            for (uint32 c = 0; c < channels; ++c)
+            {
+                const auto* sample = mapped + std::size_t(y) * rowPitch + (x * channels + c) * componentBytes;
+                float value;
+                if (half)
+                {
+                    uint16 bits; std::memcpy(&bits, sample, sizeof(bits));
+                    const int exponent = (bits >> 10) & 31, mantissa = bits & 1023;
+                    if (exponent == 31) value = mantissa ? std::numeric_limits<float>::quiet_NaN()
+                        : std::numeric_limits<float>::infinity();
+                    else value = exponent ? std::ldexp(float(1024 + mantissa), exponent - 25)
+                        : std::ldexp(float(mantissa), -24);
+                    if (bits & 0x8000) value = -value;
+                }
+                else std::memcpy(&value, sample, sizeof(value));
+                result[(std::size_t(y) * sourceWidth + x) * channels + c] = value;
+            }
+    buffer->Unmap();
+    rgba = std::move(result); width = sourceWidth; height = sourceHeight; error.clear();
+    return true;
+#else
+    (void)texture; (void)rgba; (void)width; (void)height;
+    error = "Editor GPU verification is unavailable"; return false;
 #endif
 }

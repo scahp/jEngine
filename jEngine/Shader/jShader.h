@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "Core/jName.h"
 #include "Core/TInstantStruct.h"
 #include <atomic>
@@ -415,7 +415,8 @@ struct jShaderGBufferVertexShader : public jShader
 {
     DECLARE_SHADER_PARAMETER_SETS(
         jViewShaderParameters,
-        jRenderObjectShaderParameters)
+        jRenderObjectShaderParameters,
+        jMaterialShaderParameters)
 
     DECLARE_DEFINE(USE_VERTEX_COLOR, 0, 1);
     DECLARE_DEFINE(USE_VERTEX_BITANGENT, 0, 1);
@@ -440,8 +441,11 @@ struct jShaderGBufferPixelShader : public jShader
     DECLARE_DEFINE(USE_SRGB_ALBEDO_TEXTURE, 0, 1);
     DECLARE_DEFINE(USE_VARIABLE_SHADING_RATE, 0, 1);
     DECLARE_DEFINE(USE_PBR, 0, 1);
+    DECLARE_DEFINE(USE_SUBSURFACE, 0, 1);
+    DECLARE_DEFINE(USE_SKIN_MATERIAL, 0, 1);
+    DECLARE_DEFINE(USE_SKIN_UV, 0, 1);
     
-    using ShaderPermutation = jPermutation<USE_VERTEX_COLOR, USE_ALBEDO_TEXTURE, USE_SRGB_ALBEDO_TEXTURE, USE_VARIABLE_SHADING_RATE, USE_PBR>;
+    using ShaderPermutation = jPermutation<USE_VERTEX_COLOR, USE_ALBEDO_TEXTURE, USE_SRGB_ALBEDO_TEXTURE, USE_VARIABLE_SHADING_RATE, USE_PBR, USE_SUBSURFACE, USE_SKIN_MATERIAL, USE_SKIN_UV>;
     ShaderPermutation Permutation;
 
     DECLARE_SHADER_WITH_PERMUTATION(jShaderGBufferPixelShader, Permutation)
@@ -489,9 +493,12 @@ struct jShaderForwardVertexShader : public jShader
         jDirectionalLightShaderParameters,
         jPointLightShaderParameters,
         jSpotLightShaderParameters,
-        jRenderObjectShaderParameters)
+        jRenderObjectShaderParameters,
+        jMaterialShaderParameters)
 
-    using ShaderPermutation = jPermutation<>;
+    DECLARE_DEFINE(USE_VERTEX_COLOR, 0, 1);
+    DECLARE_DEFINE(USE_VERTEX_BITANGENT, 0, 1);
+    using ShaderPermutation = jPermutation<USE_VERTEX_COLOR, USE_VERTEX_BITANGENT>;
     ShaderPermutation Permutation;
 
     DECLARE_SHADER_WITH_PERMUTATION(jShaderForwardVertexShader, Permutation)
@@ -504,9 +511,12 @@ struct jShaderForwardInstancingVertexShader : public jShader
         jDirectionalLightShaderParameters,
         jPointLightShaderParameters,
         jSpotLightShaderParameters,
-        jRenderObjectShaderParameters)
+        jRenderObjectShaderParameters,
+        jMaterialShaderParameters)
 
-    using ShaderPermutation = jPermutation<>;
+    DECLARE_DEFINE(USE_VERTEX_COLOR, 0, 1);
+    DECLARE_DEFINE(USE_VERTEX_BITANGENT, 0, 1);
+    using ShaderPermutation = jPermutation<USE_VERTEX_COLOR, USE_VERTEX_BITANGENT>;
     ShaderPermutation Permutation;
 
     DECLARE_SHADER_WITH_PERMUTATION(jShaderForwardInstancingVertexShader, Permutation)
@@ -516,7 +526,8 @@ struct jShaderOmniShadowVertexShader : public jShader
 {
     DECLARE_SHADER_PARAMETER_SETS(
         jPointLightOnlyShaderParameters,
-        jRenderObjectShaderParameters)
+        jRenderObjectShaderParameters,
+        jMaterialShaderParameters)
 
     using ShaderPermutation = jPermutation<>;
     ShaderPermutation Permutation;
@@ -538,7 +549,8 @@ struct jShaderSpotShadowVertexShader : public jShader
 {
     DECLARE_SHADER_PARAMETER_SETS(
         jSpotLightOnlyShaderParameters,
-        jRenderObjectShaderParameters)
+        jRenderObjectShaderParameters,
+        jMaterialShaderParameters)
 
     using ShaderPermutation = jPermutation<>;
     ShaderPermutation Permutation;
@@ -550,7 +562,8 @@ struct jShaderDirectionalShadowVertexShader : public jShader
 {
     DECLARE_SHADER_PARAMETER_SETS(
         jDirectionalLightOnlyShaderParameters,
-        jRenderObjectShaderParameters)
+        jRenderObjectShaderParameters,
+        jMaterialShaderParameters)
 
     using ShaderPermutation = jPermutation<>;
     ShaderPermutation Permutation;
@@ -572,7 +585,8 @@ struct jShaderShadowInstancingVertexShader : public jShader
 {
     DECLARE_SHADER_PARAMETER_SETS(
         jDirectionalLightOnlyShaderParameters,
-        jRenderObjectShaderParameters)
+        jRenderObjectShaderParameters,
+        jMaterialShaderParameters)
 
     using ShaderPermutation = jPermutation<>;
     ShaderPermutation Permutation;
@@ -590,8 +604,11 @@ struct jShaderDirectionalLightPixelShader : public jShader
     DECLARE_DEFINE(USE_SUBPASS, 0, 1);
     DECLARE_DEFINE(USE_SHADOW_MAP, 0, 1);
     DECLARE_DEFINE(USE_PBR, 0, 1);
+    DECLARE_DEFINE(USE_MSAA, 0, 1);
+    DECLARE_DEFINE(USE_SUBSURFACE, 0, 1);
+    DECLARE_DEFINE(USE_SKIN_MATERIAL, 0, 1);
 
-    using ShaderPermutation = jPermutation<USE_SUBPASS, USE_SHADOW_MAP, USE_PBR>;
+    using ShaderPermutation = jPermutation<USE_SUBPASS, USE_SHADOW_MAP, USE_PBR, USE_MSAA, USE_SUBSURFACE, USE_SKIN_MATERIAL>;
     ShaderPermutation Permutation;
 
     static void AppendConditionalShaderParameterSets(jShaderParameterBinder& InOutBinder, const ShaderPermutation& InPermutation);
@@ -609,8 +626,11 @@ struct jShaderPointLightPixelShader : public jShader
     DECLARE_DEFINE(USE_SUBPASS, 0, 1);
     DECLARE_DEFINE(USE_SHADOW_MAP, 0, 1);
     DECLARE_DEFINE(USE_PBR, 0, 1);
+    DECLARE_DEFINE(USE_MSAA, 0, 1);
+    DECLARE_DEFINE(USE_SUBSURFACE, 0, 1);
+    DECLARE_DEFINE(USE_SKIN_MATERIAL, 0, 1);
 
-    using ShaderPermutation = jPermutation<USE_SUBPASS, USE_SHADOW_MAP, USE_PBR>;
+    using ShaderPermutation = jPermutation<USE_SUBPASS, USE_SHADOW_MAP, USE_PBR, USE_MSAA, USE_SUBSURFACE, USE_SKIN_MATERIAL>;
     ShaderPermutation Permutation;
 
     static void AppendConditionalShaderParameterSets(jShaderParameterBinder& InOutBinder, const ShaderPermutation& InPermutation);
@@ -642,8 +662,11 @@ struct jShaderSpotLightPixelShader : public jShader
     DECLARE_DEFINE(USE_SHADOW_MAP, 0, 1);
     DECLARE_DEFINE(USE_REVERSEZ, 0, 1);
     DECLARE_DEFINE(USE_PBR, 0, 1);
+    DECLARE_DEFINE(USE_MSAA, 0, 1);
+    DECLARE_DEFINE(USE_SUBSURFACE, 0, 1);
+    DECLARE_DEFINE(USE_SKIN_MATERIAL, 0, 1);
 
-    using ShaderPermutation = jPermutation<USE_SUBPASS, USE_SHADOW_MAP, USE_REVERSEZ, USE_PBR>;
+    using ShaderPermutation = jPermutation<USE_SUBPASS, USE_SHADOW_MAP, USE_REVERSEZ, USE_PBR, USE_MSAA, USE_SUBSURFACE, USE_SKIN_MATERIAL>;
     ShaderPermutation Permutation;
 
     static void AppendConditionalShaderParameterSets(jShaderParameterBinder& InOutBinder, const ShaderPermutation& InPermutation);

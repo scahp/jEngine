@@ -1,0 +1,5 @@
+# Adapted for jEngine: world-space normal maps are not tangent-space bump maps.
+newmtl defaultMat
+Kd 1 1 1
+d 1
+map_Kd Infinite-Level_02.jpg

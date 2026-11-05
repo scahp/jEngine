@@ -12,6 +12,7 @@ class jObject;
 struct ImVec2;
 struct Vector;
 struct jEditorThumbnail;
+struct jImageData;
 namespace jEditorTools
 {
 struct Mesh
@@ -20,7 +21,12 @@ struct Mesh
     std::vector<uint32_t> Indices;
 };
 Mesh BuildTerrain(const jEditorAuthoring::TerrainProperties& terrain);
-enum class NodeKind { Color, Scalar, Texture, Multiply, Add };
+enum class NodeKind
+{
+    Color, Scalar, Texture, Multiply, Add,
+    UV, TextureObject, TextureSample, TextureSampleNormal, Channel,
+    Parallax, POM, Relief, Interior, Horizon, DiffusionProfile
+};
 struct MaterialNode
 {
     uint32_t Id = 0, InputA = 0, InputB = 0;
@@ -28,6 +34,13 @@ struct MaterialNode
     jEditorAuthoring::Vec3 Color{1, 1, 1};
     float Scalar = 1, X = 0, Y = 0;
     std::string Texture;
+    uint32_t InputC = 0, InputD = 0;
+    std::array<float, 4> Parameters{1, 1, 0, 0};
+    jMaterialMapping::TextureSemantic Semantic = jMaterialMapping::TextureSemantic::Linear;
+    jMaterialMapping::NormalSpace NormalSpace = jMaterialMapping::NormalSpace::Tangent;
+    std::array<float, 3> InputBasisSignXYZ{1.f, 1.f, 1.f};
+    // Absent: legacy Parameters.x flip for Tangent, no flip for Object/World.
+    std::optional<bool> FlipNormalY;
 };
 struct MaterialGraph
 {
@@ -41,12 +54,33 @@ struct MaterialGraph
         std::string MetallicRoughnessTexture, EmissionTexture;
     };
     std::optional<SurfaceProperties> Surface;
+    uint32_t Horizon = 0;
+    uint32_t Version = 1;
+    uint32_t SubsurfaceWeight = 0, SubsurfaceColor = 0, SubsurfaceThickness = 0, SubsurfaceProfile = 0;
+    uint32_t SpecularWeight = 0, DiffuseOcclusion = 0, PreScatterWeight = 0;
 };
 bool EvaluateMaterial(const MaterialGraph& graph, jEditorAuthoring::MaterialProperties& material, std::string& error);
 bool SaveMaterial(const MaterialGraph& graph, const std::filesystem::path& file, std::string& error);
 bool LoadMaterial(const std::filesystem::path& file, MaterialGraph& graph, std::string& error);
+struct PreparedMaterialMapping
+{
+    std::shared_ptr<const jMaterialMapping::Program> Program;
+    std::array<std::shared_ptr<jTexture>, jMaterialMapping::MaximumTextures> Textures{};
+};
+// CPU compilation plus owner-thread managed texture preparation. Failure preserves output.
+bool PrepareMaterialMapping(const std::filesystem::path& root, const MaterialGraph& graph,
+    PreparedMaterialMapping& output, std::string& error, bool* pending = nullptr);
+// Polling is owner-thread only; the monotonic completion epoch supports retry
+// even when another caller already harvested a completed worker.
+uint64_t PollMaterialMappingTexturePreparation();
+size_t PendingMaterialMappingTextureCount();
+void InvalidateMaterialMappingTextureCache(const std::filesystem::path& root, const std::string& source);
+void CancelMaterialMappingTexturePreparation();
+bool DecodeMaterialDataTexture(const std::filesystem::path& file, std::shared_ptr<jImageData>& output, std::string& error);
+void ApplyMaterialMapping(jMaterial& material, const PreparedMaterialMapping& prepared, uint32_t overrideMask);
+uint32_t MaterialMappingOverrides(const jEditorAuthoring::MaterialProperties& material);
 bool ApplySceneMaterialLibrary(const std::filesystem::path& source, const std::vector<jObject*>& objects,
-    size_t& appliedSlots, std::string& error);
+    size_t& appliedSlots, std::string& error, bool* pending = nullptr, bool allowRasterOnly = true);
 bool PrepareMaterialThumbnail(const std::filesystem::path& root, const std::filesystem::path& file,
     jEditorThumbnail& thumbnail, std::string& diagnostic);
 void InheritMaterialGraph(jEditorAuthoring::MaterialProperties& instance, const jEditorAuthoring::MaterialProperties& defaults);

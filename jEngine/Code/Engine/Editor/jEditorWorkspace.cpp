@@ -9,6 +9,8 @@
 #include "jEditorAssetPanel.h"
 #include "jEditorCapture.h"
 #include "jEditorProjectSettings.h"
+#include "jEditorWater.h"
+#include "jSceneFeatureTools.h"
 #include "FileLoader/jEditorAssets.h"
 #include "FileLoader/jEditorAssetPath.h"
 #include "FileLoader/jImageFileLoader.h"
@@ -21,6 +23,7 @@
 #include "jOptions.h"
 #include "Scene/jCamera.h"
 #include "Scene/jObject.h"
+#include "Scene/jRenderObject.h"
 #include "RHI/jRHI.h"
 #include <fstream>
 #include <future>
@@ -56,10 +59,12 @@ struct CaptureDialog
     char File[2048]{};
     std::string Error;
 };
+struct RendererChoiceRect { ImVec2 Position{}, Size{}; bool Visible = false; };
 struct Workspace
 {
     bool Visible = true, Runtime = false, ViewHovered = false, ViewFocused = false;
     bool ViewportOnly = false, ToggleViewportOnly = false;
+    bool RendererControlVisible = false, ViewToolbarOwnsInput = false;
     bool FixedLayout = true, ShowAssets = true, ShowLogs = true, ShowProfiler = false, ShowTools = false;
     bool PaintTerrainInScene = false;
     bool SurfaceSnap = true, SuppressEditorEscape = false;
@@ -77,6 +82,10 @@ struct Workspace
     float LeftWidth = 245, RightWidth = 325, BottomHeight = 205, FontScale = 1;
     float AutoSaveSeconds = 0, WatchSeconds = 0;
     ImVec2 ViewPosition{}, ViewSize{};
+    ImVec2 RendererControlPosition{}, RendererControlSize{};
+    std::array<RendererChoiceRect, 3> RendererChoices{};
+    std::optional<jGame::ESceneRenderPipeline> RendererSwitchTarget;
+    std::string RendererSwitchError;
     uint64_t RowRevision = ~uint64_t(0), AssetRevision = ~uint64_t(0);
     uint64_t RowSignature = ~uint64_t(0);
     EntityId HierarchyActive = 0, RangeAnchor = 0, RevealHierarchy = 0, RowSelected = 0;
@@ -111,6 +120,108 @@ void Message(const std::string& value, bool error = false)
 {
     State().Status = value;
     jLog::Get().Write(error ? EjLogLevel::Error : EjLogLevel::Info, "Editor", value);
+}
+const char* RendererLabel(jGame::ESceneRenderPipeline renderer)
+{
+    switch (renderer)
+    {
+    case jGame::ESceneRenderPipeline::Deferred: return "Deferred";
+    case jGame::ESceneRenderPipeline::Forward: return "Forward";
+    case jGame::ESceneRenderPipeline::PathTracing: return "Path Tracing";
+    }
+    return "Unknown";
+}
+bool ViewportRendererToolbar()
+{
+    auto& s = State();
+    auto* game = g_Engine ? &g_Engine->Game : nullptr;
+    const auto active = game ? game->GetActiveSceneRenderPipeline() : jGame::ESceneRenderPipeline::Deferred;
+    if (game && s.RendererSwitchTarget && !game->IsSceneRenderPipelineSwitchPending())
+    {
+        const auto target = *s.RendererSwitchTarget; s.RendererSwitchTarget.reset();
+        if (active == target)
+        {
+            s.RendererSwitchError.clear();
+            Message(std::string("Renderer: ") + RendererLabel(active));
+        }
+        else
+        {
+            s.RendererSwitchError = std::string("Renderer switch to ") + RendererLabel(target)
+                + " was not applied. Active: " + RendererLabel(active) + ". See Console for details.";
+            Message(s.RendererSwitchError, true);
+        }
+    }
+    const ImVec2 start = ImGui::GetCursorScreenPos();
+    const float available = std::max(0.0f, ImGui::GetContentRegionAvail().x);
+    const float labelWidth = ImGui::CalcTextSize("Renderer").x + ImGui::GetStyle().ItemSpacing.x;
+    const float comboWidth = ImGui::CalcTextSize("Path Tracing").x + 2 * ImGui::GetStyle().FramePadding.x + ImGui::GetFrameHeight();
+    const bool inlineLabel = available >= labelWidth + comboWidth;
+    ImGui::AlignTextToFramePadding(); ImGui::TextUnformatted("Renderer");
+    if (inlineLabel) ImGui::SameLine();
+    ImGui::SetNextItemWidth(std::max(1.0f, std::min(comboWidth, ImGui::GetContentRegionAvail().x)));
+    ImGui::BeginDisabled(!game || game->IsSceneRenderPipelineSwitchPending());
+    const bool popup = ImGui::BeginCombo("##ViewportRenderer", game ? RendererLabel(active) : "Unavailable");
+    if (popup)
+    {
+        const jGame::ESceneRenderPipeline choices[] = {jGame::ESceneRenderPipeline::Deferred,
+            jGame::ESceneRenderPipeline::Forward, jGame::ESceneRenderPipeline::PathTracing};
+        for (const auto choice : choices)
+        {
+            std::string reason;
+            const bool supported = game && game->CanSwitchSceneRenderPipeline(choice, reason);
+            const bool selected = ImGui::Selectable(RendererLabel(choice), active == choice, supported ? ImGuiSelectableFlags_None : ImGuiSelectableFlags_Disabled);
+            auto& choiceRect = s.RendererChoices[static_cast<size_t>(choice)];
+            choiceRect.Position = ImGui::GetItemRectMin();
+            const auto choiceEnd = ImGui::GetItemRectMax();
+            choiceRect.Size = ImVec2(choiceEnd.x - choiceRect.Position.x, choiceEnd.y - choiceRect.Position.y);
+            choiceRect.Visible = ImGui::IsItemVisible();
+            if (selected)
+            {
+                // Draw only queues the request. The owner update performs the GPU/lifecycle work.
+                if (game->RequestSceneRenderPipeline(choice, reason))
+                {
+                    s.RendererSwitchError.clear();
+                    if (game->IsSceneRenderPipelineSwitchPending())
+                    {
+                        s.RendererSwitchTarget = choice;
+                        Message(std::string("Renderer switch queued: ") + RendererLabel(choice));
+                    }
+                    else Message(std::string("Renderer: ") + RendererLabel(active));
+                }
+                else { s.RendererSwitchError = reason; Message(reason, true); }
+            }
+            if (active == choice) ImGui::SetItemDefaultFocus();
+            if (!supported && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            {
+                ImGui::BeginTooltip(); ImGui::PushTextWrapPos(ImGui::GetFontSize() * 28);
+                ImGui::TextUnformatted(reason.empty() ? "Renderer unavailable" : reason.c_str());
+                ImGui::PopTextWrapPos(); ImGui::EndTooltip();
+            }
+        }
+        ImGui::EndCombo();
+    }
+    // EndCombo restores the parent combo's item data; inside its popup these
+    // getters would describe a popup item rather than the control in Scene.
+    s.RendererControlPosition = ImGui::GetItemRectMin();
+    const auto controlEnd = ImGui::GetItemRectMax();
+    s.RendererControlSize = ImVec2(controlEnd.x - s.RendererControlPosition.x, controlEnd.y - s.RendererControlPosition.y);
+    s.RendererControlVisible = ImGui::IsItemVisible();
+    const bool comboActive = ImGui::IsItemActive();
+    const bool comboHovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled);
+    ImGui::EndDisabled();
+    if (game && game->IsSceneRenderPipelineSwitchPending())
+    {
+        const char* pending = "Switch pending";
+        if (start.x + available - controlEnd.x >= ImGui::CalcTextSize(pending).x + ImGui::GetStyle().ItemSpacing.x) ImGui::SameLine();
+        ImGui::TextDisabled("%s", pending);
+        if (comboHovered) ImGui::SetTooltip("The active renderer is shown until the owner update applies this request.");
+    }
+    else if (!s.RendererSwitchError.empty()) ImGui::TextWrapped("%s", s.RendererSwitchError.c_str());
+    ImGui::Separator();
+    const ImVec2 end(start.x + available, ImGui::GetCursorScreenPos().y);
+    const bool toolbarHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) && ImGui::IsMouseHoveringRect(start, end);
+    if (popup || comboActive || (toolbarHovered && (ImGui::IsMouseClicked(0) || ImGui::IsMouseClicked(1)))) s.ViewToolbarOwnsInput = true;
+    return toolbarHovered || popup || comboActive || ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup);
 }
 void ShowDialog(Dialog dialog, const fs::path& path = {})
 {
@@ -271,7 +382,7 @@ void Vec3Field(Document& document, Entity& entity, const char* label, Vec3& valu
 }
 void AddMenu(jEditor& editor)
 {
-    for (int i = 0; i <= static_cast<int>(EntityKind::Terrain); ++i)
+    for (int i = 0; i <= static_cast<int>(EntityKind::Water); ++i)
     {
         auto kind = static_cast<EntityKind>(i);
         if (kind == EntityKind::Model) continue;
@@ -511,11 +622,126 @@ void MaterialInspector(jEditor& editor, Entity& entity)
         flags ? &flags->NormalTexture : nullptr);
     if (flags) ResetMaterialParameter(document, entity, "Normal texture", flags->NormalTexture,
         material.NormalTexture, defaults.NormalTexture);
+    if (ImGui::TreeNode("Subsurface material"))
+    {
+        auto shown = material;
+        if (flags)
+        {
+            if (!flags->SubsurfaceWeight) shown.SubsurfaceWeight = defaults.SubsurfaceWeight;
+            if (!flags->SubsurfaceColor) shown.SubsurfaceColor = defaults.SubsurfaceColor;
+            if (!flags->SubsurfaceThickness) shown.SubsurfaceThicknessWorld = defaults.SubsurfaceThicknessWorld;
+            if (!flags->SubsurfaceProfile) shown.SubsurfaceProfile = defaults.SubsurfaceProfile;
+        }
+        else if (!material.SubsurfaceOverrideEnabled)
+        {
+            const auto* object = editor.ObjectForEntity(entity.Id);
+            if (object && !object->RenderObjects.empty() && object->RenderObjects[0]->MaterialPtr && object->RenderObjects[0]->MaterialPtr->Surface)
+            {
+                const auto& surface = *object->RenderObjects[0]->MaterialPtr->Surface;
+                shown.SubsurfaceWeight = surface.Subsurface;
+                shown.SubsurfaceColor = {surface.SubsurfaceColor[0], surface.SubsurfaceColor[1], surface.SubsurfaceColor[2]};
+                shown.SubsurfaceThicknessWorld = surface.SubsurfaceThicknessWorld; shown.SubsurfaceProfile = surface.SubsurfaceProfile;
+            }
+        }
+        const auto finishSSS = [&](bool changed, bool* overridden, const char* label)
+        {
+            if (changed)
+            {
+                material.SubsurfaceOverrideEnabled = true;
+                material.SubsurfaceWeight = shown.SubsurfaceWeight; material.SubsurfaceColor = shown.SubsurfaceColor;
+                material.SubsurfaceThicknessWorld = shown.SubsurfaceThicknessWorld; material.SubsurfaceProfile = shown.SubsurfaceProfile;
+                if (overridden) *overridden = true;
+            }
+            FinishMaterialProperty(document, entity, changed, label);
+        };
+        finishSSS(ImGui::SliderFloat("Subsurface weight", &shown.SubsurfaceWeight, 0, 1), flags ? &flags->SubsurfaceWeight : nullptr, "Subsurface weight");
+        if (flags) ResetMaterialParameter(document, entity, "SSS weight", flags->SubsurfaceWeight, material.SubsurfaceWeight, defaults.SubsurfaceWeight);
+        finishSSS(ImGui::ColorEdit3("Subsurface color", &shown.SubsurfaceColor.X), flags ? &flags->SubsurfaceColor : nullptr, "Subsurface color");
+        if (flags) ResetMaterialParameter(document, entity, "SSS color", flags->SubsurfaceColor, material.SubsurfaceColor, defaults.SubsurfaceColor);
+        finishSSS(ImGui::DragFloat("Thickness (world)", &shown.SubsurfaceThicknessWorld, .01f, 0, 10000, "%.3g", ImGuiSliderFlags_AlwaysClamp),
+            flags ? &flags->SubsurfaceThickness : nullptr, "Subsurface thickness");
+        if (flags) ResetMaterialParameter(document, entity, "SSS thickness", flags->SubsurfaceThickness, material.SubsurfaceThicknessWorld, defaults.SubsurfaceThicknessWorld);
+        static const auto profiles = [] { std::array<const char*, 8> names{}; for (size_t i = 0; i < names.size(); ++i) names[i] = jSubsurface::Profiles[i].Name; return names; }();
+        int profile = int(shown.SubsurfaceProfile);
+        const bool profileChanged = ImGui::Combo("Diffusion profile", &profile, profiles.data(), int(profiles.size()));
+        if (profileChanged) shown.SubsurfaceProfile = uint32_t(profile);
+        finishSSS(profileChanged, flags ? &flags->SubsurfaceProfile : nullptr, "Subsurface profile");
+        if (flags) ResetMaterialParameter(document, entity, "SSS profile", flags->SubsurfaceProfile, material.SubsurfaceProfile, defaults.SubsurfaceProfile);
+        if (material.SubsurfaceOverrideEnabled && ImGui::Button("Inherit subsurface"))
+        {
+            material.SubsurfaceOverrideEnabled = false;
+            if (flags) flags->SubsurfaceWeight = flags->SubsurfaceColor = flags->SubsurfaceThickness = flags->SubsurfaceProfile = false;
+            document.Update(entity, "Inherit subsurface material");
+        }
+        ImGui::TextWrapped("Deferred surface diffusion requires Project Settings > Enable Deferred SSS. Thickness uses scene world units; 0 disables diffusion. Presets approximate surface scattering, not hidden-surface transmission. PT keeps its existing subsurface approximation.");
+        const auto& reason = GetRendererFeatureDiagnostics().SubsurfaceSupportReason;
+        if (!reason.empty()) ImGui::TextWrapped("%s", reason.c_str());
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNode("Skin shading"))
+    {
+        auto shown = material;
+        if (flags)
+        {
+            if (!flags->ShadingModel) shown.ShadingModel = defaults.ShadingModel;
+            if (!flags->SubsurfaceSpace) shown.SubsurfaceSpace = defaults.SubsurfaceSpace;
+            if (!flags->SpecularWeight) shown.SpecularWeight = defaults.SpecularWeight;
+            if (!flags->DiffuseOcclusion) shown.DiffuseOcclusion = defaults.DiffuseOcclusion;
+            if (!flags->PreScatterWeight) shown.PreScatterWeight = defaults.PreScatterWeight;
+        }
+        else if (!material.SkinOverrideEnabled)
+        {
+            const auto* object = editor.ObjectForEntity(entity.Id);
+            if (object && !object->RenderObjects.empty() && object->RenderObjects[0]->MaterialPtr && object->RenderObjects[0]->MaterialPtr->Surface)
+            {
+                const auto& surface = *object->RenderObjects[0]->MaterialPtr->Surface;
+                shown.ShadingModel = surface.ShadingModel; shown.SubsurfaceSpace = surface.SubsurfaceSpace;
+                shown.SpecularWeight = surface.SpecularWeight; shown.DiffuseOcclusion = surface.DiffuseOcclusion;
+                shown.PreScatterWeight = surface.PreScatterWeight;
+            }
+        }
+        const auto finishSkin = [&](bool changed, bool* overridden, const char* label)
+        {
+            if (changed)
+            {
+                material.SkinOverrideEnabled = true;
+                material.ShadingModel = shown.ShadingModel; material.SubsurfaceSpace = shown.SubsurfaceSpace;
+                material.SpecularWeight = shown.SpecularWeight; material.DiffuseOcclusion = shown.DiffuseOcclusion;
+                material.PreScatterWeight = shown.PreScatterWeight;
+                if (overridden) *overridden = true;
+            }
+            FinishMaterialProperty(document, entity, changed, label);
+        };
+        int model = int(shown.ShadingModel), space = int(shown.SubsurfaceSpace);
+        const bool modelChanged = ImGui::Combo("Shading model", &model, "Standard PBR\0Skin Kelemen\0");
+        if (modelChanged) shown.ShadingModel = jMaterialMapping::ShadingModel(model);
+        finishSkin(modelChanged, flags ? &flags->ShadingModel : nullptr, "Shading model");
+        if (flags) ResetMaterialParameter(document, entity, "Shading model", flags->ShadingModel, material.ShadingModel, defaults.ShadingModel);
+        const bool spaceChanged = ImGui::Combo("Subsurface space", &space, "Screen\0Texture (UV)\0");
+        if (spaceChanged) shown.SubsurfaceSpace = jMaterialMapping::SubsurfaceSpace(space);
+        finishSkin(spaceChanged, flags ? &flags->SubsurfaceSpace : nullptr, "Subsurface space");
+        if (flags) ResetMaterialParameter(document, entity, "Subsurface space", flags->SubsurfaceSpace, material.SubsurfaceSpace, defaults.SubsurfaceSpace);
+        finishSkin(ImGui::SliderFloat("Specular weight", &shown.SpecularWeight, 0, 8), flags ? &flags->SpecularWeight : nullptr, "Specular weight");
+        if (flags) ResetMaterialParameter(document, entity, "Specular weight", flags->SpecularWeight, material.SpecularWeight, defaults.SpecularWeight);
+        finishSkin(ImGui::SliderFloat("Diffuse occlusion", &shown.DiffuseOcclusion, 0, 1), flags ? &flags->DiffuseOcclusion : nullptr, "Diffuse occlusion");
+        if (flags) ResetMaterialParameter(document, entity, "Diffuse occlusion", flags->DiffuseOcclusion, material.DiffuseOcclusion, defaults.DiffuseOcclusion);
+        finishSkin(ImGui::SliderFloat("Pre-scatter weight", &shown.PreScatterWeight, 0, 1), flags ? &flags->PreScatterWeight : nullptr, "Pre-scatter weight");
+        if (flags) ResetMaterialParameter(document, entity, "Pre-scatter weight", flags->PreScatterWeight, material.PreScatterWeight, defaults.PreScatterWeight);
+        if (material.SkinOverrideEnabled && ImGui::Button("Inherit skin shading"))
+        {
+            material.SkinOverrideEnabled = false;
+            if (flags) flags->ShadingModel = flags->SubsurfaceSpace = flags->SpecularWeight = flags->DiffuseOcclusion = flags->PreScatterWeight = false;
+            document.Update(entity, "Inherit skin shading");
+        }
+        ImGui::TextWrapped("Skin Kelemen interprets Roughness as Beckmann m. Texture diffusion uses UVs and requires its renderer support; these material controls alone do not reproduce the original full Skin pipeline.");
+        ImGui::TreePop();
+    }
     if (ImGui::Button("Material graph")) State().ShowTools = true;
 }
 bool HasMaterial(EntityKind kind)
 {
-    return kind == EntityKind::Cube || kind == EntityKind::Sphere || kind == EntityKind::Model || kind == EntityKind::Terrain;
+    return kind == EntityKind::Cube || kind == EntityKind::Sphere || kind == EntityKind::Model
+        || kind == EntityKind::Terrain || kind == EntityKind::Water;
 }
 bool IsLight(EntityKind kind)
 {
@@ -789,6 +1015,34 @@ void Inspector(jEditor& editor)
     }
     if (HasMaterial(e.Kind))
         if (ImGui::CollapsingHeader("Material", ImGuiTreeNodeFlags_DefaultOpen)) MaterialInspector(editor, e);
+    if (e.Kind == EntityKind::Cube || e.Kind == EntityKind::Sphere || e.Kind == EntityKind::Model
+        || e.Kind == EntityKind::ParticleEmitter || e.Kind == EntityKind::Terrain || e.Kind == EntityKind::Water)
+        if (ImGui::CollapsingHeader("Shadow casting", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            bool overrideCasting = e.ShadowCaster.has_value();
+            if (ImGui::Checkbox("Override shadow casting", &overrideCasting))
+            {
+                if (overrideCasting)
+                {
+                    const auto* object = editor.ObjectForEntity(e.Id);
+                    e.ShadowCaster = object ? !object->SkipShadowMapGen : true;
+                }
+                else e.ShadowCaster.reset();
+                document.Update(e, "Override shadow casting");
+            }
+            if (e.ShadowCaster)
+            {
+                bool casts = *e.ShadowCaster;
+                const bool changed = ImGui::Checkbox("Cast shadows", &casts);
+                if (changed) e.ShadowCaster = casts;
+                FinishProperty(document, e, changed, "Object shadow casting");
+            }
+            else ImGui::TextDisabled("Inherits source / prototype shadow casting.");
+            ImGui::TextWrapped("Disabling casting keeps this object visible as a shadow receiver.");
+        }
+    if (e.Kind == EntityKind::Water)
+        jEditorWater::RenderInspector(editor, e.Id,
+            [&](Entity& candidate, const char* label, bool changed) { FinishProperty(document, candidate, changed, label); });
     if (IsLight(e.Kind))
         if (ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen))
         {
@@ -801,6 +1055,39 @@ void Inspector(jEditor& editor)
                 FinishProperty(document, e, ImGui::SliderFloat("Outer cone", &e.Light.OuterConeDegrees, .01f, 89), "Outer cone");
             }
             FinishProperty(document, e, ImGui::Checkbox("Cast shadows", &e.Light.CastShadows), "Shadow setting");
+            bool overrideShadows = e.Light.ShadowOverride.has_value();
+            if (ImGui::Checkbox("Override shadow settings", &overrideShadows))
+            {
+                if (overrideShadows)
+                {
+                    const auto kind = e.Kind == EntityKind::DirectionalLight ? jAdvancedShadows::LightKind::Directional
+                        : e.Kind == EntityKind::PointLight ? jAdvancedShadows::LightKind::Point : jAdvancedShadows::LightKind::Spot;
+                    std::string reason;
+                    auto settings = gOptions.AdvancedShadows;
+                    if (!jAdvancedShadows::ValidateForLight(settings, kind, reason))
+                    {
+                        settings = {};
+                        ImGui::TextWrapped("Inherited shadow settings are incompatible with this light; the override starts from engine defaults.");
+                    }
+                    e.Light.ShadowOverride = settings;
+                }
+                else e.Light.ShadowOverride.reset();
+                document.Update(e, "Override shadow settings");
+            }
+            if (e.Light.ShadowOverride)
+            {
+                const auto kind = e.Kind == EntityKind::DirectionalLight ? jAdvancedShadows::LightKind::Directional
+                    : e.Kind == EntityKind::PointLight ? jAdvancedShadows::LightKind::Point : jAdvancedShadows::LightKind::Spot;
+                std::string error;
+                auto settings = *e.Light.ShadowOverride;
+                ImGui::BeginGroup();
+                const bool changed = jEditorProjectSettings::RenderAdvancedShadowControls(settings, error, kind);
+                ImGui::EndGroup();
+                if (changed) e.Light.ShadowOverride = settings;
+                FinishProperty(document, e, changed, "Light shadow settings");
+            }
+            else ImGui::TextDisabled("Inherits project / global shadow settings.");
+            ImGui::TextWrapped("Raster shadows only; Path Tracing and HWRT ray shadows use their own visibility.");
         }
     if (e.Kind == EntityKind::Camera && ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen))
     {
@@ -1581,6 +1868,30 @@ float GetAuthoringSceneAspect()
     const auto size = State().ViewSize;
     return size.x > 0.0f && size.y > 0.0f ? size.x / size.y : 0.0f;
 }
+bool GetAuthoringViewportRect(float& x, float& y, float& width, float& height)
+{
+    const auto& s = State();
+    if (s.ViewportOnly || !IsAuthoringWorkspaceVisible() || s.ViewSize.x <= 0 || s.ViewSize.y <= 0) return false;
+    x = s.ViewPosition.x; y = s.ViewPosition.y; width = s.ViewSize.x; height = s.ViewSize.y;
+    return true;
+}
+bool GetAuthoringRendererControlRect(float& x, float& y, float& width, float& height)
+{
+    const auto& s = State();
+    if (s.ViewportOnly || !IsAuthoringWorkspaceVisible() || !s.RendererControlVisible) return false;
+    x = s.RendererControlPosition.x; y = s.RendererControlPosition.y;
+    width = s.RendererControlSize.x; height = s.RendererControlSize.y;
+    return width > 0 && height > 0;
+}
+bool GetAuthoringRendererChoiceRect(int renderer, float& x, float& y, float& width, float& height)
+{
+    const auto& s = State();
+    if (s.ViewportOnly || !IsAuthoringWorkspaceVisible() || renderer < 0 || static_cast<size_t>(renderer) >= s.RendererChoices.size()) return false;
+    const auto& choice = s.RendererChoices[static_cast<size_t>(renderer)];
+    if (!choice.Visible) return false;
+    x = choice.Position.x; y = choice.Position.y; width = choice.Size.x; height = choice.Size.y;
+    return width > 0 && height > 0;
+}
 bool MapAuthoringViewportPoint(double& x, double& y)
 {
     auto& s = State();
@@ -1648,6 +1959,7 @@ void TickAuthoringWorkspace(jEditor& editor, float dt)
         AdvancePlacement(editor);
         AdvanceModelReplacement(editor);
     }
+    jSceneFeatureTools::Tick(editor, s.Project.get());
     s.FrameTimes[s.FrameOffset++ % s.FrameTimes.size()] = dt * 1000; s.FrameOffset %= s.FrameTimes.size();
     if (s.Registry)
     {
@@ -1698,8 +2010,8 @@ void UpdateAuthoringViewportOnlyInput(jEditor& editor)
 void RenderAuthoringWorkspace(jEditor& editor)
 {
     auto& s = State(); auto& document = editor.GetDocument();
-    s.ViewSize = {};
-    s.ViewHovered = s.ViewFocused = false;
+    s.ViewHovered = s.ViewFocused = s.RendererControlVisible = false; s.ViewSize = {};
+    for (auto& choice : s.RendererChoices) choice.Visible = false;
     editor.SetViewportInputState(false, false); editor.SetShortcutInputState(false);
     if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) jEditorTools::FinishTerrainStroke(editor);
     if (s.OwnPropertyTransaction && (s.PropertyOwner != editor.GetSelectedEntityId() || !ImGui::IsAnyItemActive())) FinishInspectorEdit(editor);
@@ -1775,6 +2087,7 @@ void RenderAuthoringWorkspace(jEditor& editor)
             ImGui::MenuItem("Material / Animation / Effects / Terrain", nullptr, &s.ShowTools);
             if (ImGui::MenuItem("Extensions / hot reload")) jEditorExtensions::SetVisible(editor, true);
             if (ImGui::MenuItem("Project settings")) jEditorProjectSettings::SetVisible(true);
+            if (ImGui::MenuItem("Environment / reflections / atmosphere")) jSceneFeatureTools::SetVisible(true);
             ImGui::MenuItem("Layout settings", nullptr, &s.ShowSettings);
             if (ImGui::MenuItem("Reset layout")) { s.ResetLayout = true; s.LeftWidth = 245; s.RightWidth = 325; s.BottomHeight = 205; }
             if (ImGui::MenuItem("Save layout")) SaveLayout();
@@ -1859,6 +2172,14 @@ void RenderAuthoringWorkspace(jEditor& editor)
     if (scene) ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     const bool viewOpen = panel(scene ? "Scene" : "Game", left, top, viewWidth, vp->Size.y - top - bottom, viewFlags);
     if (viewOpen && scene) SceneToolbar(editor);
+    const bool toolbarBlocksInput = viewOpen && ViewportRendererToolbar();
+    if (viewOpen && (toolbarBlocksInput || s.ViewToolbarOwnsInput) && !ImGui::IsMouseDown(ImGuiMouseButton_Left))
+    {
+        // Release an existing drag even when the toolbar blocks viewport input.
+        ImGuizmo::Enable(false);
+        editor.RenderViewportGizmo(nullptr);
+        ImGuizmo::Enable(true);
+    }
     auto size = ImGui::GetContentRegionAvail();
     if (viewOpen && size.x >= 1.0f && size.y >= 1.0f)
     {
@@ -1882,7 +2203,11 @@ void RenderAuthoringWorkspace(jEditor& editor)
         ImGui::SetCursorScreenPos(position); s.ViewPosition = position; s.ViewSize = size;
         if (void* texture = jEditorUiRenderer::ScenePreviewTexture()) ImGui::Image(texture, size);
         else ImGui::Dummy(size);
-        s.ViewHovered = ImGui::IsItemHovered(); s.ViewFocused = ImGui::IsWindowFocused();
+        const bool imageHovered = ImGui::IsItemHovered();
+        if (imageHovered && (ImGui::IsMouseClicked(0) || ImGui::IsMouseClicked(1))) s.ViewToolbarOwnsInput = false;
+        const bool viewportInputBlocked = toolbarBlocksInput || s.ViewToolbarOwnsInput;
+        s.ViewHovered = imageHovered && !viewportInputBlocked;
+        s.ViewFocused = ImGui::IsWindowFocused() && !viewportInputBlocked;
         editor.SetViewportInputState(s.ViewHovered, s.ViewFocused);
         if (s.ViewFocused) editor.SetShortcutInputState(true);
         auto* camera = Camera();
@@ -1892,7 +2217,7 @@ void RenderAuthoringWorkspace(jEditor& editor)
         sceneDraw->PushClipRect(position, ImVec2(position.x + size.x, position.y + size.y), true);
         const bool terrainBrush = !dragging && s.ShowTools && s.PaintTerrainInScene && camera &&
             jEditorTools::RenderTerrainBrush(editor, *camera, position, size, s.ViewHovered);
-        const bool gizmoInput = !dragging && !terrainBrush &&
+        const bool gizmoInput = !dragging && !terrainBrush && !viewportInputBlocked &&
             editor.RenderViewportGizmo(camera, position.x, position.y, size.x, size.y);
         if (dragging || terrainBrush) editor.CancelViewportDuplicateDrag();
         sceneDraw->PopClipRect();
@@ -1909,9 +2234,10 @@ void RenderAuthoringWorkspace(jEditor& editor)
                     editor.Placement.PickMouseY = int32(y);
                 }
             }
-            if ((io.MouseDown[1] || (io.KeyAlt && io.MouseDown[0])) && (io.MouseDelta.x || io.MouseDelta.y)) editor.HandleCameraMouseMove(int32(io.MouseDelta.x), int32(io.MouseDelta.y), Camera());
+            if ((io.MouseDown[1] || (io.KeyAlt && io.MouseDown[0])) && (io.MouseDelta.x || io.MouseDelta.y))
+                editor.HandleCameraMouseMove(int32(io.MouseDelta.x), int32(io.MouseDelta.y), camera);
         }
-        if (!s.Status.empty() && size.y > ImGui::GetTextLineHeight() + 16)
+        if (!s.Status.empty() && size.x > 12 && size.y > ImGui::GetTextLineHeight() + 16)
         {
             const ImVec2 status(position.x + 6, position.y + size.y - ImGui::GetTextLineHeight() - 8);
             sceneDraw->PushClipRect(position, ImVec2(position.x + size.x, position.y + size.y), true);
@@ -1977,6 +2303,7 @@ void RenderAuthoringWorkspace(jEditor& editor)
     KeyboardShortcuts();
     jEditorExtensions::Render(editor);
     jEditorProjectSettings::Render(editor, s.Project.get());
+    jSceneFeatureTools::Render(editor, s.Project.get());
     if (s.IntegrationDraw) s.IntegrationDraw();
     if (s.ViewHovered && !io.WantTextInput && !ImGui::IsAnyItemActive()) io.WantCaptureMouse = false;
     if (s.ViewFocused && !io.WantTextInput && !ImGui::IsAnyItemActive()) io.WantCaptureKeyboard = false;
@@ -1985,6 +2312,7 @@ void RenderAuthoringWorkspace(jEditor& editor)
 void ShutdownAuthoringWorkspace()
 {
     jEditorCapture::Shutdown();
+    jSceneFeatureTools::Shutdown();
     auto& s = State(); jEditorAssetPanel::Shutdown(); if (s.Registry) s.Registry->Shutdown();
     s.ShowKeyboardShortcuts = false;
     if (g_Editor) { ClearAssetPlacement(*g_Editor); jEditorExtensions::Shutdown(*g_Editor); }

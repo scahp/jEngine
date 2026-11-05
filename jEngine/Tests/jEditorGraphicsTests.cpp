@@ -2,6 +2,9 @@
 #include "Code/Engine/Editor/jEditorProcedural.h"
 #include "Shader/jCommonShaderParameters.h"
 #include "Shader/jLightingShaderParameters.h"
+#include "Renderer/Features/jShadowFiltering.h"
+#include "RHI/jRHI.h"
+#include "Shader/jShader.h"
 #include <cmath>
 #include <limits>
 
@@ -12,10 +15,88 @@ int RunEditorGraphicsTests()
     int failures = 0;
     auto expect = [&](bool pass, const char* label)
     { std::cout << (pass ? "PASS " : "FAIL ") << label << '\n'; failures += !pass; };
+    {
+        // Reproduce a backend allocating its native holder, then failing to
+        // open a shader include. A partial holder must never reach a pipeline.
+        struct PartialCompiled : jCompiledShader
+        {
+            int& Destroyed;
+            explicit PartialCompiled(int& destroyed) : Destroyed(destroyed) {}
+            ~PartialCompiled() override { ++Destroyed; }
+        };
+        struct FailingCompiler : jRHI
+        {
+            int& Destroyed;
+            explicit FailingCompiler(int& destroyed) : Destroyed(destroyed) {}
+            bool CreateShaderInternal(jShader* shader, const jShaderInfo&) const override
+            { shader->CompiledShader = new PartialCompiled(Destroyed); return false; }
+        };
+        int destroyed = 0;
+        FailingCompiler backend(destroyed);
+        auto* previous = g_rhi;
+        g_rhi = &backend;
+        jShaderInfo info;
+        info.SetShaderFilepath(jNameStatic("expected-missing-include-regression.hlsl"));
+        jShader shader(info);
+        shader.Initialize();
+        g_rhi = previous;
+        expect(shader.GetCompiledShader() == nullptr && destroyed == 1,
+            "failed shader initialization destroys its partial native stage before pipeline publication");
+    }
+    {
+        std::unique_ptr<jPipelineStateInfo> prepared;
+        {
+            jPipelineStateFixedInfo setup;
+            setup.Viewports.emplace_back(0.f, 0.f, 320.f, 180.f);
+            setup.Scissors.emplace_back(0, 0, 320, 180);
+            jPipelineStateInfo temporary(&setup, jGraphicsPipelineShader{}, {}, nullptr, {});
+            prepared = std::make_unique<jPipelineStateInfo>(std::move(temporary));
+            setup.Viewports[0].Width = 17;
+            expect(prepared->PipelineStateFixed != &setup && prepared->FixedStateSnapshot &&
+                prepared->PipelineStateFixed->Viewports[0].Width == 320,
+                "cached graphics pipelines freeze their setup state before stack storage changes");
+        }
+        const jPipelineStateInfo copy(*prepared);
+        prepared.reset();
+        expect(copy.FixedStateSnapshot && copy.PipelineStateFixed->Viewports[0].Width == 320 &&
+            copy.PipelineStateFixed->Scissors[0].Extent.y == 180,
+            "prepared fixed raster state outlives both setup and the original command holder");
+    }
     expect(sizeof(RenderObjectUniformBuffer) == 192 && offsetof(RenderObjectUniformBuffer, BaseColorOpacity) == 144 &&
         offsetof(RenderObjectUniformBuffer, EmissiveOverride) == 160 && offsetof(RenderObjectUniformBuffer, SurfaceFlags) == 176 &&
         offsetof(RenderObjectUniformBuffer, IndexElementSize) == 184 && offsetof(RenderObjectUniformBuffer, SurfacePadding) == 188,
         "material and geometry UBO keeps its 192-byte layout with explicit index width");
+    expect(sizeof(ViewUniformBuffer) == 560 && offsetof(ViewUniformBuffer, ShadowFilterParams) == 352
+        && offsetof(ViewUniformBuffer, SHCoefficients) == 368
+        && offsetof(ViewUniformBuffer, MaterialViewDirection) == 544,
+        "shared view preserves existing offsets and adds aligned environment/material context");
+    expect(uint32(EMSAASamples::COUNT_2) == 2 && uint32(EMSAASamples::COUNT_4) == 4,
+        "MSAA counts match native sample-count flags and graphics argument values");
+    expect(sizeof(jMaterialGraphUniformBuffer) == 1232
+        && offsetof(jMaterialGraphUniformBuffer, OutputOverridesMask) == 1024
+        && offsetof(jMaterialGraphUniformBuffer, WaterWavesA) == 1040
+        && offsetof(jMaterialGraphUniformBuffer, WaterControl) == 1168
+        && offsetof(jMaterialGraphUniformBuffer, MaterialSubsurfaceColorWeight) == 1184
+        && offsetof(jMaterialGraphUniformBuffer, MaterialSubsurfaceParameters) == 1200
+        && offsetof(jMaterialGraphUniformBuffer, MaterialSkinParameters) == 1216,
+        "mapping, water, diffusion and skin preserve aligned material offsets");
+    jShadowFiltering::Settings filtering;
+    expect(jShadowFiltering::TryMakeSettings(1, 4.0f, filtering) &&
+        filtering.Method == jShadowFiltering::Mode::Poisson16 && filtering.RadiusTexels == 4.0f,
+        "shadow filtering accepts the bounded Poisson mode and texel radius");
+    const auto validFiltering = filtering;
+    bool invalidFilteringRejected = true;
+    for (int mode : {-1, 2})
+        invalidFilteringRejected &= !jShadowFiltering::TryMakeSettings(mode, 1.0f, filtering);
+    for (float radius : {-1.0f, 4.001f, std::numeric_limits<float>::infinity(),
+        std::numeric_limits<float>::quiet_NaN()})
+        invalidFilteringRejected &= !jShadowFiltering::TryMakeSettings(1, radius, filtering);
+    expect(invalidFilteringRejected && filtering.Method == validFiltering.Method &&
+        filtering.RadiusTexels == validFiltering.RadiusTexels,
+        "invalid and nonfinite shadow settings leave the last valid result unchanged");
+    expect(jShadowFiltering::TryMakeSettings(0, 0.0f, filtering) &&
+        filtering.Method == jShadowFiltering::Mode::Single && filtering.RadiusTexels == 0.0f,
+        "existing comparison sampling and zero-radius settings remain valid");
     TerrainProperties terrain;
     terrain.Resolution = 3; terrain.SizeX = 20; terrain.SizeZ = 10;
     Mesh mesh; std::string error;
@@ -83,12 +164,30 @@ int ExportEditorGraphicsShaderFixtures(const char* directory, bool vulkan)
         write("editor-gbuffer-vs", "#define PIXEL_SHADER 0\n#define COMPUTE_SHADER 0\n"
             "#define USE_ALBEDO_TEXTURE 1\n#define USE_VERTEX_BITANGENT 1\n#define USE_VERTEX_COLOR 0\n" +
             declarations + "\n#include \"gbuffer_vs.hlsl\"\n");
-        write("editor-forward", flags + "\n#include \"common.hlsl\"\n" + declarations +
-            jShaderParameterSet::GenerateHLSL<jDirectionalLightShaderParameters>(3) +
-            jShaderParameterSet::GenerateHLSL<jPointLightShaderParameters>(4) +
-            jShaderParameterSet::GenerateHLSL<jSpotLightShaderParameters>(5) + "\n#include \"shader_fs.hlsl\"\n");
+        write("editor-forward", flags + "\n#include \"common.hlsl\"\n" +
+            jShaderParameterSet::GenerateHLSL<jViewShaderParameters>(0) +
+            jShaderParameterSet::GenerateHLSL<jDirectionalLightShaderParameters>(1) +
+            jShaderParameterSet::GenerateHLSL<jPointLightShaderParameters>(2) +
+            jShaderParameterSet::GenerateHLSL<jSpotLightShaderParameters>(3) +
+            jShaderParameterSet::GenerateHLSL<jRenderObjectShaderParameters>(4) +
+            jShaderParameterSet::GenerateHLSL<jMaterialShaderParameters>(5) + "\n#include \"shader_fs.hlsl\"\n");
+        const std::string deferredFlags = flags + "#define USE_SHADOW_MAP 1\n#define USE_SUBPASS 0\n"
+            "#define USE_REVERSEZ 0\n";
+        const std::string deferredView = jShaderParameterSet::GenerateHLSL<jViewShaderParameters>(0);
+        const std::string sceneTextures = jShaderParameterSet::GenerateHLSL<jSceneTexturesShaderParameters>(3);
+        write("shadow-directional", deferredFlags + "#include \"common.hlsl\"\n" + deferredView +
+            jShaderParameterSet::GenerateHLSL<jDirectionalLightShaderParameters>(1) +
+            jShaderParameterSet::GenerateHLSL<jDirectionalLightIBLShaderParameters>(2) + sceneTextures +
+            "\n#include \"directionallight_fs.hlsl\"\n");
+        write("shadow-point", deferredFlags + "#include \"common.hlsl\"\n" + deferredView +
+            jShaderParameterSet::GenerateHLSL<jPointLightShaderParameters>(1) + sceneTextures +
+            "\n#include \"pointlight_fs.hlsl\"\n");
+        write("shadow-spot", deferredFlags + "#include \"common.hlsl\"\n" + deferredView +
+            jShaderParameterSet::GenerateHLSL<jSpotLightShaderParameters>(1) + sceneTextures +
+            "\n#include \"spotlight_fs.hlsl\"\n");
         const std::string shadowPrefix = "#define COMPUTE_SHADER 0\n#define PIXEL_SHADER 0\n#include \"common.hlsl\"\n" +
-            jShaderParameterSet::GenerateHLSL<jRenderObjectShaderParameters>(1);
+            jShaderParameterSet::GenerateHLSL<jRenderObjectShaderParameters>(1) +
+            jShaderParameterSet::GenerateHLSL<jMaterialShaderParameters>(2);
         write("editor-shadow-vs", shadowPrefix + jShaderParameterSet::GenerateHLSL<jDirectionalLightOnlyShaderParameters>(0) +
             "\n#include \"shadow_vs.hlsl\"\n");
         write("editor-shadow-instancing-vs", shadowPrefix + jShaderParameterSet::GenerateHLSL<jDirectionalLightOnlyShaderParameters>(0) +
@@ -105,6 +204,20 @@ int ExportEditorGraphicsShaderFixtures(const char* directory, bool vulkan)
         contract << "{\"RenderObjectUniformBuffer\":{\"size\":" << sizeof(RenderObjectUniformBuffer) << ",\"fields\":{";
         bool first = true;
         for (const auto& field : RenderObjectUniformBuffer::GetShaderUniformBufferFieldMembers())
+        {
+            if (!first) contract << ',';
+            first = false; contract << '"' << field.Name << "\":" << field.ByteOffset;
+        }
+        contract << "}},\"ViewUniformBuffer\":{\"size\":" << sizeof(ViewUniformBuffer) << ",\"fields\":{";
+        first = true;
+        for (const auto& field : ViewUniformBuffer::GetShaderUniformBufferFieldMembers())
+        {
+            if (!first) contract << ',';
+            first = false; contract << '"' << field.Name << "\":" << field.ByteOffset;
+        }
+        contract << "}},\"jMaterialGraphUniformBuffer\":{\"size\":" << sizeof(jMaterialGraphUniformBuffer) << ",\"fields\":{";
+        first = true;
+        for (const auto& field : jMaterialGraphUniformBuffer::GetShaderUniformBufferFieldMembers())
         {
             if (!first) contract << ',';
             first = false; contract << '"' << field.Name << "\":" << field.ByteOffset;

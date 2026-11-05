@@ -10,6 +10,9 @@
 #include <thread>
 #include <utility>
 #include <vector>
+#include "Renderer/Features/jWaterSimulation.h"
+#include "Renderer/Features/jAdvancedShadowSettings.h"
+#include "Material/jMaterialMapping.h"
 
 // Authoring data has no runtime pointers and is edited only by its creating thread.
 // Angles are degrees; transforms use T * Rz * Ry * Rx * S, column vectors.
@@ -18,7 +21,7 @@ namespace jEditorAuthoring
 using EntityId = uint64_t;
 constexpr EntityId InvalidEntity = 0;
 
-enum class EntityKind { Empty, Cube, Sphere, Model, PointLight, SpotLight, DirectionalLight, Camera, ParticleEmitter, Terrain };
+enum class EntityKind { Empty, Cube, Sphere, Model, PointLight, SpotLight, DirectionalLight, Camera, ParticleEmitter, Terrain, Water };
 struct Vec3
 {
     float X = 0, Y = 0, Z = 0;
@@ -32,6 +35,9 @@ struct Transform
 struct MaterialGraphOverrides
 {
     bool BaseColor = false, BaseColorTexture = false, Metallic = false, Roughness = false, NormalTexture = false;
+    bool SubsurfaceWeight = false, SubsurfaceColor = false, SubsurfaceThickness = false, SubsurfaceProfile = false;
+    bool ShadingModel = false, SubsurfaceSpace = false;
+    bool SpecularWeight = false, DiffuseOcclusion = false, PreScatterWeight = false;
     bool operator==(const MaterialGraphOverrides&) const = default;
 };
 struct MaterialProperties
@@ -41,6 +47,18 @@ struct MaterialProperties
     float Metallic = 0, Roughness = 0.5f, Opacity = 1;
     std::string BaseColorTexture, NormalTexture, GraphAsset;
     std::optional<MaterialGraphOverrides> GraphOverrides;
+    // Presence of the serialized subsurface block distinguishes an explicit
+    // zero weight from an older instance inheriting its imported surface.
+    bool SubsurfaceOverrideEnabled = false;
+    float SubsurfaceWeight = 0.f;
+    Vec3 SubsurfaceColor{1.f, 1.f, 1.f};
+    float SubsurfaceThicknessWorld = 1.f;
+    uint32_t SubsurfaceProfile = 0;
+    // Omitted legacy data inherits the imported/shared material skin settings.
+    bool SkinOverrideEnabled = false;
+    jMaterialMapping::ShadingModel ShadingModel = jMaterialMapping::ShadingModel::StandardPBR;
+    jMaterialMapping::SubsurfaceSpace SubsurfaceSpace = jMaterialMapping::SubsurfaceSpace::Screen;
+    float SpecularWeight = 1.f, DiffuseOcclusion = 1.f, PreScatterWeight = 1.f;
     bool operator==(const MaterialProperties&) const = default;
 };
 struct LightProperties
@@ -48,6 +66,8 @@ struct LightProperties
     Vec3 Color{1, 1, 1};
     float Intensity = 1, Range = 1000, InnerConeDegrees = 20, OuterConeDegrees = 35;
     bool CastShadows = true;
+    // Absent inherits project/global defaults; present replaces the whole set.
+    std::optional<jAdvancedShadows::Settings> ShadowOverride;
     bool operator==(const LightProperties&) const = default;
 };
 struct CameraProperties
@@ -85,6 +105,20 @@ struct TerrainProperties
     std::vector<float> Heights;
     bool operator==(const TerrainProperties&) const = default;
 };
+struct WaterProperties
+{
+    uint32_t Resolution = 33;
+    float SizeX = 1000, SizeZ = 1000;
+    // A calm four-wave pond preset, in the same world units as this surface.
+    // Runtime shaders currently support at most four waves; CPU queries use
+    // exactly this data and an explicit caller-owned time in seconds.
+    jWaterSimulation::Settings Waves{0.f, {
+        {{1.f, .25f}, 8.f, 400.f, 70.f, .25f, 0.f},
+        {{-.3f, 1.f}, 5.f, 230.f, 45.f, .25f, 1.2f},
+        {{.6f, -.8f}, 3.f, 140.f, 30.f, .2f, 2.4f},
+        {{-1.f, -.5f}, 2.f, 90.f, 20.f, .15f, .6f}}};
+    bool operator==(const WaterProperties&) const = default;
+};
 struct NavigationProperties
 {
     bool Enabled = false;
@@ -97,6 +131,9 @@ struct Entity
     EntityKind Kind = EntityKind::Empty;
     std::string Name = "Entity";
     bool Visible = true, Locked = false;
+    // Renderable objects only: absent inherits the source/prototype caster flag.
+    // This is independent of Light.CastShadows.
+    std::optional<bool> ShadowCaster;
     Transform Local{};
     // Project-relative, forward-slash paths. Empty means a procedural/no asset entity.
     std::string SourceAsset, AssetId;
@@ -108,6 +145,7 @@ struct Entity
     AnimationProperties Animation{};
     ParticleProperties Particles{};
     TerrainProperties Terrain{};
+    WaterProperties Water{};
     NavigationProperties Navigation{};
     bool operator==(const Entity&) const = default;
 };

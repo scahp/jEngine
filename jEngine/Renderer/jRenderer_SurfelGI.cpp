@@ -2490,7 +2490,7 @@ void jRenderer::SurfelGIResolvePass()
         , 1);
 }
 
-void jRenderer::ApplySurfelGI()
+bool jRenderer::ApplySurfelGI()
 {
     /*
      * Final shading step for SurfelGI.
@@ -2502,14 +2502,24 @@ void jRenderer::ApplySurfelGI()
      * We copy the current color target first to avoid read/write hazards while dispatching the
      * compute shader into ColorPtr.
      */
-    if (!gOptions.UseSurfelGI || !GSurfelGIFrameValid || !jSceneRenderTarget::SurfelGI_Resolve_RT)
-        return;
-    if (!RenderFrameContextPtr || !RenderFrameContextPtr->SceneRenderTargetPtr)
-        return;
+    const float intensity = gOptions.SurfelGIIntensity;
+    if (!gOptions.UseSurfelGI || !GSurfelGIFrameValid || !jSceneRenderTarget::SurfelGI_Resolve_RT ||
+        !std::isfinite(intensity) || intensity <= 0.0f)
+        return false;
+    if (!RenderFrameContextPtr || !RenderFrameContextPtr->SceneRenderTargetPtr || RenderFrameContextPtr->UseForwardRenderer)
+        return false;
+
+    const auto& scene = RenderFrameContextPtr->SceneRenderTargetPtr;
+    if (!scene->ColorPtr || !scene->ColorPtr->GetTexture() ||
+        !scene->GetGBuffer(EGBufferType::ALBEDO) || !scene->GetGBuffer(EGBufferType::ALBEDO)->GetTexture() ||
+        !jSceneRenderTarget::SurfelGI_Resolve_RT->GetTexture())
+        return false;
 
     const int32 ColorWidth = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->Info.Width;
     const int32 ColorHeight = RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->Info.Height;
+    if (ColorWidth <= 0 || ColorHeight <= 0) return false;
     auto TempColorRT = jRenderTargetPool::GetRenderTargetForOneFrame(RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->Info);
+    if (!TempColorRT || !TempColorRT->GetTexture()) return false;
     jRHIUtil::DrawQuad(RenderFrameContextPtr, TempColorRT, { 0, 0, ColorWidth, ColorHeight },
         [&](const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr, jShaderBindingArray& InOutShaderBindingArray, jShaderBindingResourceInlineAllocator& InOutResourceInlineAllactor)
         {
@@ -2533,11 +2543,12 @@ void jRenderer::ApplySurfelGI()
         });
 
     jApplySurfelGIUniformBuffer ApplyUniformData;
-    ApplyUniformData.SurfelGIIntensity = Max(0.0f, gOptions.SurfelGIIntensity);
+    ApplyUniformData.SurfelGIIntensity = intensity;
     ApplyUniformData.SceneWidth = ColorWidth;
     ApplyUniformData.SceneHeight = ColorHeight;
 
     auto ApplyUniformBuffer = g_rhi->CreateUniformBufferBlock(jNameStatic("ApplySurfelGIUniformBuffer"), jLifeTimeType::OneFrame, sizeof(ApplyUniformData));
+    if (!ApplyUniformBuffer) return false;
     ApplyUniformBuffer->UpdateBufferData(&ApplyUniformData, sizeof(ApplyUniformData));
 
     DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "ApplySurfelGI", Vector4(0.95f, 0.55f, 0.2f, 1.0f));
@@ -2564,6 +2575,7 @@ void jRenderer::ApplySurfelGI()
         , jNameStatic("ApplySurfelGI_CS")
         , jNameStatic("Resource/Shaders/hlsl/ApplySurfelGI_cs.hlsl")
         , Parameters, NumGroupsX, NumGroupsY, 1);
+    return true;
 }
 
 #ifdef __APPLE__

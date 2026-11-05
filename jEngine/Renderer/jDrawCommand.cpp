@@ -115,6 +115,8 @@ void jDrawCommand::PrepareToDraw(bool InIsPositionOnly)
     // Create Pipeline
     CurrentPipelineStateInfo = (jPipelineStateInfo*)g_rhi->CreatePipelineStateInfo(PipelineStateFixed, Shader
         , VertexBufferArray, RenderPass, ShaderBindingGroup.GetLayoutArray(), PushConstant, SubpassIndex);
+    if (CurrentPipelineStateInfo)
+        PipelineStateFixed = CurrentPipelineStateInfo->PipelineStateFixed;
 
     IsPositionOnly = InIsPositionOnly;
 }
@@ -159,5 +161,9 @@ void jDrawCommand::Draw() const
     const auto& RenderObjectGeoDataPtr = RenderObject->GeometryDataPtr;
     const jVertexBuffer* InstanceData = OverrideInstanceData ? OverrideInstanceData : RenderObjectGeoDataPtr->VertexBuffer_InstanceDataPtr.get();
     const int32 InstanceCount = InstanceData ? InstanceData->GetElementCount() : 1;
-    RenderObject->Draw(RenderFrameContextPtr, InstanceCount);
+    if (IndirectArgumentsOverride)
+        g_rhi->DrawElementsIndirect(RenderFrameContextPtr, RenderObject->GetPrimitiveType(),
+            IndirectArgumentsOverride.get(), IndirectArgumentIndex, 1);
+    else
+        RenderObject->Draw(RenderFrameContextPtr, InstanceCount);
 }

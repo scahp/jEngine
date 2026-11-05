@@ -9,6 +9,7 @@ enum class EGBufferType : uint8
     ALBEDO = 1,
     VELOCITY = 2,
     EMISSIVE = 3,
+    MATERIAL_VISIBILITY = 4,
     MAX,
 };
 
@@ -42,13 +43,24 @@ struct jSceneRenderTarget : public std::enable_shared_from_this<jSceneRenderTarg
 
     static std::shared_ptr<jRenderTarget> AtmosphericShadow_RT;
     static std::shared_ptr<jRenderTarget> VBuffer_RT;
+    static std::shared_ptr<jRenderTarget> HitObject_RT;
 
     std::shared_ptr<jRenderTarget> ColorPtr;
     std::shared_ptr<jRenderTarget> DepthPtr;
     std::shared_ptr<jRenderTarget> LinearDepthPtr;
     std::shared_ptr<jRenderTarget> ResolvePtr;
+    bool UseSubpass = false;
+    bool HasSkinMaterials = false;
+    bool HasTextureSubsurfaceMaterials = false;
+    std::shared_ptr<jRenderTarget> SkinUV;
+    std::vector<std::shared_ptr<jRenderTarget>> SkinIntermediateTargets;
+    std::shared_ptr<jRenderTarget> SubsurfaceMask;
+    std::shared_ptr<jRenderTarget> DiffuseLighting;
+    // Keep original MRTs alive after the HDR/metadata resolve publishes the
+    // single-sample scene consumed by existing post and editor passes.
+    std::vector<std::shared_ptr<jRenderTarget>> MultisampleTargets;
     
-    std::shared_ptr<jRenderTarget> GBuffer[4];
+    std::shared_ptr<jRenderTarget> GBuffer[5];
 
     const std::shared_ptr<jRenderTarget>& GetGBuffer(EGBufferType InType)
     {

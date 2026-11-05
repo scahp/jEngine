@@ -430,7 +430,8 @@ void jRenderer_PathTracing::PathTracing()
                 fallback.normalmapTexID = fallback.emissionmapTexID = -1; fallback.opacity = 1.0f;
                 const auto& material = *RObj->MaterialPtr;
                 const auto& payload = material.MaterialDataPtr;
-                if (payload && payload->GetDataSizeInBytes() == sizeof(MaterialUniformBuffer))
+                const bool hasLegacyPayload = payload && payload->GetDataSizeInBytes() == sizeof(MaterialUniformBuffer);
+                if (hasLegacyPayload)
                     std::memcpy(&fallback, payload->GetData(), sizeof(MaterialUniformBuffer));
                 fallback.padding2 = 0.f;
                 if (const auto& surface = material.Surface)
@@ -457,6 +458,27 @@ void jRenderer_PathTracing::PathTracing()
                     fallback.metallicRoughnessTexID = textureIndex(material, Slot::Metallic);
                     fallback.emissionmapTexID = textureIndex(material, Slot::Emission);
                     fallback.padding2 = surface->LegacyPackedMap ? 2.f : 1.f;
+                }
+                else if (!hasLegacyPayload)
+                {
+                    using Slot = jMaterial::EMaterialTextureType;
+                    fallback.baseColor = material.UseMaterialProperties ? Vector(material.BaseColorOpacity) : Vector(1.f);
+                    fallback.opacity = material.UseMaterialProperties ? material.BaseColorOpacity.w : 1.f;
+                    fallback.emission = material.UseMaterialProperties ? material.Emissive : Vector(0.f);
+                    fallback.baseColorTexId = textureIndex(material, Slot::Albedo);
+                    fallback.normalmapTexID = textureIndex(material, Slot::Normal);
+                    fallback.metallicRoughnessTexID = textureIndex(material, Slot::Metallic);
+                    fallback.emissionmapTexID = textureIndex(material, Slot::Emission);
+                    // Native raster imports read metallic B / roughness G directly;
+                    // runtime factors override them, while untextured slots use gOptions.
+                    const bool hasPackedMap = fallback.metallicRoughnessTexID >= 0;
+                    fallback.metallic = material.UseMaterialProperties ? material.MetallicFactor
+                        : (hasPackedMap ? 1.f : gOptions.Metallic);
+                    fallback.roughness = material.UseMaterialProperties ? material.RoughnessFactor
+                        : (hasPackedMap ? 1.f : gOptions.Roughness);
+                    fallback.alphaMode = material.IsRaytracingAlphaTestEnabled() ? 1.f : 2.f;
+                    fallback.alphaCutoff = material.RaytracingAlphaCutoff;
+                    fallback.padding2 = 1.f;
                 }
                 auto MaterialUniformParametersPtr = g_rhi->CreateUniformBufferBlock(jNameStatic("jMaterialUniformBuffer"), jLifeTimeType::OneFrame, sizeof(MaterialUniformBuffer));
                 MaterialUniformParametersPtr->UpdateBufferData(&fallback, sizeof(MaterialUniformBuffer));

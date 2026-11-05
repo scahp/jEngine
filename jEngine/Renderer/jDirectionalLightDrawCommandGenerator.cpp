@@ -1,9 +1,10 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jDirectionalLightDrawCommandGenerator.h"
 #include "jPrimitiveUtil.h"
 #include "jOptions.h"
 #include "Scene/jRenderObject.h"
 #include "Shader/jLightingShaderParameters.h"
+#include "Shader/jSkinShadingShaderParameters.h"
 #include "jSceneRenderTargets.h"
 
 jObject* jDirectionalLightDrawCommandGenerator::GlobalFullscreenPrimitive = nullptr;
@@ -49,9 +50,12 @@ void jDirectionalLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* Ou
     , const jView* InView, const jViewLight& InLightView, jRenderPass* InRenderPass, int32 InSubpassIndex)
 {
     jShaderDirectionalLightPixelShader::ShaderPermutation ShaderPermutation;
-    ShaderPermutation.SetIndex<jShaderDirectionalLightPixelShader::USE_SUBPASS>(gOptions.UseSubpass);
+    ShaderPermutation.SetIndex<jShaderDirectionalLightPixelShader::USE_SUBPASS>(InRenderFrameContextPtr->UseSubpass);
     ShaderPermutation.SetIndex<jShaderDirectionalLightPixelShader::USE_SHADOW_MAP>(InLightView.ShadowMapPtr ? 1 : 0);
     ShaderPermutation.SetIndex<jShaderDirectionalLightPixelShader::USE_PBR>(ENABLE_PBR);
+    ShaderPermutation.SetIndex<jShaderDirectionalLightPixelShader::USE_MSAA>(g_rhi->GetSelectedMSAASamples() != EMSAASamples::COUNT_1);
+    ShaderPermutation.SetIndex<jShaderDirectionalLightPixelShader::USE_SUBSURFACE>(InRenderFrameContextPtr->UseSubsurface);
+    ShaderPermutation.SetIndex<jShaderDirectionalLightPixelShader::USE_SKIN_MATERIAL>(InRenderFrameContextPtr->HasSkinMaterials);
     Shader.PixelShader = jShaderDirectionalLightPixelShader::CreateShader(ShaderPermutation);
 
     jShaderBindingInstanceGroup LightShaderBindingGroup = ShaderBindingGroup;
@@ -67,8 +71,17 @@ void jDirectionalLightDrawCommandGenerator::GenerateDrawCommand(jDrawCommand* Ou
     temp = jShaderParameterSet::CreateShaderBindingInstance(Parameters, EShaderAccessStageFlag::FRAGMENT, jShaderBindingInstanceType::SingleFrame);
     LightShaderBindingGroup.Add(temp);
 
-    SceneTextureShaderBindingInstance = InRenderFrameContextPtr->SceneRenderTargetPtr->PrepareGBufferShaderBindingInstance(gOptions.UseSubpass);
+    SceneTextureShaderBindingInstance = InRenderFrameContextPtr->SceneRenderTargetPtr->PrepareGBufferShaderBindingInstance(InRenderFrameContextPtr->UseSubpass);
     LightShaderBindingGroup.Add(SceneTextureShaderBindingInstance);
+    if (InRenderFrameContextPtr->HasSkinMaterials)
+    {
+        jSkinEnergyShaderParameters skin;
+        skin.SkinEnergyLUT = { InRenderFrameContextPtr->SkinEnergyLUT ? InRenderFrameContextPtr->SkinEnergyLUT.get() : GBlackTexture.get(),
+            TSamplerStateInfo<ETextureFilter::NEAREST, ETextureFilter::NEAREST,
+                ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE, ETextureAddressMode::CLAMP_TO_EDGE>::Create() };
+        LightShaderBindingGroup.Add(jShaderParameterSet::CreateShaderBindingInstance(skin,
+            EShaderAccessStageFlag::FRAGMENT, jShaderBindingInstanceType::SingleFrame));
+    }
 
     check(OutDestDrawCommand);
     new (OutDestDrawCommand) jDrawCommand(InRenderFrameContextPtr, &InLightView, GlobalFullscreenPrimitive->RenderObjects[0], InRenderPass

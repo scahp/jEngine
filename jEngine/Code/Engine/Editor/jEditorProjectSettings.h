@@ -4,6 +4,10 @@
 #include <filesystem>
 #include <span>
 #include <string>
+#include <optional>
+#include "Renderer/Features/jSceneFeatureSettings.h"
+#include "Renderer/Features/jAdvancedShadowSettings.h"
+#include "Renderer/Features/jTextureSubsurfaceSettings.h"
 
 class jEditor;
 class jEditorProject;
@@ -16,8 +20,11 @@ namespace jEditorProjectSettings
 {
 // Known settings: render.deferred, render.surfelgi, render.surfelgi.inline,
 // render.ssgi, render.bloom, render.vsync (true/false); render.surfelgi.intensity
-// (0..8), render.surfelgi.inline.rays (1..16); input.camera.forward/back/left/
+// (0..8), render.surfelgi.inline.rays (1..16); render.shadow.filter (0=existing,
+// 1=Poisson PCF), render.shadow.radiusTexels (finite 0..4); input.camera.forward/back/left/
 // right/up/down (portable single key names). Unknown setting entries are preserved.
+// Scene features use render.environment.*, render.ppr.* and render.atmosphere.*;
+// the codecs below share their strict scalar/vector/path validation.
 bool Validate(const jEditorProjectConfig& config, std::string& error,
     const std::filesystem::path& projectRoot = {});
 bool Validate(const jEditorProject& project, std::string& error);
@@ -27,6 +34,26 @@ bool Apply(const jEditorProject& project, jEditor& editor, std::string& error);
 // Unknown settings from the current project survive candidate omission.
 bool Save(jEditorProject& project, jEditor& editor, const jEditorProjectConfig& candidate,
     std::string& error);
+// Shared scene-feature codecs. Read validates paths/loads only the bounded .jsh
+// coefficient asset when a root is supplied; raw HDR projection is never here.
+// Both functions are transactional and preserve unrelated settings.
+bool ReadSceneFeatures(const jEditorProjectConfig& config, const std::filesystem::path& projectRoot,
+    jSceneFeatures::Settings& output, std::string& shAsset, std::string& error);
+bool WriteSceneFeatures(jEditorProjectConfig& config, const jSceneFeatures::Settings& input,
+    const std::string& shAsset, std::string& error);
+// Missing advanced-shadow keys use engine defaults. Strict parsing and writes
+// are transactional; unrelated project settings survive unchanged.
+bool ReadAdvancedShadows(const jEditorProjectConfig& config, jAdvancedShadows::Settings& output, std::string& error);
+bool WriteAdvancedShadows(jEditorProjectConfig& config, const jAdvancedShadows::Settings& input, std::string& error);
+// Optional project defaults, including explicit world-units/mm conversion.
+// Missing keys use engine defaults; validation/failure preserves the output.
+bool ReadTextureSubsurface(const jEditorProjectConfig& config, jTextureSubsurface::Settings& output, std::string& error);
+bool WriteTextureSubsurface(jEditorProjectConfig& config, const jTextureSubsurface::Settings& input, std::string& error);
+// Owner-thread ImGui controls only; callers own document/history/save/publish.
+// No kind means independent global defaults. A per-light edit rejects illegal
+// combinations; global controls explain any incompatible effective light type.
+bool RenderAdvancedShadowControls(jAdvancedShadows::Settings& settings, std::string& error,
+    std::optional<jAdvancedShadows::LightKind> kind = std::nullopt);
 void SetVisible(bool visible);
 bool IsVisible();
 void Render(jEditor& editor, jEditorProject* project);

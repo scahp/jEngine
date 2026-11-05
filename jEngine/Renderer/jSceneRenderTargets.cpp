@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "jSceneRenderTargets.h"
+#include "jAdvancedShadowPass.h"
 #include "jBloomDimensions.h"
 #include "RHI/jRenderTargetPool.h"
 #include "RHI/jSwapchain.h"
@@ -8,6 +9,15 @@
 #include "Scene/Light/jSpotLight.h"
 #include "Shader/jLightingShaderParameters.h"
 #include "jOptions.h"
+#include "jEngine.h"
+#include "jHiZOcclusionPass.h"
+#include "jSubsurfacePass.h"
+#include "jRasterFeatureDebug.h"
+#include "jSkinShading.h"
+#include "jTextureSubsurfacePass.h"
+#include "Scene/jObject.h"
+#include "Scene/jRenderObject.h"
+#include "Material/jMaterial.h"
 
 // 임시
 std::shared_ptr<jRenderTarget> jSceneRenderTarget::IrradianceMap;
@@ -30,6 +40,7 @@ std::shared_ptr<jRenderTarget> jSceneRenderTarget::SurfelGI_Attempt_RT;
 std::shared_ptr<jRenderTarget> jSceneRenderTarget::SurfelGI_Resolve_RT;
 std::shared_ptr<jRenderTarget> jSceneRenderTarget::AtmosphericShadow_RT;
 std::shared_ptr<jRenderTarget> jSceneRenderTarget::VBuffer_RT;
+std::shared_ptr<jRenderTarget> jSceneRenderTarget::HitObject_RT;
 
 // todo : remove this.
 #include "jPrimitiveUtil.h"
@@ -38,6 +49,44 @@ jFullscreenQuadPrimitive* jSceneRenderTarget::GlobalFullscreenPrimitive = nullpt
 
 void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::vector<jLight*>* InLights)
 {
+    auto& diagnostics = MutableRendererFeatureDiagnostics();
+    const bool raster = !g_Engine || !g_Engine->Game.IsUsingPathTracingRenderer();
+    const bool deferred = raster && gOptions.UseDeferredRenderer;
+    // Model selection is independent of the global diffusion switch. Turning
+    // scattering off must retain the same pore normals and skin BRDF.
+    HasSkinMaterials = false;
+    HasTextureSubsurfaceMaterials = false;
+    if (deferred)
+        for (const auto* object : jObject::GetStaticRenderObject())
+            if (object && object->MaterialPtr && object->MaterialPtr->Surface)
+            {
+                const auto& surface = *object->MaterialPtr->Surface;
+                HasSkinMaterials |= surface.ShadingModel == jSurfaceShadingModel::SkinKelemen;
+                HasTextureSubsurfaceMaterials |= surface.ShadingModel == jSurfaceShadingModel::SkinKelemen
+                    && surface.SubsurfaceSpace == jSubsurfaceSpace::Texture;
+            }
+    const uint32 requested = gOptions.RequestedMSAASamples;
+    const uint64 bytesPerPixel = 32u + (HasSkinMaterials ? 12u : 0u)
+        + (jSubsurface::HasEffect(gOptions.Subsurface) ? 16u + (HasTextureSubsurfaceMaterials ? 8u : 0u) : 0u);
+    const bool withinBudget = SCR_WIDTH > 0 && SCR_HEIGHT > 0 && SCR_WIDTH <= 8192 && SCR_HEIGHT <= 8192 &&
+        uint64(SCR_WIDTH) * uint64(SCR_HEIGHT) * bytesPerPixel * (uint64(requested) + 1u) <= 512ull * 1024ull * 1024ull;
+    const auto applied = g_rhi->SelectMSAASamples(deferred && withinBudget ? requested : 1);
+    diagnostics.AppliedMSAASamples = static_cast<int32>(applied);
+    diagnostics.MSAASupportReason = requested == 1 ? "Disabled (1 sample)." : !deferred
+        ? "Per-sample MSAA requires the Deferred renderer; using 1 sample."
+        : !withinBudget ? "The deferred MSAA attachment budget is 512 MiB; using 1 sample."
+        : static_cast<uint32>(applied) != requested
+        ? "The requested deferred attachment sample count is unsupported; using 1 sample."
+        : "Per-sample deferred lighting; HDR colours resolve after lighting.";
+    jSubsurface::Settings subsurface;
+    std::string validationError;
+    const bool subsurfaceActive = deferred && jSubsurface::ValidateSettings(gOptions.Subsurface, subsurface, validationError)
+        && jSubsurface::HasEffect(subsurface);
+    diagnostics.SubsurfaceSupportReason = !gOptions.Subsurface.Enabled ? "Disabled."
+        : !deferred ? "Screen-space diffusion requires the Deferred renderer."
+        : !validationError.empty() ? validationError : !subsurfaceActive ? "Zero diffusion strength or radius." : "Ready.";
+    UseSubpass = deferred && gOptions.UseSubpass && applied == EMSAASamples::COUNT_1 && !subsurfaceActive && !HasSkinMaterials;
+
     jRenderTargetInfo ColorRTInfo = {
         .Type = ETextureType::TEXTURE_2D,
         .Format = ETextureFormat::R11G11B10F,
@@ -47,7 +96,7 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
         .IsGenerateMipmap = false,
         .SampleCount = g_rhi->GetSelectedMSAASamples(),
         .RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
-        .TextureCreateFlag = ETextureCreateFlag::UAV,
+        .TextureCreateFlag = (applied == EMSAASamples::COUNT_1 ? ETextureCreateFlag::UAV : ETextureCreateFlag::NONE) | ETextureCreateFlag::TransferSrc,
         .ResourceName = jNameStatic("ColorPtr")
     };
     ColorPtr = jRenderTargetPool::GetRenderTarget(ColorRTInfo);
@@ -63,7 +112,7 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
             .Height = Height,
             .LayerCount = 1,
             .IsGenerateMipmap = false,
-            .SampleCount = g_rhi->GetSelectedMSAASamples(),
+            .SampleCount = EMSAASamples::COUNT_1,
             .RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
             .ResourceName = jNameStatic("BloomSetup")
         };
@@ -83,7 +132,7 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
                 .Height = Height,
                 .LayerCount = 1,
                 .IsGenerateMipmap = false,
-                .SampleCount = g_rhi->GetSelectedMSAASamples(),
+                .SampleCount = EMSAASamples::COUNT_1,
                 .RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
                 .ResourceName = jName(TempStr)
             };
@@ -104,7 +153,7 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
                 .Height = Height,
                 .LayerCount = 1,
                 .IsGenerateMipmap = false,
-                .SampleCount = g_rhi->GetSelectedMSAASamples(),
+                .SampleCount = EMSAASamples::COUNT_1,
                 .RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
                 .ResourceName = jName(TempStr)
             };
@@ -121,8 +170,8 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
         .LayerCount = 1,
         .IsGenerateMipmap = false,
         .SampleCount = g_rhi->GetSelectedMSAASamples(),
-        .IsUseAsSubpassInput = gOptions.UseSubpass,
-        .IsMemoryless = gOptions.UseMemoryless,
+        .IsUseAsSubpassInput = UseSubpass,
+        .IsMemoryless = gOptions.UseMemoryless && UseSubpass,
         .RTClearValue = jRTClearValue(1.0f, 0),
         .ResourceName = jNameStatic("DepthPtr")
     };
@@ -146,18 +195,12 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
         .Height = SCR_HEIGHT,
         .LayerCount = 1,
         .IsGenerateMipmap = false,
-        .SampleCount = g_rhi->GetSelectedMSAASamples(),
+        .SampleCount = EMSAASamples::COUNT_1,
         .RTClearValue = jRTClearValue(0.0f, 0),
         .TextureCreateFlag = ETextureCreateFlag::UAV,
         .ResourceName = jNameStatic("LinearDepthPtr")
     };
     LinearDepthPtr = jRenderTargetPool::GetRenderTarget(LinearDepthRTInfo);
-
-    if ((int32)g_rhi->GetSelectedMSAASamples() > 1)
-    {
-        check(InSwapchain);
-        ResolvePtr = jRenderTarget::CreateFromTexture(InSwapchain->TexturePtr);
-    }
 
     if (!FinalColorPtr)
     {
@@ -175,7 +218,7 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
             .Height = AtmosphericHeight,
             .LayerCount = 1,
             .IsGenerateMipmap = false,
-            .SampleCount = g_rhi->GetSelectedMSAASamples(),
+            .SampleCount = EMSAASamples::COUNT_1,
             .IsUseAsSubpassInput = false,
             .IsMemoryless = false,
             .RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
@@ -246,11 +289,18 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
     }
 
     wchar_t TempStr[256] = { 0, };
-    ETextureFormat GBufferTexFormat[_countof(GBuffer)] = { ETextureFormat::R11G11B10F, ETextureFormat::R11G11B10F, ETextureFormat::RGBA16F, ETextureFormat::R11G11B10F };
+    ETextureFormat GBufferTexFormat[_countof(GBuffer)] = { ETextureFormat::R11G11B10F, ETextureFormat::R11G11B10F, ETextureFormat::RGBA16F, ETextureFormat::R11G11B10F, ETextureFormat::RG16F };
+    if (HasSkinMaterials)
+    {
+        GBufferTexFormat[0] = ETextureFormat::RGBA16F;
+        GBufferTexFormat[1] = ETextureFormat::RGBA16F;
+        GBufferTexFormat[4] = ETextureFormat::RGBA16F;
+    }
     for (int32 i = 0; i < _countof(GBuffer); ++i)
     {
-        const bool UseAsSubpassInput = gOptions.UseSubpass;
-        const bool IsMemoryless = gOptions.UseMemoryless && gOptions.UseSubpass && i != int32(EGBufferType::EMISSIVE);
+        const bool UseAsSubpassInput = UseSubpass;
+        const bool IsMemoryless = gOptions.UseMemoryless && UseSubpass
+            && i != int32(EGBufferType::EMISSIVE) && i != 4;
 
         wsprintf(TempStr, TEXT("GBuffer[%d]"), i);
         jRenderTargetInfo Info = {
@@ -263,16 +313,36 @@ void jSceneRenderTarget::Create(const jSwapchainImage* InSwapchain, const std::v
             .SampleCount = g_rhi->GetSelectedMSAASamples(),
             .IsUseAsSubpassInput = UseAsSubpassInput,
             .IsMemoryless = IsMemoryless,
-            .RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
+            .RTClearValue = i == 4 ? jRTClearValue(1.0f, 1.0f, 0.0f, 0.0f) : jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f),
             .TextureCreateFlag = ETextureCreateFlag::NONE,
             .ResourceName = jName(TempStr)
         };
         GBuffer[i] = jRenderTargetPool::GetRenderTarget(Info);
     }
+    if (subsurfaceActive)
+    {
+        jRenderTargetInfo info = {.Type = ETextureType::TEXTURE_2D, .Format = ETextureFormat::RGBA16F,
+            .Width = SCR_WIDTH, .Height = SCR_HEIGHT, .SampleCount = applied,
+            .RTClearValue = jRTClearValue(0.f, 0.f, 0.f, 0.f), .TextureCreateFlag = ETextureCreateFlag::TransferSrc,
+            .ResourceName = jNameStatic("SubsurfaceMaterialMask")};
+        SubsurfaceMask = jRenderTargetPool::GetRenderTarget(info);
+        info.ResourceName = jNameStatic("SubsurfaceDiffuseLighting");
+        DiffuseLighting = jRenderTargetPool::GetRenderTarget(info);
+        if (HasTextureSubsurfaceMaterials)
+        {
+            info.ResourceName = jNameStatic("SkinSurfaceUVAndIdentity");
+            SkinUV = jRenderTargetPool::GetRenderTarget(info);
+        }
+    }
 }
 
 void jSceneRenderTarget::Return()
 {
+    if (SubsurfaceMask) SubsurfaceMask->Return();
+    if (DiffuseLighting) DiffuseLighting->Return();
+    if (SkinUV) SkinUV->Return();
+    for (auto& target : SkinIntermediateTargets) if (target) target->Return();
+    for (auto& target : MultisampleTargets) if (target) target->Return();
     if (ColorPtr)
         ColorPtr->Return();
     if (DepthPtr)
@@ -319,6 +389,12 @@ void jSceneRenderTarget::Return()
 
 void jSceneRenderTarget::ReleasePersistentResources()
 {
+    jAdvancedShadows::ReleaseResources();
+    jHiZOcclusion::ReleaseResources();
+    jSubsurface::ReleaseResources();
+    jSkinShading::ReleaseResources();
+    jTextureSubsurface::ReleaseResources();
+    jRasterFeatureDebug::ReleaseResources();
     auto ReturnAndResetRenderTarget = [](std::shared_ptr<jRenderTarget>& InOutRenderTarget)
     {
         if (InOutRenderTarget)
@@ -345,6 +421,7 @@ void jSceneRenderTarget::ReleasePersistentResources()
     ReturnAndResetRenderTarget(SurfelGI_Resolve_RT);
     ReturnAndResetRenderTarget(AtmosphericShadow_RT);
     ReturnAndResetRenderTarget(VBuffer_RT);
+    ReturnAndResetRenderTarget(HitObject_RT);
 }
 
 std::shared_ptr<jRenderTarget> jSceneRenderTarget::GetShadowMap(const jLight* InLight) const
@@ -366,8 +443,17 @@ std::shared_ptr<jShaderBindingInstance> jSceneRenderTarget::PrepareGBufferShader
         Parameters.GBuffer1 = { GBuffer[1]->GetTexture() };
         Parameters.GBuffer2 = { GBuffer[2]->GetTexture() };
         Parameters.GBuffer3 = { GBuffer[3]->GetTexture() };
+        Parameters.GBuffer4 = { GBuffer[4]->GetTexture() };
         Parameters.DepthTexture = { DepthPtr->GetTexture() };
         return jShaderParameterSet::CreateShaderBindingInstance(Parameters, EShaderAccessStageFlag::FRAGMENT, jShaderBindingInstanceType::SingleFrame);
+    }
+    else if (GBuffer[0]->Info.SampleCount != EMSAASamples::COUNT_1)
+    {
+        jSceneMultisampleTexturesShaderParameters p;
+        p.GBuffer0 = {GBuffer[0]->GetTexture()}; p.GBuffer1 = {GBuffer[1]->GetTexture()};
+        p.GBuffer2 = {GBuffer[2]->GetTexture()}; p.GBuffer3 = {GBuffer[3]->GetTexture()};
+        p.GBuffer4 = {GBuffer[4]->GetTexture()}; p.DepthTexture = {DepthPtr->GetTexture()};
+        return jShaderParameterSet::CreateShaderBindingInstance(p, EShaderAccessStageFlag::FRAGMENT, jShaderBindingInstanceType::SingleFrame);
     }
     else
     {
@@ -379,6 +465,7 @@ std::shared_ptr<jShaderBindingInstance> jSceneRenderTarget::PrepareGBufferShader
         Parameters.GBuffer1 = { GBuffer[1]->GetTexture(), GBufferSamplerStateInfo };
         Parameters.GBuffer2 = { GBuffer[2]->GetTexture(), GBufferSamplerStateInfo };
         Parameters.GBuffer3 = { GBuffer[3]->GetTexture(), GBufferSamplerStateInfo };
+        Parameters.GBuffer4 = { GBuffer[4]->GetTexture(), GBufferSamplerStateInfo };
         Parameters.DepthTexture = { DepthPtr->GetTexture(), GBufferSamplerStateInfo };
         return jShaderParameterSet::CreateShaderBindingInstance(Parameters, EShaderAccessStageFlag::ALL_GRAPHICS, jShaderBindingInstanceType::SingleFrame);
     }

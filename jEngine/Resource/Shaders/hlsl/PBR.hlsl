@@ -4,6 +4,18 @@
 #include "Sphericalmap.hlsl"
 #include "BRDF.hlsl"
 
+// Exact diffuse term of PBR(), isolated for surface diffusion. Specular is
+// retained in the original total and never sent through the diffusion filter.
+float3 PBRDiffuse(float3 L, float3 N, float3 V, float3 albedo, float3 lightColor,
+    float distanceToLight, float metallic)
+{
+    const float3 F0 = lerp(float3(0.04, 0.04, 0.04), albedo, metallic);
+    const float3 H = normalize(V + L);
+    const float3 F = FresnelSchlick(max(dot(H, V), 0.0), F0);
+    return (1.0 - F) * (1.0 - metallic) * albedo / PI * lightColor *
+        max(dot(N, L), 0.0) / (distanceToLight * distanceToLight);
+}
+
 float3 PBR(float3 InL, float3 InN, float3 InV, float3 InAlbedo, float3 InLightColor, float InDistToLight, float InMetallic, float InRoughness)
 {
     float3 F0 = float3(0.04f, 0.04f, 0.04f);

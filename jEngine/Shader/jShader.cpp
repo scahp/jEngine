@@ -1,9 +1,10 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "jShader.h"
 #include "FileLoader/jFile.h"
 #include "Shader/jAOShaderParameters.h"
 #include "Shader/jCommonShaderParameters.h"
 #include "Shader/jLightingShaderParameters.h"
+#include "Shader/jSkinShadingShaderParameters.h"
 
 IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderFullscreenQuadVertexShader
     , "DrawQuadVS"
@@ -244,31 +245,50 @@ bool jShader::UpdateShader()
 
 void jShader::Initialize()
 {
-	verify(g_rhi->CreateShaderInternal(this, ShaderInfo));
+    if (!g_rhi->CreateShaderInternal(this, ShaderInfo))
+    {
+        // Backends may allocate a compiled holder before opening all includes.
+        // Do not publish that holder with a zero native shader stage.
+        delete CompiledShader;
+        CompiledShader = nullptr;
+        std::cerr << "Shader creation failed: " << ShaderInfo.GetShaderFilepath().ToStr() << '\n';
+    }
 }
 
 void jShaderDirectionalLightPixelShader::AppendConditionalShaderParameterSets(jShaderParameterBinder& InOutBinder, const ShaderPermutation& InPermutation)
 {
-    if (InPermutation.Get<jShaderDirectionalLightPixelShader::USE_SUBPASS>() == 0)
+    if (InPermutation.Get<jShaderDirectionalLightPixelShader::USE_MSAA>() != 0)
+        InOutBinder.Add<jSceneMultisampleTexturesShaderParameters>();
+    else if (InPermutation.Get<jShaderDirectionalLightPixelShader::USE_SUBPASS>() == 0)
         InOutBinder.Add<jSceneTexturesShaderParameters>();
     else
         InOutBinder.Add<jSceneSubpassInputShaderParameters>();
+    if (InPermutation.Get<jShaderDirectionalLightPixelShader::USE_SKIN_MATERIAL>() != 0)
+        InOutBinder.Add<jSkinEnergyShaderParameters>();
 }
 
 void jShaderPointLightPixelShader::AppendConditionalShaderParameterSets(jShaderParameterBinder& InOutBinder, const ShaderPermutation& InPermutation)
 {
-    if (InPermutation.Get<jShaderPointLightPixelShader::USE_SUBPASS>() == 0)
+    if (InPermutation.Get<jShaderPointLightPixelShader::USE_MSAA>() != 0)
+        InOutBinder.Add<jSceneMultisampleTexturesShaderParameters>();
+    else if (InPermutation.Get<jShaderPointLightPixelShader::USE_SUBPASS>() == 0)
         InOutBinder.Add<jSceneTexturesShaderParameters>();
     else
         InOutBinder.Add<jSceneSubpassInputShaderParameters>();
+    if (InPermutation.Get<jShaderPointLightPixelShader::USE_SKIN_MATERIAL>() != 0)
+        InOutBinder.Add<jSkinEnergyShaderParameters>();
 }
 
 void jShaderSpotLightPixelShader::AppendConditionalShaderParameterSets(jShaderParameterBinder& InOutBinder, const ShaderPermutation& InPermutation)
 {
-    if (InPermutation.Get<jShaderSpotLightPixelShader::USE_SUBPASS>() == 0)
+    if (InPermutation.Get<jShaderSpotLightPixelShader::USE_MSAA>() != 0)
+        InOutBinder.Add<jSceneMultisampleTexturesShaderParameters>();
+    else if (InPermutation.Get<jShaderSpotLightPixelShader::USE_SUBPASS>() == 0)
         InOutBinder.Add<jSceneTexturesShaderParameters>();
     else
         InOutBinder.Add<jSceneSubpassInputShaderParameters>();
+    if (InPermutation.Get<jShaderSpotLightPixelShader::USE_SKIN_MATERIAL>() != 0)
+        InOutBinder.Add<jSkinEnergyShaderParameters>();
 }
 
 //////////////////////////////////////////////////////////////////////////

@@ -2,6 +2,8 @@
 #include "Math/Vector.h"
 #include "Scene/jCamera.h"
 #include <functional>
+#include <optional>
+#include "Renderer/Features/jAdvancedShadowSettings.h"
 
 enum class ELightType
 {
@@ -138,6 +140,9 @@ public:
 
 	FORCEINLINE ELightType GetLightType() const { return Type; }
 
+    const std::optional<jAdvancedShadows::Settings>& GetShadowOverride() const { return ShadowOverride; }
+    void SetShadowOverride(const std::optional<jAdvancedShadows::Settings>& settings) { ShadowOverride = settings; }
+
 	const ELightType Type = ELightType::MAX;
 	bool IsShadowCaster = true;
 	jObject* LightDebugObject = nullptr;
@@ -148,6 +153,9 @@ public:
 	}
 
 	PRE_UPDATE_LAMBDA PreUpdateLambda = nullptr;
+
+private:
+    std::optional<jAdvancedShadows::Settings> ShadowOverride;
 };
 
 class jAmbientLight : public jLight

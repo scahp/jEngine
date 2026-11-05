@@ -1,0 +1,107 @@
+{
+  "baseColor": 4,
+  "format": "jEngineMaterial",
+  "horizon": 0,
+  "metallic": 0,
+  "nodes": [
+    {
+      "a": 0,
+      "b": 0,
+      "c": 0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "d": 0,
+      "id": 1,
+      "kind": 5,
+      "parameters": [
+        1.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "semantic": 0,
+      "texture": "",
+      "value": 1.0,
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "a": 0,
+      "b": 0,
+      "c": 0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "d": 0,
+      "id": 2,
+      "kind": 6,
+      "parameters": [
+        1.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "semantic": 1,
+      "texture": "Assets/room.png",
+      "value": 1.0,
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "a": 0,
+      "b": 0,
+      "c": 0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "d": 0,
+      "id": 3,
+      "kind": 6,
+      "parameters": [
+        1.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "semantic": 0,
+      "texture": "Assets/height.png",
+      "value": 1.0,
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "a": 1,
+      "b": 2,
+      "c": 0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "d": 0,
+      "id": 4,
+      "kind": 13,
+      "parameters": [
+        3.0,
+        3.0,
+        1.2000000476837158,
+        1.0
+      ],
+      "semantic": 0,
+      "texture": "",
+      "value": 1.0,
+      "x": 0.0,
+      "y": 0.0
+    }
+  ],
+  "normal": 0,
+  "roughness": 0,
+  "version": 2
+}

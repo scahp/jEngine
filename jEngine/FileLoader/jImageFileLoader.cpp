@@ -249,7 +249,8 @@ std::shared_ptr<jTexture> jImageFileLoader::UploadImageData(const jImageData* im
         desc.Height = imageData->Height;
         desc.DepthOrArraySize = static_cast<uint16>(imageData->LayerCount);
         desc.MipLevels = static_cast<uint16>(imageData->MipLevel);
-        desc.Format = static_cast<DXGI_FORMAT>(source.SubresourceFootprints[0].Format);
+        const auto sourceFormat = static_cast<DXGI_FORMAT>(source.SubresourceFootprints[0].Format);
+        desc.Format = sourceFormat == DXGI_FORMAT_UNKNOWN ? GetDX12TextureFormat(imageData->Format) : sourceFormat;
         desc.SampleDesc.Count = 1;
         uint64 size = 0;
         g_rhi_dx12->Device->GetCopyableFootprints(&desc, 0, count, 0,

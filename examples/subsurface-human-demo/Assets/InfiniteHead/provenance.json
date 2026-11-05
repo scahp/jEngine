@@ -1,0 +1,44 @@
+{
+  "sourceRepository": "scahp/Shadows",
+  "sourceCommit": "51249d3d4d9ea1c3320741077aaa5335b28c3418",
+  "asset": "Infinite 3D Head Scan",
+  "author": "Lee Perry-Smith / Infinite-Realities",
+  "license": "CC BY 3.0 Unported (head scan and its diffuse, normal and specular/AO maps); separate from engine MIT",
+  "licenseURL": "https://creativecommons.org/licenses/by/3.0/",
+  "originalSource": "http://www.ir-ltd.net/infinite-3d-head-scan-released",
+  "publishedAttribution": "https://renderman.pixar.com/photorealistic-head",
+  "files": {
+    "Infinite-Level_02.OBJ": {
+      "bytes": 1383204,
+      "sha256": "6a250caf0a10ec72ff3e175fe9d56e32dbbae00d525ea2cba38aa465583171d3",
+      "source": "https://github.com/scahp/Shadows/blob/51249d3d4d9ea1c3320741077aaa5335b28c3418/Shadows/SkinData/Infinite-Level_02.OBJ",
+      "modified": false
+    },
+    "Infinite-Level_02.jpg": {
+      "bytes": 8975275,
+      "sha256": "4fc7297835e2081cb914d1a8507fc837687102eed7bd3c6bed25b72960a09e08",
+      "source": "https://github.com/scahp/Shadows/blob/51249d3d4d9ea1c3320741077aaa5335b28c3418/Shadows/SkinData/Infinite-Level_02.jpg",
+      "modified": false
+    },
+    "Infinite-Level_02.mtl": {
+      "bytes": 140,
+      "sha256": "21c65f4ffc47e7400beb43e6874f27bd2347ccfcade601423535c1f5084ee922",
+      "modified": true,
+      "changes": "Retains diffuse map; omits the incompatible world-space normal bump binding and explicitly sets opaque diffuse defaults."
+    },
+    "Infinite-Level_02_World_NoSmoothUV.jpg": {
+      "bytes": 18297370,
+      "sha256": "d1c3d6610f5cfc879f8eb09d78f74544680fe59b4da7c0fbe2cf4e7ec69996ae",
+      "source": "https://github.com/scahp/Shadows/blob/51249d3d4d9ea1c3320741077aaa5335b28c3418/Shadows/SkinData/Infinite-Level_02_World_NoSmoothUV.jpg",
+      "modified": false,
+      "semantic": "linear object-baked normal; RH-to-LH z sign -1"
+    },
+    "SpecularAOMap.png": {
+      "bytes": 139507,
+      "sha256": "fc7740e66a8aaeb951d003f146adb84701890d3a042a1b7aae4cb29423724561",
+      "source": "https://github.com/scahp/Shadows/blob/51249d3d4d9ea1c3320741077aaa5335b28c3418/Shadows/SkinData/SpecularAOMap.png",
+      "modified": false,
+      "semantic": "linear R specular weight, G Beckmann m, B diffuse AO"
+    }
+  }
+}
