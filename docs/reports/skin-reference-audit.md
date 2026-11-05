@@ -38,6 +38,23 @@ The material switch is explicit. StandardPBR retains its existing BRDF. SkinKele
 - The transport settings are persisted in the project. Generic units default to one world unit per millimetre; the scale-300 reference preset explicitly selects 0.3.
 - Raw data JPEGs are decoded without sRGB conversion. The 6K map requires an explicit 36-million-texel limit and a bounded 256-MiB decoded-data cache. Two workers can temporarily hold decoder and copied image buffers in addition to the cache.
 
+## Remaining shadow-boundary calibration
+
+The user subsequently reported that the red scattering at shadow boundaries is still too weak. The native assertions above establish execution, finite transport, controls and diffuse/specular composition. They do **not** establish that the original demo's shadow-boundary appearance has been reproduced. The remaining difference is broader than tone mapping.
+
+TSM is enabled in the delivered ON project. Its contribution and the local UV diffusion profile both need reference calibration. Before filtering, angular corrections and clamps, for a raw light-entry distance difference `D` and the reference model scale300:
+
+| Quantity | Original Shadows demo | Current human preset |
+| --- | --- | --- |
+| Stored transmission alpha | `exp(-20 * D / 300)` | `exp(-0.2 * D / 0.3)` |
+| Thickness reconstructed with `-log(alpha)/0.2` | `D / 3` | `D / 0.3` |
+
+Thus the current base reconstructed thickness is ten times larger at equal geometric distance. The later squared-thickness Gaussian fade can strongly suppress transmission. The engine's entry-normal correction and alpha filtering also differ, so this is an algebraic scale comparison, not a claim of a constant tenfold image difference.
+
+The local diffusion step also changed: the original passes variance differences directly as spatial sample steps; the engine uses square roots of variance differences and an explicit world-unit/mm conversion. Equal numeric quality settings therefore do not preserve the original effective per-channel profile.
+
+Next quality work must separately compare UV diffusion and TSM at the same shadow boundary, preserve a neutral OFF control, and tune or explicitly version a reference-compatible preset. Increasing blur merely to hide a shadow defect, or citing the142 transport checks as proof of perceptual parity, is not an adequate fix. No such calibration change is included in this publication.
+
 ## Actual source UV audit
 
 A CPU raster of the real Assimp 6.0.5 triangulation found **208 genuinely overlapping texels** at 1024x1024, all inside the two isolated eye charts (104 each). The central head chart has no detected overlap. Sixteen triangles have degenerate UVs. Pixel-centre/top-left ownership, reversed winding and coincident-layer controls distinguish this from shared-edge double counting; 8-bit subpixel quantization produced the same counts.
