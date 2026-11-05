@@ -59,6 +59,7 @@ set_source_files_properties(
   jEngine/Renderer/Features/jEnvironmentLighting.cpp
   jEngine/Renderer/Features/jHorizonMapping.cpp
   jEngine/Renderer/Features/jWaterSimulation.cpp
+  jEngine/Renderer/Features/jAdvancedShadowMath.cpp
   jEngine/Tests/jSceneFeatureCpuTests.cpp
   jEngine/Tests/jSceneFeatureTests.cpp
   PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
@@ -70,6 +71,19 @@ if(BUILD_TESTING)
   add_dependencies(jEngine jengine_plugin_fixture_v1 jengine_plugin_fixture_v2 jengine_plugin_fixture_badabi jengine_plugin_fixture_failload jengine_plugin_fixture_failrestore jengine_plugin_fixture_oversized jengine_plugin_fixture_missingexport)
   target_compile_definitions(jEngine PRIVATE JENGINE_PLUGIN_FIXTURE_DIRECTORY="$<TARGET_FILE_DIR:jengine_plugin_fixture_v1>")
   find_package(Python3 COMPONENTS Interpreter REQUIRED)
+  add_executable(jEngineAdvancedShadowMathTests tests/advanced-shadow-math.cpp
+    jEngine/Renderer/Features/jAdvancedShadowMath.cpp)
+  target_include_directories(jEngineAdvancedShadowMathTests PRIVATE jEngine)
+  add_executable(jEngineAdvancedShadowSettingsTests tests/advanced-shadow-settings.cpp)
+  target_include_directories(jEngineAdvancedShadowSettingsTests PRIVATE jEngine)
+  target_compile_definitions(jEngineAdvancedShadowSettingsTests PRIVATE JENGINE_ADVANCED_SHADOW_SETTINGS_TEST_MAIN)
+  if(MSVC)
+    target_compile_options(jEngineAdvancedShadowMathTests PRIVATE /W4 /utf-8)
+    target_compile_options(jEngineAdvancedShadowSettingsTests PRIVATE /W4 /utf-8)
+  endif()
+  add_test(NAME advanced-shadow-math COMMAND jEngineAdvancedShadowMathTests)
+  add_test(NAME advanced-shadow-settings COMMAND jEngineAdvancedShadowSettingsTests)
+  set_tests_properties(advanced-shadow-math advanced-shadow-settings PROPERTIES LABELS "cpu;shadow" TIMEOUT 60)
   add_test(NAME cpu-math COMMAND jEngine --ci-cpu)
   add_test(NAME cli-input
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/ci/check-cli.py"

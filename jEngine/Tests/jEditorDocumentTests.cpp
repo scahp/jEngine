@@ -30,6 +30,109 @@ int RunEditorDocumentTests()
     const auto nearly = [](float a, float b) { return std::abs(a - b) < 0.001f * std::max(1.0f, std::abs(a)); };
     try
     {
+        {
+            Document casters;
+            std::vector<EntityId> ids;
+            for (const auto kind : {EntityKind::Cube, EntityKind::Sphere, EntityKind::Model,
+                EntityKind::ParticleEmitter, EntityKind::Terrain, EntityKind::Water})
+            {
+                const auto id = casters.Create(kind, "Caster setting"); ids.push_back(id);
+                auto entity = *casters.Find(id); entity.ShadowCaster = ids.size() % 2 == 0;
+                expect(casters.Update(entity), "renderable entities accept explicit true and false shadow casting");
+            }
+            const auto file = fixture / "shadow-casters.jscene";
+            Document loaded;
+            expect(casters.Save(file) && loaded.Load(file) && loaded.Entities() == casters.Entities(),
+                "actual v1 scene save/load preserves caster false and true alongside the optional Water component");
+            auto receiver = *loaded.Find(ids[0]); receiver.ShadowCaster.reset();
+            expect(loaded.Update(receiver) && loaded.Undo() && loaded.Find(receiver.Id)->ShadowCaster == std::optional<bool>(false)
+                && loaded.Redo() && !loaded.Find(receiver.Id)->ShadowCaster,
+                "Undo and Redo distinguish inherited casting from an explicit receiver-only false override");
+            const auto prefab = fixture / "receiver.jprefab";
+            Document instantiated;
+            const bool prefabSaved = casters.SavePrefab(ids[0], prefab);
+            const auto id = prefabSaved ? instantiated.InstantiatePrefab(prefab) : InvalidEntity;
+            expect(id && instantiated.Find(id)->ShadowCaster == std::optional<bool>(false),
+                "actual receiver-only prefab preserves its explicit false caster setting");
+            auto legacy = Json::parse(casters.ToJson());
+            for (auto& entity : legacy["entities"]) entity.erase("shadowCaster");
+            Document inherited;
+            bool allInherited = inherited.LoadJson(legacy.dump());
+            for (const auto& [key, entity] : inherited.Entities()) allInherited &= !entity.ShadowCaster;
+            expect(allInherited && !Json::parse(inherited.ToJson())["entities"][0].contains("shadowCaster"),
+                "old v1 documents inherit prototype flags and do not gain synthetic caster overrides");
+            const auto before = loaded.ToJson(); const auto revision = loaded.Revision();
+            for (const auto& invalidValue : Json::array({0, 1, 0.0, "false", nullptr, Json::object()}))
+            {
+                auto invalid = Json::parse(before); invalid["entities"][0]["shadowCaster"] = invalidValue;
+                expect(!loaded.LoadJson(invalid.dump()) && loaded.ToJson() == before && loaded.Revision() == revision,
+                    "optional caster field requires an exact JSON boolean and rejects transactionally");
+            }
+            for (const auto kind : {EntityKind::Empty, EntityKind::Camera, EntityKind::PointLight, EntityKind::SpotLight, EntityKind::DirectionalLight})
+            {
+                const auto nonrenderable = loaded.Create(kind);
+                auto entity = *loaded.Find(nonrenderable); entity.ShadowCaster = false;
+                expect(!loaded.Update(entity), "nonrenderable and light entities cannot mix object caster flags with light shadow settings");
+            }
+        }
+        {
+            Document shadows;
+            std::vector<EntityId> lightIds;
+            for (const auto kind : {EntityKind::DirectionalLight, EntityKind::PointLight, EntityKind::SpotLight})
+            {
+                const auto id = shadows.Create(kind, "Shadow override light"); lightIds.push_back(id);
+                auto light = *shadows.Find(id);
+                jAdvancedShadows::Settings settings;
+                settings.Method = jAdvancedShadows::Representation::Deep;
+                settings.DirectionalProjection = jAdvancedShadows::Projection::Cascaded;
+                settings.PointProjection = jAdvancedShadows::PointProjection::DualParaboloid;
+                settings.MinimumVariance = 1e-8f; settings.MapResolution = 128;
+                light.Light.ShadowOverride = settings;
+                expect(shadows.Update(light), "all three light types accept a complete validated deep shadow override");
+            }
+            const auto file = fixture / "advanced-shadows.jscene";
+            Document restored;
+            expect(shadows.Save(file) && restored.Load(file) && restored.Entities() == shadows.Entities(),
+                "real scene save/load preserves independent projections and complete per-light shadow settings");
+            const auto original = *restored.Find(lightIds[0]);
+            auto edited = original; edited.Light.ShadowOverride->SplitLambda = .75f;
+            expect(restored.Update(edited) && restored.Undo() && restored.Find(original.Id)->Light == original.Light
+                && restored.Redo() && restored.Find(original.Id)->Light == edited.Light,
+                "shadow settings participate in real document Undo and Redo");
+            const auto prefab = fixture / "advanced-light.jprefab";
+            Document destination;
+            const bool savedPrefab = restored.SavePrefab(original.Id, prefab);
+            const auto instantiated = savedPrefab ? destination.InstantiatePrefab(prefab) : InvalidEntity;
+            expect(instantiated && destination.Find(instantiated)->Light == edited.Light,
+                "prefab publication and instantiation preserve shadow overrides");
+            Json legacy = Json::parse(shadows.ToJson());
+            for (auto& entity : legacy["entities"]) entity["light"].erase("shadow");
+            Document oldVersion;
+            expect(oldVersion.LoadJson(legacy.dump()) && !oldVersion.Find(lightIds[0])->Light.ShadowOverride
+                && Json::parse(oldVersion.ToJson())["version"] == 1,
+                "unchanged version-one lights inherit defaults without synthesizing a shadow override");
+            const auto before = restored.ToJson(); const auto revision = restored.Revision(); const auto path = restored.Path();
+            const auto rejectShadow = [&](const Json& shadow, const char* label)
+            {
+                auto invalid = Json::parse(before); invalid["entities"][0]["light"]["shadow"] = shadow;
+                expect(!restored.LoadJson(invalid.dump()) && !restored.LastError().empty() && restored.ToJson() == before
+                    && restored.Revision() == revision && restored.Path() == path, label);
+            };
+            const Json valid = Json::parse(before)["entities"][0]["light"]["shadow"];
+            for (const auto field : {"projection", "pointProjection", "representation"})
+            { auto invalid = valid; invalid[field] = 99; rejectShadow(invalid, "unknown shadow enums reject before replacing scene/history/path"); }
+            { auto invalid = valid; invalid["resolution"] = 96; rejectShadow(invalid, "non-power-of-two shadow map size rejects"); }
+            { auto invalid = valid; invalid["blurRadius"] = 1.5; rejectShadow(invalid, "fractional shadow integer fields cannot truncate silently"); }
+            { auto invalid = valid; invalid["cascadeStabilize"] = 1; rejectShadow(invalid, "shadow boolean requires a JSON boolean"); }
+            { auto invalid = valid; invalid["minimumVariance"] = 1e-9; rejectShadow(invalid, "out-of-range finite moment values reject"); }
+            { auto invalid = valid; invalid["deepTauMax"] = 33; rejectShadow(invalid, "deep accumulation limit rejects before scene replacement"); }
+            { auto invalid = valid; invalid["extra"] = 1; rejectShadow(invalid, "unknown per-light shadow fields reject"); }
+            { auto invalid = valid; invalid.erase("volumeRange"); rejectShadow(invalid, "partial shadow override rejects instead of silently inheriting fields"); }
+            { auto invalid = valid; invalid["representation"] = 5; rejectShadow(invalid, "directional CSM and shadow volumes are an explicitly rejected combination"); }
+            const auto cubeId = restored.Create(EntityKind::Cube);
+            auto cube = *restored.Find(cubeId); cube.Light.ShadowOverride = jAdvancedShadows::Settings{};
+            expect(!restored.Update(cube), "shadow overrides cannot be authored onto a non-light entity");
+        }
         Document scene;
         expect(!scene.IsDirty() && scene.Entities().empty() && !scene.CanUndo(), "new document starts clean and empty");
         expect(scene.NewScene("Authoring regression / 장면"), "UTF-8 scene name accepted");

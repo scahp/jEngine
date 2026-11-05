@@ -1,7 +1,9 @@
 #include "common.hlsl"
+// Advanced shadow shader injection point.
 #include "lightutil.hlsl"
 #include "PBR.hlsl"
 #include "shadowfiltering.hlsl"
+#include "Features/advancedshadowlighting.hlsl"
 
 #ifndef USE_SUBPASS
 #define USE_SUBPASS 0
@@ -20,7 +22,7 @@ float4 main(VSOutput input) : SV_TARGET
 
     float4 color = 0;
 #if USE_SUBPASS
-    float2 GBufferData0 = GBuffer0.SubpassLoad();
+    float3 GBufferData0 = GBuffer0.SubpassLoad().xyz;
     float3 GBufferData1 = GBuffer1.SubpassLoad();
     float4 GBufferData2 = GBuffer2.SubpassLoad();
     float DepthValue = DepthTexture.SubpassLoad();
@@ -45,7 +47,10 @@ float4 main(VSOutput input) : SV_TARGET
     float Lit = 1.0f;
 #if USE_SHADOW_MAP
     // Point light shadow map
-    if (DistanceToLight <= PointLight.MaxDistance)
+    if (PointShadow.SamplingParams.z > 0.5)
+        Lit = JE_SampleAdvancedLightShadow(PointShadow, PointAdvancedShadowMap,
+            PointDeepShadow0, PointDeepShadow1, PointAdvancedShadowMapSampler, WorldPos, ViewParam.VP);
+    else if (DistanceToLight <= PointLight.MaxDistance)
     {
         float NormalizedDistance = DistanceToLight / PointLight.MaxDistance;
 

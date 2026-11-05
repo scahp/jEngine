@@ -75,7 +75,7 @@ EntityKind LightKind(jLight* light)
 }
 LightProperties ReadLight(jLight* light)
 {
-    LightProperties p; p.CastShadows=light->IsShadowCaster;
+    LightProperties p; p.CastShadows=light->IsShadowCaster; p.ShadowOverride=light->GetShadowOverride();
     if (auto* l=dynamic_cast<jPointLight*>(light)) { p.Color=A(l->GetLightData().Color);p.Range=l->GetLightData().MaxDistance; }
     if (auto* l=dynamic_cast<jSpotLight*>(light)) { const auto& d=l->GetLightData();p.Color=A(d.Color);p.Range=d.MaxDistance;p.InnerConeDegrees=RadianToDegree(d.PenumbraRadian);p.OuterConeDegrees=RadianToDegree(d.UmbraRadian); }
     if (auto* l=dynamic_cast<jDirectionalLight*>(light)) p.Color=A(l->GetLightData().Color);
@@ -136,6 +136,7 @@ struct jEditorRuntime::Impl
         jEditorAuthoring::Entity Last;
         Matrix AppliedWorld{IdentityType};
         bool Registered=false,MaterialApplied=false,HasAppliedWorld=false;
+        bool InheritedShadowCaster=true,HasInheritedShadowCaster=false;
         std::string AssetKey;
     };
     struct Borrowed { jObject* Object=nullptr;jObjectID Id=0;jLight* Light=nullptr;bool WasRegistered=false; };
@@ -258,6 +259,9 @@ struct jEditorRuntime::Impl
     void Apply(Binding& b,const Entity& entity,const Matrix& world)
     {
         if(b.Object){
+            if(!b.HasInheritedShadowCaster){b.InheritedShadowCaster=!b.Object->SkipShadowMapGen;b.HasInheritedShadowCaster=true;}
+            const bool skipShadow=!entity.ShadowCaster.value_or(b.InheritedShadowCaster);
+            if(b.Object->SkipShadowMapGen!=skipShadow)b.Object->SetSkipShadowMapGen(skipShadow);
             for(size_t i=0;i<b.Object->RenderObjects.size();++i){
                 auto* mesh=b.Object->RenderObjects[i];
                 const Matrix transformed=world*(i<b.MeshLocal.size()?b.MeshLocal[i]:Matrix(IdentityType));
@@ -306,6 +310,7 @@ struct jEditorRuntime::Impl
             }
             if(auto* l=dynamic_cast<jDirectionalLight*>(b.Light))l->SetColor(color);
             b.Light->IsShadowCaster=entity.Light.CastShadows;
+            b.Light->SetShadowOverride(entity.Light.ShadowOverride);
             if(refresh){
                 // Publication follows Game.Update. Refresh shadow cameras and
                 // light volumes now without invoking the legacy script twice.
@@ -329,6 +334,7 @@ struct jEditorRuntime::Impl
         const auto duplicate=DuplicateOf.find(entity.Id);
         if(duplicate!=DuplicateOf.end()&&(entity.Kind==EntityKind::Model||entity.Kind==EntityKind::Cube||entity.Kind==EntityKind::Sphere))if(auto original=Bindings.find(duplicate->second);original!=Bindings.end()&&original->second.Object){
             binding.OwnedObject=CloneObject(*original->second.Object);binding.Object=binding.OwnedObject.get();
+            binding.InheritedShadowCaster=original->second.InheritedShadowCaster;binding.HasInheritedShadowCaster=original->second.HasInheritedShadowCaster;
             binding.MeshLocal=original->second.MeshLocal;binding.MaterialApplied=true;return true;
         }
         if(entity.Kind==EntityKind::PointLight || entity.Kind==EntityKind::SpotLight || entity.Kind==EntityKind::DirectionalLight){
@@ -539,6 +545,7 @@ bool jEditor::CaptureWorldToDocument()
         entity.Visible=object->Visible;entity.Material.Metallic=gOptions.Metallic;entity.Material.Roughness=gOptions.Roughness;
         if(!s.Doc.Update(entity,"Capture properties")){s.Error=s.Doc.LastError();s.Doc.Delete(id);continue;}
         jEditorRuntime::Impl::Binding b;b.Object=object;b.Last=entity;b.Registered=true;b.MaterialApplied=true;
+        b.InheritedShadowCaster=!object->SkipShadowMapGen;b.HasInheritedShadowCaster=true;
         b.MeshLocal=kind==EntityKind::Model?matrices:std::vector<Matrix>(matrices.size(),Matrix(IdentityType));
         b.AssetKey=kind==EntityKind::Model?s.Key(entity.SourceAsset,entity.AssetId):std::string();
         s.Bindings[id]=b;s.BorrowedObjects.push_back({object,object->GetObjectID(),nullptr,true});

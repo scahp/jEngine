@@ -9,6 +9,7 @@
 #include <thread>
 #include <vector>
 #include "Renderer/Features/jWaterSimulation.h"
+#include "Renderer/Features/jAdvancedShadowSettings.h"
 
 // Authoring data has no runtime pointers and is edited only by its creating thread.
 // Angles are degrees; transforms use T * Rz * Ry * Rx * S, column vectors.
@@ -47,6 +48,8 @@ struct LightProperties
     Vec3 Color{1, 1, 1};
     float Intensity = 1, Range = 1000, InnerConeDegrees = 20, OuterConeDegrees = 35;
     bool CastShadows = true;
+    // Absent inherits project/global defaults; present replaces the whole set.
+    std::optional<jAdvancedShadows::Settings> ShadowOverride;
     bool operator==(const LightProperties&) const = default;
 };
 struct CameraProperties
@@ -110,6 +113,9 @@ struct Entity
     EntityKind Kind = EntityKind::Empty;
     std::string Name = "Entity";
     bool Visible = true, Locked = false;
+    // Renderable objects only: absent inherits the source/prototype caster flag.
+    // This is independent of Light.CastShadows.
+    std::optional<bool> ShadowCaster;
     Transform Local{};
     // Project-relative, forward-slash paths. Empty means a procedural/no asset entity.
     std::string SourceAsset, AssetId;

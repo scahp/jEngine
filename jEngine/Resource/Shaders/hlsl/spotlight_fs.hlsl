@@ -1,7 +1,9 @@
 #include "common.hlsl"
+// Advanced shadow shader injection point.
 #include "lightutil.hlsl"
 #include "PBR.hlsl"
 #include "shadowfiltering.hlsl"
+#include "Features/advancedshadowlighting.hlsl"
 
 #ifndef USE_SUBPASS
 #define USE_SUBPASS 0
@@ -50,7 +52,10 @@ float4 main(VSOutput input) : SV_TARGET
 
     float Lit = 1.0f;
 #if USE_SHADOW_MAP
-    if (-1.0 <= SpotLightShadowPosition.z && SpotLightShadowPosition.z <= 1.0)
+    if (SpotShadow.SamplingParams.z > 0.5)
+        Lit = JE_SampleAdvancedLightShadow(SpotShadow, SpotAdvancedShadowMap,
+            SpotDeepShadow0, SpotDeepShadow1, SpotAdvancedShadowMapSampler, WorldPos, ViewParam.VP);
+    else if (-1.0 <= SpotLightShadowPosition.z && SpotLightShadowPosition.z <= 1.0)
     {
         const float Bias = 0.01f;
         #if USE_REVERSEZ

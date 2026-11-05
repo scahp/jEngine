@@ -1,6 +1,7 @@
 ﻿#include "pch.h"
 #include "jSpotLight.h"
 #include "Shader/jLightingShaderParameters.h"
+#include "Renderer/jAdvancedShadowPass.h"
 
 jSpotLight::jSpotLight()
     : jLight(ELightType::SPOT)
@@ -67,6 +68,7 @@ const std::shared_ptr<jShaderBindingInstance>& jSpotLight::PrepareShaderBindingI
             jSpotLightShaderParameters Parameters;
             Parameters.SpotLight.Buffer = LightDataUniformBlockPtr;
             Parameters.SpotLightShadowMap = { InShadowMap ? InShadowMap : GWhiteTexture.get(), ShadowSamplerStateInfo };
+            jAdvancedShadows::SetDefaultBindings(Parameters);
             ShaderBindingInstanceWithShadowMap = jShaderParameterSet::CreateShaderBindingInstance(Parameters, EShaderAccessStageFlag::ALL_GRAPHICS, jShaderBindingInstanceType::MultiFrame);
         }
     }

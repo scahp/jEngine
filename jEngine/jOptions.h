@@ -1,6 +1,10 @@
 #pragma once
 #include "Math/Vector.h"
 #include "Renderer/Features/jSceneFeatureSettings.h"
+#include "Renderer/Features/jAdvancedShadowSettings.h"
+
+// Owner-thread registration. Repeated calls reuse the same validated variables.
+void RegisterAdvancedShadowConsoleVariables();
 
 enum class EDenoiser : int32
 {
@@ -42,6 +46,7 @@ struct jOptions
     bool UseDeferredRenderer;
     int32 ShadowFilterMode;
     float ShadowFilterRadiusTexels;
+    jAdvancedShadows::Settings AdvancedShadows;
     jSceneFeatures::Settings SceneFeatures;
     bool UseHWRTDirectLighting;
     int32 HWRTDirectLightingMode;

@@ -144,11 +144,10 @@ VkDescriptorSetLayout jShaderBindingLayout_Vulkan::CreateDescriptorSetLayout(con
 
 VkPipelineLayout jShaderBindingLayout_Vulkan::CreatePipelineLayout(const jShaderBindingLayoutArray& InShaderBindingLayoutArray, const jPushConstant* InPushConstant, EShaderAccessStageFlag InShaderAccessStageFlag)
 {
-    if (InShaderBindingLayoutArray.NumOfData <= 0)
-        return 0;
-
+    // Resource-free shaders still require a valid (empty) pipeline layout.
     VkPipelineLayout vkPipelineLayout = nullptr;
     size_t hash = InShaderBindingLayoutArray.GetHash();
+    hash = XXH64(InShaderBindingLayoutArray.NumOfData, hash);
 
     if (InPushConstant)
         hash = XXH64(InPushConstant->GetHash(), hash);
@@ -219,7 +218,7 @@ VkPipelineLayout jShaderBindingLayout_Vulkan::CreatePipelineLayout(const jShader
         VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         pipelineLayoutInfo.setLayoutCount = (uint32)DescriptorSetLayouts.size();
-        pipelineLayoutInfo.pSetLayouts = &DescriptorSetLayouts[0];
+        pipelineLayoutInfo.pSetLayouts = DescriptorSetLayouts.data();
         if (PushConstantRanges.size() > 0)
         {
             pipelineLayoutInfo.pushConstantRangeCount = (int32)PushConstantRanges.size();

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Shader/jCommonShaderParameters.h"
+#include "Shader/jAdvancedShadowShaderParameters.h"
 #include "Scene/Light/jDirectionalLight.h"
 #include "Scene/Light/jPointLight.h"
 #include "Scene/Light/jSpotLight.h"
@@ -51,6 +52,10 @@ END_SHADER_PARAMETER_SET()
 BEGIN_SHADER_PARAMETER_SET(jDirectionalLightShaderParameters)
     SHADER_UNIFORM_BUFFER(jDirectionalLightUniformBufferData, DirectionalLight)
     SHADER_TEXTURE2D_COMPARISON(DirectionalLightShadowMap)
+    SHADER_UNIFORM_BUFFER(jAdvancedShadowData, DirectionalShadow)
+    SHADER_TEXTURE2D(DirectionalAdvancedShadowMap)
+    SHADER_TEXTURE2D_SRV(DirectionalDeepShadow0)
+    SHADER_TEXTURE2D_SRV(DirectionalDeepShadow1)
 END_SHADER_PARAMETER_SET()
 
 BEGIN_SHADER_PARAMETER_SET(jDirectionalLightOnlyShaderParameters)
@@ -60,6 +65,10 @@ END_SHADER_PARAMETER_SET()
 BEGIN_SHADER_PARAMETER_SET(jPointLightShaderParameters)
     SHADER_UNIFORM_BUFFER(jPointLightUniformBufferData, PointLight)
     SHADER_TEXTURECUBE_COMPARISON(PointLightShadowCubeMap)
+    SHADER_UNIFORM_BUFFER(jAdvancedShadowData, PointShadow)
+    SHADER_TEXTURE2D(PointAdvancedShadowMap)
+    SHADER_TEXTURE2D_SRV(PointDeepShadow0)
+    SHADER_TEXTURE2D_SRV(PointDeepShadow1)
 END_SHADER_PARAMETER_SET()
 
 BEGIN_SHADER_PARAMETER_SET(jPointLightOnlyShaderParameters)
@@ -69,6 +78,10 @@ END_SHADER_PARAMETER_SET()
 BEGIN_SHADER_PARAMETER_SET(jSpotLightShaderParameters)
     SHADER_UNIFORM_BUFFER(jSpotLightUniformBufferData, SpotLight)
     SHADER_TEXTURE2D_COMPARISON(SpotLightShadowMap)
+    SHADER_UNIFORM_BUFFER(jAdvancedShadowData, SpotShadow)
+    SHADER_TEXTURE2D(SpotAdvancedShadowMap)
+    SHADER_TEXTURE2D_SRV(SpotDeepShadow0)
+    SHADER_TEXTURE2D_SRV(SpotDeepShadow1)
 END_SHADER_PARAMETER_SET()
 
 BEGIN_SHADER_PARAMETER_SET(jSpotLightOnlyShaderParameters)

@@ -107,24 +107,28 @@ void jObject::RemoveObject(jObject* object)
 
 void jObject::FlushDirtyState()
 {
-	if (!s_DirtyStateObjects.empty())
-	{
-		for (auto iter : s_DirtyStateObjects)
-		{
-			auto it_find = std::find(s_ShadowCasterObject.begin(), s_ShadowCasterObject.end(), iter);
-			const bool existInShadowCasterObject = s_ShadowCasterObject.end() != it_find;
-			//if (iter->SkipShadowMapGen)
-			//{
-			//	if (existInShadowCasterObject)
-			//		s_ShadowCasterObject.erase(it_find);
-			//}
-			//else
-			//{
-			//	if (!existInShadowCasterObject)
-			//		s_ShadowCasterObject.push_back(iter);
-			//}
-		}
-	}
+    // Like AddObject/RemoveObject, publication belongs to the scene owner.
+    // Visibility is represented by scene registration; a dirty hidden object
+    // must never be reintroduced merely because its shadow flag changed.
+    for (auto* object : s_DirtyStateObjects)
+    {
+        if (!object) continue;
+        const bool registered = std::find(s_StaticObjects.begin(), s_StaticObjects.end(), object) != s_StaticObjects.end();
+        std::erase(s_ShadowCasterObject, object);
+        for (auto* render : object->RenderObjects)
+            std::erase(s_ShadowCasterRenderObject, render);
+
+        if (registered && !object->SkipShadowMapGen)
+        {
+            s_ShadowCasterObject.push_back(object);
+            for (auto* render : object->RenderObjects)
+                if (render && std::find(s_StaticRenderObjects.begin(), s_StaticRenderObjects.end(), render) != s_StaticRenderObjects.end()
+                    && std::find(s_ShadowCasterRenderObject.begin(), s_ShadowCasterRenderObject.end(), render) == s_ShadowCasterRenderObject.end())
+                    s_ShadowCasterRenderObject.push_back(render);
+        }
+        object->DirtyObjectState = false;
+    }
+    s_DirtyStateObjects.clear();
 }
 
 void jObject::AddBoundBoxObject(jObject* object)
@@ -222,6 +226,8 @@ jObject::jObject()
 
 jObject::~jObject()
 {
+    // FlushDirtyState may run after an unregistered/retired object is deleted.
+    s_DirtyStateObjects.erase(this);
 	// Remove from ObjectID map
 	s_ObjectIDMap.erase(ObjectID);
 

@@ -101,6 +101,9 @@ code push and on PRs targeting `main`. Build artifacts and logs are kept for fiv
 [Scene features](docs/manual/scene-features.md) · [Mapping nodes](docs/manual/material-mapping.md) · [Selected-feature validation](docs/reports/selected-scene-features.md) · [Screenshots and measurements (HTML)](docs/reports/selected-scene-features.html)
 [Scene-feature sample project](examples/scene-feature-demo/README.md)
 
+[Advanced shadows](docs/manual/advanced-shadows.md) — CSM, VSM/ESM/EVSM, shadow volumes, Deep, dual-paraboloid and PSM.
+[Validation and captures](docs/reports/advanced-shadows.md) · [Shadow sample project](examples/advanced-shadow-demo/README.md)
+
 ## Third party libraries
 
 See [third-party notices](THIRD_PARTY_NOTICES.md).

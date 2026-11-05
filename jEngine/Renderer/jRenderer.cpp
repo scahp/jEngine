@@ -34,6 +34,7 @@
 #include "jPrimitiveUtil.h"
 #include "jRenderer.h"
 #include "jSceneRenderTargets.h"
+#include "jAdvancedShadowPass.h"
 #include "jSpotLightDrawCommandGenerator.h"
 #include "Shader/jShaderParameterSet.h"
 
@@ -337,6 +338,8 @@ void jRenderer::Setup()
     jEditorProcedural::PrepareRenderResources(RenderFrameContextPtr);
 #endif
     View.ShadowCasterLights.reserve(View.Lights.size());
+    AdvancedShadowFrame = std::make_shared<jAdvancedShadows::Frame>();
+    AdvancedShadowFrame->BuildAndRecord(RenderFrameContextPtr, View, !IsUseHWRTDirectLighting());
 
     // Build per-light view data
     for (int32 i = 0; i < View.Lights.size(); ++i)
@@ -350,7 +353,8 @@ void jRenderer::Setup()
                 ViewLight.ShadowMapPtr = RenderFrameContextPtr->SceneRenderTargetPtr->GetShadowMap(ViewLight.Light);
             }
 
-            ViewLight.ShaderBindingInstance = ViewLight.Light->PrepareShaderBindingInstance(ViewLight.ShadowMapPtr ? ViewLight.ShadowMapPtr->GetTexture() : nullptr);
+            ViewLight.ShaderBindingInstance = AdvancedShadowFrame->CreateLightBinding(ViewLight.Light,
+                ViewLight.ShadowMapPtr ? ViewLight.ShadowMapPtr->GetTexture() : nullptr);
 
             if (ViewLight.Light->IsShadowCaster)
             {
@@ -442,6 +446,11 @@ void jRenderer::SetupShadowPass()
 
         // Shadow 패스에서 사용할 ViewLight를 보관한다. 이후 Light와 Shadow Camera 정보를 재사용한다.
         ShadowPasses.ViewLight = ViewLight;
+
+        // Keep the legacy descriptor's depth image initialized/readable without
+        // repeating geometry work after a complete advanced output was recorded.
+        // A rejected advanced transaction follows the original draw path below.
+        if (AdvancedShadowFrame && AdvancedShadowFrame->HasOutput(ViewLight.Light)) continue;
 
         jGraphicsPipelineShader ShadowShader;
         {
@@ -838,6 +847,7 @@ void jRenderer::SetupBasePass()
         jDirectionalLightShaderParameters directionalParameters;
         directionalParameters.DirectionalLight.Buffer = uniform(jNameStatic("ForwardDirectional"), directionalData);
         directionalParameters.DirectionalLightShadowMap = {shadow(directional) ? shadow(directional) : neutralWhite2D(), sampler};
+        AdvancedShadowFrame->SetBindings(directionalParameters, directional ? directional->Light : nullptr);
         ForwardLightBindings.push_back(jShaderParameterSet::CreateShaderBindingInstance(directionalParameters,
             EShaderAccessStageFlag::ALL_GRAPHICS, jShaderBindingInstanceType::SingleFrame));
 
@@ -850,6 +860,7 @@ void jRenderer::SetupBasePass()
         pointParameters.PointLight.Buffer = uniform(jNameStatic("ForwardPoint"), pointData);
         pointParameters.PointLightShadowCubeMap = {shadow(point) ? shadow(point)
             : neutralShadow(ETextureType::TEXTURE_CUBE, 1.f), sampler};
+        AdvancedShadowFrame->SetBindings(pointParameters, point ? point->Light : nullptr);
         ForwardLightBindings.push_back(jShaderParameterSet::CreateShaderBindingInstance(pointParameters,
             EShaderAccessStageFlag::ALL_GRAPHICS, jShaderBindingInstanceType::SingleFrame));
 
@@ -872,6 +883,7 @@ void jRenderer::SetupBasePass()
         jSpotLightShaderParameters spotParameters;
         spotParameters.SpotLight.Buffer = uniform(jNameStatic("ForwardSpot"), spotData);
         spotParameters.SpotLightShadowMap = {spotShadow, sampler};
+        AdvancedShadowFrame->SetBindings(spotParameters, spot ? spot->Light : nullptr);
         ForwardLightBindings.push_back(jShaderParameterSet::CreateShaderBindingInstance(spotParameters,
             EShaderAccessStageFlag::ALL_GRAPHICS, jShaderBindingInstanceType::SingleFrame));
 

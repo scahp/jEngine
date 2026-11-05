@@ -54,13 +54,29 @@ Usage: [Scene features and baking](manual/scene-features.md), [Material mapping 
 
 The atmospheric model is a ground-level approximation, not a planet/LUT model. PPR requires Deferred, stored GBuffer attachments and single-sample inputs; it reflects visible scene information and uses fallback for missing information. Water and UV/interior mapping do not create collision geometry or update ray-tracing hit geometry. Selecting Path Tracing is gated while these raster-only materials are present.
 
+## Advanced shadow implementation batch
+
+The user selected **1, 17, 18, 19, 20 and 21**. These now share a pure CPU math module, a validated settings contract, GPU helpers and an owner-thread renderer adapter. Forward and Deferred consume the same per-light result. Project defaults, light overrides, object caster flags, scene/prefab persistence and Undo use the existing editor workflow.
+
+| No. | Feature | Delivered engine integration |
+| --- | --- | --- |
+| 1 | CSM restoration | One to four practical splits, texel stabilization, bounded distance/padding and an atlas in the current Vulkan/DX12 RHI. |
+| 17 | VSM / ESM / EVSM | FP32 moment encoding, tile-clamped separable blur, explicit exponents, variance and light-bleeding controls. |
+| 18 | Shadow volumes | Welded closed-manifold geometry, finite capped extrusion, z-fail stencil and per-light visibility mask; explicit fallback for unsupported geometry. |
+| 19 | Deep shadows | Eight additive optical-depth bins in two half-float targets, using authored scalar material opacity. |
+| 20 | Dual-paraboloid point shadows | Two-hemisphere atlas with bounded conforming subdivision and seam sampling; cube fallback on invalid geometry or budget exhaustion. |
+| 21 | Perspective shadow maps | Viewer-dependent post-perspective directional projection, virtual slide-back and reported fitted-orthographic fallback. |
+
+Existing Single/Cube/Depth defaults retain the original path. Advanced resources and geometry preparation have explicit budgets. These are raster shadow features; Path Tracing and HWRT ray visibility retain their own evaluation. Windows backend integration and DXIL compilation are implemented, while physical Windows runtime validation is pending.
+
+Usage: [Advanced shadows](manual/advanced-shadows.md). Evidence, performance scope and limitations: [implementation report](reports/advanced-shadows.md). Try the [saved sample project](../examples/advanced-shadow-demo/README.md).
+
 ## Remaining decisions
 
 No item below is authorized by this batch. Hi-Z and light-indexed shading remain prototypes in their reference branches.
 
 | No. | Feature / source branch | Recommended engine module and decision |
 | --- | --- | --- |
-| 1 | Existing CSM restoration / Shadows `master`, jEngine history | Restore the existing cascade algorithms to the current Vulkan/DX12 renderer. CSM was added in 2019 and removed with the old OpenGL pipeline during the 2022 Vulkan migration. The active directional light has one `ShadowVP` and one 2D shadow layer. Choose counts, splits, distance and stabilization. |
 | 2 | Forward+ / `ForwardPlus` | Shared bounded light grid for Forward/Deferred. Choose light limits and overflow policy. |
 | 3 | Weighted OIT / `WeightOIT` | Transparency accumulation/revealage and material classification. Agree approximation and fallback. |
 | 4 | BSDF / jEngine `PathTracingBSDF` | Shared sampling/evaluation/PDF library. Preserve current index/binding fixes and repair refraction math. |
@@ -69,25 +85,20 @@ No item below is authorized by this batch. Hi-Z and light-indexed shading remain
 | 12 | Skin SSS / `Skin` | Diffusion profile and shared scattering pass. Choose texture-space or screen-space evaluation. |
 | 13 | Cosmetic layers / `Physically-based-cosmetic` | Material layer optics, masks and thickness; requires the skin/shading contract. |
 | 16 | Radiosity / `RadiosityCornellBox` | Bounded cancellable offline bake, or retain as research. Choose output asset and scene scope. |
-| 17 | VSM / ESM / EVSM / `master` | Moment shadow representation and blur. Choose precision, memory and light-bleeding tolerance. |
-| 18 | Shadow volumes / `master` | Adjacency/extrusion and stencil visibility. Choose a portable path and intended use. |
-| 19 | Deep shadows / `master` | Transparent transmittance module. Define hair/volume use, overflow and memory budgets. |
-| 20 | Dual-paraboloid shadows / `DualParaboloidShadowMap` | Optional point-light projection strategy; define hemisphere seam/warp quality. |
-| 21 | Perspective shadow maps / `PSM` | Camera-dependent shadow warp with a robust degeneracy fallback. |
 | 22 | Deferred per-sample MSAA / `MSAA_And_Antialiasing` | Multisample GBuffer/lighting/resolve policy; set a quality/cost target. |
 | 23 | 2D SDF text / `SDF` | Optional scalable text atlas/rendering module; this source is not a 3D distance-field renderer. |
 | 24 | Hi-Z / `HiZOcclusion` | **Prototype:** reusable depth pyramid, followed by bounded visibility/indirect-draw integration. |
 | 25 | Light-indexed rendering / `LightIndexedDeferredRendering` | **Prototype:** evaluate pixel light indices as another light-grid consumer; source renderer `Do` is empty. |
 
-For general scenes, the next coherent group is **1 existing CSM restoration, 2 Forward+ and 3 OIT**, followed by a separately designed Hi-Z visibility module. Item 1 restores and ports an existing feature, rather than introducing CSM for the first time. For Path Tracing quality, decide **4 BSDF and 5 Russian Roulette** together.
+Twelve numbered choices remain. For general scenes, the next coherent group is **2 Forward+ and 3 OIT**, followed by a separately designed Hi-Z visibility module. For Path Tracing quality, decide **4 BSDF and 5 Russian Roulette** together.
 
 ### CSM history and current runtime
 
 CSM was added in shared jEngine/Shadows history by `3b7a12ba0c52` (2019-07-27, "Added Cascade shadow"), with later fixes including `11b6e3129b0b` and `d87f1e7af69e`. These commits are ancestors of jEngine main. Commit `797710bcf911` (2022-08-25, "Remove all files to merge vulkan api") deleted the previous pipeline, cascade light code and GLSL shaders before the Vulkan merge `e2d68554e187`. The prepared Shadows `master` still contains the old implementation.
 
-At the current implementation commit `f8ec7f64`, [`jDirectionalLight`](../jEngine/Scene/Light/jDirectionalLight.h) holds one shadow matrix, [`jSceneRenderTargets.cpp`](../jEngine/Renderer/jSceneRenderTargets.cpp) allocates a single-layer 2D directional shadow target, and [`directionallight_fs.hlsl`](../jEngine/Resource/Shaders/hlsl/directionallight_fs.hlsl) samples that matrix. The old `CreateCascadeDirectionalLight` factory remains declared, but its implementation/update bodies in [`jLight.cpp`](../jEngine/Scene/Light/jLight.cpp) are commented out. The SurfelGI Cascade controls are GI clipmaps, not directional-light CSM.
+At the earlier audit commit `f8ec7f64`, [`jDirectionalLight`](../jEngine/Scene/Light/jDirectionalLight.h) holds one shadow matrix, [`jSceneRenderTargets.cpp`](../jEngine/Renderer/jSceneRenderTargets.cpp) allocates a single-layer 2D directional shadow target, and [`directionallight_fs.hlsl`](../jEngine/Resource/Shaders/hlsl/directionallight_fs.hlsl) samples that matrix. The old `CreateCascadeDirectionalLight` factory remains declared, but its implementation/update bodies in [`jLight.cpp`](../jEngine/Scene/Light/jLight.cpp) are commented out. The SurfelGI Cascade controls are GI clipmaps, not directional-light CSM.
 
-Reintegration can reuse split/frustum/matrix selection algorithms; shadow allocation, per-cascade culling/draw submission, shader selection and filtering must follow the current RHI. This audit does not enable or implement CSM.
+The selected advanced-shadow batch restores CSM through the current RHI and shared lighting bindings. The old factory remains historical; the active implementation is `Renderer/jAdvancedShadowPass.cpp` with reusable projection math in `Renderer/Features/jAdvancedShadowMath.cpp`. The earlier audit describes the pre-restoration state.
 
 ## Excluded from new-feature counts
 

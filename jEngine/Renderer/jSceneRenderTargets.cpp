@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "jSceneRenderTargets.h"
+#include "jAdvancedShadowPass.h"
 #include "jBloomDimensions.h"
 #include "RHI/jRenderTargetPool.h"
 #include "RHI/jSwapchain.h"
@@ -321,6 +322,7 @@ void jSceneRenderTarget::Return()
 
 void jSceneRenderTarget::ReleasePersistentResources()
 {
+    jAdvancedShadows::ReleaseResources();
     auto ReturnAndResetRenderTarget = [](std::shared_ptr<jRenderTarget>& InOutRenderTarget)
     {
         if (InOutRenderTarget)

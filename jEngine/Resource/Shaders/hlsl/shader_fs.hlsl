@@ -1,6 +1,7 @@
 #include "common.hlsl"
 // Material shader injection point.
 #include "shadowfiltering.hlsl"
+#include "Features/advancedshadowlighting.hlsl"
 #include "Features/materialsurface.hlsl"
 #include "Features/environmentlighting.hlsl"
 
@@ -163,8 +164,13 @@ float4 main(VSOutput input
         float NormalizedDistance = DistanceToLight / PointLight.MaxDistance;
 
         const float Bias = 0.005f;
-        float Shadow = SampleShadowVisibilityCube(PointLightShadowCubeMap, PointLightShadowCubeMapSampler,
-            LightDir.xyz, NormalizedDistance - Bias, ViewParam.ShadowFilterParams.y, (int)ViewParam.ShadowFilterParams.x);
+        float Shadow;
+        if (PointShadow.SamplingParams.z > 0.5)
+            Shadow = JE_SampleAdvancedLightShadow(PointShadow, PointAdvancedShadowMap,
+                PointDeepShadow0, PointDeepShadow1, PointAdvancedShadowMapSampler, input.WorldPos.xyz, ViewParam.VP);
+        else
+            Shadow = SampleShadowVisibilityCube(PointLightShadowCubeMap, PointLightShadowCubeMapSampler,
+                LightDir.xyz, NormalizedDistance - Bias, ViewParam.ShadowFilterParams.y, (int)ViewParam.ShadowFilterParams.x);
         if (Shadow > 0.0f)
         {
             PointLightLit = Shadow * GetPointLight(PointLight, SurfaceNormal, input.WorldPos.xyz, ViewWorld);
@@ -176,7 +182,11 @@ float4 main(VSOutput input
     DirectionalLightShadowPosition.y = -DirectionalLightShadowPosition.y;
 
     float3 DirectionalLightLit = GetDirectionalLight(DirectionalLight, SurfaceNormal, ViewWorld);
-    if (-1.0 <= DirectionalLightShadowPosition.z && DirectionalLightShadowPosition.z <= 1.0)
+    if (DirectionalShadow.SamplingParams.z > 0.5)
+        DirectionalLightLit *= JE_SampleAdvancedLightShadow(DirectionalShadow, DirectionalAdvancedShadowMap,
+            DirectionalDeepShadow0, DirectionalDeepShadow1, DirectionalAdvancedShadowMapSampler,
+            input.WorldPos.xyz, ViewParam.VP);
+    else if (-1.0 <= DirectionalLightShadowPosition.z && DirectionalLightShadowPosition.z <= 1.0)
     {
         const float Bias = 0.01f;
         float Shadow = SampleShadowVisibility2D(DirectionalLightShadowMap, DirectionalLightShadowMapSampler,
@@ -195,7 +205,14 @@ float4 main(VSOutput input
     SpotLightShadowPosition.y = -SpotLightShadowPosition.y;
 
     float3 SpotLightLit = 0.0f;
-    if (-1.0 <= SpotLightShadowPosition.z && SpotLightShadowPosition.z <= 1.0)
+    if (SpotShadow.SamplingParams.z > 0.5)
+    {
+        const float Shadow = JE_SampleAdvancedLightShadow(SpotShadow, SpotAdvancedShadowMap,
+            SpotDeepShadow0, SpotDeepShadow1, SpotAdvancedShadowMapSampler, input.WorldPos.xyz, ViewParam.VP);
+        if (Shadow > 0.0f)
+            SpotLightLit = Shadow * GetSpotLight(SpotLight, SurfaceNormal, input.WorldPos.xyz, ViewWorld);
+    }
+    else if (-1.0 <= SpotLightShadowPosition.z && SpotLightShadowPosition.z <= 1.0)
     {
         const float Bias = 0.01f;
         #if USE_REVERSEZ

@@ -545,6 +545,31 @@ void Inspector(jEditor& editor)
     }
     if (e.Kind == EntityKind::Cube || e.Kind == EntityKind::Sphere || e.Kind == EntityKind::Model || e.Kind == EntityKind::Terrain || e.Kind == EntityKind::Water)
         if (ImGui::CollapsingHeader("Material", ImGuiTreeNodeFlags_DefaultOpen)) MaterialInspector(editor, e);
+    if (e.Kind == EntityKind::Cube || e.Kind == EntityKind::Sphere || e.Kind == EntityKind::Model
+        || e.Kind == EntityKind::ParticleEmitter || e.Kind == EntityKind::Terrain || e.Kind == EntityKind::Water)
+        if (ImGui::CollapsingHeader("Shadow casting", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            bool overrideCasting = e.ShadowCaster.has_value();
+            if (ImGui::Checkbox("Override shadow casting", &overrideCasting))
+            {
+                if (overrideCasting)
+                {
+                    const auto* object = editor.ObjectForEntity(e.Id);
+                    e.ShadowCaster = object ? !object->SkipShadowMapGen : true;
+                }
+                else e.ShadowCaster.reset();
+                document.Update(e, "Override shadow casting");
+            }
+            if (e.ShadowCaster)
+            {
+                bool casts = *e.ShadowCaster;
+                const bool changed = ImGui::Checkbox("Cast shadows", &casts);
+                if (changed) e.ShadowCaster = casts;
+                FinishProperty(document, e, changed, "Object shadow casting");
+            }
+            else ImGui::TextDisabled("Inherits source / prototype shadow casting.");
+            ImGui::TextWrapped("Disabling casting keeps this object visible as a shadow receiver.");
+        }
     if (e.Kind == EntityKind::Water)
         jEditorWater::RenderInspector(editor, e.Id,
             [&](Entity& candidate, const char* label, bool changed) { FinishProperty(document, candidate, changed, label); });
@@ -560,6 +585,39 @@ void Inspector(jEditor& editor)
                 FinishProperty(document, e, ImGui::SliderFloat("Outer cone", &e.Light.OuterConeDegrees, .01f, 89), "Outer cone");
             }
             FinishProperty(document, e, ImGui::Checkbox("Cast shadows", &e.Light.CastShadows), "Shadow setting");
+            bool overrideShadows = e.Light.ShadowOverride.has_value();
+            if (ImGui::Checkbox("Override shadow settings", &overrideShadows))
+            {
+                if (overrideShadows)
+                {
+                    const auto kind = e.Kind == EntityKind::DirectionalLight ? jAdvancedShadows::LightKind::Directional
+                        : e.Kind == EntityKind::PointLight ? jAdvancedShadows::LightKind::Point : jAdvancedShadows::LightKind::Spot;
+                    std::string reason;
+                    auto settings = gOptions.AdvancedShadows;
+                    if (!jAdvancedShadows::ValidateForLight(settings, kind, reason))
+                    {
+                        settings = {};
+                        ImGui::TextWrapped("Inherited shadow settings are incompatible with this light; the override starts from engine defaults.");
+                    }
+                    e.Light.ShadowOverride = settings;
+                }
+                else e.Light.ShadowOverride.reset();
+                document.Update(e, "Override shadow settings");
+            }
+            if (e.Light.ShadowOverride)
+            {
+                const auto kind = e.Kind == EntityKind::DirectionalLight ? jAdvancedShadows::LightKind::Directional
+                    : e.Kind == EntityKind::PointLight ? jAdvancedShadows::LightKind::Point : jAdvancedShadows::LightKind::Spot;
+                std::string error;
+                auto settings = *e.Light.ShadowOverride;
+                ImGui::BeginGroup();
+                const bool changed = jEditorProjectSettings::RenderAdvancedShadowControls(settings, error, kind);
+                ImGui::EndGroup();
+                if (changed) e.Light.ShadowOverride = settings;
+                FinishProperty(document, e, changed, "Light shadow settings");
+            }
+            else ImGui::TextDisabled("Inherits project / global shadow settings.");
+            ImGui::TextWrapped("Raster shadows only; Path Tracing and HWRT ray shadows use their own visibility.");
         }
     if (e.Kind == EntityKind::Camera && ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen))
     {

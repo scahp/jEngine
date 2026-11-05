@@ -25,6 +25,7 @@ jEngine의 기본 **저작 화면**에서 프로젝트를 만들고, 물체를 �
 | 9 | [확장 플러그인과 실행 패키지](09-extensions-packaging.md) | 네이티브 확장 빌드·교체, 이동 가능한 실행 폴더 만들기 |
 | 10 | [환경광·반사·대기·물과 베이크](scene-features.md) | SH, PPR, 대기 산란, Water와 Horizon 자산 준비하기 |
 | 11 | [노드 재질의 매핑](material-mapping.md) | Parallax/POM, Relief, Interior, Horizon 노드 연결하기 |
+| 12 | [고급 그림자](advanced-shadows.md) | CSM, VSM/ESM/EVSM, Shadow Volume, Deep, Dual Paraboloid, PSM 설정과 객체별 그림자 생성 |
 
 ## 가장 짧은 체험 순서
 

@@ -1757,6 +1757,7 @@ void jGame::ProcessInput(float deltaTime)
 void jGame::Setup()
 {
  	srand(static_cast<uint32>(time(NULL)));
+    RegisterAdvancedShadowConsoleVariables();
 
 	// Register test console variables
 	{

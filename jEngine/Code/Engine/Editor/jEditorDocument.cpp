@@ -232,9 +232,22 @@ bool ValidateEntity(const Entity& entity, std::string& error)
     if (!VectorNumber(entity.Material.BaseColor, 0, 1) || !VectorNumber(entity.Material.Emissive, 0, 1e6f)
         || !Number(entity.Material.Metallic, 0, 1) || !Number(entity.Material.Roughness, 0, 1) || !Number(entity.Material.Opacity, 0, 1))
         return reject("Invalid material properties");
+    if (entity.ShadowCaster && entity.Kind != EntityKind::Cube && entity.Kind != EntityKind::Sphere
+        && entity.Kind != EntityKind::Model && entity.Kind != EntityKind::ParticleEmitter
+        && entity.Kind != EntityKind::Terrain && entity.Kind != EntityKind::Water)
+        return reject("Shadow casting overrides require a renderable object; lights use Light.CastShadows");
     if (!VectorNumber(entity.Light.Color, 0, 1e6f) || !Number(entity.Light.Intensity, 0, 1e9f)
         || !Number(entity.Light.Range, 1e-4f, 1e8f) || !Number(entity.Light.InnerConeDegrees, 0, 89.9f)
         || !Number(entity.Light.OuterConeDegrees, entity.Light.InnerConeDegrees, 89.9f)) return reject("Invalid light properties");
+    if (entity.Light.ShadowOverride)
+    {
+        using K = jAdvancedShadows::LightKind;
+        const auto kind = entity.Kind == EntityKind::DirectionalLight ? K::Directional
+            : entity.Kind == EntityKind::PointLight ? K::Point : K::Spot;
+        if (entity.Kind != EntityKind::DirectionalLight && entity.Kind != EntityKind::PointLight && entity.Kind != EntityKind::SpotLight)
+            return reject("Shadow overrides require a directional, point or spot light");
+        if (!jAdvancedShadows::ValidateForLight(*entity.Light.ShadowOverride, kind, error)) return false;
+    }
     if (!Number(entity.Camera.VerticalFovDegrees, 1, 179) || !Number(entity.Camera.NearPlane, 1e-4f, 1e8f)
         || !Number(entity.Camera.FarPlane, 1e-4f, 1e9f) || entity.Camera.FarPlane <= entity.Camera.NearPlane) return reject("Invalid camera properties");
     if (!Number(entity.Animation.Duration, 1e-4f, 86400) || entity.Animation.Keys.size() > MaxAnimationKeys)
@@ -337,6 +350,16 @@ Json Encode(const Transform& value)
 {
     return {{"position", Encode(value.Position)}, {"rotationDegrees", Encode(value.RotationDegrees)}, {"scale", Encode(value.Scale)}};
 }
+Json EncodeShadow(const jAdvancedShadows::Settings& s)
+{
+    return {{"projection", std::uint32_t(s.DirectionalProjection)}, {"pointProjection", std::uint32_t(s.PointProjection)},
+        {"representation", std::uint32_t(s.Method)}, {"resolution", s.MapResolution}, {"cascadeCount", s.CascadeCount},
+        {"splitLambda", s.SplitLambda}, {"maxDistance", s.MaxDistance}, {"cascadeStabilize", s.CascadeStabilize},
+        {"casterPadding", s.CasterPadding}, {"positiveExponent", s.PositiveExponent}, {"negativeExponent", s.NegativeExponent},
+        {"minimumVariance", s.MinimumVariance}, {"bleedReduction", s.BleedReduction}, {"blurRadius", s.BlurRadius},
+        {"deepOpacityMultiplier", s.DeepOpacityMultiplier}, {"deepTauMax", s.DeepTauMax}, {"deepMaxDistance", s.DeepMaxDistance},
+        {"volumeMaxTriangles", s.VolumeMaxTriangles}, {"volumeRange", s.VolumeRange}};
+}
 Json Encode(const Entity& e)
 {
     Json keys = Json::array();
@@ -363,6 +386,8 @@ Json Encode(const Entity& e)
         {"terrain", {{"resolution", e.Terrain.Resolution}, {"sizeX", e.Terrain.SizeX}, {"sizeZ", e.Terrain.SizeZ}, {"heights", e.Terrain.Heights}}},
         {"navigation", {{"enabled", e.Navigation.Enabled}, {"cellSize", e.Navigation.CellSize}, {"agentRadius", e.Navigation.AgentRadius},
             {"agentHeight", e.Navigation.AgentHeight}, {"maxSlopeDegrees", e.Navigation.MaxSlopeDegrees}}}};
+    if (e.Light.ShadowOverride) result["light"]["shadow"] = EncodeShadow(*e.Light.ShadowOverride);
+    if (e.ShadowCaster) result["shadowCaster"] = *e.ShadowCaster;
     // Keep unchanged v1 documents byte-shape compatible for non-water defaults.
     if (e.Kind == EntityKind::Water || e.Water != WaterProperties{})
     {
@@ -386,9 +411,11 @@ std::string Serialize(const SceneState& state, const char* format = "jEngineScen
     if (selectionRoots) result["roots"] = *selectionRoots;
     return result.dump(2) + "\n";
 }
-void ObjectKeys(const Json& json, std::initializer_list<const char*> keys, const char* optionalKey = nullptr)
+void ObjectKeys(const Json& json, std::initializer_list<const char*> keys, const char* optionalKey = nullptr,
+    const char* secondOptionalKey = nullptr)
 {
-    if (!json.is_object() || json.size() != keys.size() + (optionalKey && json.contains(optionalKey)))
+    if (!json.is_object() || json.size() != keys.size() + (optionalKey && json.contains(optionalKey))
+        + (secondOptionalKey && json.contains(secondOptionalKey)))
         throw std::runtime_error("Unexpected or missing JSON fields");
     for (const char* key : keys)
         if (!json.contains(key)) throw std::runtime_error(std::string("Missing JSON field: ") + key);
@@ -422,6 +449,25 @@ bool Boolean(const Json& value)
     if (!value.is_boolean()) throw std::runtime_error("Expected JSON boolean");
     return value.get<bool>();
 }
+jAdvancedShadows::Settings DecodeShadow(const Json& j)
+{
+    ObjectKeys(j, {"projection", "pointProjection", "representation", "resolution", "cascadeCount", "splitLambda", "maxDistance",
+        "cascadeStabilize", "casterPadding", "positiveExponent", "negativeExponent", "minimumVariance", "bleedReduction",
+        "blurRadius", "deepOpacityMultiplier", "deepTauMax", "deepMaxDistance", "volumeMaxTriangles", "volumeRange"});
+    jAdvancedShadows::Settings s;
+    s.DirectionalProjection = jAdvancedShadows::Projection(Unsigned32(j.at("projection")));
+    s.PointProjection = jAdvancedShadows::PointProjection(Unsigned32(j.at("pointProjection")));
+    s.Method = jAdvancedShadows::Representation(Unsigned32(j.at("representation")));
+    s.MapResolution = Unsigned32(j.at("resolution")); s.CascadeCount = Unsigned32(j.at("cascadeCount"));
+    s.SplitLambda = Float(j.at("splitLambda")); s.MaxDistance = Float(j.at("maxDistance"));
+    s.CascadeStabilize = Boolean(j.at("cascadeStabilize")); s.CasterPadding = Float(j.at("casterPadding"));
+    s.PositiveExponent = Float(j.at("positiveExponent")); s.NegativeExponent = Float(j.at("negativeExponent"));
+    s.MinimumVariance = Float(j.at("minimumVariance")); s.BleedReduction = Float(j.at("bleedReduction"));
+    s.BlurRadius = Unsigned32(j.at("blurRadius")); s.DeepOpacityMultiplier = Float(j.at("deepOpacityMultiplier"));
+    s.DeepTauMax = Float(j.at("deepTauMax")); s.DeepMaxDistance = Float(j.at("deepMaxDistance"));
+    s.VolumeMaxTriangles = Unsigned32(j.at("volumeMaxTriangles")); s.VolumeRange = Float(j.at("volumeRange"));
+    return s;
+}
 Vec3 DecodeVec(const Json& value)
 {
     if (!value.is_array() || value.size() != 3) throw std::runtime_error("Expected three vector components");
@@ -435,7 +481,7 @@ Transform DecodeTransform(const Json& value)
 Entity DecodeEntity(const Json& j)
 {
     ObjectKeys(j, {"id", "parent", "kind", "name", "visible", "locked", "transform", "sourceAsset", "assetId", "meshLocalTransforms",
-        "material", "light", "camera", "animation", "particles", "terrain", "navigation"}, "water");
+        "material", "light", "camera", "animation", "particles", "terrain", "navigation"}, "water", "shadowCaster");
     Entity e;
     e.Id = Unsigned(j.at("id")); e.Parent = Unsigned(j.at("parent"));
     const std::string kind = String(j.at("kind"));
@@ -444,6 +490,7 @@ Entity DecodeEntity(const Json& j)
         if (kind == KindName(EntityKind(i))) { e.Kind = EntityKind(i); known = true; break; }
     if (!known) throw std::runtime_error("Unknown entity kind");
     e.Name = String(j.at("name")); e.Visible = Boolean(j.at("visible")); e.Locked = Boolean(j.at("locked"));
+    if (const auto shadow = j.find("shadowCaster"); shadow != j.end()) e.ShadowCaster = Boolean(*shadow);
     e.Local = DecodeTransform(j.at("transform")); e.SourceAsset = String(j.at("sourceAsset")); e.AssetId = String(j.at("assetId"));
     const auto& meshes = j.at("meshLocalTransforms");
     if (!meshes.is_array() || meshes.size() > 65536) throw std::runtime_error("Mesh transform limit exceeded");
@@ -464,9 +511,10 @@ Entity DecodeEntity(const Json& j)
             normal == it->end() ? !e.Material.NormalTexture.empty() : Boolean(*normal)};
     }
     const auto& l = j.at("light");
-    ObjectKeys(l, {"color", "intensity", "range", "innerConeDegrees", "outerConeDegrees", "castShadows"});
+    ObjectKeys(l, {"color", "intensity", "range", "innerConeDegrees", "outerConeDegrees", "castShadows"}, "shadow");
     e.Light.Color = DecodeVec(l.at("color")); e.Light.Intensity = Float(l.at("intensity")); e.Light.Range = Float(l.at("range"));
     e.Light.InnerConeDegrees = Float(l.at("innerConeDegrees")); e.Light.OuterConeDegrees = Float(l.at("outerConeDegrees")); e.Light.CastShadows = Boolean(l.at("castShadows"));
+    if (const auto shadow = l.find("shadow"); shadow != l.end()) e.Light.ShadowOverride = DecodeShadow(*shadow);
     const auto& c = j.at("camera");
     ObjectKeys(c, {"verticalFovDegrees", "nearPlane", "farPlane", "primary"});
     e.Camera.VerticalFovDegrees = Float(c.at("verticalFovDegrees")); e.Camera.NearPlane = Float(c.at("nearPlane"));

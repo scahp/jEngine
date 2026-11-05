@@ -3,7 +3,9 @@
 #include <cstdint>
 #include <filesystem>
 #include <string>
+#include <optional>
 #include "Renderer/Features/jSceneFeatureSettings.h"
+#include "Renderer/Features/jAdvancedShadowSettings.h"
 
 class jEditor;
 class jEditorProject;
@@ -37,6 +39,15 @@ bool ReadSceneFeatures(const jEditorProjectConfig& config, const std::filesystem
     jSceneFeatures::Settings& output, std::string& shAsset, std::string& error);
 bool WriteSceneFeatures(jEditorProjectConfig& config, const jSceneFeatures::Settings& input,
     const std::string& shAsset, std::string& error);
+// Missing advanced-shadow keys use engine defaults. Strict parsing and writes
+// are transactional; unrelated project settings survive unchanged.
+bool ReadAdvancedShadows(const jEditorProjectConfig& config, jAdvancedShadows::Settings& output, std::string& error);
+bool WriteAdvancedShadows(jEditorProjectConfig& config, const jAdvancedShadows::Settings& input, std::string& error);
+// Owner-thread ImGui controls only; callers own document/history/save/publish.
+// No kind means independent global defaults. A per-light edit rejects illegal
+// combinations; global controls explain any incompatible effective light type.
+bool RenderAdvancedShadowControls(jAdvancedShadows::Settings& settings, std::string& error,
+    std::optional<jAdvancedShadows::LightKind> kind = std::nullopt);
 void SetVisible(bool visible);
 bool IsVisible();
 void Render(jEditor& editor, jEditorProject* project);

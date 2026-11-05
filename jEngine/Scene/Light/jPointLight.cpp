@@ -1,6 +1,7 @@
 ﻿#include "pch.h"
 #include "jPointLight.h"
 #include "Shader/jLightingShaderParameters.h"
+#include "Renderer/jAdvancedShadowPass.h"
 
 jPointLight::jPointLight()
     : jLight(ELightType::POINT)
@@ -66,6 +67,7 @@ const std::shared_ptr<jShaderBindingInstance>& jPointLight::PrepareShaderBinding
             jPointLightShaderParameters Parameters;
             Parameters.PointLight.Buffer = LightDataUniformBlockPtr;
             Parameters.PointLightShadowCubeMap = { InShadowMap ? InShadowMap : GWhiteCubeTexture.get(), ShadowSamplerStateInfo };
+            jAdvancedShadows::SetDefaultBindings(Parameters);
             ShaderBindingInstanceWithShadowMap = jShaderParameterSet::CreateShaderBindingInstance(Parameters, EShaderAccessStageFlag::ALL_GRAPHICS, jShaderBindingInstanceType::MultiFrame);
         }
     }

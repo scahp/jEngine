@@ -4,6 +4,8 @@
 #include "Code/Engine/jEditor.h"
 #include "FileLoader/jEditorAssets.h"
 #include "jOptions.h"
+#include "Code/Engine/ConsoleVariables/jConsole.h"
+#include "Code/Engine/ConsoleVariables/jConsoleVariable.h"
 #include <chrono>
 #include <fstream>
 #include <iostream>
@@ -53,6 +55,12 @@ int RunEditorProjectSettingsTests()
             {"input.camera.forward", "I"}, {"input.camera.back", "K"}, {"input.camera.left", "J"},
             {"input.camera.right", "L"}, {"input.camera.up", "U"}, {"input.camera.down", "O"},
             {"custom.future.option", "preserve this value"}};
+        jAdvancedShadows::Settings advanced;
+        advanced.DirectionalProjection = jAdvancedShadows::Projection::Cascaded;
+        advanced.PointProjection = jAdvancedShadows::PointProjection::DualParaboloid;
+        advanced.Method = jAdvancedShadows::Representation::ExponentialVariance;
+        advanced.MapResolution = 128; advanced.MinimumVariance = 1e-8f;
+        expect(Settings::WriteAdvancedShadows(candidate, advanced, error), "encode full independent shadow defaults without losing small variance values");
         GSupportInlineRaytracing = false; GRHISupportVsync = false;
         const auto documentBeforeSettings = editor.GetDocument().ToJson();
         const auto revisionBeforeSettings = editor.GetDocument().Revision();
@@ -64,6 +72,8 @@ int RunEditorProjectSettingsTests()
         expect(gOptions.ShadowFilterMode == 1 && gOptions.ShadowFilterRadiusTexels == 2.25f
             && editor.GetDocument().ToJson() == documentBeforeSettings && editor.GetDocument().Revision() == revisionBeforeSettings,
             "saved Poisson shadow-map settings apply without changing the scene document or undo revision");
+        expect(gOptions.AdvancedShadows == advanced,
+            "advanced shadow settings publish the exact saved typed snapshot rather than a UI-only copy");
         expect(!gOptions.SurfelGIInlineRayEnable && !GUseVsync
             && project.GetConfig().Settings.at("render.surfelgi.inline") == "true"
             && project.GetConfig().Settings.at("render.vsync") == "true", "unsupported requested features retained while effective states remain disabled");
@@ -77,6 +87,8 @@ int RunEditorProjectSettingsTests()
             "same request enables actual inline/VSync options when capabilities are present");
         expect(gOptions.ShadowFilterMode == 1 && gOptions.ShadowFilterRadiusTexels == 2.25f,
             "reopened project restores actual shadow filtering options");
+        expect(gOptions.AdvancedShadows == advanced && gOptions.AdvancedShadows.MinimumVariance == 1e-8f,
+            "actual project reopen and Apply preserve the smallest supported variance exactly");
         expect(Settings::ConsumePresentModeChange() && !Settings::ConsumePresentModeChange(), "VSync queues exactly one safe-boundary swapchain refresh request");
         ResetAllKeyState(); SetKeyDownState(EInputKey::I, true);
         expect(Settings::ActionDown("camera.forward", EInputKey::W) && !Settings::ActionDown("camera.back", EInputKey::S),
@@ -114,12 +126,14 @@ int RunEditorProjectSettingsTests()
             const bool deferred = gOptions.UseDeferredRenderer, surfel = gOptions.UseSurfelGI;
             const int shadowMode = gOptions.ShadowFilterMode;
             const float shadowRadius = gOptions.ShadowFilterRadiusTexels;
+            const auto advancedBefore = gOptions.AdvancedShadows;
             const auto binding = Settings::Binding("camera.forward", EInputKey::W);
             expect(!Settings::Save(project, editor, bad, error) && !error.empty()
                 && project.GetConfig().Settings == validConfig.Settings && project.GetConfig().Name == validConfig.Name
                 && project.GetConfig().StartupScene == validConfig.StartupScene && text(project.GetProjectFile()) == validDisk
                 && gOptions.UseDeferredRenderer == deferred && gOptions.UseSurfelGI == surfel
                 && gOptions.ShadowFilterMode == shadowMode && gOptions.ShadowFilterRadiusTexels == shadowRadius
+                && gOptions.AdvancedShadows == advancedBefore
                 && Settings::Binding("camera.forward", EInputKey::W) == binding, name);
         };
         for (const std::string invalid : {"NaN", "inf", "-1", "8.1", "2garbage", "", " 1", "1 "})
@@ -130,6 +144,24 @@ int RunEditorProjectSettingsTests()
         { auto bad = validConfig; bad.Settings["render.shadow.filter"] = invalid; reject(bad, "invalid shadow mode preserves config disk and actual runtime options"); }
         for (const std::string invalid : {"NaN", "inf", "-0.01", "4.01", "2garbage", "", " 1", "1 "})
         { auto bad = validConfig; bad.Settings["render.shadow.radiusTexels"] = invalid; reject(bad, "nonfinite out-of-range or malformed shadow radius rejected transactionally"); }
+        for (const std::string invalid : {"3", "-1", "1.5", "1x", "NaN", "", " 1", "1 "})
+        { auto bad = validConfig; bad.Settings["render.shadow.projection"] = invalid; reject(bad, "advanced shadow enums require complete bounded integers"); }
+        for (const std::string invalid : {"NaN", "inf", "0", "1e-9", "1.01", "1x", " 0.2"})
+        { auto bad = validConfig; bad.Settings["render.shadow.moments.minimumVariance"] = invalid; reject(bad, "invalid advanced moments preserve manifest runtime and camera state"); }
+        for (const auto pair : {std::pair{"render.shadow.resolution", "96"}, std::pair{"render.shadow.cascade.count", "5"},
+            std::pair{"render.shadow.volume.maxTriangles", "65537"}, std::pair{"render.shadow.deep.tauMax", "33"},
+            std::pair{"render.shadow.cascade.stabilize", "1"}})
+        { auto bad = validConfig; bad.Settings[pair.first] = pair.second; reject(bad, "advanced shadow capacity and strict boolean limits reject transactionally"); }
+        {
+            auto bad = validConfig; bad.Settings["render.shadow.resolution"] = "96";
+            auto retained = advanced; const auto before = retained;
+            expect(!Settings::ReadAdvancedShadows(bad, retained, error) && retained == before,
+                "failed shadow codec leaves the caller's previous snapshot intact");
+            auto invalid = advanced; invalid.DeepTauMax = 33;
+            auto retainedConfig = validConfig;
+            expect(!Settings::WriteAdvancedShadows(retainedConfig, invalid, error) && retainedConfig.Settings == validConfig.Settings,
+                "failed shadow encoding preserves every existing known and unknown project setting");
+        }
         { auto bad = validConfig; bad.Settings["render.ssgi"] = "yes"; reject(bad, "ambiguous boolean cannot silently enable renderer settings"); }
         { auto bad = validConfig; bad.Settings["input.camera.forward"] = "CTRL+I"; reject(bad, "invalid camera key cannot replace active bindings"); }
         { auto bad = validConfig; bad.Settings["input.camera.forward"] = "K"; reject(bad, "conflicting camera bindings rejected with diagnostic"); }
@@ -153,8 +185,25 @@ int RunEditorProjectSettingsTests()
             && gOptions.BloomEyeAdaptation == defaults.BloomEyeAdaptation && gOptions.SurfelGIIntensity == defaults.SurfelGIIntensity
             && gOptions.SurfelGIInlineRayCount == defaults.SurfelGIInlineRayCount && !GUseVsync
             && gOptions.ShadowFilterMode == defaults.ShadowFilterMode && gOptions.ShadowFilterRadiusTexels == defaults.ShadowFilterRadiusTexels
+            && gOptions.AdvancedShadows == defaults.AdvancedShadows
             && Settings::Binding("camera.forward", EInputKey::I) == EInputKey::W, "omitted known settings restore engine defaults rather than previous project values");
         expect(Settings::ConsumePresentModeChange(), "resetting VSync defaults also schedules frame-boundary refresh");
+        RegisterAdvancedShadowConsoleVariables(); RegisterAdvancedShadowConsoleVariables();
+        auto* representation = jConsole::Get().FindVariable("r.shadow.representation");
+        auto* variance = jConsole::Get().FindVariable("r.shadow.moments.min_variance");
+        expect(representation&&variance,"validated advanced shadow console variables register idempotently");
+        if(representation&&variance)
+        {
+            representation->SetFromString("3");variance->SetFromString("1e-8");
+            const auto accepted=gOptions.AdvancedShadows;
+            expect(accepted.Method==jAdvancedShadows::Representation::ExponentialVariance&&accepted.MinimumVariance==1e-8f,
+                "real typed console adapters publish bounded enum and small float values");
+            representation->SetFromString("6");variance->SetFromString("NaN");variance->SetFromString("1e-9");
+            expect(gOptions.AdvancedShadows==accepted,"invalid console edits preserve the last valid complete shadow snapshot");
+            std::thread foreignShadow([&]{representation->SetFromString("1");});foreignShadow.join();
+            expect(gOptions.AdvancedShadows==accepted,"foreign thread cannot publish shadow settings through console adapters");
+            gOptions.AdvancedShadows=defaults.AdvancedShadows;
+        }
         const auto savedSettings = project.GetConfig();
         fs::rename(project.GetProjectFile(), fixture / "saved-manifest.jproject");
         fs::create_directory(project.GetProjectFile());

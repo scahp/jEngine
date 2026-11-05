@@ -21,7 +21,7 @@ def main():
     parser.add_argument('--icd', type=Path)
     parser.add_argument('--api', choices=['vulkan', 'dx12'], default='vulkan')
     parser.add_argument('--output', type=Path, default=Path('build/authoring/verification'))
-    parser.add_argument('--case', action='append', choices=['uploads', 'workflow', 'renderer-switch', 'scene-features'])
+    parser.add_argument('--case', action='append', choices=['uploads', 'workflow', 'renderer-switch', 'scene-features', 'advanced-shadows'])
     parser.add_argument('--scene-id', default='Sponza_PathTracing/sponza.glb',
                         help='Scene Browser scene used for renderer-switch verification; prepare its shared materials first.')
     parser.add_argument('--scene-loader', default='Model', choices=['Model', 'PathTracing'])
@@ -62,6 +62,8 @@ def main():
                            '--scene-browser', args.scene_id, args.scene_loader]
             elif case == 'scene-features':
                 command = [str(engine), '--ci-scene-features', str(destination)]
+            elif case == 'advanced-shadows':
+                command = [str(engine), '--ci-advanced-shadows', str(destination)]
             else:
                 command = [str(engine), '--ci-editor-flow', str(destination)]
             command.append('-' + args.api)
@@ -102,6 +104,12 @@ def main():
                         or len(flow['checks']) < 12 or not all(item['pass'] for item in flow['checks'])):
                     raise RuntimeError('Selected rendering feature GPU checks did not pass')
                 entry['scene_features_report'] = flow
+            elif case == 'advanced-shadows':
+                flow = json.loads((destination / 'advanced-shadows-gpu-report.json').read_text())
+                if (flow['status'] != 'passed' or flow['failureCount'] or flow['renderedFrames'] < 24
+                        or len(flow['checks']) < 24 or not all(item['pass'] for item in flow['checks'])):
+                    raise RuntimeError('Advanced shadow GPU checks did not pass')
+                entry['advanced_shadows_report'] = flow
             else:
                 flow = json.loads((destination / 'editor-authoring-gpu-report.json').read_text())
                 if (flow['status'] != 'passed' or flow['failureCount'] or flow['authoredEntities'] != 100

@@ -179,10 +179,6 @@ void* jPipelineStateInfo_Vulkan::CreateGraphicsPipelineState()
         return vkPipeline;
 
     check(PipelineStateFixed);
-    check(VertexBufferArray.NumOfData);
-
-    VkPipelineVertexInputStateCreateInfo vertexInputInfo2 = ((jVertexBuffer_Vulkan*)VertexBufferArray[0])->CreateVertexInputState();
-
     // vkCreateGraphicsPipelines 호출 전까지 아래 bindingDescriptions, attributeDescriptions 소멸해제 안되야 함.
     std::vector<VkVertexInputBindingDescription> bindingDescriptions;
     std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
@@ -190,7 +186,11 @@ void* jPipelineStateInfo_Vulkan::CreateGraphicsPipelineState()
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     jVertexBuffer_Vulkan::CreateVertexInputState(vertexInputInfo, bindingDescriptions, attributeDescriptions, VertexBufferArray);
 
-    VkPipelineInputAssemblyStateCreateInfo inputAssembly = ((jVertexBuffer_Vulkan*)VertexBufferArray[0])->CreateInputAssemblyState();
+    // Vertex-ID fullscreen triangles have no vertex buffers or attributes.
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    if (VertexBufferArray.NumOfData)
+        inputAssembly = ((jVertexBuffer_Vulkan*)VertexBufferArray[0])->CreateInputAssemblyState();
 
     // 4. Viewports and scissors
     // SwapChain의 이미지 사이즈가 이 클래스에 정의된 상수 WIDTH, HEIGHT와 다를 수 있다는 것을 기억 해야함.

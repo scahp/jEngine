@@ -28,6 +28,8 @@
 #include <fstream>
 #include <iomanip>
 #include <sstream>
+#include <cmath>
+#include <limits>
 
 namespace
 {
@@ -759,5 +761,103 @@ std::string CaptureSceneFeatureTexturePixels(const std::shared_ptr<jTexture>& te
 #else
     (void)texture; (void)pngPath;
     return "{\"available\":false,\"readback\":false}";
+#endif
+}
+
+bool ReadSceneFeatureTextureFloats(const std::shared_ptr<jTexture>& texture,
+    std::vector<float>& rgba, uint32_t& width, uint32_t& height, std::string& error)
+{
+#ifdef ENABLE_EDITOR_FEATURES
+    if (!texture || !texture->Width || !texture->Height || texture->Width > 4096 || texture->Height > 4096
+        || (texture->Format != ETextureFormat::RGBA32F && texture->Format != ETextureFormat::RGBA16F))
+    { error = "Float readback requires a bounded RGBA32F/RGBA16F color texture"; return false; }
+    const bool half = texture->Format == ETextureFormat::RGBA16F;
+    const uint32 channels = 4, componentBytes = half ? 2 : 4;
+    const uint32 sourceWidth = texture->Width, sourceHeight = texture->Height;
+    uint32 rowPitch = sourceWidth * channels * componentBytes;
+    uint64 size = uint64(rowPitch) * sourceHeight;
+#ifdef _WIN32
+    D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint{};
+    if (IsUseDX12())
+    {
+        const auto description = static_cast<jTexture_DX12*>(texture.get())->Texture->Get()->GetDesc();
+        uint32 rows = 0; uint64 rowBytes = 0;
+        g_rhi_dx12->Device->GetCopyableFootprints(&description, 0, 1, 0, &footprint, &rows, &rowBytes, &size);
+        rowPitch = footprint.Footprint.RowPitch;
+    }
+#endif
+    // Synchronous verification only. This wait is outside timed frame samples
+    // and is never used by a production shadow pass.
+    g_rhi->Flush();
+    auto buffer = g_rhi->CreateRawBuffer(size, 512, EBufferCreateFlag::Readback,
+        IsUseVulkan() ? EResourceLayout::UNDEFINED : EResourceLayout::TRANSFER_DST);
+    if (!buffer || !buffer->GetHandle()) { error = "Float readback buffer allocation failed"; return false; }
+    auto* command = g_rhi->BeginSingleTimeCommands();
+    if (!command) { error = "Float readback command allocation failed"; return false; }
+    const auto previous = texture->GetLayout();
+    g_rhi->TransitionLayout(command, texture.get(), EResourceLayout::TRANSFER_SRC);
+    g_rhi->TransitionLayout(command, buffer.get(), EResourceLayout::TRANSFER_DST);
+    command->FlushBarrierBatch();
+    if (IsUseVulkan())
+    {
+        const auto native = static_cast<jCommandBuffer_Vulkan*>(command)->GetRef();
+        VkBufferImageCopy copy{};
+        copy.bufferOffset = buffer->GetOffset();
+        copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+        copy.imageExtent = {sourceWidth, sourceHeight, 1};
+        vkCmdCopyImageToBuffer(native, static_cast<jTexture_Vulkan*>(texture.get())->Image,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, static_cast<jBuffer_Vulkan*>(buffer.get())->Buffer, 1, &copy);
+        VkBufferMemoryBarrier barrier{VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT; barrier.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED; barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.buffer = static_cast<jBuffer_Vulkan*>(buffer.get())->Buffer;
+        barrier.offset = buffer->GetOffset(); barrier.size = size;
+        vkCmdPipelineBarrier(native, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT,
+            0, 0, nullptr, 1, &barrier, 0, nullptr);
+    }
+#ifdef _WIN32
+    else
+    {
+        D3D12_TEXTURE_COPY_LOCATION source{}, destination{};
+        source.pResource = static_cast<ID3D12Resource*>(texture->GetHandle());
+        source.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+        destination.pResource = static_cast<ID3D12Resource*>(buffer->GetHandle());
+        destination.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+        destination.PlacedFootprint = footprint;
+        destination.PlacedFootprint.Offset += buffer->GetOffset();
+        static_cast<jCommandBuffer_DX12*>(command)->Get()->CopyTextureRegion(&destination, 0, 0, 0, &source, nullptr);
+    }
+#endif
+    g_rhi->TransitionLayout(command, texture.get(), previous);
+    command->FlushBarrierBatch();
+    g_rhi->EndSingleTimeCommands(command);
+    const auto* mapped = static_cast<const uint8*>(buffer->Map());
+    if (!mapped) { error = "Float readback mapping failed"; return false; }
+    std::vector<float> result(std::size_t(sourceWidth) * sourceHeight * channels);
+    for (uint32 y = 0; y < sourceHeight; ++y)
+        for (uint32 x = 0; x < sourceWidth; ++x)
+            for (uint32 c = 0; c < channels; ++c)
+            {
+                const auto* sample = mapped + std::size_t(y) * rowPitch + (x * channels + c) * componentBytes;
+                float value;
+                if (half)
+                {
+                    uint16 bits; std::memcpy(&bits, sample, sizeof(bits));
+                    const int exponent = (bits >> 10) & 31, mantissa = bits & 1023;
+                    if (exponent == 31) value = mantissa ? std::numeric_limits<float>::quiet_NaN()
+                        : std::numeric_limits<float>::infinity();
+                    else value = exponent ? std::ldexp(float(1024 + mantissa), exponent - 25)
+                        : std::ldexp(float(mantissa), -24);
+                    if (bits & 0x8000) value = -value;
+                }
+                else std::memcpy(&value, sample, sizeof(value));
+                result[(std::size_t(y) * sourceWidth + x) * channels + c] = value;
+            }
+    buffer->Unmap();
+    rgba = std::move(result); width = sourceWidth; height = sourceHeight; error.clear();
+    return true;
+#else
+    (void)texture; (void)rgba; (void)width; (void)height;
+    error = "Editor GPU verification is unavailable"; return false;
 #endif
 }

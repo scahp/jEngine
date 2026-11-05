@@ -49,7 +49,8 @@ void jRasterizationStateInfo_DX12::Initialize()
     RasterizeDesc.DepthBias = (int32)(DepthBiasEnable ? DepthBiasConstantFactor : 0);
     RasterizeDesc.DepthBiasClamp = DepthBiasClamp;
     RasterizeDesc.SlopeScaledDepthBias = DepthBiasSlopeFactor;
-    RasterizeDesc.DepthClipEnable = DepthClampEnable;
+    // RHI uses Vulkan's depth-clamp meaning; D3D12 exposes its inverse.
+    RasterizeDesc.DepthClipEnable = !DepthClampEnable;
     RasterizeDesc.MultisampleEnable = (int32)SampleCount > 1;
 
     //RasterizeDesc.AntialiasedLineEnable;
@@ -73,8 +74,11 @@ void jDepthStencilStateInfo_DX12::Initialize()
     DepthStencilStateDesc.DepthWriteMask = DepthWriteEnable ? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
     DepthStencilStateDesc.DepthFunc = GetDX12CompareOp(DepthCompareOp);
     DepthStencilStateDesc.StencilEnable = StencilTestEnable;
-    //DepthStencilStateDesc.StencilReadMask;
-    //DepthStencilStateDesc.StencilWriteMask;
+    // D3D12 has common masks for both faces. Shadow-volume states deliberately
+    // use the same read/write masks on front and back.
+    const auto* masks = Front ? Front : Back;
+    DepthStencilStateDesc.StencilReadMask = masks ? static_cast<UINT8>(masks->CompareMask) : 0xff;
+    DepthStencilStateDesc.StencilWriteMask = masks ? static_cast<UINT8>(masks->WriteMask) : 0xff;
     if (Front)
         DepthStencilStateDesc.FrontFace = ((jStencilOpStateInfo_DX12*)Front)->StencilOpStateDesc;
 
@@ -127,8 +131,6 @@ void* jPipelineStateInfo_DX12::CreateGraphicsPipelineState()
 
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
         
-    check(VertexBufferArray.NumOfData > 0);
-
     std::vector<D3D12_INPUT_ELEMENT_DESC> OutInputElementDescs;
     jVertexBuffer_DX12::CreateVertexInputState(OutInputElementDescs, VertexBufferArray);
     psoDesc.InputLayout.pInputElementDescs = OutInputElementDescs.data();
@@ -169,7 +171,9 @@ void* jPipelineStateInfo_DX12::CreateGraphicsPipelineState()
     }
     psoDesc.DepthStencilState = ((jDepthStencilStateInfo_DX12*)(PipelineStateFixed->DepthStencilState))->DepthStencilStateDesc;
     psoDesc.SampleMask = UINT_MAX;
-    psoDesc.PrimitiveTopologyType = ((jVertexBuffer_DX12*)VertexBufferArray[0])->GetTopologyTypeOnly();
+    // Match Vulkan's empty-input path for SV_VertexID fullscreen triangles.
+    psoDesc.PrimitiveTopologyType = VertexBufferArray.NumOfData
+        ? ((jVertexBuffer_DX12*)VertexBufferArray[0])->GetTopologyTypeOnly() : D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
     psoDesc.NumRenderTargets = (uint32)RenderPassDX12->GetRTVFormats().size();
 
     const int32 NumOfRTVs = Min((int32)_countof(psoDesc.RTVFormats), (int32)RenderPassDX12->GetRTVFormats().size());

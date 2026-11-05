@@ -37,6 +37,10 @@ def main():
     argument_cases += (['--ci-scene-features'], ['--ci-scene-features', '--invalid'],
                        ['--ci-scene-features', 'unused', '--ci-editor-gpu'],
                        ['--ci-scene-features', 'unused', '--ci-renderer-switch', 'unused'])
+    argument_cases += (['--ci-advanced-shadows'], ['--ci-advanced-shadows', '--invalid'],
+                       ['--ci-advanced-shadows', 'unused', '--ci-editor-gpu'],
+                       ['--ci-advanced-shadows', 'unused', '--ci-scene-features', 'unused'],
+                       ['--ci-advanced-shadows', 'first', '--ci-advanced-shadows', 'second'])
     for arguments in argument_cases:
         result = subprocess.run([str(engine), *arguments], cwd=source, env=base, capture_output=True, text=True, timeout=15)
         if result.returncode != 1 or 'jEngine initialized:' in result.stdout:

@@ -4,6 +4,7 @@
 #include "jOptions.h"
 #include "jEngine.h"
 #include "Renderer/Features/jShadowFiltering.h"
+#include "Renderer/jAdvancedShadowPass.h"
 #include "RHI/jRHI.h"
 #include "RHI/jRaytracingScene.h"
 #include <algorithm>
@@ -28,6 +29,13 @@ constexpr std::array<Action, 6> Actions{{
 constexpr std::array<const char*, 10> RenderKeys{{"render.deferred", "render.surfelgi", "render.surfelgi.inline",
     "render.ssgi", "render.bloom", "render.vsync", "render.surfelgi.intensity", "render.surfelgi.inline.rays",
     "render.shadow.filter", "render.shadow.radiusTexels"}};
+constexpr const char* AdvancedShadowKeys[] = {
+    "render.shadow.projection", "render.shadow.pointProjection", "render.shadow.representation", "render.shadow.resolution",
+    "render.shadow.cascade.count", "render.shadow.cascade.lambda", "render.shadow.maxDistance", "render.shadow.cascade.stabilize",
+    "render.shadow.casterPadding", "render.shadow.moments.positiveExponent", "render.shadow.moments.negativeExponent",
+    "render.shadow.moments.minimumVariance", "render.shadow.moments.bleedReduction", "render.shadow.moments.blurRadius",
+    "render.shadow.deep.opacityMultiplier", "render.shadow.deep.tauMax", "render.shadow.deep.maxDistance",
+    "render.shadow.volume.maxTriangles", "render.shadow.volume.range"};
 constexpr const char* SceneKeys[] = {
     "render.environment.enabled", "render.environment.intensity", "render.environment.combineGI", "render.environment.shAsset",
     "render.ppr.enabled", "render.ppr.fillHoles", "render.ppr.plane", "render.ppr.thickness", "render.ppr.normalThreshold",
@@ -43,6 +51,7 @@ struct Prepared
     float Intensity;
     int Rays;
     jShadowFiltering::Settings ShadowFilter;
+    jAdvancedShadows::Settings AdvancedShadows;
     jSceneFeatures::Settings SceneFeatures;
     std::string EnvironmentAsset;
     std::map<std::string, EInputKey> Bindings;
@@ -83,6 +92,7 @@ const Action* FindAction(const char* name)
 bool KnownKey(const std::string& key)
 {
     if (std::find(RenderKeys.begin(), RenderKeys.end(), key) != RenderKeys.end()) return true;
+    if (std::find(std::begin(AdvancedShadowKeys), std::end(AdvancedShadowKeys), key) != std::end(AdvancedShadowKeys)) return true;
     if (std::find(std::begin(SceneKeys), std::end(SceneKeys), key) != std::end(SceneKeys)) return true;
     for (const auto& action : Actions) if (key == std::string("input.") + action.Name) return true;
     return false;
@@ -165,6 +175,7 @@ bool Prepare(const jEditorProjectConfig& config, Prepared& prepared, std::string
     }
     if (!jShadowFiltering::TryMakeSettings(shadowMode, shadowRadius, prepared.ShadowFilter))
     { error = "Shadow filtering requires render.shadow.filter 0 or 1 and finite render.shadow.radiusTexels from 0 to 4"; return false; }
+    if (!ReadAdvancedShadows(config, prepared.AdvancedShadows, error)) return false;
     if (!ReadSceneFeatures(config, root, prepared.SceneFeatures, prepared.EnvironmentAsset, error)) return false;
     std::map<EInputKey, std::string> used;
     for (const auto& action : Actions)
@@ -209,6 +220,7 @@ void Publish(Prepared&& prepared)
     gOptions.UseDeferredRenderer = prepared.Deferred;
     gOptions.ShadowFilterMode = static_cast<int>(prepared.ShadowFilter.Method);
     gOptions.ShadowFilterRadiusTexels = prepared.ShadowFilter.RadiusTexels;
+    gOptions.AdvancedShadows = prepared.AdvancedShadows;
     gOptions.SceneFeatures = prepared.SceneFeatures;
     gOptions.UseSurfelGI = prepared.SurfelGI;
     gOptions.SurfelGIInlineRayEnable = prepared.Inline && GSupportInlineRaytracing;
@@ -333,6 +345,176 @@ bool FeatureAssetPath(const std::string& value,const fs::path& root,std::string&
     if(relative.extension()!=".jsh"){error="Environment SH asset must use .jsh";return false;}
     return bool(jEditorProject::ResolveSafe(root.empty()?fs::current_path():root,relative,error,!root.empty()));
 }
+}
+
+bool ReadAdvancedShadows(const jEditorProjectConfig& config, jAdvancedShadows::Settings& output, std::string& error)
+{
+    jAdvancedShadows::Settings candidate;
+    const auto& values = config.Settings;
+    std::uint32_t projection = 0, point = 0, representation = 0;
+    if (!FeatureUnsigned(values, "render.shadow.projection", projection, error)
+        || !FeatureUnsigned(values, "render.shadow.pointProjection", point, error)
+        || !FeatureUnsigned(values, "render.shadow.representation", representation, error)) return false;
+    candidate.DirectionalProjection = jAdvancedShadows::Projection(projection);
+    candidate.PointProjection = jAdvancedShadows::PointProjection(point);
+    candidate.Method = jAdvancedShadows::Representation(representation);
+#define JE_SHADOW_READ_INT(key, field) if (!FeatureUnsigned(values, "render.shadow." key, candidate.field, error)) return false
+#define JE_SHADOW_READ_FLOAT(key, field) if (!FeatureFloat(values, "render.shadow." key, candidate.field, error)) return false
+    JE_SHADOW_READ_INT("resolution", MapResolution);
+    JE_SHADOW_READ_INT("cascade.count", CascadeCount);
+    JE_SHADOW_READ_FLOAT("cascade.lambda", SplitLambda);
+    JE_SHADOW_READ_FLOAT("maxDistance", MaxDistance);
+    if (!Boolean(values, "render.shadow.cascade.stabilize", candidate.CascadeStabilize, error)) return false;
+    JE_SHADOW_READ_FLOAT("casterPadding", CasterPadding);
+    JE_SHADOW_READ_FLOAT("moments.positiveExponent", PositiveExponent);
+    JE_SHADOW_READ_FLOAT("moments.negativeExponent", NegativeExponent);
+    JE_SHADOW_READ_FLOAT("moments.minimumVariance", MinimumVariance);
+    JE_SHADOW_READ_FLOAT("moments.bleedReduction", BleedReduction);
+    JE_SHADOW_READ_INT("moments.blurRadius", BlurRadius);
+    JE_SHADOW_READ_FLOAT("deep.opacityMultiplier", DeepOpacityMultiplier);
+    JE_SHADOW_READ_FLOAT("deep.tauMax", DeepTauMax);
+    JE_SHADOW_READ_FLOAT("deep.maxDistance", DeepMaxDistance);
+    JE_SHADOW_READ_INT("volume.maxTriangles", VolumeMaxTriangles);
+    JE_SHADOW_READ_FLOAT("volume.range", VolumeRange);
+#undef JE_SHADOW_READ_INT
+#undef JE_SHADOW_READ_FLOAT
+    return jAdvancedShadows::ValidateSettings(candidate, output, error);
+}
+
+bool WriteAdvancedShadows(jEditorProjectConfig& config, const jAdvancedShadows::Settings& input, std::string& error)
+{
+    jAdvancedShadows::Settings checked;
+    if (!jAdvancedShadows::ValidateSettings(input, checked, error)) return false;
+    auto values = config.Settings;
+    values["render.shadow.projection"] = std::to_string(std::uint32_t(checked.DirectionalProjection));
+    values["render.shadow.pointProjection"] = std::to_string(std::uint32_t(checked.PointProjection));
+    values["render.shadow.representation"] = std::to_string(std::uint32_t(checked.Method));
+#define JE_SHADOW_WRITE_INT(key, field) values["render.shadow." key] = std::to_string(checked.field)
+#define JE_SHADOW_WRITE_FLOAT(key, field) values["render.shadow." key] = FeatureText(checked.field)
+    JE_SHADOW_WRITE_INT("resolution", MapResolution);
+    JE_SHADOW_WRITE_INT("cascade.count", CascadeCount);
+    JE_SHADOW_WRITE_FLOAT("cascade.lambda", SplitLambda);
+    JE_SHADOW_WRITE_FLOAT("maxDistance", MaxDistance);
+    values["render.shadow.cascade.stabilize"] = checked.CascadeStabilize ? "true" : "false";
+    JE_SHADOW_WRITE_FLOAT("casterPadding", CasterPadding);
+    JE_SHADOW_WRITE_FLOAT("moments.positiveExponent", PositiveExponent);
+    JE_SHADOW_WRITE_FLOAT("moments.negativeExponent", NegativeExponent);
+    JE_SHADOW_WRITE_FLOAT("moments.minimumVariance", MinimumVariance);
+    JE_SHADOW_WRITE_FLOAT("moments.bleedReduction", BleedReduction);
+    JE_SHADOW_WRITE_INT("moments.blurRadius", BlurRadius);
+    JE_SHADOW_WRITE_FLOAT("deep.opacityMultiplier", DeepOpacityMultiplier);
+    JE_SHADOW_WRITE_FLOAT("deep.tauMax", DeepTauMax);
+    JE_SHADOW_WRITE_FLOAT("deep.maxDistance", DeepMaxDistance);
+    JE_SHADOW_WRITE_INT("volume.maxTriangles", VolumeMaxTriangles);
+    JE_SHADOW_WRITE_FLOAT("volume.range", VolumeRange);
+#undef JE_SHADOW_WRITE_INT
+#undef JE_SHADOW_WRITE_FLOAT
+    config.Settings = std::move(values); error.clear(); return true;
+}
+
+bool RenderAdvancedShadowControls(jAdvancedShadows::Settings& settings, std::string& error,
+    std::optional<jAdvancedShadows::LightKind> kind)
+{
+    using namespace jAdvancedShadows;
+    Settings candidate;
+    if (!ValidateSettings(settings, candidate, error))
+        ImGui::TextColored(ImVec4(1,.6f,.4f,1), "%s", error.c_str());
+    ImGui::PushItemWidth(std::max(48.f, ImGui::GetContentRegionAvail().x
+        - ImGui::CalcTextSize("Maximum shadow distance").x - ImGui::GetStyle().ItemInnerSpacing.x));
+    bool changed = false;
+    int method = int(candidate.Method);
+    if (ImGui::Combo("Representation", &method, "Depth\0Variance (VSM)\0Exponential (ESM)\0Exponential Variance (EVSM)\0Deep (8 bins)\0Shadow Volume\0"))
+    { candidate.Method = Representation(method); changed = true; }
+    if (!kind || *kind == LightKind::Directional)
+    {
+        int projection = int(candidate.DirectionalProjection);
+        if (ImGui::Combo("Directional projection", &projection, "Single\0Cascaded (CSM)\0Perspective (PSM)\0"))
+        { candidate.DirectionalProjection = Projection(projection); changed = true; }
+    }
+    if (!kind || *kind == LightKind::Point)
+    {
+        int projection = int(candidate.PointProjection);
+        if (ImGui::Combo("Point projection", &projection, "Cube\0Dual Paraboloid\0"))
+        { candidate.PointProjection = PointProjection(projection); changed = true; }
+    }
+    if (candidate.Method != Representation::ShadowVolume)
+    {
+        int resolution = candidate.MapResolution == 64 ? 0 : candidate.MapResolution == 128 ? 1
+            : candidate.MapResolution == 256 ? 2 : candidate.MapResolution == 512 ? 3 : 4;
+        if (ImGui::Combo("Map tile resolution", &resolution, "64\0" "128\0" "256\0" "512\0" "1024\0"))
+        { candidate.MapResolution = 64u << resolution; changed = true; }
+        changed |= ImGui::DragFloat("Maximum shadow distance", &candidate.MaxDistance, 10, .01f, 1e6f, "%.4g", ImGuiSliderFlags_AlwaysClamp);
+        changed |= ImGui::DragFloat("Caster padding", &candidate.CasterPadding, 10, 0, 1e5f, "%.4g", ImGuiSliderFlags_AlwaysClamp);
+    }
+    if ((!kind || *kind == LightKind::Directional) && candidate.DirectionalProjection == Projection::Cascaded
+        && candidate.Method != Representation::ShadowVolume)
+    {
+        int count = int(candidate.CascadeCount);
+        if (ImGui::SliderInt("Cascade count", &count, 1, 4)) { candidate.CascadeCount = std::uint32_t(count); changed = true; }
+        changed |= ImGui::SliderFloat("Split lambda", &candidate.SplitLambda, 0, 1);
+        changed |= ImGui::Checkbox("Stabilize cascades", &candidate.CascadeStabilize);
+    }
+    if (candidate.Method == Representation::Variance || candidate.Method == Representation::Exponential
+        || candidate.Method == Representation::ExponentialVariance)
+    {
+        if (candidate.Method != Representation::Variance)
+            changed |= ImGui::SliderFloat("Positive exponent", &candidate.PositiveExponent, .1f, 40);
+        if (candidate.Method == Representation::ExponentialVariance)
+            changed |= ImGui::SliderFloat("Negative exponent", &candidate.NegativeExponent, .1f, 40);
+        if (candidate.Method != Representation::Exponential)
+        {
+            changed |= ImGui::DragFloat("Minimum variance", &candidate.MinimumVariance, 1e-6f, 1e-8f, 1, "%.8g", ImGuiSliderFlags_AlwaysClamp);
+            changed |= ImGui::SliderFloat("Light bleed reduction", &candidate.BleedReduction, 0, .999f);
+        }
+        int radius = int(candidate.BlurRadius);
+        if (ImGui::SliderInt("Moment blur radius", &radius, 0, 8)) { candidate.BlurRadius = std::uint32_t(radius); changed = true; }
+    }
+    if (candidate.Method == Representation::Deep)
+    {
+        ImGui::TextDisabled("8 optical-depth bins; opacity includes material alpha.");
+        changed |= ImGui::SliderFloat("Opacity multiplier", &candidate.DeepOpacityMultiplier, 0, 16);
+        changed |= ImGui::SliderFloat("Maximum optical depth", &candidate.DeepTauMax, .01f, 32);
+        changed |= ImGui::DragFloat("Deep maximum distance", &candidate.DeepMaxDistance, 10, .01f, 1e6f, "%.4g", ImGuiSliderFlags_AlwaysClamp);
+    }
+    if (candidate.Method == Representation::ShadowVolume
+        || ((!kind || *kind == LightKind::Point) && candidate.PointProjection == PointProjection::DualParaboloid))
+    {
+        int triangles = int(candidate.VolumeMaxTriangles);
+        if (ImGui::SliderInt("Geometry triangle budget", &triangles, 1, int(MaximumVolumeTriangles)))
+        { candidate.VolumeMaxTriangles = std::uint32_t(triangles); changed = true; }
+    }
+    if (candidate.Method == Representation::ShadowVolume)
+    {
+        changed |= ImGui::DragFloat("Volume range", &candidate.VolumeRange, 10, 32, 1e6f, "%.4g", ImGuiSliderFlags_AlwaysClamp);
+        ImGui::TextWrapped("Volumes require Single directional / Cube point projection. Source triangle and GPU budgets are bounded.");
+    }
+    Settings validated;
+    const bool valid = ValidateSettings(candidate, validated, error)
+        && (!kind || ValidateForLight(candidate, *kind, error));
+    if (!valid) ImGui::TextColored(ImVec4(1,.6f,.4f,1), "%s", error.c_str());
+    if (!kind && valid)
+        for (const auto light : {LightKind::Directional, LightKind::Point})
+        {
+            std::string reason;
+            if (!ValidateForLight(candidate, light, reason)) ImGui::TextColored(ImVec4(1,.75f,.4f,1), "%s", reason.c_str());
+        }
+    if (!kind && ImGui::TreeNode("Last-frame shadow diagnostics"))
+    {
+        const auto& frame = jAdvancedShadows::GetLastFrameStats();
+        ImGui::Text("Additional targets: %.2f MiB", double(frame.AdditionalTargetBytes) / (1024 * 1024));
+        for (std::size_t i = 0; i < std::min<std::size_t>(frame.Lights.size(), 16); ++i)
+        {
+            const auto& light = frame.Lights[i];
+            ImGui::Text("Light %u: advanced %s, %d raster / %d compute passes", unsigned(i + 1),
+                light.Active ? "active" : "inactive", light.RasterPasses, light.ComputePasses);
+            if (!light.Diagnostic.empty()) ImGui::TextWrapped("%s", light.Diagnostic.c_str());
+        }
+        if (frame.Lights.size() > 16) ImGui::TextDisabled("%u more lights", unsigned(frame.Lights.size() - 16));
+        ImGui::TreePop();
+    }
+    ImGui::PopItemWidth();
+    if (changed && valid) { settings = validated; return true; }
+    return false;
 }
 
 bool ReadSceneFeatures(const jEditorProjectConfig& config,const fs::path& root,
@@ -537,6 +719,11 @@ void Render(jEditor& editor, jEditorProject* project)
         BoolWidget("Deferred renderer", "render.deferred", requested.Deferred);
         if (ImGui::TreeNodeEx("Shadows", ImGuiTreeNodeFlags_DefaultOpen))
         {
+            auto advanced = requested.AdvancedShadows;
+            std::string advancedError;
+            if (RenderAdvancedShadowControls(advanced, advancedError)
+                && WriteAdvancedShadows(state.Draft, advanced, advancedError)) state.Changed = true;
+            ImGui::Separator();
             constexpr const char* filters[] = {"Existing", "Poisson PCF"};
             int mode = static_cast<int>(requested.ShadowFilter.Method);
             float radius = requested.ShadowFilter.RadiusTexels;
@@ -560,7 +747,7 @@ void Render(jEditor& editor, jEditorProject* project)
             if (g_Engine) ImGui::Text("Active renderer: %s", g_Engine->Game.GetActiveSceneRenderPipelineName());
             if (pathTracing) ImGui::TextWrapped("Path Tracing is active; these settings are retained for raster shadow maps.");
             else if (hwrt) ImGui::TextWrapped("HWRT direct lighting is active; ray-traced shadows bypass this filter.");
-            else ImGui::TextWrapped("Shadow-map filtering only. Path Tracing and HWRT rays do not use this filter.");
+            else ImGui::TextWrapped("Raster shadows only. The comparison filter applies to Depth; Path Tracing and HWRT rays bypass these settings.");
             ImGui::TreePop();
         }
         BoolWidget("SurfelGI", "render.surfelgi", requested.SurfelGI);

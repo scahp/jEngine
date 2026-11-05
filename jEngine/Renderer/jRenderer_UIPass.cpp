@@ -7,6 +7,7 @@
 #include "jEngine.h"
 #include "RHI/jRaytracingScene.h"
 #include "Code/Engine/ConsoleVariables/jConsole.h"
+#include "Code/Engine/Editor/jEditorProjectSettings.h"
 #include "Scene/jCamera.h"
 #include <algorithm>
 #include <cctype>
@@ -814,6 +815,11 @@ void IRenderer::UIPass()
                         ImGui::Separator();
                         if (ImGui::CollapsingHeader("Shadows", ImGuiTreeNodeFlags_DefaultOpen))
                         {
+                            auto advanced = gOptions.AdvancedShadows;
+                            std::string advancedError;
+                            if (jEditorProjectSettings::RenderAdvancedShadowControls(advanced, advancedError))
+                                gOptions.AdvancedShadows = advanced;
+                            ImGui::Separator();
                             jShadowFiltering::Settings current;
                             jShadowFiltering::TryMakeSettings(gOptions.ShadowFilterMode, gOptions.ShadowFilterRadiusTexels, current);
                             constexpr const char* filters[] = {"Existing", "Poisson PCF"};
@@ -832,7 +838,7 @@ void IRenderer::UIPass()
                             }
                             if (bIsUsingPathTracingRenderer) ImGui::TextWrapped("Path Tracing is active; these settings are retained for raster shadow maps.");
                             else if (IsHWRTDirectLightingActive) ImGui::TextWrapped("HWRT direct lighting is active; ray-traced shadows bypass this filter.");
-                            else ImGui::TextWrapped("Shadow-map filtering only. Path Tracing and HWRT rays do not use this filter.");
+                            else ImGui::TextWrapped("Raster shadows only. The comparison filter applies to Depth; Path Tracing and HWRT rays bypass these settings.");
                             ImGui::Separator();
                         }
                         ImGui::Checkbox("ShowDebugObject", &gOptions.ShowDebugObject);
@@ -2307,4 +2313,3 @@ void IRenderer::UIPass()
 	});
 	g_ImGUI->Draw(RenderFrameContextPtr);
 }
-

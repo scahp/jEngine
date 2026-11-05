@@ -6,6 +6,7 @@ class jView;
 struct jSceneRenderTarget;
 struct jRenderFrameContext;
 namespace jSceneFeatures { struct Settings; }
+namespace jAdvancedShadows { class Frame; }
 
 // Light 별로 렌더링할 정보들을 갖고 있는 객체
 struct jShadowDrawInfo
@@ -95,6 +96,7 @@ public:
     std::future<void> BasePassSetupCompleteEvent;
 
     std::vector<jShadowDrawInfo> ShadowDrawInfo;
+    std::shared_ptr<jAdvancedShadows::Frame> AdvancedShadowFrame;
     std::vector<jDrawCommand> BasePasses;
     std::vector<std::shared_ptr<IUniformBufferBlock>> ForwardLightUniformBuffers;
     std::vector<std::shared_ptr<jShaderBindingInstance>> ForwardLightBindings;

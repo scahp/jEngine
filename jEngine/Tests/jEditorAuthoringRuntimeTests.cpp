@@ -50,12 +50,18 @@ int RunEditorAuthoringRuntimeTests()
         const Matrix firstBase=original.RenderObjects[0]->World,secondBase=original.RenderObjects[1]->World;
         jObject::AddObject(&original);editor.TrackWorldObjectSource(&original,"Assets/fixture.gltf","fixture-asset",1);
         std::unique_ptr<jPointLight> sourceLight(jLight::CreatePointLight(Vector(20,30,40),Vector(2,3,4),500,Vector::OneVector,Vector::OneVector,64));
+        jAdvancedShadows::Settings importedShadows;
+        importedShadows.Method=jAdvancedShadows::Representation::Deep;
+        importedShadows.PointProjection=jAdvancedShadows::PointProjection::DualParaboloid;
+        sourceLight->SetShadowOverride(importedShadows);
         jLight::AddLights(sourceLight.get());
         expect(editor.CaptureWorldToDocument(),"capture binds registered model and real light to plain authored entities");
         const auto modelId=editor.EntityForObject(&original);EntityId lightId=0;
         for(const auto& [id,e]:editor.GetDocument().Entities())if(editor.LightForEntity(id)==sourceLight.get())lightId=id;
         expect(modelId&&lightId&&editor.GetDocument().Find(modelId)->SourceAsset=="Assets/fixture.gltf"
             &&editor.GetDocument().Find(modelId)->MeshLocalTransforms.size()==2,"capture persists source references and every mesh-local transform");
+        expect(lightId&&editor.GetDocument().Find(lightId)->Light.ShadowOverride==sourceLight->GetShadowOverride(),
+            "world capture persists the actual source light shadow override without inventing a global override");
         auto camera=std::unique_ptr<jCamera>(jCamera::CreateCamera(Vector(0,0,-100),Vector::ZeroVector,Vector(0,1,-100),DegreeToRadian(60),0.1f,10000,1280,720,true));
         camera->UpdateCamera();editor.Tick(0,camera.get());
         {
@@ -72,6 +78,29 @@ int RunEditorAuthoringRuntimeTests()
                 "actual authoring gizmo draws without input or an invalid initial operation and preserves authored state");
         }
         auto& document=editor.GetDocument();auto model=*document.Find(modelId);
+        expect(!model.ShadowCaster,"captured models inherit their source shadow-casting flag by default");
+        model.ShadowCaster=false;document.Update(model,"Receiver only");editor.Tick(0,camera.get());jObject::FlushDirtyState();
+        expect(original.SkipShadowMapGen&&std::find(jObject::GetStaticObject().begin(),jObject::GetStaticObject().end(),&original)!=jObject::GetStaticObject().end()
+            &&std::find(jObject::GetShadowCasterObject().begin(),jObject::GetShadowCasterObject().end(),&original)==jObject::GetShadowCasterObject().end()
+            &&std::find(jObject::GetShadowCasterRenderObject().begin(),jObject::GetShadowCasterRenderObject().end(),original.RenderObjects[0])==jObject::GetShadowCasterRenderObject().end(),
+            "owner publication removes actual object and render meshes from casters while keeping the receiver registered");
+        editor.SyncDocumentToWorld();
+        expect(!original.DirtyObjectState,"unchanged caster value avoids redundant dirty-state publication on a full document sync");
+        editor.SelectEntity(modelId);const auto casterCopyId=editor.DuplicateSelected();editor.Tick(0,camera.get());
+        auto* casterCopy=editor.ObjectForEntity(casterCopyId);
+        const bool copyReceiver=casterCopy&&casterCopy->SkipShadowMapGen;
+        if(const auto* copied=document.Find(casterCopyId)){
+            auto casterCopyEntity=*copied;casterCopyEntity.ShadowCaster.reset();
+            document.Update(casterCopyEntity,"Inherit duplicate caster flag");editor.Tick(0,camera.get());jObject::FlushDirtyState();
+        }
+        expect(copyReceiver&&casterCopy&&!casterCopy->SkipShadowMapGen&&original.SkipShadowMapGen,
+            "duplicate retains the actual prototype baseline so clearing its override does not inherit the edited source instance flag");
+        document.Delete(casterCopyId);editor.Tick(0,camera.get());
+        model=*document.Find(modelId);model.ShadowCaster.reset();document.Update(model,"Inherit source caster flag");
+        editor.Tick(0,camera.get());jObject::FlushDirtyState();editor.SelectEntity(modelId);
+        expect(!original.SkipShadowMapGen&&std::count(jObject::GetShadowCasterObject().begin(),jObject::GetShadowCasterObject().end(),&original)==1,
+            "clearing object casting override restores exactly one inherited source caster registration");
+        model=*document.Find(modelId);
         model.Local.Position={100,20,-5};model.Local.RotationDegrees={0,90,0};model.Local.Scale={2,2,2};
         expect(document.Update(model,"Move model"),"authored transform enters the real command history");editor.Tick(0,camera.get());
         float matrix[16];document.GetWorldMatrix(modelId,matrix);const Matrix modelWorld(matrix);
@@ -170,6 +199,19 @@ int RunEditorAuthoringRuntimeTests()
         expect(std::abs((camera->Pos-camera->Target).Length()-oldDistance)<0.01f,"Alt-left orbit preserves the focus radius");
         ResetAllKeyState();g_MouseState[MouseButtonIndex(EMouseButtonType::LEFT)].Down=false;
         int lightCallbacks=0;auto* authoredLight=dynamic_cast<jPointLight*>(editor.LightForEntity(lightId));
+        auto shadowEntity=*document.Find(lightId);
+        auto changedShadows=importedShadows;changedShadows.Method=jAdvancedShadows::Representation::Variance;
+        shadowEntity.Light.ShadowOverride=changedShadows;
+        const bool shadowUpdated=document.Update(shadowEntity,"Change actual light shadows");editor.Tick(0,camera.get());
+        expect(shadowUpdated&&authoredLight->GetShadowOverride()==shadowEntity.Light.ShadowOverride,
+            "owner runtime applies a persisted shadow override to the actual reconstructed light");
+        const bool shadowUndone=document.Undo();editor.Tick(0,camera.get());
+        expect(shadowUndone&&authoredLight->GetShadowOverride()==std::optional<jAdvancedShadows::Settings>(importedShadows),
+            "Undo republishes the previous actual per-light shadow method");
+        shadowEntity=*document.Find(lightId);shadowEntity.Light.ShadowOverride.reset();
+        const bool shadowCleared=document.Update(shadowEntity,"Inherit shadows");editor.Tick(0,camera.get());
+        expect(shadowCleared&&!authoredLight->GetShadowOverride(),"clearing an override returns the runtime light to project/global inheritance");
+        document.Undo();editor.Tick(0,camera.get());
         auto lightEntity=*document.Find(lightId);lightEntity.Local.Position.X+=17;lightEntity.Light.Range+=45;document.Update(lightEntity,"Move authored light");
         authoredLight->PreUpdateLambda=[&](jLight* light,float){++lightCallbacks;light->SetPosition(Vector(999));};
         editor.Tick(0,camera.get());const auto lightPosition=Vector(lightEntity.Local.Position.X,lightEntity.Local.Position.Y,lightEntity.Local.Position.Z);

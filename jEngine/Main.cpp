@@ -109,6 +109,8 @@ int RunSceneFeatureProjectTests();
 int RunEditorToolsTests();
 int RunEditorAuthoringRuntimeTests();
 int RunSceneFeatureIntegrationGpuTests(const char* directory);
+int RunAdvancedShadowIntegrationGpuTests(const char* directory);
+namespace jAdvancedShadows { int RunAdapterTests(); }
 int RunModelUploadGpuTests();
 int RunEditorParticleMaterialGpuTests();
 int RunLogBenchmark();
@@ -164,7 +166,8 @@ int main(int argc, char** argv)
         const int project = RunSceneFeatureProjectTests();
         const int tools = RunEditorToolsTests();
         const int runtime = RunEditorAuthoringRuntimeTests();
-        return graphics || settings || sceneCpu || sceneSettings || mapping || water || project || tools || runtime ? EXIT_FAILURE : EXIT_SUCCESS;
+        const int shadows = jAdvancedShadows::RunAdapterTests();
+        return graphics || settings || sceneCpu || sceneSettings || mapping || water || project || tools || runtime || shadows ? EXIT_FAILURE : EXIT_SUCCESS;
     }
     if (argc == 2 && std::strcmp(argv[1], "--ci-log-benchmark") == 0) return RunLogBenchmark();
     if (argc >= 2 && (std::strcmp(argv[1], "--benchmark-assets") == 0 || std::strcmp(argv[1], "--benchmark-editor") == 0))
@@ -195,24 +198,26 @@ int main(int argc, char** argv)
     }
 
     // Validate external input before creating a window, GPU resources or worker threads.
-    std::string editorFlowDirectory, rendererSwitchDirectory, sceneFeaturesDirectory;
+    std::string editorFlowDirectory, rendererSwitchDirectory, sceneFeaturesDirectory, advancedShadowsDirectory;
     for (int i = 1; i < argc; ++i)
     {
         const bool rendererSwitch = std::strcmp(argv[i], "--ci-renderer-switch") == 0;
         const bool sceneFeatures = std::strcmp(argv[i], "--ci-scene-features") == 0;
-        if (!rendererSwitch && !sceneFeatures && std::strcmp(argv[i], "--ci-editor-flow") != 0) continue;
-        auto& directory = sceneFeatures ? sceneFeaturesDirectory : rendererSwitch ? rendererSwitchDirectory : editorFlowDirectory;
+        const bool advancedShadows = std::strcmp(argv[i], "--ci-advanced-shadows") == 0;
+        if (!rendererSwitch && !sceneFeatures && !advancedShadows && std::strcmp(argv[i], "--ci-editor-flow") != 0) continue;
+        auto& directory = advancedShadows ? advancedShadowsDirectory : sceneFeatures ? sceneFeaturesDirectory : rendererSwitch ? rendererSwitchDirectory : editorFlowDirectory;
         if (!directory.empty() || ++i == argc || !argv[i][0] || argv[i][0] == '-')
-        { std::cerr << "Usage: --ci-editor-flow|--ci-renderer-switch|--ci-scene-features <owned-output-directory> [-vulkan|-dx12]" << std::endl; return EXIT_FAILURE; }
+        { std::cerr << "Usage: --ci-editor-flow|--ci-renderer-switch|--ci-scene-features|--ci-advanced-shadows <owned-output-directory> [-vulkan|-dx12]" << std::endl; return EXIT_FAILURE; }
         try { directory = jEditorAssetPath::ToUtf8(std::filesystem::absolute(jEditorAssetPath::FromUtf8(argv[i]))); }
         catch (const std::exception& error) { std::cerr << error.what() << std::endl; return EXIT_FAILURE; }
     }
-    if ((int(!editorFlowDirectory.empty()) + int(!rendererSwitchDirectory.empty()) + int(!sceneFeaturesDirectory.empty()) > 1) ||
-        ((!editorFlowDirectory.empty() || !rendererSwitchDirectory.empty() || !sceneFeaturesDirectory.empty()) && gCommandLineArgument.HasArgument("--ci-editor-gpu")))
+    if ((int(!editorFlowDirectory.empty()) + int(!rendererSwitchDirectory.empty()) + int(!sceneFeaturesDirectory.empty()) + int(!advancedShadowsDirectory.empty()) > 1) ||
+        ((!editorFlowDirectory.empty() || !rendererSwitchDirectory.empty() || !sceneFeaturesDirectory.empty() || !advancedShadowsDirectory.empty()) && gCommandLineArgument.HasArgument("--ci-editor-gpu")))
     { std::cerr << "Select only one editor GPU test" << std::endl; return EXIT_FAILURE; }
     if (!editorFlowDirectory.empty()) SetAuthoringTestStateDirectory(jEditorAssetPath::FromUtf8(editorFlowDirectory) / "workspace-state");
     if (!rendererSwitchDirectory.empty()) SetAuthoringTestStateDirectory(jEditorAssetPath::FromUtf8(rendererSwitchDirectory) / "workspace-state");
     if (!sceneFeaturesDirectory.empty()) SetAuthoringTestStateDirectory(jEditorAssetPath::FromUtf8(sceneFeaturesDirectory) / "workspace-state");
+    if (!advancedShadowsDirectory.empty()) SetAuthoringTestStateDirectory(jEditorAssetPath::FromUtf8(advancedShadowsDirectory) / "workspace-state");
     std::string authoringError;
     if (!ConfigureEditorStartup(argc, argv, authoringError)) { std::cerr << authoringError << std::endl; return EXIT_FAILURE; }
     std::string browserScene, browserLoader;
@@ -240,7 +245,7 @@ int main(int argc, char** argv)
     }
     bool waitForTestScene = false;
     if (!ReadEngineBoolean("JENGINE_TEST_WAIT_FOR_SCENE", waitForTestScene)) return EXIT_FAILURE;
-    if (gCommandLineArgument.HasArgument("--ci-editor-gpu") || !editorFlowDirectory.empty() || !rendererSwitchDirectory.empty() || !sceneFeaturesDirectory.empty()) waitForTestScene = true;
+    if (gCommandLineArgument.HasArgument("--ci-editor-gpu") || !editorFlowDirectory.empty() || !rendererSwitchDirectory.empty() || !sceneFeaturesDirectory.empty() || !advancedShadowsDirectory.empty()) waitForTestScene = true;
     if (!ReadEngineBoolean("JENGINE_SURFEL_GI", gOptions.UseSurfelGI)
         || !ReadEngineBoolean("JENGINE_INLINE_RAY", gOptions.SurfelGIInlineRayEnable))
         return EXIT_FAILURE;
@@ -366,6 +371,12 @@ int main(int argc, char** argv)
         g_Engine->Release(); g_rhi->ReleaseRHI(); glfwTerminate(); return EXIT_FAILURE;
     }
 #endif
+    if (!advancedShadowsDirectory.empty())
+    {
+        const int failures = RunAdvancedShadowIntegrationGpuTests(advancedShadowsDirectory.c_str());
+        g_Engine->Release(); g_rhi->ReleaseRHI(); glfwTerminate();
+        return failures ? EXIT_FAILURE : EXIT_SUCCESS;
+    }
     if (!sceneFeaturesDirectory.empty())
     {
         const int failures = RunSceneFeatureIntegrationGpuTests(sceneFeaturesDirectory.c_str());

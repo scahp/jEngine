@@ -1,7 +1,9 @@
 #include "common.hlsl"
+// Advanced shadow shader injection point.
 #include "lightutil.hlsl"
 #include "PBR.hlsl"
 #include "shadowfiltering.hlsl"
+#include "Features/advancedshadowlighting.hlsl"
 
 #ifndef USE_VARIABLE_SHADING_RATE
 #define USE_VARIABLE_SHADING_RATE 0
@@ -57,7 +59,11 @@ float4 main(VSOutput input
 
     float Lit = 1.0f;
 #if USE_SHADOW_MAP
-    if (-1.0 <= DirectionalLightShadowPosition.z && DirectionalLightShadowPosition.z <= 1.0)
+    if (DirectionalShadow.SamplingParams.z > 0.5)
+        Lit = JE_SampleAdvancedLightShadow(DirectionalShadow, DirectionalAdvancedShadowMap,
+            DirectionalDeepShadow0, DirectionalDeepShadow1, DirectionalAdvancedShadowMapSampler,
+            WorldPos, ViewParam.VP);
+    else if (-1.0 <= DirectionalLightShadowPosition.z && DirectionalLightShadowPosition.z <= 1.0)
     {
         const float Bias = 0.002f;
         Lit = SampleShadowVisibility2D(DirectionalLightShadowMap, DirectionalLightShadowMapSampler,

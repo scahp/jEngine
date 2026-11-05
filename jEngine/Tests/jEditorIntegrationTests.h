@@ -2,11 +2,15 @@
 
 #include <string>
 #include <memory>
+#include <vector>
+#include <cstdint>
 struct jTexture;
 
 // Serialized actual preview readback metrics plus an unmodified PNG capture.
 std::string CaptureSceneFeaturePixels(const char* pngPath);
 std::string CaptureSceneFeatureTexturePixels(const std::shared_ptr<jTexture>& texture, const char* pngPath);
+bool ReadSceneFeatureTextureFloats(const std::shared_ptr<jTexture>& texture,
+    std::vector<float>& rgba, uint32_t& width, uint32_t& height, std::string& error);
 
 // Call after real RHI/engine initialization and initial scene imports complete.
 // Runs bounded owner-thread Update/Draw/EndOfFrame cycles; writes a durable JSON
