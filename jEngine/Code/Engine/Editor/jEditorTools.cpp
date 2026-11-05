@@ -1108,6 +1108,11 @@ struct ToolState
 {
     EntityId Selected = 0; MaterialGraph Graph; uint32_t SelectedNode = 0, NextNode = 4;
     std::vector<MaterialGraph> Undo, Redo;
+    uint32_t MovingNode = 0, RevealNode = 0;
+    float GraphHeightRatio = .6f, GraphWidthRatio = .65f;
+    bool DetailsBesideGraph = false, FocusNodeSearch = false;
+    ImVec2 NewNodePosition{20, 20}, VisibleGraphPosition{20, 20};
+    char NodeSearch[128]{};
     std::string Error, AssignedGraph; char GraphPath[512] = "Assets/Materials/Material.jmaterial";
     bool AssignedGraphHasNormal = false;
     std::filesystem::path SceneMaterialRoot;
@@ -1233,12 +1238,43 @@ void GraphHistory()
     auto& s = Tools(); s.Undo.push_back(s.Graph); if (s.Undo.size() > 64) s.Undo.erase(s.Undo.begin()); s.Redo.clear();
 }
 constexpr float MaterialNodeWidth = 165;
+struct MaterialNodeDefinition
+{
+    NodeKind Kind;
+    const char* Name;
+    const char* Category;
+    const char* Description;
+    const char* Keywords;
+    ImU32 Color;
+};
+constexpr MaterialNodeDefinition MaterialNodeDefinitions[] = {
+    {NodeKind::Color, "Color", "Constants", "Constant RGB color.", "constant3vector vector3 rgb color colour", IM_COL32(91, 67, 121, 255)},
+    {NodeKind::Scalar, "Scalar", "Constants", "Constant numeric value.", "constant float value number", IM_COL32(91, 67, 121, 255)},
+    {NodeKind::Add, "Add", "Math", "Add two numeric inputs.", "sum plus arithmetic", IM_COL32(63, 95, 112, 255)},
+    {NodeKind::Multiply, "Multiply", "Math", "Multiply two numeric inputs.", "product times tint arithmetic", IM_COL32(63, 95, 112, 255)},
+    {NodeKind::Channel, "Channel", "Math", "Extract one R, G, B or A component.", "componentmask separate split rgba", IM_COL32(63, 95, 112, 255)},
+    {NodeKind::UV, "UV", "Coordinates", "Mesh texture coordinates with tiling and offset.", "texcoord texturecoordinate mapping", IM_COL32(110, 80, 48, 255)},
+    {NodeKind::TextureObject, "Texture Object", "Textures", "Texture asset reference for sampling and mapping nodes.", "texture2d image asset", IM_COL32(52, 103, 77, 255)},
+    {NodeKind::TextureSample, "Texture Sample", "Textures", "Sample RGBA from a texture at UV coordinates.", "texturesample image color", IM_COL32(52, 103, 77, 255)},
+    {NodeKind::TextureSampleNormal, "Sample Normal", "Textures", "Decode a normal map in tangent, object or world space.", "normalmap normal map bump", IM_COL32(52, 103, 77, 255)},
+    {NodeKind::Texture, "Texture", "Textures", "Legacy color sample using the original mesh UV.", "legacy image sample", IM_COL32(52, 103, 77, 255)},
+    {NodeKind::Parallax, "Parallax", "Mapping", "Offset UV coordinates using a height texture.", "height depth offset", IM_COL32(54, 88, 135, 255)},
+    {NodeKind::POM, "POM", "Mapping", "Parallax occlusion mapping with bounded ray steps.", "parallaxocclusionmapping height depth", IM_COL32(54, 88, 135, 255)},
+    {NodeKind::Relief, "Relief", "Mapping", "Relief or dual-depth texture mapping.", "height depth ray", IM_COL32(54, 88, 135, 255)},
+    {NodeKind::Interior, "Interior", "Mapping", "Virtual room sampling, with optional dual-depth input.", "room window depth", IM_COL32(54, 88, 135, 255)},
+    {NodeKind::Horizon, "Horizon", "Mapping", "Visibility and ambient occlusion from baked horizon maps.", "shadow ao occlusion", IM_COL32(54, 88, 135, 255)},
+    {NodeKind::DiffusionProfile, "Diffusion Profile", "Subsurface", "Diffusion preset for the material SSS Profile output.", "sss skin scattering subsurface", IM_COL32(125, 65, 65, 255)}
+};
+const MaterialNodeDefinition* MaterialNodeInfo(NodeKind kind)
+{
+    for (const auto& definition : MaterialNodeDefinitions)
+        if (definition.Kind == kind) return &definition;
+    return nullptr;
+}
 const char* MaterialNodeName(NodeKind kind)
 {
-    static const char* names[] = {"Color", "Scalar", "Texture", "Multiply", "Add", "UV", "Texture Object", "Texture Sample",
-        "Sample Normal", "Channel", "Parallax", "POM", "Relief", "Interior", "Horizon", "Diffusion Profile"};
-    const auto index = int(kind);
-    return index >= 0 && index < int(std::size(names)) ? names[index] : "Invalid";
+    const auto* definition = MaterialNodeInfo(kind);
+    return definition ? definition->Name : "Invalid";
 }
 struct MaterialInputPin { const char* Label; uint32_t MaterialNode::*Source; };
 std::span<const MaterialInputPin> MaterialInputs(NodeKind kind)
@@ -1303,6 +1339,136 @@ bool AcceptMaterialOutput(const MaterialOutputPin& pin, NodeKind kind)
     if (pin.Source == &MaterialGraph::Normal)
         return kind == NodeKind::Texture || kind == NodeKind::TextureSampleNormal || kind == NodeKind::Color || kind == NodeKind::Multiply || kind == NodeKind::Add;
     return kind != NodeKind::Horizon && kind != NodeKind::TextureObject && kind != NodeKind::DiffusionProfile && !MaterialUVKind(kind);
+}
+
+void RestoreGraphHistory(bool redo)
+{
+    auto& s = Tools();
+    auto& source = redo ? s.Redo : s.Undo;
+    auto& destination = redo ? s.Undo : s.Redo;
+    if (source.empty()) return;
+    destination.push_back(std::move(s.Graph));
+    s.Graph = std::move(source.back()); source.pop_back();
+    if (std::none_of(s.Graph.Nodes.begin(), s.Graph.Nodes.end(), [&](const auto& node) { return node.Id == s.SelectedNode; }))
+        s.SelectedNode = 0;
+    s.MovingNode = s.RevealNode = 0;
+    s.Error.clear();
+}
+
+void RemoveMaterialNode(uint32_t id)
+{
+    auto& s = Tools();
+    const auto node = std::find_if(s.Graph.Nodes.begin(), s.Graph.Nodes.end(), [id](const auto& value) { return value.Id == id; });
+    if (node == s.Graph.Nodes.end()) return;
+    GraphHistory();
+    for (const auto& pin : MaterialOutputPins)
+        if (s.Graph.*pin.Source == id) s.Graph.*pin.Source = 0;
+    for (auto& current : s.Graph.Nodes)
+        for (auto* input : {&current.InputA, &current.InputB, &current.InputC, &current.InputD})
+            if (*input == id) *input = 0;
+    s.Graph.Nodes.erase(node);
+    s.SelectedNode = s.MovingNode = s.RevealNode = 0;
+    s.Error.clear();
+}
+
+void AddMaterialNode(NodeKind kind)
+{
+    auto& s = Tools();
+    if (s.Graph.Nodes.size() >= MaxMaterialNodes) return;
+    GraphHistory();
+    MaterialNode node;
+    // Allocate from the current graph, including after undo or loading an asset.
+    while (!s.NextNode || std::any_of(s.Graph.Nodes.begin(), s.Graph.Nodes.end(), [&](const auto& value) { return value.Id == s.NextNode; }))
+        ++s.NextNode;
+    node.Id = s.NextNode++; node.Kind = kind;
+    node.X = std::max(0.f, s.NewNodePosition.x); node.Y = std::max(0.f, s.NewNodePosition.y);
+    if (kind == NodeKind::Channel || kind == NodeKind::DiffusionProfile) node.Parameters = {0, 0, 0, 0};
+    if (kind == NodeKind::Parallax) node.Parameters = {.05f, 4, 0, 0};
+    if (kind == NodeKind::POM || kind == NodeKind::Relief) node.Parameters = {.05f, 32, 6, 0};
+    if (kind == NodeKind::Interior) node.Parameters = {1, 1, 1, 1};
+    if (kind == NodeKind::Horizon) node.Parameters = {.05f, 1, 1, 0};
+    s.SelectedNode = node.Id;
+    s.RevealNode = node.Id;
+    s.Graph.Nodes.push_back(std::move(node));
+    s.Error.clear();
+}
+
+void OpenMaterialNodePopup(const ImVec2& position)
+{
+    auto& s = Tools();
+    s.NewNodePosition = position;
+    s.NodeSearch[0] = 0;
+    s.FocusNodeSearch = true;
+    ImGui::OpenPopup("Add material node");
+}
+
+ImVec2 FreeMaterialNodePosition()
+{
+    const auto& s = Tools();
+    // Toolbar additions use an unoccupied slot; a context-menu addition uses
+    // the exact graph-space location captured by the right click instead.
+    ImVec2 position = s.VisibleGraphPosition;
+    for (size_t slot = 0; slot <= MaxMaterialNodes * 4; ++slot)
+    {
+        position = ImVec2(s.VisibleGraphPosition.x + float(slot % 3) * 190,
+            s.VisibleGraphPosition.y + float(slot / 3) * 190);
+        if (std::none_of(s.Graph.Nodes.begin(), s.Graph.Nodes.end(), [&](const auto& node) {
+            return position.x < node.X + MaterialNodeWidth + 10 && position.x + MaterialNodeWidth + 10 > node.X
+                && position.y < node.Y + MaterialNodeHeight(node.Kind) + 10 && position.y + 174 > node.Y;
+        })) break;
+    }
+    return position;
+}
+
+void MaterialNodePopup(bool nodeActions)
+{
+    auto& s = Tools();
+    if (!ImGui::BeginPopup("Add material node")) return;
+    if (nodeActions && s.SelectedNode)
+    {
+        ImGui::TextDisabled("Selected node #%u", s.SelectedNode);
+        if (ImGui::MenuItem("Delete node", "Delete / Backspace")) RemoveMaterialNode(s.SelectedNode);
+        ImGui::Separator();
+    }
+    ImGui::TextUnformatted("Add material node");
+    if (s.FocusNodeSearch) { ImGui::SetKeyboardFocusHere(); s.FocusNodeSearch = false; }
+    ImGui::SetNextItemWidth(300);
+    const bool enter = ImGui::InputTextWithHint("##NodeSearch", "Search nodes, categories or aliases...", s.NodeSearch, sizeof(s.NodeSearch), ImGuiInputTextFlags_EnterReturnsTrue);
+    ImGuiTextFilter filter(s.NodeSearch);
+    const bool full = s.Graph.Nodes.size() >= MaxMaterialNodes;
+    if (full) ImGui::TextDisabled("Node limit reached (%zu). Delete a node first.", MaxMaterialNodes);
+    ImGui::BeginDisabled(full);
+    const float listHeight = std::min(350.f, ImGui::GetIO().DisplaySize.y * .5f);
+    ImGui::BeginChild("NodePalette", ImVec2(320, std::max(100.f, listHeight)));
+    const char* category = nullptr;
+    bool any = false;
+    std::optional<NodeKind> chosen;
+    for (const auto& definition : MaterialNodeDefinitions)
+    {
+        const std::string searchable = std::string(definition.Name) + " " + definition.Category + " " + definition.Keywords;
+        if (!filter.PassFilter(searchable.c_str())) continue;
+        if (!category || std::strcmp(category, definition.Category) != 0)
+        {
+            if (category) ImGui::Spacing();
+            ImGui::TextDisabled("%s", definition.Category);
+            category = definition.Category;
+        }
+        const bool first = !any; any = true;
+        if (ImGui::Selectable(definition.Name) || (first && enter && !full)) chosen = definition.Kind;
+        if (ImGui::IsItemHovered())
+        {
+            ImGui::BeginTooltip();
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 28);
+            ImGui::TextUnformatted(definition.Description);
+            ImGui::PopTextWrapPos();
+            ImGui::EndTooltip();
+        }
+    }
+    if (!any) ImGui::TextDisabled("No matching nodes.");
+    ImGui::EndChild();
+    ImGui::EndDisabled();
+    if (chosen) { AddMaterialNode(*chosen); ImGui::CloseCurrentPopup(); }
+    ImGui::EndPopup();
 }
 
 uint32_t DroppedMaterialNode()
@@ -1476,33 +1642,26 @@ void SurfaceSettings(MaterialGraph::SurfaceProperties& surface)
     if (changed) { GraphHistory(); surface = std::move(edited); }
 }
 
-void GraphUI(jEditor& editor, Entity e, const jEditorProject* project, const jEditorAssetRegistry* registry)
+void MaterialCanvas(const ImVec2& size, bool showOutput, const jEditorProject* project, const jEditorAssetRegistry* registry)
 {
     auto& s = Tools();
-    const bool library = !s.SceneMaterialRoot.empty();
-    ImGui::TextWrapped("Drag Out to a typed input or Material Output pin. Click an input to choose or disconnect its source.");
-    static int addKind = 0; ImGui::Combo("New node", &addKind,
-        "Color\0Scalar\0Texture\0Multiply\0Add\0UV\0Texture Object\0Texture Sample\0Sample Normal\0Channel\0Parallax\0POM\0Relief\0Interior\0Horizon\0Diffusion Profile\0");
-    ImGui::BeginDisabled(s.Graph.Nodes.size() >= MaxMaterialNodes);
-    if (ImGui::Button("Add node"))
-    {
-        GraphHistory(); MaterialNode node; node.Id = s.NextNode++; node.Kind = NodeKind(addKind);
-        node.X = 20 + float(s.Graph.Nodes.size() % 3) * 185; node.Y = 20 + float(s.Graph.Nodes.size() / 3) * 180;
-        if (node.Kind == NodeKind::Channel) node.Parameters = {0, 0, 0, 0};
-        if (node.Kind == NodeKind::Parallax) node.Parameters = {.05f, 4, 0, 0};
-        if (node.Kind == NodeKind::POM || node.Kind == NodeKind::Relief) node.Parameters = {.05f, 32, 6, 0};
-        if (node.Kind == NodeKind::Interior) node.Parameters = {1, 1, 1, 1};
-        if (node.Kind == NodeKind::Horizon) node.Parameters = {.05f, 1, 1, 0};
-        if (node.Kind == NodeKind::DiffusionProfile) node.Parameters = {0, 0, 0, 0};
-        s.Graph.Nodes.push_back(node);
-    }
-    ImGui::EndDisabled();
-    ImGui::SameLine(); if (ImGui::Button("Undo graph") && !s.Undo.empty()) { s.Redo.push_back(s.Graph); s.Graph = s.Undo.back(); s.Undo.pop_back(); }
-    ImGui::SameLine(); if (ImGui::Button("Redo graph") && !s.Redo.empty()) { s.Undo.push_back(s.Graph); s.Graph = s.Redo.back(); s.Redo.pop_back(); }
-    ImGui::SameLine();
-    const bool showOutput = ImGui::Button("Show output");
-    ImGui::BeginChild("MaterialCanvas", ImVec2(0, 390), true, ImGuiWindowFlags_HorizontalScrollbar);
+    if (!ImGui::BeginChild("MaterialCanvas", size, true, ImGuiWindowFlags_HorizontalScrollbar)) { ImGui::EndChild(); return; }
     const auto origin = ImGui::GetCursorScreenPos(); auto* draw = ImGui::GetWindowDrawList();
+    s.VisibleGraphPosition = ImVec2(ImGui::GetScrollX() + 20, ImGui::GetScrollY() + 20);
+    if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) s.MovingNode = 0;
+    const auto windowPosition = ImGui::GetWindowPos(), windowSize = ImGui::GetWindowSize();
+    const bool hovered = ImGui::IsWindowHovered() && ImGui::IsMouseHoveringRect(windowPosition,
+        ImVec2(windowPosition.x + windowSize.x, windowPosition.y + windowSize.y));
+    if (hovered && (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseReleased(ImGuiMouseButton_Right)))
+    {
+        s.SelectedNode = 0;
+        for (auto node = s.Graph.Nodes.rbegin(); node != s.Graph.Nodes.rend(); ++node)
+        {
+            const ImVec2 min(origin.x + node->X, origin.y + node->Y);
+            if (ImGui::IsMouseHoveringRect(min, ImVec2(min.x + MaterialNodeWidth, min.y + MaterialNodeHeight(node->Kind))))
+            { s.SelectedNode = node->Id; break; }
+        }
+    }
     ImVec2 output(origin.x + 230, origin.y + 20);
     float canvasBottom = output.y + MaterialPinY(int(std::size(MaterialOutputPins)) - 1) + 28;
     for (const auto& node : s.Graph.Nodes)
@@ -1523,11 +1682,17 @@ void GraphUI(jEditor& editor, Entity e, const jEditorProject* project, const jEd
         ImGui::PushID(int(node.Id)); ImVec2 p(origin.x + node.X, origin.y + node.Y);
         const ImVec2 end(p.x + MaterialNodeWidth, p.y + MaterialNodeHeight(node.Kind));
         draw->AddRectFilled(p, end, IM_COL32(42, 47, 55, 255), 5);
-        draw->AddRect(p, end, IM_COL32(110, 130, 160, 255), 5);
-        ImGui::SetCursorScreenPos(p); if (ImGui::Button((std::string(MaterialNodeName(node.Kind)) + " #" + std::to_string(node.Id)).c_str(), ImVec2(MaterialNodeWidth, 23))) s.SelectedNode = node.Id;
-        if (ImGui::IsItemActivated()) GraphHistory();
+        const bool selected = s.SelectedNode == node.Id;
+        draw->AddRect(p, end, selected ? IM_COL32(255, 188, 66, 255) : IM_COL32(110, 130, 160, 255), 5, 0, selected ? 3.f : 1.f);
+        const auto* definition = MaterialNodeInfo(node.Kind);
+        ImGui::PushStyleColor(ImGuiCol_Button, selected ? IM_COL32(147, 99, 31, 255) : definition ? definition->Color : IM_COL32(54, 88, 135, 255));
+        ImGui::SetCursorScreenPos(p);
+        ImGui::Button((std::string(MaterialNodeName(node.Kind)) + " #" + std::to_string(node.Id)).c_str(), ImVec2(MaterialNodeWidth, 23));
+        ImGui::PopStyleColor();
+        if (ImGui::IsItemActivated()) s.SelectedNode = node.Id;
         if (ImGui::IsItemActive() && ImGui::IsMouseDragging(0))
         {
+            if (s.MovingNode != node.Id) { GraphHistory(); s.MovingNode = node.Id; }
             node.X = std::max(0.f, node.X + ImGui::GetIO().MouseDelta.x);
             node.Y = std::max(0.f, node.Y + ImGui::GetIO().MouseDelta.y);
         }
@@ -1571,11 +1736,40 @@ void GraphUI(jEditor& editor, Entity e, const jEditorProject* project, const jEd
     ImGui::SetCursorScreenPos(ImVec2(output.x + MaterialNodeWidth + 8, canvasBottom));
     ImGui::Dummy(ImVec2(1, 1));
     if (showOutput) { ImGui::SetScrollHereX(1); ImGui::SetScrollY(0); }
+    if (s.RevealNode)
+    {
+        const auto node = std::find_if(s.Graph.Nodes.begin(), s.Graph.Nodes.end(), [&](const auto& value) { return value.Id == s.RevealNode; });
+        if (node != s.Graph.Nodes.end())
+        {
+            const float visibleWidth = std::max(1.f, windowSize.x - 36);
+            const float visibleHeight = std::max(1.f, windowSize.y - 36);
+            const float scrollX = ImGui::GetScrollX(), scrollY = ImGui::GetScrollY();
+            if (node->X < scrollX) ImGui::SetScrollX(std::max(0.f, node->X - 20));
+            else if (node->X + MaterialNodeWidth > scrollX + visibleWidth)
+                ImGui::SetScrollX(node->X + MaterialNodeWidth - visibleWidth);
+            if (node->Y < scrollY) ImGui::SetScrollY(std::max(0.f, node->Y - 20));
+            else if (node->Y + MaterialNodeHeight(node->Kind) > scrollY + visibleHeight)
+                ImGui::SetScrollY(node->Y + MaterialNodeHeight(node->Kind) - visibleHeight);
+        }
+        s.RevealNode = 0;
+    }
+    if (hovered && ImGui::IsMouseReleased(ImGuiMouseButton_Right))
+        OpenMaterialNodePopup(ImVec2(ImGui::GetIO().MousePos.x - origin.x, ImGui::GetIO().MousePos.y - origin.y));
+    MaterialNodePopup(true);
     ImGui::EndChild();
+}
+
+void MaterialDetails(jEditor& editor, Entity e)
+{
+    auto& s = Tools();
+    const bool library = !s.SceneMaterialRoot.empty();
+    ImGui::TextUnformatted("Node details");
+    ImGui::Separator();
     auto node = std::find_if(s.Graph.Nodes.begin(), s.Graph.Nodes.end(), [&](const auto& n) { return n.Id == s.SelectedNode; });
     if (node != s.Graph.Nodes.end())
     {
-        ImGui::Text("Selected node %u", node->Id);
+        ImGui::TextColored(ImVec4(1, .74f, .26f, 1), "%s  #%u", MaterialNodeName(node->Kind), node->Id);
+        if (const auto* definition = MaterialNodeInfo(node->Kind)) ImGui::TextWrapped("%s", definition->Description);
         const auto before = s.Graph;
         bool activated = false;
         const auto track = [&] { activated |= ImGui::IsItemActivated(); };
@@ -1651,18 +1845,10 @@ void GraphUI(jEditor& editor, Entity e, const jEditorProject* project, const jEd
             ImGui::TextWrapped("Approximate world-unit diffusion presets. Connect to SSS Profile; material thickness bounds the effective radius.");
         }
         if (activated) { s.Undo.push_back(before); if (s.Undo.size() > 64) s.Undo.erase(s.Undo.begin()); s.Redo.clear(); }
-        if (ImGui::Button("Remove node"))
-        {
-            GraphHistory();
-            for (const auto& pin : MaterialOutputPins)
-                if (s.Graph.*pin.Source == node->Id) s.Graph.*pin.Source = 0;
-            for (auto& current : s.Graph.Nodes)
-                for (const auto& pin : MaterialInputs(current.Kind))
-                    if (current.*pin.Source == node->Id) current.*pin.Source = 0;
-            s.Graph.Nodes.erase(node);
-            s.SelectedNode = 0;
-        }
+        if (ImGui::Button("Remove node")) RemoveMaterialNode(node->Id);
     }
+    else ImGui::TextWrapped("Click a node to edit its properties. Right-click the graph to add a node.");
+    ImGui::Spacing(); ImGui::Separator();
     if (!s.Graph.Surface && ImGui::Button("Add surface settings")) { GraphHistory(); s.Graph.Surface.emplace(); }
     if (s.Graph.Surface) SurfaceSettings(*s.Graph.Surface);
     ImGui::TextWrapped("Surface diffusion requires Deferred and Project Settings > Enable Deferred SSS. Weight 0 or world thickness 0 disables diffusion. The existing PT subsurface scalar remains a separate shading approximation.");
@@ -1685,10 +1871,14 @@ void GraphUI(jEditor& editor, Entity e, const jEditorProject* project, const jEd
     if (ImGui::Button("Load graph"))
     {
         auto path = jEditorProject::ResolveSafe(editor.GetProjectRoot(), s.GraphPath, s.Error, true);
-        if (path && LoadMaterial(*path, s.Graph, s.Error)) { s.NextNode = 1; for (const auto& n : s.Graph.Nodes) s.NextNode = std::max(s.NextNode, n.Id + 1); }
+        if (path && LoadMaterial(*path, s.Graph, s.Error))
+        {
+            s.SelectedNode = s.MovingNode = s.RevealNode = 0; s.Undo.clear(); s.Redo.clear();
+            s.NextNode = 1; for (const auto& n : s.Graph.Nodes) s.NextNode = std::max(s.NextNode, n.Id + 1);
+        }
     }
     ImGui::BeginDisabled(editor.GetDocument().IsPlaying() || editor.GetDocument().IsEffectivelyLocked(e.Id));
-    ImGui::SameLine(); if (ImGui::Button("Save and Apply"))
+    if (ImGui::Button("Save and Apply"))
     {
         auto path = jEditorProject::ResolveSafe(editor.GetProjectRoot(), s.GraphPath, s.Error);
         auto defaults = e.Material.GraphOverrides ? MaterialProperties{} : e.Material;
@@ -1706,10 +1896,82 @@ void GraphUI(jEditor& editor, Entity e, const jEditorProject* project, const jEd
             editor.ReimportAsset(s.GraphPath);
         }
     }
-    ImGui::SameLine();
     if (ImGui::Button("Use as shared material") && AssignSharedMaterial(editor, e.Id, s.GraphPath, s.Error))
         s.Selected = 0;
     ImGui::EndDisabled();
+}
+
+void GraphUI(jEditor& editor, Entity e, const jEditorProject* project, const jEditorAssetRegistry* registry)
+{
+    auto& s = Tools();
+    auto& io = ImGui::GetIO();
+    // The graph owns these shortcuts only while its tools window has focus.
+    // Text fields, sliders and pin/palette popups keep their normal key handling.
+    if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) && !io.WantTextInput
+        && !ImGui::IsAnyItemActive() && !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup))
+    {
+        io.WantCaptureKeyboard = true;
+        const bool command = io.KeyCtrl || io.KeySuper;
+        if (!command && !io.KeyAlt && (ImGui::IsKeyPressed(ImGuiKey_Delete, false) || ImGui::IsKeyPressed(ImGuiKey_Backspace, false)))
+            RemoveMaterialNode(s.SelectedNode);
+        if (command && ImGui::IsKeyPressed(ImGuiKey_Z, false)) RestoreGraphHistory(io.KeyShift);
+        if (command && ImGui::IsKeyPressed(ImGuiKey_Y, false)) RestoreGraphHistory(true);
+    }
+
+    if (ImGui::Button("Add node")) OpenMaterialNodePopup(FreeMaterialNodePosition());
+    MaterialNodePopup(false);
+    ImGui::SameLine();
+    ImGui::BeginDisabled(s.Undo.empty());
+    if (ImGui::Button("Undo graph")) RestoreGraphHistory(false);
+    ImGui::EndDisabled(); ImGui::SameLine();
+    ImGui::BeginDisabled(s.Redo.empty());
+    if (ImGui::Button("Redo graph")) RestoreGraphHistory(true);
+    ImGui::EndDisabled(); ImGui::SameLine();
+    const bool showOutput = ImGui::Button("Show output");
+    ImGui::Checkbox("Details beside graph", &s.DetailsBesideGraph);
+    ImGui::SameLine(); ImGui::TextDisabled("%zu / %zu nodes", s.Graph.Nodes.size(), MaxMaterialNodes);
+    ImGui::TextWrapped("Right-click: add node | Delete / Backspace: remove | Drag the divider to resize panels.");
+    if (!s.Error.empty())
+    {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, .55f, .35f, 1));
+        ImGui::TextWrapped("%s", s.Error.c_str());
+        ImGui::PopStyleColor();
+    }
+
+    ImGui::BeginGroup();
+    const auto start = ImGui::GetCursorScreenPos();
+    const auto available = ImGui::GetContentRegionAvail();
+    constexpr float divider = 8;
+    const bool beside = s.DetailsBesideGraph;
+    float& ratio = beside ? s.GraphWidthRatio : s.GraphHeightRatio;
+    const float extent = std::max(2.f, (beside ? available.x : available.y) - divider);
+    const float graphMinimum = std::min(beside ? 220.f : 100.f, extent * .4f);
+    const float detailsMinimum = std::min(beside ? 190.f : 100.f, extent * .4f);
+    const float graphExtent = std::clamp(extent * ratio, graphMinimum, extent - detailsMinimum);
+    const ImVec2 canvasSize(beside ? graphExtent : std::max(1.f, available.x), beside ? std::max(1.f, available.y) : graphExtent);
+    MaterialCanvas(canvasSize, showOutput, project, registry);
+
+    const ImVec2 dividerPosition(start.x + (beside ? graphExtent : 0), start.y + (beside ? 0 : graphExtent));
+    const ImVec2 dividerSize(beside ? divider : canvasSize.x, beside ? canvasSize.y : divider);
+    ImGui::SetCursorScreenPos(dividerPosition);
+    ImGui::InvisibleButton("MaterialPanelDivider", dividerSize);
+    const bool active = ImGui::IsItemActive(), hovered = ImGui::IsItemHovered();
+    if (hovered || active) ImGui::SetMouseCursor(beside ? ImGuiMouseCursor_ResizeEW : ImGuiMouseCursor_ResizeNS);
+    if (active)
+    {
+        const float delta = beside ? io.MouseDelta.x : io.MouseDelta.y;
+        ratio = std::clamp(graphExtent + delta, graphMinimum, extent - detailsMinimum) / extent;
+    }
+    if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) ratio = beside ? .65f : .6f;
+    const ImVec2 dividerEnd(dividerPosition.x + dividerSize.x, dividerPosition.y + dividerSize.y);
+    ImGui::GetWindowDrawList()->AddRectFilled(dividerPosition, dividerEnd,
+        ImGui::GetColorU32(active ? ImGuiCol_SeparatorActive : hovered ? ImGuiCol_SeparatorHovered : ImGuiCol_Separator), 2);
+
+    ImGui::SetCursorScreenPos(ImVec2(start.x + (beside ? graphExtent + divider : 0), start.y + (beside ? 0 : graphExtent + divider)));
+    const ImVec2 detailsSize(beside ? extent - graphExtent : canvasSize.x, beside ? canvasSize.y : extent - graphExtent);
+    if (ImGui::BeginChild("MaterialDetails", detailsSize, true)) MaterialDetails(editor, e);
+    ImGui::EndChild();
+    ImGui::EndGroup();
 }
 
 void SelectSceneMaterial(size_t index)
@@ -1721,7 +1983,7 @@ void SelectSceneMaterial(size_t index)
     if (!file || !LoadMaterial(*file, graph, s.Error)) return;
     s.SceneMaterialIndex = index;
     s.Graph = std::move(graph);
-    s.SelectedNode = 0;
+    s.SelectedNode = s.MovingNode = s.RevealNode = 0;
     s.NextNode = 1;
     for (const auto& node : s.Graph.Nodes) s.NextNode = std::max(s.NextNode, node.Id + 1);
     s.Undo.clear(); s.Redo.clear();
@@ -1767,12 +2029,11 @@ bool RenderSceneMaterialLibrary(jEditor& editor, const jEditorProject* project, 
             if (ImGui::Selectable(s.SceneMaterials[i].first.c_str(), i == s.SceneMaterialIndex)) SelectSceneMaterial(i);
         ImGui::EndCombo();
     }
-    if (!s.Graph.Nodes.empty())
+    if (!s.SceneMaterials.empty())
     {
         const bool matchingProject = project && project->GetRoot() == s.SceneMaterialRoot;
         GraphUI(editor, {}, matchingProject ? project : nullptr, matchingProject ? registry : nullptr);
     }
-    if (!s.Error.empty()) ImGui::TextWrapped("%s", s.Error.c_str());
     return true;
 }
 }
@@ -1845,10 +2106,10 @@ bool Render(jEditor& editor, const jEditorProject* project, const jEditorAssetRe
     auto& s = Tools(); auto& doc = editor.GetDocument(); const auto* selected = doc.Find(editor.GetSelectedEntityId());
     if (!selected) { ImGui::TextUnformatted("Select an object to edit its material, animation or procedural components."); return false; }
     Entity e = *selected;
-    bool paintInScene = false;
+    bool paintInScene = false, graphVisible = false;
     if (s.Selected != e.Id || s.AssignedGraph != e.Material.GraphAsset)
     {
-        s.Selected = e.Id; s.AssignedGraph = e.Material.GraphAsset; s.Graph = {}; s.Undo.clear(); s.Redo.clear();
+        s.Selected = e.Id; s.AssignedGraph = e.Material.GraphAsset; s.Graph = {}; s.Undo.clear(); s.Redo.clear(); s.SelectedNode = s.MovingNode = s.RevealNode = 0;
         s.Graph.Nodes = {{1, 0, 0, NodeKind::Color, e.Material.BaseColor, 1, 20, 20, ""}, {2, 0, 0, NodeKind::Scalar, {}, e.Material.Metallic, 20, 120, ""}, {3, 0, 0, NodeKind::Scalar, {}, e.Material.Roughness, 20, 220, ""}};
         s.Graph.BaseColor = 1; s.Graph.Metallic = 2; s.Graph.Roughness = 3; s.NextNode = 4; s.Error.clear();
         if (!e.Material.GraphAsset.empty()) { std::snprintf(s.GraphPath, sizeof(s.GraphPath), "%s", e.Material.GraphAsset.c_str()); const auto file = editor.GetProjectRoot() / e.Material.GraphAsset; LoadMaterial(file, s.Graph, s.Error); for (const auto& n : s.Graph.Nodes) s.NextNode = std::max(s.NextNode, n.Id + 1); }
@@ -1856,7 +2117,7 @@ bool Render(jEditor& editor, const jEditorProject* project, const jEditorAssetRe
     }
     if (ImGui::BeginTabBar("AdvancedTools"))
     {
-        if (ImGui::BeginTabItem("Material graph")) { GraphUI(editor, e, project, registry); ImGui::EndTabItem(); }
+        if (ImGui::BeginTabItem("Material graph")) { graphVisible = true; GraphUI(editor, e, project, registry); ImGui::EndTabItem(); }
         if (ImGui::BeginTabItem("Animation"))
         {
             bool changed = ImGui::Checkbox("Enabled", &e.Animation.Enabled); ImGui::SameLine(); changed |= ImGui::Checkbox("Loop", &e.Animation.Loop);
@@ -1938,7 +2199,7 @@ bool Render(jEditor& editor, const jEditorProject* project, const jEditorAssetRe
         }
         ImGui::EndTabBar();
     }
-    if (!s.Error.empty()) ImGui::TextColored(ImVec4(1, .4f, .25f, 1), "%s", s.Error.c_str());
+    if (!graphVisible && !s.Error.empty()) ImGui::TextColored(ImVec4(1, .4f, .25f, 1), "%s", s.Error.c_str());
     return paintInScene;
 }
 void Tick(jEditor& editor, float dt)

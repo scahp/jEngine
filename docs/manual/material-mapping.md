@@ -7,7 +7,7 @@ Material mapping graphs evaluate surface color, normals and apparent depth in **
 ## Open, connect and apply a graph
 
 1. Select an unlocked object in **Hierarchy**. Open **Window → Material / Animation / Effects / Terrain → Material graph**, or click **Inspector → Material graph**.
-2. Choose a type in **New node**, then click **Add node**. Click its title to edit its values below the canvas. Drag its title to move it.
+2. Right-click the graph background, or click **Add node**, to open the searchable node palette. Choose a node to place it at the right-click location; toolbar additions use a free slot. Click a node body or title to select it; the amber outline matches its **Node details** heading. Drag its title to move it.
 3. Drag **Out** onto a compatible input, or click an input and select its source. The same popup offers **Disconnect**. **Show output** scrolls to **Material Output**.
 4. Connect a scalar, RGB or RGBA value to **Base Color**. Connect the other outputs as needed. UV coordinates, texture objects and Horizon visibility have distinct types; they cannot be used as colors.
 5. Set **Graph asset** to a project-relative path such as `Assets/Materials/Brick.jmaterial`. Click **Save and Apply**, then save the scene to persist the object's graph reference.
@@ -15,6 +15,25 @@ Material mapping graphs evaluate surface color, normals and apparent depth in **
 Use **Undo graph** and **Redo graph** for graph edits. Applying the graph updates the scene document through its normal history. Saving a graph writes an asset file; scene Undo does not roll back that file on disk. **Load graph** opens an existing asset. **Use as shared material** assigns the saved asset through the shared-material workflow.
 
 For imported scenes with a material sidecar, **Scene material library → Source material** selects a source slot. **Save and apply to scene** writes that slot's graph and refreshes the meshes using it. Paths in this mode are relative to the imported scene's material-library root.
+
+## Selection, shortcuts and panel layout
+
+- Click a node body or title to select it. Click empty graph space to clear selection. Newly added nodes are selected automatically; changing the object, source material or loaded graph clears stale selection.
+- With the graph tools focused, **Delete** or **Backspace** removes the selected node and disconnects its incoming references and material outputs. **Remove node** in Node details and **Delete node** in the right-click menu use the same operation. **Undo graph** restores the node and its connections.
+- Use **Ctrl/Cmd+Z**, **Ctrl/Cmd+Shift+Z** or **Ctrl/Cmd+Y** for graph undo/redo while the graph tools are focused. Text fields, value drags and open popups keep their normal key handling. Selecting a node does not create an undo step; dragging a node creates one step for the whole move.
+- Drag the divider between the graph and **Node details** to change their relative size. Both panels scroll independently. Enable **Details beside graph** for a left/right layout; disable it for a top/bottom layout. Double-click the divider to reset that layout's ratio. Layout choices last for the current editor session.
+- Search the palette by name, category or a familiar alias: `Constant3Vector` finds Color, `TexCoord` finds UV, `TextureSample` finds Texture Sample and `ComponentMask` finds Channel. **Enter** adds the first matching node; **Escape** dismisses the popup. Tooltips describe each supported node. Channel extracts one component; it does not implement Unreal's full multi-channel ComponentMask.
+
+| Palette category | Supported nodes |
+| --- | --- |
+| Constants | Color, Scalar |
+| Math | Add, Multiply, Channel |
+| Coordinates | UV |
+| Textures | Texture Object, Texture Sample, Sample Normal, legacy Texture |
+| Mapping | Parallax, POM, Relief, Interior, Horizon |
+| Subsurface | Diffusion Profile |
+
+The layout follows the separate graph/details/palette regions described in the [Unreal Material Editor UI](https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-engine-material-editor-ui); persistent selection outlines follow the convention in [Blender's node selection manual](https://docs.blender.org/manual/en/latest/interface/controls/nodes/selecting.html). The palette exposes jEngine's existing node implementations.
 
 ## Nodes and exact pins
 

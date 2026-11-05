@@ -11,12 +11,12 @@
 | 번호 | 확인할 영역 |
 | --- | --- |
 | ① 탭 | `Material graph`, `Animation`, `Particles`, `Terrain / Navigation` |
-| ② 노드 추가·되돌리기 | New node 종류, Add node, Undo graph, Redo graph |
+| ② 노드 추가·되돌리기 | Add node 검색 메뉴, Undo graph, Redo graph |
 | ③ 캔버스 | 노드 제목과 A/B/Out 핀 |
 | ④ 출력·경로 | 세 PBR 출력과 Graph asset 입력칸 |
 | ⑤ `Save and Apply` | 그래프 저장과 실제 재질 적용 |
 
-그림은 기존 출력 선택 UI를 보여줍니다. 현재 버전에서는 캔버스의 `Material Output` 노드가 ④의 출력 선택을 대신합니다. `Node color`·`Node value`는 노드 제목을 클릭하면 나타납니다. 나머지 탭은 ①에서 바꿉니다.
+그림은 기존 출력 선택 UI를 보여줍니다. 현재 버전에서는 캔버스의 `Material Output` 노드가 ④의 출력 선택을 대신합니다. `Node color`·`Node value`는 노드 본문이나 제목을 클릭하면 독립된 `Node details` 패널에 나타납니다. 선택된 노드는 주황색 테두리로 표시됩니다. 그래프와 속성 패널 사이 경계선을 드래그해 크기를 조절하고, `Details beside graph`로 좌우 배치도 선택할 수 있습니다. 나머지 탭은 ①에서 바꿉니다.
 
 ## Material graph로 색 바꾸기
 
@@ -36,7 +36,7 @@
 | `Multiply` | 수치 입력을 곱함. 새 텍스처는 `Texture Sample` 결과를 연결 |
 | `Add` | 수치 입력을 더함. 핀의 벡터 차원이 호환되어야 함 |
 
-**② `New node → Add node`**로 노드를 추가하고 **③ `Out`**을 연산 노드의 `A`/`B`나 `Material Output`의 핀에 끌어 연결합니다. 출력 핀을 클릭해 연결할 노드를 선택하거나 연결을 끊을 수도 있습니다. `Base Color`는 색상과 샘플링 결과를, `Normal`은 `Sample Normal`의 결과 또는 기존 Texture 노멀맵을 받습니다. `Metallic`·`Roughness`에는 수치나 `Channel` 출력을 연결합니다. 새 UV·Texture Object/Sample·Parallax/POM·Relief·Interior·Horizon 노드의 핀과 사용법은 [노드 재질의 매핑](material-mapping.md)을 참고하세요. 텍스처 객체는 샘플링한 뒤 연산하며 순환·없는 참조·잘못된 타입은 거부됩니다.
+**② `Add node`** 또는 캔버스 우클릭으로 검색 메뉴를 열어 노드를 추가하고 **③ `Out`**을 연산 노드의 `A`/`B`나 `Material Output`의 핀에 끌어 연결합니다. 출력 핀을 클릭해 연결할 노드를 선택하거나 연결을 끊을 수도 있습니다. `Base Color`는 색상과 샘플링 결과를, `Normal`은 `Sample Normal`의 결과 또는 기존 Texture 노멀맵을 받습니다. `Metallic`·`Roughness`에는 수치나 `Channel` 출력을 연결합니다. 새 UV·Texture Object/Sample·Parallax/POM·Relief·Interior·Horizon 노드의 핀과 사용법은 [노드 재질의 매핑](material-mapping.md)을 참고하세요. 텍스처 객체는 샘플링한 뒤 연산하며 순환·없는 참조·잘못된 타입은 거부됩니다.
 
 프로젝트에 등록된 PNG, JPEG, BMP, TGA, HDR 이미지는 `Texture` 노드와 Inspector의 Base Color·Normal 텍스처 슬롯에 썸네일이 표시됩니다. 썸네일에 커서를 올리면 큰 미리보기와 파일 경로를 확인할 수 있습니다.
 
@@ -48,7 +48,7 @@
 
 특정 오브젝트의 Base Color, Metallic, Roughness를 수정하거나 Inspector의 Base Color·Normal 슬롯에 다른 텍스처를 놓으면 해당 항목만 인스턴스 값이 됩니다. `Use shared value`를 누르면 공유 그래프의 값으로 돌아갑니다. 그래프의 `Save and Apply`는 공유 기본값을 갱신합니다.
 
-`Undo graph`·`Redo graph`는 그래프 편집 상태를 되돌립니다. `Edit → Undo`는 장면 문서 편집을 되돌립니다. 외부 그래프 파일의 덮어쓰기까지 장면 Undo가 복원하는 것은 아닙니다.
+`Delete` 또는 `Backspace`로 선택한 노드를 삭제하면 해당 노드를 참조하던 핀과 출력도 연결 해제됩니다. 입력칸 편집 중에는 글자 삭제로 처리됩니다. `Undo graph`·`Redo graph`는 노드 삭제와 연결을 포함한 그래프 편집 상태를 되돌립니다. 그래프 창에 포커스가 있으면 `Ctrl/Cmd+Z`·`Ctrl/Cmd+Shift+Z`·`Ctrl/Cmd+Y`도 사용할 수 있습니다. 검색 분류와 패널 조작은 [그래프 사용법](material-mapping.md#selection-shortcuts-and-panel-layout)을 참고하세요. `Edit → Undo`는 장면 문서 편집을 되돌립니다. 외부 그래프 파일의 덮어쓰기까지 장면 Undo가 복원하는 것은 아닙니다.
 
 ### Sponza, Cornell Box, Hyperion 재질 가져오기
 
