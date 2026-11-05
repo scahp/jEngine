@@ -1,0 +1,20 @@
+{
+  "name": "jengine-tools",
+  "interface": {
+    "displayName": "jEngine development tools"
+  },
+  "plugins": [
+    {
+      "name": "jaeho-game-studio",
+      "source": {
+        "source": "local",
+        "path": "./tools/JaehoGameStudio"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

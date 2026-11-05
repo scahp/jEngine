@@ -1,0 +1,3 @@
+[submodule "JaehoGameStudio"]
+	path = tools/JaehoGameStudio
+	url = https://github.com/scahp/JaehoGameStudio.git

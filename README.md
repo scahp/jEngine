@@ -104,6 +104,8 @@ code push and on PRs targeting `main`. Build artifacts and logs are kept for fiv
 [Advanced shadows](docs/manual/advanced-shadows.md) — CSM, VSM/ESM/EVSM, shadow volumes, Deep, dual-paraboloid and PSM.
 [Validation and captures](docs/reports/advanced-shadows.md) · [Shadow sample project](examples/advanced-shadow-demo/README.md)
 
+[JaehoGameStudio](docs/game-studio.md) — shared AI development roles, pinned as a Git submodule in `tools/JaehoGameStudio`.
+
 ## Third party libraries
 
 See [third-party notices](THIRD_PARTY_NOTICES.md).

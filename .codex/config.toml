@@ -1,0 +1,3 @@
+# Project-scoped development skills. Models and permissions follow the host.
+[plugins."jaeho-game-studio@jengine-tools"]
+enabled = true
