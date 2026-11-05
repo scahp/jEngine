@@ -115,6 +115,8 @@ public:
     const std::string& LastError() const;
     const std::string& ImportStatus() const;
     size_t PendingImportCount() const;
+    void MarkSceneLoading();
+    bool IsSceneLoading() const;
     void CancelPendingImports();
     float PlayTime() const;
 

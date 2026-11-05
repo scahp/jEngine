@@ -3,6 +3,8 @@
 #include <string>
 #include <functional>
 class jEditor;
+struct ImDrawList;
+struct ImVec2;
 bool IsAuthoringWorkspaceVisible();
 void SetAuthoringWorkspaceVisible(bool visible);
 void SetAuthoringToolsVisible(bool visible);
@@ -29,6 +31,7 @@ bool LoadAuthoringScene(jEditor& editor, const std::filesystem::path& scene, std
 void TickAuthoringWorkspace(jEditor& editor, float deltaTime);
 void PrepareAuthoringUiFrame();
 void RenderAuthoringWorkspace(jEditor& editor);
+void DrawSceneLoadingOverlay(ImDrawList& draw, const ImVec2& position, const ImVec2& size);
 void KeepAuthoringDockSpaceAlive();
 void UpdateAuthoringViewportOnlyInput(jEditor& editor);
 void ShutdownAuthoringWorkspace();

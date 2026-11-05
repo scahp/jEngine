@@ -475,17 +475,24 @@ void IRenderer::UIPass()
 	g_ImGUI->NewFrame([=]()
 	{
 #ifdef ENABLE_EDITOR_FEATURES
-        if (IsAuthoringRuntimeMode()) return;
+        const auto drawLoading = [] {
+            auto* viewport = ImGui::GetMainViewport();
+            DrawSceneLoadingOverlay(*ImGui::GetForegroundDrawList(viewport), viewport->WorkPos, viewport->WorkSize);
+        };
+        if (IsAuthoringRuntimeMode()) { drawLoading(); return; }
         if (g_Editor && ImGui::IsKeyPressed(ImGuiKey_F11, false)) RequestAuthoringViewportOnlyToggle();
         if (viewportOnly)
         {
             if (g_Editor) UpdateAuthoringViewportOnlyInput(*g_Editor);
+            drawLoading();
             return;
         }
         if (g_Editor && ImGui::IsKeyPressed(ImGuiKey_F10, false)) SetAuthoringWorkspaceVisible(!IsAuthoringWorkspaceVisible());
         if (g_Editor && IsAuthoringWorkspaceVisible())
         {
             RenderAuthoringWorkspace(*g_Editor);
+            float x, y, width, height;
+            if (!GetAuthoringViewportRect(x, y, width, height)) drawLoading();
             return;
         }
         KeepAuthoringDockSpaceAlive();
@@ -656,6 +663,9 @@ void IRenderer::UIPass()
             ImGui::End();
             PersistUIStateIfNeeded();
             jConsole::Get().Render();
+#ifdef ENABLE_EDITOR_FEATURES
+            drawLoading();
+#endif
             return;
         }
 
@@ -1667,9 +1677,9 @@ void IRenderer::UIPass()
 						const int32 activeSceneIndex = game.GetActivePathTracingSceneIndex();
                         if (!game.GetSceneImportStatus().empty())
                             ImGui::TextWrapped("%s", game.GetSceneImportStatus().c_str());
-                        if (game.IsSceneImportPending())
+                        if (game.GetSceneLoadProgress())
                         {
-                            ImGui::TextUnformatted("Preparing the model. You can keep editing or cancel.");
+                            ImGui::TextUnformatted("You can keep editing or cancel the load.");
                             if (ImGui::Button("Cancel import")) game.CancelSceneImport();
                         }
 
@@ -2318,12 +2328,15 @@ void IRenderer::UIPass()
 		}
 
         PersistUIStateIfNeeded();
+#ifdef ENABLE_EDITOR_FEATURES
+        drawLoading();
+#endif
 
 		// Console overlay (rendered on top of everything)
 		jConsole::Get().Render();
 	});
 #ifdef ENABLE_EDITOR_FEATURES
-    if (viewportOnly)
+    if (viewportOnly && ImGui::GetDrawData()->TotalVtxCount == 0)
     {
         // There is no ImGui render pass to transition the presented image.
         auto* command = RenderFrameContextPtr->GetActiveCommandBuffer();

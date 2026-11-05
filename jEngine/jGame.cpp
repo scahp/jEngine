@@ -18,6 +18,8 @@
 #include "jOptions.h"
 #include "FileLoader/jModelLoader.h"
 #include "FileLoader/jAssetImportService.h"
+#include "FileLoader/jModelUploadPlanning.h"
+#include "FileLoader/jModelUploadSession.h"
 #include "Scene/jMeshObject.h"
 #include "Material/jMaterial.h"
 #include "Material/jMaterialMapping.h"
@@ -612,6 +614,17 @@ namespace
 	}
 }
 
+struct jGame::PendingSceneImport
+{
+    std::string SceneId;
+    std::string DisplayName;
+    ESceneLoader Loader = ESceneLoader::Model;
+    jAssetImportService::RequestId Request = 0;
+    std::unique_ptr<jModelUploadSession> Upload;
+    jModelPreparationStats Stats;
+    std::chrono::steady_clock::time_point UploadStarted;
+};
+
 jGame::jGame()
 {
 }
@@ -714,7 +727,7 @@ bool jGame::CanSwitchSceneRenderPipeline(ESceneRenderPipeline target, std::strin
             }
         }
     if (target == GetActiveSceneRenderPipeline()) return true;
-    if (PendingImportId || SceneMaterialRefreshPending || PathTracingSceneBrowser.PendingLoadIndex >= 0 || PathTracingSceneBrowser.RestartIndex >= 0
+    if (IsSceneImportPending() || PathTracingSceneBrowser.RestartIndex >= 0
 #ifdef ENABLE_EDITOR_FEATURES
         || (g_Editor && g_Editor->PendingImportCount() != 0)
 #endif
@@ -984,18 +997,37 @@ bool jGame::RefreshSceneMaterialLibrary(std::string& error)
     return true;
 }
 
+std::optional<jGame::SceneLoadProgress> jGame::GetSceneLoadProgress() const
+{
+    const auto requested = PathTracingSceneBrowser.PendingLoadIndex;
+    if (requested >= 0 && requested < static_cast<int32>(PathTracingSceneBrowser.Scenes.size()))
+        return SceneLoadProgress{PathTracingSceneBrowser.Scenes[requested].DisplayName, "Opening scene", {}};
+    if (!SceneImport) return std::nullopt;
+    if (SceneImport->Loader == ESceneLoader::PathTracing)
+        return SceneLoadProgress{SceneImport->DisplayName, "Opening scene", {}};
+    if (!SceneImport->Upload)
+        return SceneLoadProgress{SceneImport->DisplayName, "Preparing assets", {}};
+
+    const auto progress = SceneImport->Upload->GetProgress();
+    if (progress.Current == jModelUploadSession::State::Ready)
+        return SceneLoadProgress{SceneImport->DisplayName, "Building scene", {}};
+    SceneLoadProgress loading{SceneImport->DisplayName, "Uploading to GPU", {}};
+    if (progress.TotalBytes)
+        loading.UploadFraction = float(double(progress.CompletedBytes) / double(progress.TotalBytes));
+    return loading;
+}
+
 void jGame::CancelSceneImport()
 {
     if (AssetImports) AssetImports->CancelAll();
-    PendingImportId = 0;
-    PendingImportSceneId.clear();
+    SceneImport.reset();
     PathTracingSceneBrowser.PendingLoadIndex = -1;
     SceneImportStatus = "Import cancelled; current scene retained.";
 }
 
 bool jGame::WaitForSceneImportForTesting(uint32 timeoutMilliseconds)
 {
-    std::string expected = PendingImportSceneId;
+    std::string expected = SceneImport ? SceneImport->SceneId : std::string();
     const auto pending = PathTracingSceneBrowser.PendingLoadIndex;
     if (pending >= 0 && pending < static_cast<int32>(PathTracingSceneBrowser.Scenes.size()))
         expected = PathTracingSceneBrowser.Scenes[pending].SceneId;
@@ -1011,7 +1043,7 @@ bool jGame::WaitForSceneImportForTesting(uint32 timeoutMilliseconds)
             std::string materialError;
             RefreshSceneMaterialLibrary(materialError);
         }
-        if (!PendingImportId && !SceneMaterialRefreshPending && PathTracingSceneBrowser.PendingLoadIndex < 0)
+        if (!IsSceneImportPending())
         {
             const auto index = FindPathTracingSceneIndexById(expected);
             return index >= 0 && index == PathTracingSceneBrowser.ActiveIndex;
@@ -1024,57 +1056,101 @@ bool jGame::WaitForSceneImportForTesting(uint32 timeoutMilliseconds)
 
 void jGame::ProcessSceneImports()
 {
+    jModelUploadSession::CollectRetired();
     const int32 requested = PathTracingSceneBrowser.PendingLoadIndex;
     if (requested >= 0 && requested < static_cast<int32>(PathTracingSceneBrowser.Scenes.size()))
     {
-        const auto descriptor = PathTracingSceneBrowser.Scenes[requested];
-        PathTracingSceneBrowser.PendingLoadIndex = -1;
+        const auto& descriptor = PathTracingSceneBrowser.Scenes[requested];
         CancelSceneImport();
-        if (ResolveSceneLoader(descriptor) == ESceneLoader::PathTracing)
+        auto job = std::make_unique<PendingSceneImport>();
+        job->SceneId = descriptor.SceneId;
+        job->DisplayName = descriptor.DisplayName;
+        job->Loader = ResolveSceneLoader(descriptor);
+        if (job->Loader == ESceneLoader::PathTracing)
         {
-            // The legacy path-tracing importer also builds its scene. Keep that
-            // explicit owner-thread path until it gains a CPU-only payload.
-            SceneImportStatus = "Loading with legacy synchronous path-tracing importer.";
-            LoadPathTracingSceneByIndex(requested, true);
+            // The legacy importer builds the scene on the owner thread. Give
+            // the loading indicator a frame before that synchronous work.
+            SceneImportStatus = "Opening " + job->DisplayName;
         }
         else
         {
             if (!AssetImports) AssetImports = std::make_unique<jAssetImportService>();
             const auto source = std::filesystem::path(descriptor.FilePath);
-            PendingImportId = AssetImports->Request(descriptor.FilePath,
+            job->Request = AssetImports->Request(descriptor.FilePath,
                 source.has_parent_path() ? source.parent_path().generic_string() : std::string());
-            PendingImportSceneId = descriptor.SceneId;
-            SceneImportStatus = PendingImportId ? "Preparing asset on a CPU worker: " + descriptor.DisplayName
-                : "Import request rejected (queue full or shutting down).";
-            if (!PendingImportId) jConsole::Get().LogWarning(SceneImportStatus);
+            if (!job->Request)
+            {
+                SceneImportStatus = "Import request rejected (queue full or shutting down).";
+                jConsole::Get().LogWarning(SceneImportStatus);
+                return;
+            }
+            SceneImportStatus = "Preparing " + job->DisplayName;
         }
-    }
-    if (!AssetImports || !PendingImportId) return;
-    auto result = AssetImports->Poll();
-    if (!result || result->Id != PendingImportId) return;
-    PendingImportId = 0;
-    const int32 index = FindPathTracingSceneIndexById(PendingImportSceneId);
-    PendingImportSceneId.clear();
-    if (result->State != jAssetImportService::Status::Ready || index < 0)
-    {
-        SceneImportStatus = "Import failed; current scene retained: " + result->Error;
-        jConsole::Get().LogError(SceneImportStatus);
+        SceneImport = std::move(job);
         return;
     }
-    const auto stats = result->Model->GetStats();
-    const auto start = std::chrono::steady_clock::now();
-    std::string error;
-    std::unique_ptr<jMeshObject> model(jModelLoader::GetInstance().FinalizeModel(std::move(result->Model), &error));
+    if (!SceneImport) return;
+
+    const auto fail = [this](std::string message) {
+        SceneImport.reset();
+        SceneImportStatus = std::move(message);
+        jConsole::Get().LogError(SceneImportStatus);
+    };
+    const int32 index = FindPathTracingSceneIndexById(SceneImport->SceneId);
+    if (index < 0)
+    {
+        if (SceneImport->Request) AssetImports->Cancel(SceneImport->Request);
+        fail("The requested scene is no longer in the Scene Browser.");
+        return;
+    }
+    if (SceneImport->Loader == ESceneLoader::PathTracing)
+    {
+        auto job = std::move(SceneImport);
+        LoadPathTracingSceneByIndex(index, job->Loader, {});
+        if (PathTracingSceneBrowser.ActiveIndex == index)
+            SceneImportStatus = "Loaded " + job->DisplayName;
+        return;
+    }
+    if (!SceneImport->Upload)
+    {
+        auto result = AssetImports->Poll();
+        if (!result || result->Id != SceneImport->Request) return;
+        SceneImport->Request = 0;
+        if (result->State != jAssetImportService::Status::Ready || !result->Model)
+        {
+            fail("Scene import failed: " + result->Error);
+            return;
+        }
+        SceneImport->Stats = result->Model->GetStats();
+        SceneImport->UploadStarted = std::chrono::steady_clock::now();
+        std::string error;
+        SceneImport->Upload = jModelLoader::GetInstance().BeginFinalize(std::move(result->Model), &error);
+        if (!SceneImport->Upload)
+            fail("Scene GPU upload could not start: " + error);
+        else
+            SceneImportStatus = "Uploading " + SceneImport->DisplayName;
+        return;
+    }
+    if (SceneImport->Upload->GetProgress().Current != jModelUploadSession::State::Ready)
+    {
+        jModelUploadSession::Budget budget;
+        budget.MaxAdmissionMilliseconds = 3.0;
+        budget.MaxPendingChunks = jModelUploadPlanning::MaxTickets;
+        const auto progress = SceneImport->Upload->Step(budget);
+        if (progress.Current == jModelUploadSession::State::Failed || progress.Current == jModelUploadSession::State::Cancelled)
+            fail("Scene GPU upload failed: " + progress.Error);
+        return;
+    }
+    auto job = std::move(SceneImport);
+    auto model = job->Upload->TakeModel();
     if (!model)
     {
-        SceneImportStatus = "GPU finalization failed; current scene retained: " + error;
-        jConsole::Get().LogError(SceneImportStatus);
+        fail("Scene GPU upload completed without a model.");
         return;
     }
-    // At most one finalization per frame. GPU uploads and scene publication still
-    // run synchronously on the owner; this is not a hard millisecond budget.
-    LoadPathTracingSceneByIndex(index, true, model.release());
-    const double publishMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+    LoadPathTracingSceneByIndex(index, job->Loader, std::move(model));
+    const auto& stats = job->Stats;
+    const double publishMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - job->UploadStarted).count();
     std::ostringstream message;
     message << "Import complete: CPU " << stats.CpuMilliseconds << " ms, GPU/scene publish "
         << publishMs << " ms; " << stats.VertexCount << " vertices, " << stats.TextureCount << " textures.";
@@ -1593,28 +1669,14 @@ void jGame::ApplyScenePlacementPreset(int32 InIndex)
 	}
 }
 
-void jGame::LoadPathTracingSceneByIndex(int32 InIndex, bool InRebuildRaytracingScene, jMeshObject* preparedModel)
+void jGame::LoadPathTracingSceneByIndex(int32 InIndex, ESceneLoader resolvedLoader, std::unique_ptr<jMeshObject> preparedModel)
 {
 	if (InIndex < 0 || InIndex >= (int32)PathTracingSceneBrowser.Scenes.size())
 		return;
 
 	const jLoadableSceneDesc& sceneDesc = PathTracingSceneBrowser.Scenes[InIndex];
 	PathTracingSceneBrowser.PendingLoadIndex = -1;
-    const ESceneLoader resolvedLoader = preparedModel ? ESceneLoader::Model : ResolveSceneLoader(sceneDesc);
     const bool usePathTracingSceneLoader = resolvedLoader == ESceneLoader::PathTracing;
-    std::unique_ptr<jMeshObject> readyModel(preparedModel);
-    if (!usePathTracingSceneLoader && !readyModel)
-    {
-        const auto source = std::filesystem::path(sceneDesc.FilePath);
-        const auto materialRoot = source.has_parent_path() ? source.parent_path().generic_string() : std::string();
-        readyModel.reset(jModelLoader::GetInstance().LoadFromFile(sceneDesc.FilePath.c_str(), materialRoot.c_str()));
-        if (!readyModel)
-        {
-            SceneImportStatus = "Model import failed; current scene retained: " + sceneDesc.FilePath;
-            jConsole::Get().LogError(SceneImportStatus);
-            return;
-        }
-    }
     // Retain the previous scene until a replacement model is fully prepared.
     SceneRenderPipelineSwitchPending = false;
 #ifdef ENABLE_EDITOR_FEATURES
@@ -1642,7 +1704,7 @@ void jGame::LoadPathTracingSceneByIndex(int32 InIndex, bool InRebuildRaytracingS
 	}
 	else
 	{
-		jMeshObject* loadedScene = readyModel.release();
+		jMeshObject* loadedScene = preparedModel.release();
 
 		jObject::AddObject(loadedScene);
 		SceneBrowserLoadedObjects.push_back(loadedScene);
@@ -1704,7 +1766,7 @@ void jGame::LoadPathTracingSceneByIndex(int32 InIndex, bool InRebuildRaytracingS
 #endif
     if (!IsUsingPathTracingRenderer()) EnsureSceneBrowserRasterPreviewLights();
 
-	if (InRebuildRaytracingScene && IsRaytracingSceneSupported() && g_rhi && g_rhi->RaytracingScene)
+	if (IsRaytracingSceneSupported() && g_rhi && g_rhi->RaytracingScene)
 	{
 		g_rhi->RaytracingScene->Clear();
 

@@ -25,6 +25,7 @@
 #include "Scene/jObject.h"
 #include "Scene/jRenderObject.h"
 #include "RHI/jRHI.h"
+#include <cmath>
 #include <fstream>
 #include <future>
 #include <ctime>
@@ -2088,7 +2089,11 @@ bool OpenAuthoringProject(jEditor& editor, const std::filesystem::path& file, st
         if (!s.Project->RememberRecent(s.LayoutFile.parent_path() / "recent-projects.json", error)) Message(error, true);
     }
     s.AssetRevision = ~uint64_t(0);
-    if (!serialized.empty() && !editor.GetDocument().LoadJson(serialized, startup)) { error = editor.GetDocument().LastError(); return false; }
+    if (!serialized.empty())
+    {
+        if (!editor.GetDocument().LoadJson(serialized, startup)) { error = editor.GetDocument().LastError(); return false; }
+        editor.MarkSceneLoading();
+    }
     Message("Opened project " + s.Project->GetConfig().Name); return true;
 }
 bool LoadAuthoringScene(jEditor& editor, const std::filesystem::path& scene, std::string& error)
@@ -2099,6 +2104,9 @@ bool LoadAuthoringScene(jEditor& editor, const std::filesystem::path& scene, std
     ClearAssetPlacement(editor);
     jEditorExtensions::Shutdown(editor); jEditorTools::Shutdown();
     if (!editor.GetDocument().LoadJson(candidate.ToJson(), scene)) { error = editor.GetDocument().LastError(); return false; }
+    if (g_Engine && g_Editor == &editor && g_Engine->Game.GetSceneLoadProgress())
+        g_Engine->Game.CancelSceneImport();
+    editor.MarkSceneLoading();
     auto& s = State();
     s.HierarchyActive = s.RangeAnchor = s.RevealHierarchy = 0; s.Collapsed.clear(); s.RowRevision = ~uint64_t(0);
     s.ExpandedModels.clear();
@@ -2166,6 +2174,62 @@ void UpdateAuthoringViewportOnlyInput(jEditor& editor)
     if (s.ViewHovered && (io.MouseDown[1] || (io.KeyAlt && io.MouseDown[0])) && (io.MouseDelta.x || io.MouseDelta.y))
         editor.HandleCameraMouseMove(int32(io.MouseDelta.x), int32(io.MouseDelta.y), Camera());
 }
+void DrawSceneLoadingOverlay(ImDrawList& draw, const ImVec2& position, const ImVec2& size)
+{
+    auto load = g_Engine ? g_Engine->Game.GetSceneLoadProgress() : std::nullopt;
+    if (!load && g_Editor && g_Editor->IsSceneLoading())
+        load = jGame::SceneLoadProgress{g_Editor->GetDocument().Name(), "Preparing scene assets", {}};
+    if (!load) return;
+
+    const float lineHeight = ImGui::GetFontSize();
+    const float padding = lineHeight;
+    const float gap = lineHeight * .5f;
+    const float barHeight = std::max(4.f, lineHeight * .45f);
+    const float width = std::min(lineHeight * 28.f, size.x - 2.f * padding);
+    const float height = 2.f * (padding + lineHeight + gap) + barHeight;
+    if (width < 8.f * lineHeight || size.y < height + 2.f * padding) return;
+
+    const ImVec2 topLeft(position.x + (size.x - width) * .5f, position.y + (size.y - height) * .5f);
+    const ImVec2 bottomRight(topLeft.x + width, topLeft.y + height);
+    draw.PushClipRect(position, ImVec2(position.x + size.x, position.y + size.y), true);
+    auto background = ImGui::GetStyleColorVec4(ImGuiCol_WindowBg);
+    background.w = .97f;
+    draw.AddRectFilled(topLeft, bottomRight, ImGui::GetColorU32(background), 6.f);
+    draw.AddRect(topLeft, bottomRight, ImGui::GetColorU32(ImGuiCol_Border), 6.f);
+
+    std::string title = "Loading ";
+    title.append(load->Name);
+    const float left = topLeft.x + padding;
+    const float right = bottomRight.x - padding;
+    const float titleY = topLeft.y + padding;
+    ImGui::RenderTextEllipsis(&draw, ImVec2(left, titleY), ImVec2(right, titleY + lineHeight),
+        right, right, title.c_str(), title.c_str() + title.size(), nullptr);
+
+    std::string stage = load->Stage;
+    const float barY = bottomRight.y - padding - barHeight;
+    float fillStart = 0.f, fillEnd = 0.f;
+    if (load->UploadFraction)
+    {
+        fillEnd = std::clamp(*load->UploadFraction, 0.f, 1.f);
+        stage += "  " + std::to_string(int(fillEnd * 100.f)) + "%";
+    }
+    else
+    {
+        // Sweep a fixed-width segment when the loader cannot measure total work.
+        const float start = float(std::fmod(ImGui::GetTime(), 1.2) / 1.2) * 1.3f - .3f;
+        fillStart = std::max(0.f, start);
+        fillEnd = std::min(1.f, start + .3f);
+    }
+    const float stageY = titleY + lineHeight + gap;
+    ImGui::RenderTextEllipsis(&draw, ImVec2(left, stageY), ImVec2(right, stageY + lineHeight),
+        right, right, stage.c_str(), stage.c_str() + stage.size(), nullptr);
+    const ImRect bar(ImVec2(left, barY), ImVec2(right, barY + barHeight));
+    draw.AddRectFilled(bar.Min, bar.Max, ImGui::GetColorU32(ImGuiCol_FrameBg), barHeight * .5f);
+    ImGui::RenderRectFilledRangeH(&draw, bar, ImGui::GetColorU32(ImGuiCol_ButtonActive),
+        fillStart, fillEnd, barHeight * .5f);
+    draw.PopClipRect();
+}
+
 void RenderAuthoringWorkspace(jEditor& editor)
 {
     auto& s = State(); auto& document = editor.GetDocument();
@@ -2407,6 +2471,7 @@ void RenderAuthoringWorkspace(jEditor& editor)
             sceneDraw->AddText(status, IM_COL32_WHITE, s.Status.c_str());
             sceneDraw->PopClipRect();
         }
+        DrawSceneLoadingOverlay(*sceneDraw, position, size);
     }
     else editor.CancelViewportDuplicateDrag();
     ImGui::End();

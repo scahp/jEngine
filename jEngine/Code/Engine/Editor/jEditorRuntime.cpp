@@ -300,6 +300,7 @@ struct jEditorRuntime::Impl
     std::array<bool,static_cast<size_t>(EInputKey::MAX)> Keys{};
     std::string Error,Status;
     uint64_t AppliedRevision=UINT64_MAX;
+    bool SceneLoading = false;
     bool Enabled=false,Captured=false,ShuttingDown=false,Hovered=false,Focused=false,ShortcutFocused=false,GizmoTransaction=false;
     bool RasterSurfacePublicationEnabled = true;
     float Time=0,MoveSpeed=200;
@@ -896,9 +897,12 @@ bool jEditor::IsAuthoringEnabled()const{return Runtime->Data->Enabled;}
 const std::string& jEditor::LastError()const{return Runtime->Data->Error;}
 const std::string& jEditor::ImportStatus()const{return Runtime->Data->Status;}
 size_t jEditor::PendingImportCount()const{return Runtime->Data->Imports.size()+Runtime->Data->Uploads.size()+jEditorTools::PendingMaterialMappingTextureCount();}
+void jEditor::MarkSceneLoading() { Runtime->Data->SceneLoading = true; }
+bool jEditor::IsSceneLoading() const { return Runtime->Data->SceneLoading; }
 void jEditor::CancelPendingImports()
 {
     auto& s=*Runtime->Data;if(!s.Owner())return;
+    s.SceneLoading = false;
     for(const auto& [id,job]:s.Imports)s.FailedImports.insert(job.Key);
     for(auto& [key,upload]:s.Uploads){s.FailedImports.insert(key);upload.Session->Cancel();}
     if(s.Importer)s.Importer->CancelAll();s.Imports.clear();s.Uploads.clear();
@@ -1028,6 +1032,7 @@ bool jEditor::SyncDocumentToWorld()
 void jEditor::ResetWorldBindings(bool newDocument)
 {
     auto& s=*Runtime->Data;if(!s.Owner())return;
+    s.SceneLoading = false;
     CancelViewportDuplicateDrag();
     if(s.Importer)s.Importer->CancelAll();s.Imports.clear();
     for(auto& [key,upload]:s.Uploads)upload.Session->Cancel();s.Uploads.clear();
@@ -1568,6 +1573,7 @@ void jEditor::Tick(float deltaTime,jCamera* camera)
                 ||(b.Light&&b.Light->PreUpdateLambda)))s.Apply(b,b.Last,b.AppliedWorld);
         s.CollectRetired();
     }
+    if (s.SceneLoading && !PendingImportCount()) s.SceneLoading = false;
     if(s.Doc.SelectedId()&&(s.Selected.empty()||std::find(s.Selected.begin(),s.Selected.end(),s.Doc.SelectedId())==s.Selected.end()))s.Selected={s.Doc.SelectedId()};
     std::erase_if(s.Selected,[&](auto id){return !s.Doc.Find(id);});
     if(!s.Doc.SelectedId())s.Selected.clear();

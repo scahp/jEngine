@@ -1,6 +1,8 @@
 #pragma once
 #include <memory>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <cstdint>
 
 #include <string>
@@ -97,7 +99,14 @@ public:
     bool IsSceneBrowserRestartRequested() const { return PathTracingSceneBrowser.RestartIndex >= 0; }
     std::vector<std::string> GetSceneBrowserRestartArguments() const;
     void RequestSceneMaterialRefresh() { SceneMaterialRefreshPending = true; }
-    bool IsSceneImportPending() const { return PendingImportId != 0 || SceneMaterialRefreshPending; }
+    struct SceneLoadProgress
+    {
+        std::string_view Name;
+        const char* Stage = "";
+        std::optional<float> UploadFraction;
+    };
+    std::optional<SceneLoadProgress> GetSceneLoadProgress() const;
+    bool IsSceneImportPending() const { return SceneImport || SceneMaterialRefreshPending || PathTracingSceneBrowser.PendingLoadIndex >= 0; }
     const std::string& GetSceneImportStatus() const { return SceneImportStatus; }
     void CancelSceneImport();
     bool WaitForSceneImportForTesting(uint32 timeoutMilliseconds = 30000);
@@ -131,18 +140,18 @@ private:
     void EnsureSceneBrowserRasterPreviewLights();
     void ClearSceneBrowserRasterPreviewLights();
 	int32 FindPathTracingSceneIndexById(const std::string& InSceneId) const;
-	void LoadPathTracingSceneByIndex(int32 InIndex, bool InRebuildRaytracingScene, jMeshObject* preparedModel = nullptr);
+    void LoadPathTracingSceneByIndex(int32 index, ESceneLoader loader, std::unique_ptr<jMeshObject> preparedModel);
     void ProcessSceneImports();
     void ProcessSceneRenderPipelineSwitch();
 
     std::unique_ptr<jAssetImportService> AssetImports;
+    struct PendingSceneImport;
+    std::unique_ptr<PendingSceneImport> SceneImport;
     ESceneRenderPipeline PendingSceneRenderPipeline = ESceneRenderPipeline::Deferred;
     bool SceneRenderPipelineSwitchPending = false;
-    std::uint64_t PendingImportId = 0;
     bool SceneMaterialRefreshPending = false;
     bool SceneMaterialRefreshAfterRaster = false;
     bool RefreshSceneMaterialLibrary(std::string& error);
-    std::string PendingImportSceneId;
     std::string SceneImportStatus;
 	jPathTracingSceneBrowserState PathTracingSceneBrowser;
 	std::vector<jObject*> SceneBrowserLoadedObjects;
