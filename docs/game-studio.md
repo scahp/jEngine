@@ -13,7 +13,6 @@ definition copies, symlinks or junctions in the engine.
 ```text
 jEngine/
 ├── .agents/plugins/marketplace.json  # Codex plugin source
-├── .codex/config.toml                # Role config_file paths
 ├── .claude/settings.json             # Claude marketplace source
 ├── tools/JaehoGameStudio/
 │   ├── plugin.json
@@ -38,20 +37,25 @@ git submodule update --init -- tools/JaehoGameStudio
 ```
 
 The committed configuration already points to the package. No copying or link
-creation is needed after checkout. Codex reads project configuration after the
-project is trusted; open a new session after changing role registrations.
+creation is needed after checkout. No project `.codex` folder is generated.
+Open a new session after changing host agent registrations.
 
 ## Load the plugin
 
 Plugin locations are registered only in `.agents/plugins/marketplace.json`.
-Installation stores activation in the normal Codex user settings. The project
-`.codex/config.toml` contains only the seven custom-agent path registrations;
-the agent definitions remain in the submodule. Install the plugin skills with:
+Installation stores activation in the normal Codex user settings. No project
+`.codex` directory is created. Install the plugin skills with:
 
 ```sh
 codex plugin marketplace add .
 codex plugin add jaeho-game-studio@jengine-tools
 ```
+
+Marketplace registration does not automatically register the seven Codex custom
+agents. Those use separate host configuration or an existing host registration;
+the role source files stay in the submodule `codex-agents/` directory. Project
+setup does not modify user configuration. See the package README for a direct
+source reference example.
 
 Claude Code reads the current submodule directly with:
 
@@ -76,8 +80,8 @@ python3 tools/JaehoGameStudio/scripts/sync-studio.py --project . --check
 ```
 
 Windows can use the installed `python` or `py -3.11`. The script has no additional
-dependencies. It mirrors native formats inside the package and maintains path
-registrations for new roles. Common skills stay in the single package `skills/`
+dependencies. It mirrors native formats inside the package and maintains plugin path
+registrations. It never creates a project `.codex` folder. Common skills stay in the single package `skills/`
 tree. Conflicting edits stop for review; `--check` is read-only.
 
 Old unchanged project copies are retired during initial migration. Local edits
@@ -93,8 +97,8 @@ git submodule update --init -- tools/JaehoGameStudio
 ```
 
 The engine pins an exact package commit. Ordinary role-body and common-skill
-changes require no project definition synchronization. New role registrations
-are committed with the updated submodule pointer. Publish package changes first.
+changes require no project definition synchronization. New shared roles are committed inside the
+package; Codex host registration is maintained separately. Publish package changes first.
 
 Actual decisions, contracts and role checkpoints stay in `.jaeho-studio/`.
 The optional initializer creates missing records while preserving existing data:
