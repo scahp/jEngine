@@ -1,0 +1,23 @@
+{
+  "agents": {
+    "jgs-core": "956b6164ea96322bd46bd83ec2c076963b64ea71c5212ddb71f30fa42fbf7120",
+    "jgs-devrel": "e83825b2d7aedac9dc7267dd305fc2a9a1ef10a12f6d22567983ead70c5aefd6",
+    "jgs-director": "2e04752598be38723daa56b0342b7164cd88e70a2c0fa9b8cce91e83915deb0e",
+    "jgs-editor": "2b941b4a2b8d1d4bfa9057716f13188bea4935e2923e51fa467ffdd3ae547bba",
+    "jgs-graphics": "98dd372b56366f42072287616021472ddfe853c35fc23cfc9b5db5289be361b5",
+    "jgs-network": "979660a3a432d5aa60eff208d6f724124bf4012a4a7ab2e11bc8453967ac23ab",
+    "jgs-particles": "3b914bbcc5f1347655831a0780a004fa01cb1e20d39cde003204ea0348e8b7d7"
+  },
+  "package": "tools/JaehoGameStudio",
+  "schema": 1,
+  "skills": {
+    "jgs-core/SKILL.md": "5b81903bb0ead9aef284865bad4feae04955d300a801b14d26e966662b8e9ac6",
+    "jgs-devrel/SKILL.md": "c858af36e56416520f8171bbb9f5db367510696089e986bab6fd6498ae21c22c",
+    "jgs-director/SKILL.md": "c13174d360911f5e5a393635273d6ddf1bd34c20782640766adb40949ba290f4",
+    "jgs-editor/SKILL.md": "c6a58a7bf7711b96237f962b46007e2880c012e46d9eec2077b93e305db107e7",
+    "jgs-graphics/SKILL.md": "1153b5d5e0be881eba32d3a908e2f17d6bdea19a4bbbbc49dda53fec7caa0546",
+    "jgs-network/SKILL.md": "77bed4055d8299b61e03cfb163068c79926bb3c976f3de16076f9549bd1a99c2",
+    "jgs-particles/SKILL.md": "bc86c8f09ef4931ec2ca5eb2ebafd1590b5b921096ac39709cd215f351150b8e",
+    "jgs-sync/SKILL.md": "a5e49a0b68bac8e8f0c211ec91ff2bde4281a6209fa6abc071961db3fa87746e"
+  }
+}

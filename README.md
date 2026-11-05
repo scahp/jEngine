@@ -108,7 +108,7 @@ code push and on PRs targeting `main`. Build artifacts and logs are kept for fiv
 
 [Human Skin reference sample](examples/subsurface-human-demo/README.md) — original head/normal/Spec-AO maps, Skin Kelemen BRDF and UV diffusion/transmission, with six saved comparison projects. The [reference audit and actual images](docs/reports/skin-reference-audit.md) record a separate 76-frame / 142-check native pass; the generic Screen SSS/MSAA/Hi-Z receipt is 127/183. Source screenshot pixel parity is not claimed.
 
-[JaehoGameStudio](docs/game-studio.md) — shared AI development roles, pinned as a Git submodule in `tools/JaehoGameStudio`.
+[JaehoGameStudio](docs/game-studio.md) — Claude Code/Codex agents and shared skills, pinned in `tools/JaehoGameStudio`.
 
 ## Third party libraries
 

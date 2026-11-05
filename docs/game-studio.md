@@ -1,63 +1,86 @@
 # JaehoGameStudio development tools
 
-[JaehoGameStudio](https://github.com/scahp/JaehoGameStudio) supplies seven AI development roles for Codex and OpenClaw. jEngine keeps the shared package as a Git submodule at **tools/JaehoGameStudio**. It is a development aid; CMake and the engine executable do not depend on it.
+[JaehoGameStudio](https://github.com/scahp/JaehoGameStudio) provides seven development agents for **Claude Code and Codex**, eight shared skills including `jgs-sync`, and OpenClaw role guidance. jEngine pins the package as the `tools/JaehoGameStudio` submodule. CMake and the engine executable do not depend on it.
 
 ## Get the pinned package
 
-From the jEngine repository root:
+From the repository root:
 
 ```sh
 git submodule update --init -- tools/JaehoGameStudio
 ```
 
-A new checkout can instead use `git clone --recurse-submodules https://github.com/scahp/jEngine.git`. The parent repository pins a specific plugin commit. A new commit on the plugin's remote `main` does not update that pin automatically.
+A recursive clone also fetches the package. This checkout includes the following project files, so both tools can discover the roles without a separate plugin installation:
 
-## Use the roles
+| Path | Purpose |
+| --- | --- |
+| `.codex/agents/jgs-*.toml` | Codex custom agents |
+| `.claude/agents/jgs-*.md` | Claude Code custom agents |
+| `.agents/skills/<name>/` | Codex skills |
+| `.claude/skills/<name>/` | Claude Code skills |
+| `AGENTS.md` and `CLAUDE.md` | Shared maintenance instructions; Claude imports `AGENTS.md` |
+| `.jgs-mirror.json` | Relative package path and last synchronized hashes |
+| `.gitattributes` studio block | LF checkout rules scoped to mirrored files |
 
-The repository marketplace at `.agents/plugins/marketplace.json` exposes **jEngine development tools**. Select that source in the desktop Plugins directory and install **JaehoGameStudio**. For the CLI, register the marketplace before installing, from the repository root:
+All copies are regular files, including on Windows. Scoped LF rules keep mirror hashes consistent with the submodule while preserving the engine's existing source-file line endings. New Codex agents should be checked in a new conversation. The agents leave model, reasoning, tools and permissions to the existing host settings.
+
+Invoke a skill with `$jgs-director` in Codex or `/jgs-director` in Claude Code. For independent work, ask the director to delegate to `jgs-core`, `jgs-graphics`, `jgs-editor`, `jgs-network`, `jgs-devrel` and `jgs-particles` as appropriate.
+
+## Mirror edits in either direction
+
+The role skills and project instructions require mirroring after creating or editing an agent or skill. **Python 3.11 or later** is needed for synchronization; no additional Python packages are required. On Windows, use the installed interpreter, for example `py -3.11` instead of `python3`.
+
+```sh
+python3 tools/JaehoGameStudio/scripts/sync-studio.py --project .
+python3 tools/JaehoGameStudio/scripts/sync-studio.py --project . --check
+```
+
+An edit in `.claude/agents/` updates the shared role and Codex agent, and a Codex edit updates Claude. New `jgs-*` agents are discovered dynamically. Skills added or edited in either `.claude/skills/` or `.agents/skills/` update the common `skills/` tree and the other tool's copy. Scripts, references, assets and executable bits are included.
+
+The synchronizer compares each tree with its own last synchronized hashes. Conflicting edits abort before any write; it does not pick a winner by file time. `--check` is read-only. Missing copies are restored, so deletion or renaming requires an explicit coordinated retirement of the component and its state entries.
+
+Synchronization runs through the AI maintenance workflow or the explicit command. No background file watcher is installed. Client plugin caches are not editable sources. Unrelated user agents, configuration and project checkpoints are preserved.
+
+## Optional plugin installation
+
+Project-local discovery above is sufficient. The package also retains both native plugin manifests and marketplaces for users who prefer plugin installation.
+
+Codex, from this repository root:
 
 ```sh
 codex plugin marketplace add .
 codex plugin add jaeho-game-studio@jengine-tools
 ```
 
-The project `.codex/config.toml` enables this package for trusted local projects. Host policies and authentication still apply. A client that has not discovered the new local marketplace may need an app restart.
-
-The package provides `$jgs-director`, `$jgs-graphics`, `$jgs-editor`, `$jgs-core`, `$jgs-network`, `$jgs-devrel` and `$jgs-particles` skills. To register matching project-scoped custom agents for delegation, run:
+Claude Code can load the pinned plugin directly:
 
 ```sh
-python3 tools/JaehoGameStudio/scripts/install-codex-agents.py .
+claude --plugin-dir ./tools/JaehoGameStudio
 ```
 
-Use Python 3.9 or later; on Windows, replace `python3` with `py -3` or `python`. The installer creates `.codex/agents/jgs-*.toml`. It preserves identical definitions and reports conflicting files for review. It does not set a model, reasoning effort, permissions or global settings. Start a new Codex conversation after adding custom agents.
+Its plugin skill names are namespaced, such as `/jaeho-game-studio:jgs-director`. Installed plugin updates may require reloading the client. Native Codex agent registration is separate from plugin installation; the project files and synchronizer provide that registration.
 
-Example request:
-
-> `$jgs-director` Review asset publication in this jEngine checkout. Discuss the ownership contract with core, graphics and editor before assigning implementation, then collect focused verification results.
-
-OpenClaw can consume the same role skills. Its independent-agent registration and routing are host-specific; see the [plugin's instructions](../tools/JaehoGameStudio/README.md). The supplied routing JSON is reference data and is not applied automatically.
+OpenClaw can consume the shared skills. Independent OpenClaw agent registration and routing remain host-specific; `team.json` and `openclaw-routing.json` are reference data. See the [package README](../tools/JaehoGameStudio/README.md).
 
 ## Keep project context separate
 
-Shared role instructions live in the submodule. jEngine's actual decisions, contracts and role checkpoints stay in the parent checkout's `.jaeho-studio/` directory. Installing or updating the plugin does not replace those records.
-
-For a project without these records, the optional initializer only creates missing files:
+Actual engine decisions, contracts and role checkpoints stay in the parent checkout's `.jaeho-studio/` directory. Claude Code, Codex and OpenClaw use those files for handoff; their conversation histories remain separate. The optional initializer creates missing records without replacing existing files:
 
 ```sh
 python3 tools/JaehoGameStudio/scripts/init-project.py .
 ```
 
-These context files are local under the existing jEngine ignore policy. Keep credentials and personal conversation history out of the shared plugin. Codex and OpenClaw use the project checkpoints for handoff; their conversation histories remain separate.
+## Update the package and project together
 
-## Update deliberately
+After reviewing a new package revision:
 
 ```sh
 git -C tools/JaehoGameStudio fetch origin
 git -C tools/JaehoGameStudio checkout <reviewed-commit>
-git add tools/JaehoGameStudio
-git commit -m "Update JaehoGameStudio development tools"
+python3 tools/JaehoGameStudio/scripts/sync-studio.py --project .
+python3 tools/JaehoGameStudio/scripts/sync-studio.py --project . --check
 ```
 
-Review existing project agent definitions when role instructions change. The installer preserves conflicting files instead of replacing local edits. Commit the parent pointer when adopting a new plugin revision; keep normal jEngine batch/integration rules for publishing it.
+Commit the reviewed submodule pointer, both tools' native files and `.jgs-mirror.json` together. If a local edit changes the shared package during synchronization, publish that package commit first. A remote `main` change never updates the parent's pin automatically.
 
-Format references: [official OpenAI plugin packaging](https://developers.openai.com/plugins/build/plugins) and [custom agent configuration](https://learn.chatgpt.com/docs/agent-configuration/subagents#custom-agents).
+The package CI checks mirror consistency and Python regressions on macOS, Windows and Linux. Format references: [Codex custom agents](https://learn.chatgpt.com/docs/agent-configuration/subagents#custom-agents), [Codex skills](https://learn.chatgpt.com/docs/build-skills), [Claude agents](https://code.claude.com/docs/en/sub-agents), [Claude plugin layout](https://code.claude.com/docs/en/plugins-reference).
