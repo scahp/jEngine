@@ -354,6 +354,12 @@ int RunEditorAuthoringGpuTests(const char* outputDirectory)
             std::chrono::steady_clock::now()-frameStart).count());
     };
     const auto frames = [&](uint32_t count) { for (uint32_t i = 0; i < count; ++i) frame(); };
+    const auto toggleViewportOnly = [&] {
+        ImGui::GetIO().AddKeyEvent(ImGuiKey_F11, true);
+        frame();
+        ImGui::GetIO().AddKeyEvent(ImGuiKey_F11, false);
+        frame();
+    };
     try
     {
         if (!outputDirectory || !*outputDirectory) throw std::runtime_error("An explicit owned output directory is required");
@@ -510,22 +516,52 @@ int RunEditorAuthoringGpuTests(const char* outputDirectory)
                     format == Format::Jpeg ? "JPEG capture decodes at the requested size" : "BMP capture decodes at the requested size",
                     error.empty() ? GetStatus().Error : error);
             }
+
+            const auto selection = editor.GetSelectedEntityId();
+            const float sceneAspect = GetAuthoringSceneAspect();
+            ImGui::GetIO().AddKeyEvent(ImGuiKey_F11, true);
+            frames(3);
+            const auto* main = ImGui::GetMainViewport();
+            const auto& platformWindows = ImGui::GetPlatformIO().Viewports;
+            const bool detachedVisible = std::any_of(platformWindows.begin(), platformWindows.end(),
+                [&](const auto* viewport) { return viewport != main && viewport->PlatformHandle; });
+            expect(IsAuthoringViewportOnly() && camera->ProjectionAspectOverride == 0.f
+                && ImGui::GetDrawData()->TotalVtxCount == 0 && !detachedVisible,
+                "F11 presents the full window without editor draws or detached panels and stays active while held");
+            ImGui::GetIO().AddKeyEvent(ImGuiKey_F11, false);
+            frame();
+            const auto fullPng = output / "capture-viewport-only.png";
+            const bool fullCapture = Start({fullPng, 320, 180, 30, Format::Png}, error) && finishCapture();
+            expect(fullCapture && CheckStill(fullPng, 320, 180, true) && IsAuthoringViewportOnly(),
+                "viewport-only mode still renders and captures the scene without editor overlays",
+                error.empty() ? GetStatus().Error : error);
+            toggleViewportOnly();
+            frames(2);
+            expect(!IsAuthoringViewportOnly() && IsAuthoringWorkspaceVisible() && editor.GetSelectedEntityId() == selection
+                && sceneAspect > 0.f && std::abs(GetAuthoringSceneAspect() - sceneAspect) < .001f
+                && ImGui::GetDrawData()->TotalVtxCount > 0,
+                "F11 restores the Scene layout, aspect ratio, and selection");
+
             if (Supports(Format::Mp4))
             {
                 const auto path = output / "capture-video.mp4";
                 expect(!Start({path, 1281, 720, 30, Format::Mp4}, error) && !fs::exists(path),
                     "MP4 capture rejects odd dimensions before creating a file");
                 const bool started = Start({path, 1280, 720, 30, Format::Mp4}, error);
+                bool recordedInViewportOnly = false;
                 if (started)
                 {
                     frames(5);
+                    toggleViewportOnly();
                     std::this_thread::sleep_for(std::chrono::milliseconds(90));
                     frames(5);
+                    recordedInViewportOnly = IsAuthoringViewportOnly() && GetStatus().State == Phase::Recording;
+                    toggleViewportOnly();
                     Stop();
                     frame();
                 }
-                expect(started && finishCapture() && GetStatus().Frames >= 2 && CheckMp4(path, 1280, 720),
-                    "recording encodes multiple H.264 frames and finalizes a 720p MP4",
+                expect(started && finishCapture() && recordedInViewportOnly && GetStatus().Frames >= 2 && CheckMp4(path, 1280, 720),
+                    "recording continues across F11 transitions and finalizes a 720p H.264 MP4",
                     error.empty() ? GetStatus().Error : error);
             }
         }
@@ -609,6 +645,12 @@ int RunEditorAuthoringGpuTests(const char* outputDirectory)
         expect(animated && Vector(animated->World.m30,animated->World.m31,animated->World.m32).IsNearlyEqual(expectedPosition, .01f)
             && document.ToJson() == editSnapshot, "Play sampling moves the actual GPU-rendered world without editing authored data");
         expect(!camera->Pos.IsNearlyEqual(editCamera), "Play activates authored primary camera in the actual renderer");
+        toggleViewportOnly();
+        expect(IsAuthoringViewportOnly() && document.IsPlaying() && ImGui::GetDrawData()->TotalVtxCount == 0,
+            "F11 fills the window with the Game view during Play");
+        toggleViewportOnly();
+        expect(!IsAuthoringViewportOnly() && document.IsPlaying() && ImGui::GetDrawData()->TotalVtxCount > 0,
+            "F11 restores the Game layout while Play continues");
         const auto temporary = editor.CreateEntity(EntityKind::Cube, "Play-only runtime entity", ids[0]); frames(2);
         expect(temporary && editor.ObjectForEntity(temporary), "Play-only entity actually publishes live geometry");
         expect(editor.StopPlay(), "Stop restores edit snapshot"); frames(3);

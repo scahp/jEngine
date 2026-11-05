@@ -11,7 +11,7 @@ class jView;
 // owner thread before drawing; queued GPU users are drained before release.
 namespace jEditorUiRenderer
 {
-void PrepareScenePreview(const std::shared_ptr<jRenderFrameContext>& frame, const jView& view);
+void PrepareScenePreview(const std::shared_ptr<jRenderFrameContext>& frame, const jView& view, bool drawSelection);
 void DrawSelectionOutline(const std::shared_ptr<jRenderFrameContext>& frame, const jView& view,
     const std::shared_ptr<jRenderTarget>& preview);
 void* ScenePreviewTexture();

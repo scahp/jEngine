@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <span>
 #include <string>
 
 class jEditor;
@@ -34,6 +35,13 @@ void Render(jEditor& editor, jEditorProject* project);
 bool ConsumePresentModeChange();
 // No movement while Ctrl/Alt/Shift is held. Caller still gates viewport/text focus.
 bool ActionDown(const char* actionName, EInputKey fallback);
+struct CameraAction
+{
+    const char* Name;
+    const char* Label;
+    EInputKey Default;
+};
+std::span<const CameraAction> CameraActions();
 EInputKey Binding(const char* actionName, EInputKey fallback);
 const char* KeyName(EInputKey key);
 bool ParseKey(const std::string& name, EInputKey& key);

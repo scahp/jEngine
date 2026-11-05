@@ -15,8 +15,7 @@ namespace jEditorProjectSettings
 namespace
 {
 namespace fs = std::filesystem;
-struct Action { const char* Name; const char* Label; EInputKey Default; };
-constexpr std::array<Action, 6> Actions{{
+constexpr std::array<CameraAction, 6> Actions{{
     {"camera.forward", "Forward", EInputKey::W}, {"camera.back", "Back", EInputKey::S},
     {"camera.left", "Left", EInputKey::A}, {"camera.right", "Right", EInputKey::D},
     {"camera.up", "Up (right mouse held)", EInputKey::E}, {"camera.down", "Down (right mouse held)", EInputKey::Q}
@@ -55,7 +54,7 @@ std::string Upper(std::string text)
     for (char& c : text) if (c >= 'a' && c <= 'z') c = char(c - 'a' + 'A');
     return text;
 }
-const Action* FindAction(const char* name)
+const CameraAction* FindAction(const char* name)
 {
     if (!name) return nullptr;
     for (const auto& action : Actions) if (std::strcmp(name, action.Name) == 0) return &action;
@@ -298,6 +297,7 @@ bool ConsumePresentModeChange()
     if (!Owner()) return false;
     const bool changed = State().PresentModeChange; State().PresentModeChange = false; return changed;
 }
+std::span<const CameraAction> CameraActions() { return Actions; }
 EInputKey Binding(const char* actionName, EInputKey fallback)
 {
     if (!Owner() || !FindAction(actionName)) return fallback;

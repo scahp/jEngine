@@ -110,6 +110,9 @@ void jEngine::Update(float deltaTime)
 	//SCOPE_GPU_PROFILE(Engine_Update);
 
 	g_timeDeltaSecond = deltaTime;
+#ifdef ENABLE_EDITOR_FEATURES
+    if (g_Editor) ApplyAuthoringViewportOnlyToggle(*g_Editor);
+#endif
 	Game.Update(deltaTime);
 #ifdef ENABLE_EDITOR_FEATURES
     if (g_Editor)

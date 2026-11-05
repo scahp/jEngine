@@ -1758,7 +1758,7 @@ void jGame::Draw()
 void jGame::OnMouseButton()
 {
 #ifdef ENABLE_EDITOR_FEATURES
-    if (IsAuthoringWorkspaceVisible()) return; // Dedicated image handles all platform-window coordinates.
+    if (IsAuthoringViewportOnly() || IsAuthoringWorkspaceVisible()) return;
 	// Handle object picking on left mouse button click
 	if (g_Editor && g_Editor->Placement.EnablePlacementMode && g_MouseState[MouseButtonIndex(EMouseButtonType::LEFT)].Clicked)
 	{
@@ -1804,7 +1804,7 @@ void jGame::OnMouseButton()
 void jGame::OnMouseMove(int32 xOffset, int32 yOffset)
 {
 #ifdef ENABLE_EDITOR_FEATURES
-    if (IsAuthoringWorkspaceVisible()) return;
+    if (IsAuthoringViewportOnly() || IsAuthoringWorkspaceVisible()) return;
     if (g_Editor && g_Editor->IsAuthoringEnabled())
     {
         g_Editor->HandleCameraMouseMove(xOffset, yOffset, MainCamera);

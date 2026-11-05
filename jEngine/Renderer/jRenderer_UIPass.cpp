@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "jRenderer.h"
+#include "jSceneRenderTargets.h"
 #include "ImGui/jImGui.h"
 #include "Profiler/jPerformanceProfile.h"
 #include "jOptions.h"
@@ -434,6 +435,7 @@ namespace
 #ifdef ENABLE_EDITOR_FEATURES
 #include "Code/Engine/Editor/jEditorWorkspace.h"
 #include "Code/Engine/Editor/jEditorUiRenderer.h"
+#include "Code/Engine/Editor/jEditorCapture.h"
 #endif
 
 void IRenderer::UIPass()
@@ -463,13 +465,21 @@ void IRenderer::UIPass()
 
 #ifdef ENABLE_EDITOR_FEATURES
     PrepareAuthoringUiFrame();
-    HitObjectPass();
-    if (g_Editor && IsAuthoringWorkspaceVisible()) jEditorUiRenderer::PrepareScenePreview(RenderFrameContextPtr, View);
+    const bool viewportOnly = IsAuthoringViewportOnly();
+    if (!viewportOnly) HitObjectPass();
+    if (g_Editor && (viewportOnly ? jEditorCapture::GetStatus().State != jEditorCapture::Phase::Idle : IsAuthoringWorkspaceVisible()))
+        jEditorUiRenderer::PrepareScenePreview(RenderFrameContextPtr, View, !viewportOnly);
 #endif
 	g_ImGUI->NewFrame([=]()
 	{
 #ifdef ENABLE_EDITOR_FEATURES
         if (IsAuthoringRuntimeMode()) return;
+        if (g_Editor && ImGui::IsKeyPressed(ImGuiKey_F11, false)) RequestAuthoringViewportOnlyToggle();
+        if (viewportOnly)
+        {
+            if (g_Editor) UpdateAuthoringViewportOnlyInput(*g_Editor);
+            return;
+        }
         if (g_Editor && ImGui::IsKeyPressed(ImGuiKey_F10, false)) SetAuthoringWorkspaceVisible(!IsAuthoringWorkspaceVisible());
         if (g_Editor && IsAuthoringWorkspaceVisible())
         {
@@ -2282,6 +2292,17 @@ void IRenderer::UIPass()
 		// Console overlay (rendered on top of everything)
 		jConsole::Get().Render();
 	});
+#ifdef ENABLE_EDITOR_FEATURES
+    if (viewportOnly)
+    {
+        // There is no ImGui render pass to transition the presented image.
+        auto* command = RenderFrameContextPtr->GetActiveCommandBuffer();
+        auto* backBuffer = RenderFrameContextPtr->SceneRenderTargetPtr->FinalColorPtr->GetTexture();
+        g_rhi->TransitionLayout(command, backBuffer, EResourceLayout::PRESENT_SRC);
+        command->FlushBarrierBatch();
+        return;
+    }
+#endif
 	g_ImGUI->Draw(RenderFrameContextPtr);
 }
 

@@ -45,7 +45,7 @@ void Unregister(void* id)
 #endif
 }
 }
-void PrepareScenePreview(const std::shared_ptr<jRenderFrameContext>& frame, const jView& view)
+void PrepareScenePreview(const std::shared_ptr<jRenderFrameContext>& frame, const jView& view, bool drawSelection)
 {
     CurrentPreview = nullptr;
     if (!g_rhi || !g_ImGUI || !frame || !frame->SceneRenderTargetPtr ||
@@ -98,7 +98,7 @@ void PrepareScenePreview(const std::shared_ptr<jRenderFrameContext>& frame, cons
     g_rhi->TransitionLayout(command, source, restore);
 #ifdef ENABLE_EDITOR_FEATURES
     jEditorCapture::ReadFrame(frame, *texture, view.Camera ? view.Camera->ProjectionAspectOverride : 0.f);
-    DrawSelectionOutline(frame, view, preview.Target);
+    if (drawSelection) DrawSelectionOutline(frame, view, preview.Target);
 #endif
     g_rhi->TransitionLayout(command, texture, EResourceLayout::SHADER_READ_ONLY);
     command->FlushBarrierBatch();

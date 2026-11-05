@@ -2,6 +2,7 @@
 #ifdef ENABLE_EDITOR_FEATURES
 #include "jEditorRuntime.h"
 #include "jEditorTools.h"
+#include "jEditorWorkspace.h"
 #include "FileLoader/jEditorAssetPath.h"
 #include "FileLoader/jEditorAssets.h"
 #include "jEditorProjectSettings.h"
@@ -1367,7 +1368,7 @@ void jEditor::ProcessInput(float deltaTime,jCamera* camera)
     auto& s=*Runtime->Data;if(!s.Owner())return;
     std::array<bool,static_cast<size_t>(EInputKey::MAX)> pressed{};
     for(size_t i=0;i<s.Keys.size();++i){const bool down=IsKeyDown(static_cast<EInputKey>(i));pressed[i]=down&&!s.Keys[i];s.Keys[i]=down;}
-    if(!s.Enabled||!ImGui::GetCurrentContext())return;
+    if(!s.Enabled||!ImGui::GetCurrentContext()||IsAuthoringViewportOnly())return;
     const auto& io=ImGui::GetIO();
     if(io.WantTextInput||ImGui::IsAnyItemActive()||ImGuizmo::IsUsing()
         ||(io.WantCaptureKeyboard&&!s.Focused&&!s.ShortcutFocused)||ImGui::IsPopupOpen(nullptr,ImGuiPopupFlags_AnyPopup))return;
@@ -1417,7 +1418,8 @@ bool jEditor::HandleCameraInput(float deltaTime,jCamera* camera)
 }
 bool jEditor::HandleCameraMouseMove(int32 xOffset,int32 yOffset,jCamera* camera)
 {
-    auto& s=*Runtime->Data;if(!s.Owner()||!s.Enabled)return false;if(!camera||!s.Hovered||ImGuizmo::IsUsing()||ImGuizmo::IsOver())return true;
+    auto& s=*Runtime->Data;if(!s.Owner()||!s.Enabled)return false;
+    if(!camera||!s.Hovered||(!IsAuthoringViewportOnly()&&(ImGuizmo::IsUsing()||ImGuizmo::IsOver())))return true;
     const bool orbit=IsKeyDown(EInputKey::ALT)&&g_MouseState[MouseButtonIndex(EMouseButtonType::LEFT)].Down;
     const bool fly=g_MouseState[MouseButtonIndex(EMouseButtonType::RIGHT)].Down;
     if(!orbit&&!fly)return true;

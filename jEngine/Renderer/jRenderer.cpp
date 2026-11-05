@@ -9,6 +9,7 @@
 #include "RHI/jResourceBarrierBatcher.h"
 #ifdef ENABLE_EDITOR_FEATURES
 #include "Code/Engine/Editor/jEditorProcedural.h"
+#include "Code/Engine/Editor/jEditorWorkspace.h"
 #endif
 #include "RHI/jShaderBindingLayout.h"
 #include "Scene/Light/jDirectionalLight.h"
@@ -101,6 +102,9 @@ void DispatchShaderParameterComputePass(const std::shared_ptr<jRenderFrameContex
 // IRenderer
 void IRenderer::DebugPasses()
 {
+#ifdef ENABLE_EDITOR_FEATURES
+    if (IsAuthoringViewportOnly()) return;
+#endif
 	SCOPE_CPU_PROFILE(DebugPasses);
 	SCOPE_GPU_PROFILE(RenderFrameContextPtr, DebugPasses);
 	DEBUG_EVENT(RenderFrameContextPtr, "DebugPasses");

@@ -59,6 +59,7 @@ struct CaptureDialog
 struct Workspace
 {
     bool Visible = true, Runtime = false, ViewHovered = false, ViewFocused = false;
+    bool ViewportOnly = false, ToggleViewportOnly = false;
     bool FixedLayout = true, ShowAssets = true, ShowLogs = true, ShowProfiler = false, ShowTools = false;
     bool PaintTerrainInScene = false;
     bool SurfaceSnap = true, SuppressEditorEscape = false;
@@ -69,16 +70,17 @@ struct Workspace
     ImGuiTextFilter ReplacementFilter;
     CaptureDialog Capture;
     bool Docking = true, PlatformWindows = false, DocksInitialized = false;
+    ImGuiID DockSpaceId = 0;
     std::optional<bool> TestPlatformWindows;
     std::function<void()> IntegrationDraw;
-    bool ShowSettings = false, LoadLayout = true, ResetLayout = false, AutoSave = true;
+    bool ShowSettings = false, ShowKeyboardShortcuts = false, LoadLayout = true, ResetLayout = false, AutoSave = true;
     float LeftWidth = 245, RightWidth = 325, BottomHeight = 205, FontScale = 1;
     float AutoSaveSeconds = 0, WatchSeconds = 0;
     ImVec2 ViewPosition{}, ViewSize{};
     uint64_t RowRevision = ~uint64_t(0), AssetRevision = ~uint64_t(0);
     uint64_t RowSignature = ~uint64_t(0);
     EntityId HierarchyActive = 0, RangeAnchor = 0, RevealHierarchy = 0, RowSelected = 0;
-    ImGuiTextFilter EntityFilter, AssetFilter, LogFilter;
+    ImGuiTextFilter EntityFilter, AssetFilter, LogFilter, ShortcutFilter;
     std::set<EntityId> Collapsed;
     std::vector<Row> Rows;
     std::vector<size_t> AssetRows;
@@ -133,6 +135,20 @@ void ClearAssetPlacement(jEditor& editor)
     State().Placement.reset();
     State().Replacement.reset();
     editor.ReleasePlacementModels();
+}
+void SyncWorkspaceInput()
+{
+    const auto& io = ImGui::GetIO();
+    // Platform windows send input through ImGui's backend.
+    for (int key = 0; key < 26; ++key) SetKeyDownState(static_cast<EInputKey>(int(EInputKey::A) + key), ImGui::IsKeyDown(static_cast<ImGuiKey>(int(ImGuiKey_A) + key)));
+    for (int key = 0; key < 10; ++key) SetKeyDownState(static_cast<EInputKey>(int(EInputKey::NUM0) + key), ImGui::IsKeyDown(static_cast<ImGuiKey>(int(ImGuiKey_0) + key)));
+    const std::pair<EInputKey, ImGuiKey> mapped[] = {{EInputKey::DELETE_KEY, ImGuiKey_Delete}, {EInputKey::ESCAPE, ImGuiKey_Escape}, {EInputKey::SPACE, ImGuiKey_Space}, {EInputKey::ENTER, ImGuiKey_Enter}, {EInputKey::TAB, ImGuiKey_Tab}, {EInputKey::LEFT, ImGuiKey_LeftArrow}, {EInputKey::RIGHT, ImGuiKey_RightArrow}, {EInputKey::UP, ImGuiKey_UpArrow}, {EInputKey::DOWN, ImGuiKey_DownArrow}};
+    for (const auto& [engineKey, uiKey] : mapped) SetKeyDownState(engineKey, ImGui::IsKeyDown(uiKey));
+    if (State().SuppressEditorEscape) SetKeyDownState(EInputKey::ESCAPE, false);
+    SetKeyDownState(EInputKey::CTRL, io.KeyCtrl || io.KeySuper); SetKeyDownState(EInputKey::ALT, io.KeyAlt); SetKeyDownState(EInputKey::SHIFT, io.KeyShift);
+    SetKeyDownState(EInputKey::PLUS, ImGui::IsKeyDown(ImGuiKey_Equal) || ImGui::IsKeyDown(ImGuiKey_KeypadAdd)); SetKeyDownState(EInputKey::MINUS, ImGui::IsKeyDown(ImGuiKey_Minus) || ImGui::IsKeyDown(ImGuiKey_KeypadSubtract));
+    g_MouseState[MouseButtonIndex(EMouseButtonType::LEFT)].Down = io.MouseDown[0];
+    g_MouseState[MouseButtonIndex(EMouseButtonType::RIGHT)].Down = io.MouseDown[1];
 }
 void GuardUnsaved(jEditor& editor, std::function<void()> action)
 {
@@ -1249,6 +1265,98 @@ void CaptureOptions(jEditor& editor)
     ImGui::EndPopup();
 }
 
+void KeyboardShortcuts()
+{
+    auto& s = State();
+    if (!s.ShowKeyboardShortcuts) return;
+    ImGui::SetNextWindowSize(ImVec2(680, 465), ImGuiCond_FirstUseEver);
+    if (!ImGui::Begin("Keyboard Shortcuts", &s.ShowKeyboardShortcuts)) { ImGui::End(); return; }
+    if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+    ImGui::SetNextItemWidth(-FLT_MIN);
+    if (ImGui::InputTextWithHint("##Shortcut filter", "Filter by action, key, or area",
+        s.ShortcutFilter.InputBuf, sizeof(s.ShortcutFilter.InputBuf))) s.ShortcutFilter.Build();
+    ImGui::TextDisabled("Camera keys follow the active project settings.");
+
+    struct Shortcut { const char* Area; const char* Action; const char* Keys; };
+#ifdef __APPLE__
+#define JEDITOR_SHORTCUT_MOD "Cmd"
+#else
+#define JEDITOR_SHORTCUT_MOD "Ctrl"
+#endif
+    constexpr Shortcut shortcuts[] = {
+        {"View", "Toggle viewport only", "F11"},
+        {"View", "Toggle rendering panels", "F10"},
+        {"View", "Cycle console visibility", "Backtick"},
+        {"View", "Close console", "Esc"},
+        {"Scene", "New scene", JEDITOR_SHORTCUT_MOD "+N"},
+        {"Scene", "Open scene", JEDITOR_SHORTCUT_MOD "+O"},
+        {"Scene", "Save scene", JEDITOR_SHORTCUT_MOD "+S"},
+        {"Scene", "Save scene as", JEDITOR_SHORTCUT_MOD "+Shift+S"},
+        {"Selection", "Focus selection", "F"},
+        {"Selection", "Clear selection or cancel placement", "Esc"},
+        {"Selection", "Select previous or next object", "Up / Down"},
+        {"Selection", "Toggle object selection", JEDITOR_SHORTCUT_MOD "+Click"},
+        {"Selection", "Select a range in Hierarchy", "Shift+Click"},
+        {"Edit", "Undo", JEDITOR_SHORTCUT_MOD "+Z"},
+        {"Edit", "Redo", JEDITOR_SHORTCUT_MOD "+Y / " JEDITOR_SHORTCUT_MOD "+Shift+Z"},
+        {"Edit", "Copy selection", JEDITOR_SHORTCUT_MOD "+C"},
+        {"Edit", "Paste selection", JEDITOR_SHORTCUT_MOD "+V"},
+        {"Edit", "Duplicate selection", JEDITOR_SHORTCUT_MOD "+D"},
+        {"Edit", "Delete selection", "Delete"},
+        {"Transform", "Move gizmo", "Shift+W"},
+        {"Transform", "Rotate gizmo", "Shift+E"},
+        {"Transform", "Scale gizmo", "Shift+R"},
+        {"Transform", "Toggle world or local axes", "Q"},
+        {"Transform", "Toggle grid snapping", JEDITOR_SHORTCUT_MOD "+G"},
+        {"Transform", "Duplicate and move with the Move gizmo", "Alt+Drag"},
+        {"Placement", "Choose point light", "L"},
+        {"Placement", "Choose spot light", "K"},
+        {"Placement", "Choose directional light", "J"},
+        {"Placement", "Choose cube", "N"},
+        {"Placement", "Choose sphere", "M"},
+        {"Placement", "Place the chosen object type", "P"},
+    };
+#undef JEDITOR_SHORTCUT_MOD
+
+    std::vector<Shortcut> matches;
+    const auto add = [&](const Shortcut& shortcut) {
+        if (s.ShortcutFilter.IsActive())
+        {
+            const std::string text = std::string(shortcut.Area) + " " + shortcut.Action + " " + shortcut.Keys;
+            if (!s.ShortcutFilter.PassFilter(text.c_str())) return;
+        }
+        matches.push_back(shortcut);
+    };
+    if (IsUseDX12()) add({"View", "Toggle exclusive fullscreen", "Alt+Enter"});
+    for (const auto& shortcut : shortcuts) add(shortcut);
+    using namespace jEditorProjectSettings;
+    for (const auto& action : CameraActions())
+        if (const char* key = KeyName(Binding(action.Name, action.Default))) add({"Camera", action.Label, key});
+    add({"Camera", "Look around", "Right mouse drag"});
+    add({"Camera", "Orbit around focus", "Alt+Left mouse drag"});
+    add({"Camera", "Increase camera speed", "= / Numpad +"});
+    add({"Camera", "Decrease camera speed", "- / Numpad -"});
+
+    if (matches.empty()) ImGui::TextDisabled("No shortcuts match.");
+    else if (ImGui::BeginTable("Shortcut list", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY))
+    {
+        ImGui::TableSetupColumn("Area", ImGuiTableColumnFlags_WidthFixed, 95.f);
+        ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("Shortcut", ImGuiTableColumnFlags_WidthFixed, 180.f);
+        ImGui::TableSetupScrollFreeze(0, 1);
+        ImGui::TableHeadersRow();
+        for (const auto& shortcut : matches)
+        {
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0); ImGui::TextDisabled("%s", shortcut.Area);
+            ImGui::TableSetColumnIndex(1); ImGui::TextUnformatted(shortcut.Action);
+            ImGui::TableSetColumnIndex(2); ImGui::TextUnformatted(shortcut.Keys);
+        }
+        ImGui::EndTable();
+    }
+    ImGui::End();
+}
+
 void Logs()
 {
     auto& s = State(); ImGui::Combo("Minimum level", &s.MinimumLevel, "Trace\0Debug\0Info\0Warning\0Error\0Fatal\0");
@@ -1359,6 +1467,40 @@ void Dialogs(jEditor& editor)
 }
 
 bool IsAuthoringWorkspaceVisible() { return State().Visible && !State().Runtime; }
+bool IsAuthoringViewportOnly() { return State().ViewportOnly; }
+void RequestAuthoringViewportOnlyToggle()
+{
+    auto& s = State();
+    if (s.Runtime || s.UnsavedPrompt || s.OpenModal || !ImGui::GetCurrentContext() || ImGui::GetTopMostPopupModal()) return;
+    s.ToggleViewportOnly = !s.ToggleViewportOnly;
+}
+void ApplyAuthoringViewportOnlyToggle(jEditor& editor)
+{
+    auto& s = State();
+    if (!s.ToggleViewportOnly || !ImGui::GetCurrentContext()) return;
+    // Let a held gizmo or asset drag finish in the layout where it started.
+    if (ImGuizmo::IsUsing() || ImGui::GetDragDropPayload()) return;
+    s.ToggleViewportOnly = false;
+    if (s.UnsavedPrompt || s.OpenModal || ImGui::GetTopMostPopupModal()) return;
+    s.ViewportOnly = !s.ViewportOnly;
+    s.ViewHovered = s.ViewFocused = false;
+    editor.SetViewportInputState(false, false);
+    editor.SetShortcutInputState(false);
+    editor.Placement.bPickRequested = false;
+    if (!s.ViewportOnly) return;
+
+    FinishWorkspaceEdit(editor);
+    ImGui::ClearActiveID();
+    if (!ImGui::GetCurrentContext()->OpenPopupStack.empty()) ImGui::ClosePopupToLevel(0, true);
+
+    // Entering from a detached panel moves keyboard input to the main window.
+    auto& platform = ImGui::GetPlatformIO();
+    auto* main = ImGui::GetMainViewport();
+    if (main->PlatformHandle && platform.Platform_SetWindowFocus && platform.Platform_GetWindowFocus)
+        for (auto* viewport : platform.Viewports)
+            if (viewport != main && viewport->PlatformHandle && platform.Platform_GetWindowFocus(viewport))
+            { platform.Platform_SetWindowFocus(main); break; }
+}
 void SetAuthoringWorkspaceVisible(bool visible)
 {
     if (!visible && g_Editor)
@@ -1368,9 +1510,17 @@ void SetAuthoringWorkspaceVisible(bool visible)
         ClearAssetPlacement(*g_Editor);
         g_Editor->Placement.bPickRequested = false;
     }
-    State().Visible = visible;
+    auto& s = State();
+    s.Visible = visible;
+    s.ViewportOnly = s.ToggleViewportOnly = false;
 }
-void SetAuthoringRuntimeMode(bool runtime) { State().Runtime = runtime; State().Visible = !runtime; }
+void SetAuthoringRuntimeMode(bool runtime)
+{
+    auto& s = State();
+    s.Runtime = runtime;
+    s.Visible = !runtime;
+    s.ViewportOnly = s.ToggleViewportOnly = false;
+}
 void SetTestPlatformWindows(bool enabled) { if (enabled) State().TestPlatformWindows = true; else State().TestPlatformWindows.reset(); }
 void SetAuthoringIntegrationDrawHook(std::function<void()> draw) { State().IntegrationDraw = std::move(draw); }
 void SetAuthoringTestStateDirectory(const fs::path& directory)
@@ -1392,6 +1542,7 @@ bool RequestAuthoringWindowClose()
     if (g_Editor->GetDocument().IsPlaying()) g_Editor->StopPlay();
     if (!g_Editor->GetDocument().IsDirty()) return true;
     s.Visible = true;
+    s.ViewportOnly = s.ToggleViewportOnly = false;
     GuardUnsaved(*g_Editor, [] {
         State().CloseApproved = true;
         if (!g_rhi) return;
@@ -1405,7 +1556,9 @@ bool RequestAuthoringWindowClose()
 void RequestAuthoringSceneReplacement(std::function<void()> action)
 {
     if (!g_Editor || State().Runtime) { action(); return; }
-    State().Visible = true;
+    auto& s = State();
+    s.Visible = true;
+    s.ViewportOnly = s.ToggleViewportOnly = false;
     GuardUnsaved(*g_Editor, std::move(action));
 }
 bool IsAuthoringRuntimeMode() { return State().Runtime; }
@@ -1424,13 +1577,14 @@ bool IsAuthoringViewportHovered() { return State().ViewHovered; }
 bool IsAuthoringViewportFocused() { return State().ViewFocused; }
 float GetAuthoringSceneAspect()
 {
-    if (!IsAuthoringWorkspaceVisible() || !g_Editor || g_Editor->GetDocument().IsPlaying()) return 0.0f;
+    if (IsAuthoringViewportOnly() || !IsAuthoringWorkspaceVisible() || !g_Editor || g_Editor->GetDocument().IsPlaying()) return 0.0f;
     const auto size = State().ViewSize;
     return size.x > 0.0f && size.y > 0.0f ? size.x / size.y : 0.0f;
 }
 bool MapAuthoringViewportPoint(double& x, double& y)
 {
     auto& s = State();
+    if (s.ViewportOnly) return false;
     if (!IsAuthoringWorkspaceVisible()) return true;
     if (!s.ViewHovered || s.ViewSize.x <= 0 || s.ViewSize.y <= 0) return false;
     x = (x - s.ViewPosition.x) * SCR_WIDTH / s.ViewSize.x;
@@ -1489,6 +1643,11 @@ void TickAuthoringWorkspace(jEditor& editor, float dt)
 {
     jModelUploadSession::CollectRetired();
     auto& s = State(); if (s.LoadLayout) LoadLayout();
+    if (s.ViewportOnly && !editor.GetDocument().IsPlaying())
+    {
+        AdvancePlacement(editor);
+        AdvanceModelReplacement(editor);
+    }
     s.FrameTimes[s.FrameOffset++ % s.FrameTimes.size()] = dt * 1000; s.FrameOffset %= s.FrameTimes.size();
     if (s.Registry)
     {
@@ -1518,6 +1677,24 @@ void TickAuthoringWorkspace(jEditor& editor, float dt)
     jEditorTools::Tick(editor, dt);
     jEditorExtensions::Tick(editor, dt);
 }
+void UpdateAuthoringViewportOnlyInput(jEditor& editor)
+{
+    auto& s = State();
+    const auto& io = ImGui::GetIO();
+#ifdef IMGUI_HAS_DOCK
+    if (s.DockSpaceId && (io.ConfigFlags & ImGuiConfigFlags_DockingEnable))
+        ImGui::DockSpace(s.DockSpaceId, ImVec2(), ImGuiDockNodeFlags_KeepAliveOnly | ImGuiDockNodeFlags_PassthruCentralNode);
+#endif
+    auto* main = ImGui::GetMainViewport();
+    const auto getFocus = ImGui::GetPlatformIO().Platform_GetWindowFocus;
+    s.ViewFocused = !io.AppFocusLost && (!getFocus || (main->PlatformHandle && getFocus(main)));
+    const ImVec2 max(main->Pos.x + main->Size.x, main->Pos.y + main->Size.y);
+    s.ViewHovered = s.ViewFocused && ImRect(main->Pos, max).Contains(io.MousePos);
+    SyncWorkspaceInput();
+    editor.SetViewportInputState(s.ViewHovered, s.ViewFocused);
+    if (s.ViewHovered && (io.MouseDown[1] || (io.KeyAlt && io.MouseDown[0])) && (io.MouseDelta.x || io.MouseDelta.y))
+        editor.HandleCameraMouseMove(int32(io.MouseDelta.x), int32(io.MouseDelta.y), Camera());
+}
 void RenderAuthoringWorkspace(jEditor& editor)
 {
     auto& s = State(); auto& document = editor.GetDocument();
@@ -1545,17 +1722,7 @@ void RenderAuthoringWorkspace(jEditor& editor)
     }
     if (s.Replacement && document.IsPlaying()) ClearAssetPlacement(editor);
     if (s.Placement && (document.IsPlaying() || (!s.Placement->Drop && !ImGui::GetDragDropPayload()))) ClearAssetPlacement(editor);
-    // Platform windows send input through ImGui's backend. Normalize that same
-    // event stream for engine shortcuts and camera controls in every viewport.
-    for (int key = 0; key < 26; ++key) SetKeyDownState(static_cast<EInputKey>(int(EInputKey::A) + key), ImGui::IsKeyDown(static_cast<ImGuiKey>(int(ImGuiKey_A) + key)));
-    for (int key = 0; key < 10; ++key) SetKeyDownState(static_cast<EInputKey>(int(EInputKey::NUM0) + key), ImGui::IsKeyDown(static_cast<ImGuiKey>(int(ImGuiKey_0) + key)));
-    const std::pair<EInputKey, ImGuiKey> mapped[] = {{EInputKey::DELETE_KEY, ImGuiKey_Delete}, {EInputKey::ESCAPE, ImGuiKey_Escape}, {EInputKey::SPACE, ImGuiKey_Space}, {EInputKey::ENTER, ImGuiKey_Enter}, {EInputKey::TAB, ImGuiKey_Tab}, {EInputKey::LEFT, ImGuiKey_LeftArrow}, {EInputKey::RIGHT, ImGuiKey_RightArrow}, {EInputKey::UP, ImGuiKey_UpArrow}, {EInputKey::DOWN, ImGuiKey_DownArrow}};
-    for (const auto& [engineKey, uiKey] : mapped) SetKeyDownState(engineKey, ImGui::IsKeyDown(uiKey));
-    if (s.SuppressEditorEscape) SetKeyDownState(EInputKey::ESCAPE, false);
-    SetKeyDownState(EInputKey::CTRL, io.KeyCtrl || io.KeySuper); SetKeyDownState(EInputKey::ALT, io.KeyAlt); SetKeyDownState(EInputKey::SHIFT, io.KeyShift);
-    SetKeyDownState(EInputKey::PLUS, ImGui::IsKeyDown(ImGuiKey_Equal) || ImGui::IsKeyDown(ImGuiKey_KeypadAdd)); SetKeyDownState(EInputKey::MINUS, ImGui::IsKeyDown(ImGuiKey_Minus) || ImGui::IsKeyDown(ImGuiKey_KeypadSubtract));
-    g_MouseState[MouseButtonIndex(EMouseButtonType::LEFT)].Down = io.MouseDown[0];
-    g_MouseState[MouseButtonIndex(EMouseButtonType::RIGHT)].Down = io.MouseDown[1];
+    SyncWorkspaceInput();
     if ((io.KeyCtrl || io.KeySuper) && !io.WantTextInput)
     {
         if (!document.IsPlaying() && ImGui::IsKeyPressed(ImGuiKey_S, false)) { if (io.KeyShift || document.Path().empty()) ShowDialog(Dialog::Save, SceneDefault(editor)); else SaveScene(editor, document.Path()); }
@@ -1611,10 +1778,21 @@ void RenderAuthoringWorkspace(jEditor& editor)
             ImGui::MenuItem("Layout settings", nullptr, &s.ShowSettings);
             if (ImGui::MenuItem("Reset layout")) { s.ResetLayout = true; s.LeftWidth = 245; s.RightWidth = 325; s.BottomHeight = 205; }
             if (ImGui::MenuItem("Save layout")) SaveLayout();
+            if (ImGui::MenuItem("Viewport only", "F11")) RequestAuthoringViewportOnlyToggle();
             if (ImGui::MenuItem("Rendering panels", "F10")) SetAuthoringWorkspaceVisible(false);
             ImGui::EndMenu();
         }
         CaptureMenu(editor);
+        if (ImGui::BeginMenu("Help"))
+        {
+            if (ImGui::MenuItem("Keyboard Shortcuts"))
+            {
+                if (!s.ShowKeyboardShortcuts) s.ShortcutFilter.Clear();
+                s.ShowKeyboardShortcuts = true;
+                ImGui::SetWindowFocus("Keyboard Shortcuts");
+            }
+            ImGui::EndMenu();
+        }
         if (!document.IsPlaying())
         {
             if (ImGui::Button("Play"))
@@ -1637,7 +1815,7 @@ void RenderAuthoringWorkspace(jEditor& editor)
 #ifdef IMGUI_HAS_DOCK
     if (s.Docking && jEditorUiRenderer::SupportsDocking())
     {
-        const ImGuiID dock = ImGui::DockSpaceOverViewport(vp, ImGuiDockNodeFlags_PassthruCentralNode);
+        const ImGuiID dock = s.DockSpaceId = ImGui::DockSpaceOverViewport(vp, ImGuiDockNodeFlags_PassthruCentralNode);
         if (!s.DocksInitialized || s.ResetLayout)
         {
             if (s.ResetLayout || !ImGui::DockBuilderGetNode(dock) || !ImGui::DockBuilderGetNode(dock)->IsSplitNode())
@@ -1796,6 +1974,7 @@ void RenderAuthoringWorkspace(jEditor& editor)
     s.ResetLayout = false;
     Dialogs(editor);
     CaptureOptions(editor);
+    KeyboardShortcuts();
     jEditorExtensions::Render(editor);
     jEditorProjectSettings::Render(editor, s.Project.get());
     if (s.IntegrationDraw) s.IntegrationDraw();
@@ -1807,6 +1986,7 @@ void ShutdownAuthoringWorkspace()
 {
     jEditorCapture::Shutdown();
     auto& s = State(); jEditorAssetPanel::Shutdown(); if (s.Registry) s.Registry->Shutdown();
+    s.ShowKeyboardShortcuts = false;
     if (g_Editor) { ClearAssetPlacement(*g_Editor); jEditorExtensions::Shutdown(*g_Editor); }
     if (s.Packaging.valid()) s.Packaging.wait();
     jEditorTools::Shutdown(); jEditorUiRenderer::Shutdown();

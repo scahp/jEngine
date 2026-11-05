@@ -5,6 +5,9 @@
 class jEditor;
 bool IsAuthoringWorkspaceVisible();
 void SetAuthoringWorkspaceVisible(bool visible);
+bool IsAuthoringViewportOnly();
+void RequestAuthoringViewportOnlyToggle();
+void ApplyAuthoringViewportOnlyToggle(jEditor& editor);
 void SetAuthoringRuntimeMode(bool runtime);
 bool IsAuthoringRuntimeMode();
 void SetAuthoringExecutablePath(const std::filesystem::path& path);
@@ -19,6 +22,7 @@ bool LoadAuthoringScene(jEditor& editor, const std::filesystem::path& scene, std
 void TickAuthoringWorkspace(jEditor& editor, float deltaTime);
 void PrepareAuthoringUiFrame();
 void RenderAuthoringWorkspace(jEditor& editor);
+void UpdateAuthoringViewportOnlyInput(jEditor& editor);
 void ShutdownAuthoringWorkspace();
 bool RequestAuthoringWindowClose();
 void RequestAuthoringSceneReplacement(std::function<void()> action);

@@ -4,6 +4,7 @@
 #include "Code/Engine/Editor/jEditorProcedural.h"
 #include "Code/Engine/Editor/jEditorTools.h"
 #include "Code/Engine/Editor/jEditorWorkspace.h"
+#include "Code/Engine/Editor/jEditorProjectSettings.h"
 #include "FileLoader/jEditorAssets.h"
 #include "Scene/jObject.h"
 #include "Scene/jMeshObject.h"
@@ -345,6 +346,46 @@ void CheckViewportPlacement(const std::filesystem::path& directory, Expect expec
         expect(draftCreated && savedDraft.Load(draftPath) && savedDraft.Name() == "Updated working scene"
             && settings.Open(project.GetProjectFile(), error) && settings.GetConfig().StartupScene == "Scenes/startup.jscene",
             "Ctrl+S saves the working scene while retaining the explicitly designated startup scene");
+
+        const auto clickControl = [&](ImVec2 point) { frame(point, true); frame(point, false); };
+        if (auto* menu = ImGui::FindWindowByName("##MainMenuBar"))
+        {
+            const auto help = ImHashStr("Help", 0, menu->GetID("##menubar"));
+            const auto menuRect = menu->MenuBarRect();
+            ImVec2 point(menuRect.Min.x + 4, menuRect.GetCenter().y);
+            for (; point.x < menuRect.Max.x; point.x += 5)
+            {
+                frame(point, false);
+                if (context->HoveredId != help) continue;
+                clickControl(point);
+                break;
+            }
+            if (!context->OpenPopupStack.empty() && context->OpenPopupStack.back().Window)
+                clickControl(context->OpenPopupStack.back().Window->InnerRect.GetCenter());
+        }
+        auto* shortcuts = ImGui::FindWindowByName("Keyboard Shortcuts");
+        expect(shortcuts && shortcuts->Active, "Help menu opens the keyboard shortcut reference");
+        if (shortcuts && shortcuts->Active)
+        {
+            const auto listId = shortcuts->GetID("Shortcut list");
+            const auto visibleRows = [&] {
+                const auto* table = ImGui::TableFindByID(listId);
+                return table && table->LastFrameActive == context->FrameCount ? table->CurrentRow : -1;
+            };
+            const ImVec2 filter(shortcuts->DC.CursorStartPos.x + 40,
+                shortcuts->DC.CursorStartPos.y + ImGui::GetFrameHeight() * .5f);
+            clickControl(filter);
+            io.AddInputCharactersUTF8("SPACE");
+            frame(filter, false);
+            const bool noDefaultMatch = visibleRows() == -1;
+            auto remapped = project;
+            remapped.EditConfig().Settings["input.camera.forward"] = "SPACE";
+            const bool applied = jEditorProjectSettings::Apply(remapped, editor, error);
+            frame(filter, false);
+            expect(noDefaultMatch && applied && visibleRows() == 1,
+                "shortcut search shows the active remapped camera key and filters other actions");
+            jEditorProjectSettings::Apply(project, editor, error);
+        }
         SetAuthoringIntegrationDrawHook({});
     }
     else expect(false, "viewport placement fixture opens through the workspace");
