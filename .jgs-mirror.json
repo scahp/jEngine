@@ -11,13 +11,6 @@
   "package": "tools/JaehoGameStudio",
   "schema": 1,
   "skills": {
-    "jgs-core/SKILL.md": "5b81903bb0ead9aef284865bad4feae04955d300a801b14d26e966662b8e9ac6",
-    "jgs-devrel/SKILL.md": "c858af36e56416520f8171bbb9f5db367510696089e986bab6fd6498ae21c22c",
-    "jgs-director/SKILL.md": "c13174d360911f5e5a393635273d6ddf1bd34c20782640766adb40949ba290f4",
-    "jgs-editor/SKILL.md": "c6a58a7bf7711b96237f962b46007e2880c012e46d9eec2077b93e305db107e7",
-    "jgs-graphics/SKILL.md": "1153b5d5e0be881eba32d3a908e2f17d6bdea19a4bbbbc49dda53fec7caa0546",
-    "jgs-network/SKILL.md": "77bed4055d8299b61e03cfb163068c79926bb3c976f3de16076f9549bd1a99c2",
-    "jgs-particles/SKILL.md": "bc86c8f09ef4931ec2ca5eb2ebafd1590b5b921096ac39709cd215f351150b8e",
-    "jgs-sync/SKILL.md": "a5e49a0b68bac8e8f0c211ec91ff2bde4281a6209fa6abc071961db3fa87746e"
+    "jgs-sync/SKILL.md": "f39159e5e1f06ff61caa1c12298f0b05b84ed465f7b6da4e50144254441d905e"
   }
 }

@@ -17,6 +17,9 @@ New shared agent names start with `jgs-`. New skill directories have a matching
 `name` in `SKILL.md`. The script also mirrors skill scripts, references and
 assets. Review conflicting edits rather than overwriting either copy. Missing
 copies are restored; deletion and renaming require explicit coordinated changes.
+Developer roles are agents only; do not duplicate them as skills. The `jgs-sync`
+workflow remains a skill. The package's `retired-skills.json` removes unchanged
+legacy role skills during synchronization and preserves local edits for review.
 
 Commit shared package changes in its repository first, then commit the engine's
 submodule pointer, native copies and `.jgs-mirror.json` together. Edit these
