@@ -12,7 +12,6 @@ definition copies, symlinks or junctions in the engine.
 
 ```text
 jEngine/
-├── AGENTS.md, CLAUDE.md
 ├── .agents/plugins/marketplace.json  # Codex plugin source
 ├── .codex/config.toml                # Role config_file paths
 ├── .claude/settings.json             # Claude marketplace source
