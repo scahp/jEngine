@@ -2,7 +2,7 @@
 
 2026-11-05. Implemented on the local `codex/viewport-renderer-switch` branch, starting from `26eb307d`. This report covers the user-selected **8, 9, 10, 11, 14 and 15**. Item **7 Parallax/POM** is included as the authorized material-node foundation. The [remaining choices](../rendering-feature-intake.md#remaining-decisions) keep their original numbers.
 
-[Openable sample project](../../examples/scene-feature-demo/README.md) · [Scene features and baking](../manual/scene-features.md) · [Mapping node guide](../manual/material-mapping.md) · [Measurement data](data/selected-scene-features.json)
+[Standalone HTML report with embedded captures](selected-scene-features.html) · [Openable sample project](../../examples/scene-feature-demo/README.md) · [Scene features and baking](../manual/scene-features.md) · [Mapping node guide](../manual/material-mapping.md) · [Measurement data](data/selected-scene-features.json)
 
 ## Delivered behavior
 
@@ -40,12 +40,12 @@ These are **feature-off versus feature-on in the same new executable**, not an i
 
 | Path | Off median | On median | Observed difference |
 | --- | ---: | ---: | ---: |
-| Deferred SH | 8.346 ms | 8.675 ms | +0.329 ms |
+| Deferred SH | 8.346 ms | 8.675 ms | +0.328 ms |
 | Deferred PPR | 8.346 ms | 8.539 ms | +0.193 ms |
 | Deferred atmosphere | 8.346 ms | 8.563 ms | +0.217 ms |
-| Forward SH | 8.306 ms | 8.350 ms | +0.044 ms |
+| Forward SH | 8.306 ms | 8.350 ms | +0.043 ms |
 
-The timer covers owner-thread input/update/visibility, rendering, present and event polling. It includes present pacing and validation overhead; it is **not GPU-only timing**. Values cluster near an 8 ms presentation interval. Short-sample variation, including negative differences in some mapping pairs, does not establish a speedup or a reliable per-feature GPU cost. Raw samples and mapping/water profiles are in the JSON. Water time 0 versus 1.5 compares two active snapshots, not deformation-off versus on. Large-asset publication latency was not measured by this small fixture.
+Differences are calculated from unrounded samples; displayed medians are rounded. The timer covers owner-thread input/update/visibility, rendering, present and event polling. It includes present pacing and validation overhead; it is **not GPU-only timing**. Values cluster near an 8 ms presentation interval. Short-sample variation, including negative differences in some mapping pairs, does not establish a speedup or a reliable per-feature GPU cost. Raw samples and mapping/water profiles are in the JSON. Water time 0 versus 1.5 compares two active snapshots, not deformation-off versus on. Large-asset publication latency was not measured by this small fixture.
 
 Memory changes can be stated directly. The fifth RG16F GBuffer attachment costs **4 bytes/pixel**, about **3.52 MiB per 1280×720 scene-target set**, including when its visibility values are neutral. Active scene-feature passes use two RGBA16F scratch images (about 14.06 MiB at that size); PPR adds an R32_UINT image (about 3.52 MiB). Pool reuse/frame retirement controls their lifetime. Disabled scene features skip their extra compute/copy passes.
 

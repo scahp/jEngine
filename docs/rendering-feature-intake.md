@@ -60,7 +60,7 @@ No item below is authorized by this batch. Hi-Z and light-indexed shading remain
 
 | No. | Feature / source branch | Recommended engine module and decision |
 | --- | --- | --- |
-| 1 | Cascaded shadows / `master` | Cascade view builder and per-cascade RHI passes. Choose counts, splits, distance and stabilization. |
+| 1 | Existing CSM restoration / Shadows `master`, jEngine history | Restore the existing cascade algorithms to the current Vulkan/DX12 renderer. CSM was added in 2019 and removed with the old OpenGL pipeline during the 2022 Vulkan migration. The active directional light has one `ShadowVP` and one 2D shadow layer. Choose counts, splits, distance and stabilization. |
 | 2 | Forward+ / `ForwardPlus` | Shared bounded light grid for Forward/Deferred. Choose light limits and overflow policy. |
 | 3 | Weighted OIT / `WeightOIT` | Transparency accumulation/revealage and material classification. Agree approximation and fallback. |
 | 4 | BSDF / jEngine `PathTracingBSDF` | Shared sampling/evaluation/PDF library. Preserve current index/binding fixes and repair refraction math. |
@@ -79,7 +79,15 @@ No item below is authorized by this batch. Hi-Z and light-indexed shading remain
 | 24 | Hi-Z / `HiZOcclusion` | **Prototype:** reusable depth pyramid, followed by bounded visibility/indirect-draw integration. |
 | 25 | Light-indexed rendering / `LightIndexedDeferredRendering` | **Prototype:** evaluate pixel light indices as another light-grid consumer; source renderer `Do` is empty. |
 
-For general scenes, the next coherent group is **1 CSM, 2 Forward+ and 3 OIT**, followed by a separately designed Hi-Z visibility module. For Path Tracing quality, decide **4 BSDF and 5 Russian Roulette** together.
+For general scenes, the next coherent group is **1 existing CSM restoration, 2 Forward+ and 3 OIT**, followed by a separately designed Hi-Z visibility module. Item 1 restores and ports an existing feature, rather than introducing CSM for the first time. For Path Tracing quality, decide **4 BSDF and 5 Russian Roulette** together.
+
+### CSM history and current runtime
+
+CSM was added in shared jEngine/Shadows history by `3b7a12ba0c52` (2019-07-27, "Added Cascade shadow"), with later fixes including `11b6e3129b0b` and `d87f1e7af69e`. These commits are ancestors of jEngine main. Commit `797710bcf911` (2022-08-25, "Remove all files to merge vulkan api") deleted the previous pipeline, cascade light code and GLSL shaders before the Vulkan merge `e2d68554e187`. The prepared Shadows `master` still contains the old implementation.
+
+At the current implementation commit `f8ec7f64`, [`jDirectionalLight`](../jEngine/Scene/Light/jDirectionalLight.h) holds one shadow matrix, [`jSceneRenderTargets.cpp`](../jEngine/Renderer/jSceneRenderTargets.cpp) allocates a single-layer 2D directional shadow target, and [`directionallight_fs.hlsl`](../jEngine/Resource/Shaders/hlsl/directionallight_fs.hlsl) samples that matrix. The old `CreateCascadeDirectionalLight` factory remains declared, but its implementation/update bodies in [`jLight.cpp`](../jEngine/Scene/Light/jLight.cpp) are commented out. The SurfelGI Cascade controls are GI clipmaps, not directional-light CSM.
+
+Reintegration can reuse split/frustum/matrix selection algorithms; shadow allocation, per-cascade culling/draw submission, shader selection and filtering must follow the current RHI. This audit does not enable or implement CSM.
 
 ## Excluded from new-feature counts
 

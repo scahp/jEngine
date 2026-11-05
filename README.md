@@ -98,7 +98,7 @@ code push and on PRs targeting `main`. Build artifacts and logs are kept for fiv
 [Engine roadmap](docs/engine-roadmap.md) · [Editor foundation measurements](docs/reports/editor-foundation-performance.md)
 
 [Rendering feature intake](docs/rendering-feature-intake.md) — reusable modules and pending integration choices.
-[Scene features](docs/manual/scene-features.md) · [Mapping nodes](docs/manual/material-mapping.md) · [Selected-feature validation](docs/reports/selected-scene-features.md)
+[Scene features](docs/manual/scene-features.md) · [Mapping nodes](docs/manual/material-mapping.md) · [Selected-feature validation](docs/reports/selected-scene-features.md) · [Screenshots and measurements (HTML)](docs/reports/selected-scene-features.html)
 [Scene-feature sample project](examples/scene-feature-demo/README.md)
 
 ## Third party libraries
