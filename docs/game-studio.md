@@ -6,7 +6,9 @@
 
 All shared definitions, including the `jgs-sync` maintenance skill, live in the
 `tools/JaehoGameStudio` submodule. The engine stores relative path registrations.
-There are no shared definition copies, symlinks or junctions in the engine.
+The native marketplace already records the package path; no extra root state
+file is needed. Mirror hashes stay inside the plugin. There are no shared
+definition copies, symlinks or junctions in the engine.
 
 ```text
 jEngine/
@@ -14,7 +16,6 @@ jEngine/
 ├── .agents/plugins/marketplace.json  # Codex plugin source
 ├── .codex/config.toml                # Role config_file paths
 ├── .claude/settings.json             # Claude marketplace source
-├── .jgs-mirror.json                  # Relative package path
 ├── tools/JaehoGameStudio/
 │   ├── plugin.json
 │   ├── .claude-plugin/
