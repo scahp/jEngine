@@ -4,6 +4,7 @@ class jCommandBuffer;
 class jRaytracingScene;
 struct jSceneRenderTarget;
 struct jSyncAcrossCommandQueue;
+struct jTexture;
 
 struct jRenderFrameContext : public std::enable_shared_from_this<jRenderFrameContext>
 {
@@ -36,6 +37,12 @@ public:
     std::shared_ptr<jSceneRenderTarget> SceneRenderTargetPtr = nullptr;
     uint32 FrameIndex = -1;
     bool UseForwardRenderer = true;
+    // Effective frame capabilities. Persisted requests remain unchanged when a
+    // stored multisample/material pass requires the separate-pass renderer.
+    bool UseSubpass = false;
+    bool UseSubsurface = false;
+    bool HasSkinMaterials = false;
+    std::shared_ptr<jTexture> SkinEnergyLUT;
     bool IsBeginActiveCommandbuffer = false;
 
 protected:

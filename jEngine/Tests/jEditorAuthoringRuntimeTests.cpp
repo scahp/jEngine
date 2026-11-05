@@ -42,6 +42,8 @@ int RunEditorAuthoringRuntimeTests()
             "new particle emitters enable the actual authored-material publication path by default");
         editor.GetDocument().Delete(defaultEmitter);
         jObject original;auto geometry=std::make_shared<jRenderObjectGeometryData>();auto material=std::make_shared<jMaterial>();
+        material->Surface.emplace().Subsurface = .45f;
+        material->Surface->SpecularWeight = 1.4f; material->Surface->DiffuseOcclusion = .8f; material->Surface->PreScatterWeight = .65f;
         for(int n=0;n<2;++n){
             auto* mesh=new jRenderObjectElement();mesh->GeometryDataPtr=geometry;mesh->MaterialPtr=material;
             mesh->SubMesh={n*3,n*3+3,n*3,n*3+3,0,"part"};
@@ -262,6 +264,43 @@ int RunEditorAuthoringRuntimeTests()
         editor.ReimportAsset("Assets/normal.png");editor.Tick(0,camera.get());
         expect(baseRefreshed&&materialApplications==beforeTextureReimport+2&&document.Revision()==beforeTextureRevision,
             "texture reimport reapplies live base-color and normal material bindings without editing the document");
+        auto beforeSSS = editor.ObjectForEntity(modelId)->RenderObjects[0]->MaterialPtr;
+        expect(beforeSSS->Surface&&beforeSSS->Surface->Subsurface==.45f,
+            "older instance data without authored SSS retains its imported canonical subsurface scalar when other properties reapply");
+        auto& legacySlot=editor.ObjectForEntity(modelId)->RenderObjects[0]->MaterialPtr;
+        legacySlot=std::make_shared<jMaterial>(*legacySlot);legacySlot->Surface.reset();legacySlot->SubsurfaceOnlySurface=false;
+        model=*document.Find(modelId);model.Material.SubsurfaceOverrideEnabled=true;
+        model.Material.SubsurfaceWeight=.7f;model.Material.SubsurfaceColor={.8f,.4f,.2f};
+        model.Material.SubsurfaceThicknessWorld=.5f;model.Material.SubsurfaceProfile=7;
+        const bool sssUpdated=document.Update(model,"Author real subsurface material");editor.Tick(0,camera.get());
+        const auto authoredSSS=editor.ObjectForEntity(modelId)->RenderObjects[0]->MaterialPtr;
+        expect(sssUpdated&&authoredSSS->Surface&&authoredSSS->Surface->Subsurface==.7f
+            &&authoredSSS->Surface->SubsurfaceColor==std::array<float,3>{.8f,.4f,.2f}
+            &&authoredSSS->Surface->SubsurfaceThicknessWorld==.5f&&authoredSSS->Surface->SubsurfaceProfile==7&&authoredSSS->SubsurfaceOnlySurface
+            &&!editor.ObjectForEntity(modelId)->RenderObjects[1]->MaterialPtr->SubsurfaceOnlySurface
+            &&material->Surface->Subsurface==.45f,
+            "actual owner COW publication writes canonical SSS while preserving legacy versus explicit surface coverage and the shared original");
+        model=*document.Find(modelId);model.Material.SubsurfaceWeight=0;document.Update(model,"Disable material diffusion");editor.Tick(0,camera.get());
+        expect(editor.ObjectForEntity(modelId)->RenderObjects[0]->MaterialPtr->Surface->Subsurface==0,
+            "explicit authored zero weight reaches the canonical material instead of being mistaken for missing legacy data");
+        model=*document.Find(modelId);model.Material.SkinOverrideEnabled=true;
+        model.Material.ShadingModel=jSurfaceShadingModel::SkinKelemen;model.Material.SubsurfaceSpace=jSubsurfaceSpace::Texture;
+        model.Material.SpecularWeight=3;model.Material.DiffuseOcclusion=.5f;model.Material.PreScatterWeight=.25f;
+        const bool skinUpdated=document.Update(model,"Author skin model and weights");editor.Tick(0,camera.get());
+        const auto authoredSkin=editor.ObjectForEntity(modelId)->RenderObjects[0]->MaterialPtr;
+        expect(skinUpdated&&authoredSkin->Surface&&authoredSkin->Surface->ShadingModel==jSurfaceShadingModel::SkinKelemen
+            &&authoredSkin->Surface->SubsurfaceSpace==jSubsurfaceSpace::Texture&&authoredSkin->Surface->SpecularWeight==3
+            &&authoredSkin->Surface->DiffuseOcclusion==.5f&&authoredSkin->Surface->PreScatterWeight==.25f
+            &&material->Surface->ShadingModel==jSurfaceShadingModel::StandardPBR&&material->Surface->SpecularWeight==1.4f,
+            "actual owner publication writes canonical skin values to a COW instance while preserving the imported source");
+        model=*document.Find(modelId);model.Material.SkinOverrideEnabled=false;document.Update(model,"Inherit skin source");editor.Tick(0,camera.get());
+        const auto inheritedSkin=editor.ObjectForEntity(modelId)->RenderObjects[0]->MaterialPtr;
+        expect(inheritedSkin->Surface&&inheritedSkin->Surface->ShadingModel==jSurfaceShadingModel::StandardPBR
+            &&inheritedSkin->Surface->SpecularWeight==1.4f&&inheritedSkin->Surface->DiffuseOcclusion==.8f&&inheritedSkin->Surface->PreScatterWeight==.65f,
+            "clearing skin overrides restores each actual source material rather than retaining stale authored values");
+        const bool skinUndo=document.Undo();editor.Tick(0,camera.get());
+        expect(skinUndo&&editor.ObjectForEntity(modelId)->RenderObjects[0]->MaterialPtr->Surface->SpecularWeight==3,
+            "Undo of skin inheritance republishes authored canonical values through the real owner adapter");
         jEditorTools::MaterialGraph mapping;
         mapping.Nodes = {{1,0,0,jEditorTools::NodeKind::Color,{.2f,.4f,.6f}}};
         jEditorTools::MaterialNode channel;channel.Id=2;channel.Kind=jEditorTools::NodeKind::Channel;channel.InputA=1;channel.Parameters={1,0,0,0};
@@ -309,6 +348,67 @@ int RunEditorAuthoringRuntimeTests()
             &&std::count(jLight::GetLights().begin(),jLight::GetLights().end(),sourceLight.get())==1,"idempotent shutdown restores borrowed scene owners and unregisters owned instances");
         jObject::RemoveObject(&original);jLight::RemoveLights(sourceLight.get());
         g_Editor=oldEditor;
+    }
+    {
+        // The real production adapter clones its source and enables the legacy
+        // alpha permutation. Runtime must publish explicit graph coverage after
+        // that clone, rather than fixing only a native test fixture's flags.
+        jEditor editor;g_Editor=&editor;editor.SetProjectRoot(directory);jEditorProcedural::Install(editor);
+        jObject source;
+        auto legacy=std::make_shared<jMaterial>();legacy->bRaytracingAlphaTest=true;legacy->RaytracingAlphaCutoff=.3f;
+        auto masked=std::make_shared<jMaterial>();auto& sourceSurface=masked->Surface.emplace();
+        sourceSurface.AlphaMode=jSurfaceAlphaMode::Mask;sourceSurface.AlphaCutoff=.2f;sourceSurface.DoubleSided=true;sourceSurface.LegacyPackedMap=true;
+        sourceSurface.Transmission=.4f;sourceSurface.Ior=1.6f;masked->bRaytracingAlphaTest=true;masked->RaytracingAlphaCutoff=.2f;
+        for(const auto& material:{legacy,masked}){auto* mesh=new jRenderObject();mesh->MaterialPtr=material;source.AddRenderObject(mesh);}
+        jObject::AddObject(&source);editor.TrackWorldObjectSource(&source,"Assets/fixture.gltf","coverage-source",1);
+        const bool captured=editor.CaptureWorldToDocument();const auto id=editor.EntityForObject(&source);auto& document=editor.GetDocument();
+        jEditorTools::MaterialGraph graph;graph.Nodes={{1,0,0,jEditorTools::NodeKind::Color,{.8f,.6f,.4f}}};graph.BaseColor=1;
+        auto& opaque=graph.Surface.emplace().Shading;opaque.AlphaMode=jSurfaceAlphaMode::Opaque;opaque.AlphaCutoff=.4f;
+        opaque.Transmission=.9f;opaque.Subsurface=.9f;opaque.ShadingModel=jSurfaceShadingModel::SkinKelemen;
+        const std::string opaquePath="Assets/coverage-opaque.jmaterial",maskPath="Assets/coverage-mask.jmaterial";std::string error;
+        const bool opaqueSaved=jEditorTools::SaveMaterial(graph,directory/opaquePath,error);
+        auto entity=id?*document.Find(id):Entity{};entity.Material.OverrideEnabled=true;entity.Material.GraphAsset=opaquePath;
+        auto& flags=entity.Material.GraphOverrides.emplace();flags.SubsurfaceWeight=true;flags.SpecularWeight=true;
+        entity.Material.SubsurfaceOverrideEnabled=true;entity.Material.SubsurfaceWeight=.35f;entity.Material.SkinOverrideEnabled=true;entity.Material.SpecularWeight=3;
+        const bool assigned=document.Update(entity,"Assign explicit opaque graph");editor.Tick(0,nullptr);
+        const auto first=source.RenderObjects[0]->MaterialPtr,second=source.RenderObjects[1]->MaterialPtr;
+        expect(captured&&id&&opaqueSaved&&assigned&&first!=legacy&&second!=masked&&first->Surface&&second->Surface
+            &&!first->SubsurfaceOnlySurface&&!second->SubsurfaceOnlySurface&&!first->bRaytracingAlphaTest&&!second->bRaytracingAlphaTest
+            &&first->Surface->AlphaMode==jSurfaceAlphaMode::Opaque&&first->Surface->AlphaCutoff==.4f
+            &&!second->Surface->DoubleSided&&!second->Surface->LegacyPackedMap,
+            "real production adapter graph assignment publishes explicit opaque coverage after its alpha-enabled clone");
+        expect(first->Surface&&second->Surface&&first->Surface->Subsurface==.35f&&first->Surface->SpecularWeight==3
+            &&first->Surface->Transmission==0&&second->Surface->Transmission==.4f&&second->Surface->Ior==1.6f
+            &&!legacy->Surface&&legacy->bRaytracingAlphaTest&&masked->Surface->AlphaMode==jSurfaceAlphaMode::Mask,
+            "coverage publication preserves instance SSS Skin and unrelated imported surface fields without mutating shared originals");
+        opaque.AlphaMode=jSurfaceAlphaMode::Mask;opaque.AlphaCutoff=.6f;opaque.DoubleSided=true;opaque.LegacyPackedMap=true;
+        const bool maskSaved=jEditorTools::SaveMaterial(graph,directory/maskPath,error);
+        entity=*document.Find(id);entity.Material.GraphAsset=maskPath;document.Update(entity,"Assign explicit masked graph");editor.Tick(0,nullptr);
+        expect(maskSaved&&source.RenderObjects[0]->MaterialPtr->Surface->AlphaMode==jSurfaceAlphaMode::Mask
+            &&source.RenderObjects[0]->MaterialPtr->bRaytracingAlphaTest&&source.RenderObjects[0]->MaterialPtr->RaytracingAlphaCutoff==.6f
+            &&source.RenderObjects[1]->MaterialPtr->Surface->DoubleSided&&source.RenderObjects[1]->MaterialPtr->Surface->LegacyPackedMap,
+            "explicit Mask graph publishes its cutoff double-sided and packed-map coverage through the same ordinary owner path");
+        entity=*document.Find(id);entity.Material.GraphAsset.clear();entity.Material.GraphOverrides.reset();document.Update(entity,"Inherit original coverage");editor.Tick(0,nullptr);
+        const auto inheritedLegacy=source.RenderObjects[0]->MaterialPtr,inheritedMask=source.RenderObjects[1]->MaterialPtr;
+        expect(inheritedLegacy->Surface&&inheritedLegacy->SubsurfaceOnlySurface&&inheritedLegacy->bRaytracingAlphaTest
+            &&inheritedLegacy->RaytracingAlphaCutoff==.3f&&inheritedLegacy->Surface->Subsurface==.35f
+            &&inheritedMask->Surface&&inheritedMask->Surface->AlphaMode==jSurfaceAlphaMode::Mask
+            &&inheritedMask->Surface->AlphaCutoff==.2f&&inheritedMask->bRaytracingAlphaTest&&!inheritedMask->SubsurfaceOnlySurface,
+            "removing a graph restores each original coverage while preserving legacy absence and authored scattering-only metadata");
+        const bool undoMask=document.Undo();editor.Tick(0,nullptr);const bool maskRestored=source.RenderObjects[0]->MaterialPtr->bRaytracingAlphaTest
+            &&source.RenderObjects[0]->MaterialPtr->Surface->AlphaCutoff==.6f&&!source.RenderObjects[0]->MaterialPtr->SubsurfaceOnlySurface;
+        const bool undoOpaque=document.Undo();editor.Tick(0,nullptr);
+        expect(undoMask&&maskRestored&&undoOpaque&&!source.RenderObjects[0]->MaterialPtr->bRaytracingAlphaTest
+            &&source.RenderObjects[0]->MaterialPtr->Surface->AlphaMode==jSurfaceAlphaMode::Opaque,
+            "Undo republishes both Mask and Opaque graph coverage through the real adapter rather than leaving stale flags");
+        editor.SelectEntity(id);const auto duplicate=editor.DuplicateSelected();editor.Tick(0,nullptr);
+        if(duplicate){auto copy=*document.Find(duplicate);copy.Material.GraphAsset.clear();copy.Material.GraphOverrides.reset();document.Update(copy,"Inherit duplicate coverage");editor.Tick(0,nullptr);}
+        const auto* copied=editor.ObjectForEntity(duplicate);
+        expect(copied&&copied->RenderObjects[0]->MaterialPtr->SubsurfaceOnlySurface&&copied->RenderObjects[0]->MaterialPtr->bRaytracingAlphaTest
+            &&copied->RenderObjects[0]->MaterialPtr->RaytracingAlphaCutoff==.3f
+            &&!source.RenderObjects[0]->MaterialPtr->bRaytracingAlphaTest,
+            "duplicated material bindings retain original coverage inheritance independently of the edited original entity");
+        editor.ShutdownWorld();jObject::RemoveObject(&source);g_Editor=oldEditor;
     }
     {
         jPlacementTool placement;jObject grouped;

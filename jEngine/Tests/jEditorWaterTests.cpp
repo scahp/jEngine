@@ -1,11 +1,17 @@
+#include "pch.h"
 #include "jEditorWaterTests.h"
 #include "Code/Engine/Editor/jEditorWater.h"
+#include "Material/jMaterial.h"
+#include "Material/jMaterialWater.h"
+#include "Shader/jCommonShaderParameters.h"
 #include "External/PathTracingDataLoader/json.hpp"
 
 #include <chrono>
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <cstring>
+#include <type_traits>
 
 int RunEditorWaterTests()
 {
@@ -30,6 +36,66 @@ int RunEditorWaterTests()
         WaterProperties defaults;
         expect(jEditorWater::Validate(defaults,error) && defaults.Resolution==33 && defaults.SizeX==1000
             && defaults.Waves.Waves.size()==4,"pond defaults are a valid rendered four-wave profile");
+        {
+            jMaterial neutral;
+            bool constantsZero=true;
+            for(const auto& value:neutral.MappingValues)constantsZero&=value==Vector4(0.f);
+            expect(constantsZero,"fresh material mapping constants are explicitly zero despite Vector4's empty default constructor");
+            static_assert(std::is_trivially_copyable_v<jMaterialGraphUniformBuffer>);
+            static_assert(std::is_standard_layout_v<jMaterialGraphUniformBuffer>);
+            const auto waterZero=[](const jMaterialGraphUniformBuffer& p)
+            {
+                if(!(p.WaterControl==Vector4(0.f)))return false;
+                for(size_t i=0;i<4;++i)if(!(p.WaterWavesA[i]==Vector4(0.f))||!(p.WaterWavesB[i]==Vector4(0.f)))return false;
+                return true;
+            };
+            const auto preserveOther=[](const jMaterialGraphUniformBuffer& a,const jMaterialGraphUniformBuffer& b)
+            {
+                return std::memcmp(&a,&b,offsetof(jMaterialGraphUniformBuffer,WaterWavesA))==0
+                    &&a.MaterialSubsurfaceColorWeight==b.MaterialSubsurfaceColorWeight
+                    &&a.MaterialSubsurfaceParameters==b.MaterialSubsurfaceParameters;
+            };
+            jMaterialGraphUniformBuffer parameters;
+            for(int variant=0;variant<5;++variant)
+            {
+                std::memset(&parameters,0xa5,sizeof(parameters));
+                parameters.Values[0]=Vector4(.2f,.4f,.6f,.8f);
+                parameters.MaterialSubsurfaceColorWeight=Vector4(.8f,.4f,.2f,.7f);
+                parameters.MaterialSubsurfaceParameters=Vector4(.5f,7,0,0);
+                const auto before=parameters;
+                jMaterialWaterState state;state.Settings=defaults.Waves;
+                if(variant==1)state.Enabled=false;
+                if(variant==2)state.TimeSeconds=std::numeric_limits<double>::quiet_NaN();
+                if(variant==3)state.Settings.Waves.resize(5);
+                if(variant==4)state.Settings.Waves[0].Direction={0,0};
+                FillMaterialWaterShaderParameters(variant==0?nullptr:&state,parameters);
+                expect(waterZero(parameters)&&preserveOther(parameters,before),
+                    "missing disabled or invalid water clears poisoned wave/control bytes without clobbering graph constants masks or appended SSS data");
+            }
+            std::memset(&parameters,0xa5,sizeof(parameters));
+            parameters.MaterialSubsurfaceColorWeight=Vector4(.8f,.4f,.2f,.7f);
+            parameters.MaterialSubsurfaceParameters=Vector4(.5f,7,0,0);
+            const auto before=parameters;
+            jMaterialWaterState active;active.Settings=defaults.Waves;active.Settings.Waves.resize(1);
+            active.Settings.BaseHeight=3;active.TimeSeconds=17.5;
+            FillMaterialWaterShaderParameters(&active,parameters);
+            jWaterSimulation::Settings published;published.BaseHeight=parameters.WaterControl.y;
+            published.Waves.push_back({{parameters.WaterWavesA[0].x,parameters.WaterWavesA[0].y},
+                parameters.WaterWavesA[0].z,parameters.WaterWavesA[0].w,parameters.WaterWavesB[0].x,
+                parameters.WaterWavesB[0].y,parameters.WaterWavesB[0].z});
+            jWaterSimulation::SurfaceSample originalSample,publishedSample;
+            bool equivalent=jWaterSimulation::Evaluate(active.Settings,{11,19},active.TimeSeconds,originalSample,error)
+                &&jWaterSimulation::Evaluate(published,{11,19},0,publishedSample,error);
+            for(size_t i=0;i<3;++i)equivalent&=std::abs(originalSample.Position[i]-publishedSample.Position[i])<.0001f
+                &&std::abs(originalSample.Normal[i]-publishedSample.Normal[i])<.0001f;
+            expect(parameters.WaterControl==Vector4(1,3,0,1)&&equivalent&&preserveOther(parameters,before),
+                "active water snapshot preserves the real analytic position and normal after owner-side temporal phase reduction");
+            bool unusedZero=true;
+            for(size_t i=1;i<4;++i)unusedZero&=parameters.WaterWavesA[i]==Vector4(0.f)&&parameters.WaterWavesB[i]==Vector4(0.f);
+            expect(unusedZero,"active short wave lists clear every unused GPU wave slot");
+            active.Enabled=false;FillMaterialWaterShaderParameters(&active,parameters);
+            expect(waterZero(parameters)&&preserveOther(parameters,before),"disabling previously active water removes all deformation without touching SSS or mapping data");
+        }
         Document legacy;
         const auto oldId=legacy.Create(EntityKind::Cube,"Legacy cube");
         const auto oldText=legacy.ToJson();

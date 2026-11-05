@@ -7,6 +7,7 @@ struct jSceneRenderTarget;
 struct jRenderFrameContext;
 namespace jSceneFeatures { struct Settings; }
 namespace jAdvancedShadows { class Frame; }
+namespace jHiZOcclusion { class Frame; }
 
 // Light 별로 렌더링할 정보들을 갖고 있는 객체
 struct jShadowDrawInfo
@@ -97,6 +98,10 @@ public:
 
     std::vector<jShadowDrawInfo> ShadowDrawInfo;
     std::shared_ptr<jAdvancedShadows::Frame> AdvancedShadowFrame;
+    std::shared_ptr<jHiZOcclusion::Frame> HiZOcclusionFrame;
+    bool ResolveMultisampleScene();
+    bool DecodeSkinPostNormals();
+    void SubsurfacePass();
     std::vector<jDrawCommand> BasePasses;
     std::vector<std::shared_ptr<IUniformBufferBlock>> ForwardLightUniformBuffers;
     std::vector<std::shared_ptr<jShaderBindingInstance>> ForwardLightBindings;

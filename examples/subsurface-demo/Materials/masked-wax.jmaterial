@@ -1,0 +1,233 @@
+{
+  "baseColor": 1,
+  "format": "jEngineMaterial",
+  "horizon": 0,
+  "metallic": 0,
+  "nodes": [
+    {
+      "a": 0,
+      "b": 0,
+      "c": 0,
+      "color": [
+        0.550000011920929,
+        0.550000011920929,
+        0.550000011920929
+      ],
+      "d": 0,
+      "id": 1,
+      "kind": 0,
+      "parameters": [
+        1.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "semantic": 0,
+      "texture": "",
+      "value": 1.0,
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "a": 0,
+      "b": 0,
+      "c": 0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "d": 0,
+      "id": 2,
+      "kind": 1,
+      "parameters": [
+        1.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "semantic": 0,
+      "texture": "",
+      "value": 0.800000011920929,
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "a": 0,
+      "b": 0,
+      "c": 0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "d": 0,
+      "id": 3,
+      "kind": 5,
+      "parameters": [
+        1.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "semantic": 0,
+      "texture": "",
+      "value": 1.0,
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "a": 0,
+      "b": 0,
+      "c": 0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "d": 0,
+      "id": 4,
+      "kind": 6,
+      "parameters": [
+        1.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "semantic": 0,
+      "texture": "Assets/sss-mask.png",
+      "value": 1.0,
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "a": 4,
+      "b": 3,
+      "c": 0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "d": 0,
+      "id": 5,
+      "kind": 7,
+      "parameters": [
+        1.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "semantic": 0,
+      "texture": "",
+      "value": 1.0,
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "a": 5,
+      "b": 0,
+      "c": 0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "d": 0,
+      "id": 6,
+      "kind": 9,
+      "parameters": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "semantic": 0,
+      "texture": "",
+      "value": 1.0,
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "a": 0,
+      "b": 0,
+      "c": 0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "d": 0,
+      "id": 7,
+      "kind": 1,
+      "parameters": [
+        1.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "semantic": 0,
+      "texture": "",
+      "value": 50.0,
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "a": 0,
+      "b": 0,
+      "c": 0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "d": 0,
+      "id": 8,
+      "kind": 15,
+      "parameters": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "semantic": 0,
+      "texture": "",
+      "value": 1.0,
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "a": 0,
+      "b": 0,
+      "c": 0,
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "d": 0,
+      "id": 9,
+      "kind": 0,
+      "parameters": [
+        1.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "semantic": 0,
+      "texture": "",
+      "value": 1.0,
+      "x": 0.0,
+      "y": 0.0
+    }
+  ],
+  "normal": 0,
+  "roughness": 2,
+  "subsurfaceOutputs": {
+    "color": 9,
+    "profile": 8,
+    "thickness": 7,
+    "weight": 6
+  },
+  "version": 2
+}

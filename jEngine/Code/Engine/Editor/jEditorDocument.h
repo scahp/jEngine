@@ -10,6 +10,7 @@
 #include <vector>
 #include "Renderer/Features/jWaterSimulation.h"
 #include "Renderer/Features/jAdvancedShadowSettings.h"
+#include "Material/jMaterialMapping.h"
 
 // Authoring data has no runtime pointers and is edited only by its creating thread.
 // Angles are degrees; transforms use T * Rz * Ry * Rx * S, column vectors.
@@ -32,6 +33,9 @@ struct Transform
 struct MaterialGraphOverrides
 {
     bool BaseColor = false, BaseColorTexture = false, Metallic = false, Roughness = false, NormalTexture = false;
+    bool SubsurfaceWeight = false, SubsurfaceColor = false, SubsurfaceThickness = false, SubsurfaceProfile = false;
+    bool ShadingModel = false, SubsurfaceSpace = false;
+    bool SpecularWeight = false, DiffuseOcclusion = false, PreScatterWeight = false;
     bool operator==(const MaterialGraphOverrides&) const = default;
 };
 struct MaterialProperties
@@ -41,6 +45,18 @@ struct MaterialProperties
     float Metallic = 0, Roughness = 0.5f, Opacity = 1;
     std::string BaseColorTexture, NormalTexture, GraphAsset;
     std::optional<MaterialGraphOverrides> GraphOverrides;
+    // Presence of the serialized subsurface block distinguishes an explicit
+    // zero weight from an older instance inheriting its imported surface.
+    bool SubsurfaceOverrideEnabled = false;
+    float SubsurfaceWeight = 0.f;
+    Vec3 SubsurfaceColor{1.f, 1.f, 1.f};
+    float SubsurfaceThicknessWorld = 1.f;
+    uint32_t SubsurfaceProfile = 0;
+    // Omitted legacy data inherits the imported/shared material skin settings.
+    bool SkinOverrideEnabled = false;
+    jMaterialMapping::ShadingModel ShadingModel = jMaterialMapping::ShadingModel::StandardPBR;
+    jMaterialMapping::SubsurfaceSpace SubsurfaceSpace = jMaterialMapping::SubsurfaceSpace::Screen;
+    float SpecularWeight = 1.f, DiffuseOcclusion = 1.f, PreScatterWeight = 1.f;
     bool operator==(const MaterialProperties&) const = default;
 };
 struct LightProperties

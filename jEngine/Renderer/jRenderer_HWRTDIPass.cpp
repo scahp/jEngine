@@ -737,7 +737,10 @@ bool jRenderer::IsUseHWRTDirectLighting() const
         && RenderFrameContextPtr
         && RenderFrameContextPtr->RaytracingScene
         && RenderFrameContextPtr->RaytracingScene->IsValid()
-        && !RenderFrameContextPtr->UseForwardRenderer;
+        && !RenderFrameContextPtr->UseForwardRenderer
+        && !RenderFrameContextPtr->UseSubsurface
+        && !RenderFrameContextPtr->HasSkinMaterials
+        && g_rhi->GetSelectedMSAASamples() == EMSAASamples::COUNT_1;
 }
 
 bool jRenderer::HWRTDirectLightingPass()

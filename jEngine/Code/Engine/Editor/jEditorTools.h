@@ -25,7 +25,7 @@ enum class NodeKind
 {
     Color, Scalar, Texture, Multiply, Add,
     UV, TextureObject, TextureSample, TextureSampleNormal, Channel,
-    Parallax, POM, Relief, Interior, Horizon
+    Parallax, POM, Relief, Interior, Horizon, DiffusionProfile
 };
 struct MaterialNode
 {
@@ -37,6 +37,10 @@ struct MaterialNode
     uint32_t InputC = 0, InputD = 0;
     std::array<float, 4> Parameters{1, 1, 0, 0};
     jMaterialMapping::TextureSemantic Semantic = jMaterialMapping::TextureSemantic::Linear;
+    jMaterialMapping::NormalSpace NormalSpace = jMaterialMapping::NormalSpace::Tangent;
+    std::array<float, 3> InputBasisSignXYZ{1.f, 1.f, 1.f};
+    // Absent: legacy Parameters.x flip for Tangent, no flip for Object/World.
+    std::optional<bool> FlipNormalY;
 };
 struct MaterialGraph
 {
@@ -52,6 +56,8 @@ struct MaterialGraph
     std::optional<SurfaceProperties> Surface;
     uint32_t Horizon = 0;
     uint32_t Version = 1;
+    uint32_t SubsurfaceWeight = 0, SubsurfaceColor = 0, SubsurfaceThickness = 0, SubsurfaceProfile = 0;
+    uint32_t SpecularWeight = 0, DiffuseOcclusion = 0, PreScatterWeight = 0;
 };
 bool EvaluateMaterial(const MaterialGraph& graph, jEditorAuthoring::MaterialProperties& material, std::string& error);
 bool SaveMaterial(const MaterialGraph& graph, const std::filesystem::path& file, std::string& error);

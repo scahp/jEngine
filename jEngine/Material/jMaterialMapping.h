@@ -17,6 +17,9 @@ inline constexpr size_t MaximumValues = 64;
 inline constexpr size_t MaximumHlslBytes = 64 * 1024;
 
 enum class TextureSemantic : uint32_t { Linear = 0, Color = 1, Normal = 2 };
+enum class NormalSpace : uint32_t { Tangent = 0, Object = 1, World = 2 };
+enum class ShadingModel : uint32_t { StandardPBR = 0, SkinKelemen = 1 };
+enum class SubsurfaceSpace : uint32_t { Screen = 0, Texture = 1 };
 enum OutputOverride : uint32_t
 {
     OverrideBaseColor = 1u << 0,
@@ -24,6 +27,15 @@ enum OutputOverride : uint32_t
     OverrideMetallic = 1u << 2,
     OverrideRoughness = 1u << 3,
     OverrideBaseColorTexture = 1u << 4,
+    OverrideSubsurfaceWeight = 1u << 5,
+    OverrideSubsurfaceColor = 1u << 6,
+    OverrideSubsurfaceThickness = 1u << 7,
+    OverrideSubsurfaceProfile = 1u << 8,
+    OverrideSpecularWeight = 1u << 9,
+    OverrideDiffuseOcclusion = 1u << 10,
+    OverridePreScatterWeight = 1u << 11,
+    OverrideShadingModel = 1u << 12,
+    OverrideSubsurfaceSpace = 1u << 13,
 };
 
 struct TextureBinding

@@ -21,7 +21,7 @@ def main():
     parser.add_argument('--icd', type=Path)
     parser.add_argument('--api', choices=['vulkan', 'dx12'], default='vulkan')
     parser.add_argument('--output', type=Path, default=Path('build/authoring/verification'))
-    parser.add_argument('--case', action='append', choices=['uploads', 'workflow', 'renderer-switch', 'scene-features', 'advanced-shadows'])
+    parser.add_argument('--case', action='append', choices=['uploads', 'workflow', 'renderer-switch', 'scene-features', 'advanced-shadows', 'subsurface', 'raster-visibility', 'subsurface-human'])
     parser.add_argument('--scene-id', default='Sponza_PathTracing/sponza.glb',
                         help='Scene Browser scene used for renderer-switch verification; prepare its shared materials first.')
     parser.add_argument('--scene-loader', default='Model', choices=['Model', 'PathTracing'])
@@ -64,6 +64,12 @@ def main():
                 command = [str(engine), '--ci-scene-features', str(destination)]
             elif case == 'advanced-shadows':
                 command = [str(engine), '--ci-advanced-shadows', str(destination)]
+            elif case == 'subsurface-human':
+                command = [str(engine), '--ci-subsurface-human', str(destination)]
+            elif case == 'subsurface':
+                command = [str(engine), '--ci-subsurface', str(destination)]
+            elif case == 'raster-visibility':
+                command = [str(engine), '--ci-raster-visibility', str(destination)]
             else:
                 command = [str(engine), '--ci-editor-flow', str(destination)]
             command.append('-' + args.api)
@@ -71,6 +77,8 @@ def main():
             case_env = {**env, 'JENGINE_LOG_FILE': str(destination / 'engine.jsonl')}
             if case == 'scene-features':
                 case_env['JENGINE_TEST_SCENE_FEATURES'] = '1'
+            if case in ('subsurface', 'raster-visibility', 'subsurface-human'):
+                case_env['JENGINE_TEST_RASTER_FEATURES'] = '1'
             # This capture occurs inside EndOfFrame at global frame 60. Scene
             # feature profiles measure that method; use their explicit readbacks
             # outside timed frames so PNG/native capture cannot pollute samples.
@@ -104,6 +112,13 @@ def main():
                         or len(flow['checks']) < 12 or not all(item['pass'] for item in flow['checks'])):
                     raise RuntimeError('Selected rendering feature GPU checks did not pass')
                 entry['scene_features_report'] = flow
+            elif case in ('subsurface', 'raster-visibility', 'subsurface-human'):
+                filename = 'subsurface-human-gpu-report.json' if case == 'subsurface-human' else 'subsurface-gpu-report.json' if case == 'subsurface' else 'raster-visibility-gpu-report.json'
+                flow = json.loads((destination / filename).read_text())
+                if (flow['status'] != 'passed' or flow['failureCount'] or flow['renderedFrames'] < 8
+                        or len(flow['checks']) < 8 or not all(item['pass'] for item in flow['checks'])):
+                    raise RuntimeError('Actual material diffusion or visibility/MSAA checks did not pass')
+                entry[case + '_report'] = flow
             elif case == 'advanced-shadows':
                 flow = json.loads((destination / 'advanced-shadows-gpu-report.json').read_text())
                 if (flow['status'] != 'passed' or flow['failureCount'] or flow['renderedFrames'] < 24

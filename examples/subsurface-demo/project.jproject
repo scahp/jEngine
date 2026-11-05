@@ -1,0 +1,17 @@
+{
+  "assetRoot": "Assets",
+  "name": "Subsurface diffusion",
+  "projectId": "3198f55c-fe06-4ad5-a7c2-6eb745e23b77",
+  "schemaVersion": 1,
+  "settings": {
+    "render.deferred": "true",
+    "render.msaa.samples": "1",
+    "render.ssgi": "false",
+    "render.sss.enabled": "true",
+    "render.sss.maxRadiusPixels": "64",
+    "render.sss.radiusScale": "6",
+    "render.sss.strength": "1",
+    "render.surfelgi": "false"
+  },
+  "startupScene": "Scenes/skin.jscene"
+}

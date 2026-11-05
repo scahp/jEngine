@@ -31,6 +31,98 @@ int RunEditorDocumentTests()
     try
     {
         {
+            Document materialScene;
+            const auto id = materialScene.Create(EntityKind::Cube, "SSS material instance");
+            auto entity = *materialScene.Find(id);
+            entity.Material.OverrideEnabled = true; entity.Material.SubsurfaceOverrideEnabled = true;
+            entity.Material.SubsurfaceWeight = .65f; entity.Material.SubsurfaceColor = {.8f,.4f,.2f};
+            entity.Material.SubsurfaceThicknessWorld = .5f; entity.Material.SubsurfaceProfile = 7;
+            entity.Material.GraphAsset = "Assets/skin.jmaterial";
+            auto& overrides = entity.Material.GraphOverrides.emplace();
+            overrides.SubsurfaceWeight = overrides.SubsurfaceColor = overrides.SubsurfaceThickness = overrides.SubsurfaceProfile = true;
+            const auto file = fixture / "subsurface.jscene";
+            Document reopened;
+            expect(materialScene.Update(entity) && materialScene.Save(file) && reopened.Load(file) && reopened.Entities() == materialScene.Entities(),
+                "real scene file preserves authored SSS values and all four instance graph override flags");
+            entity.Material.SubsurfaceWeight = 0; entity.Material.SubsurfaceThicknessWorld = 0;
+            expect(reopened.Update(entity) && reopened.Undo() && reopened.Find(id)->Material.SubsurfaceWeight == .65f
+                && reopened.Redo() && reopened.Find(id)->Material.SubsurfaceOverrideEnabled && reopened.Find(id)->Material.SubsurfaceWeight == 0,
+                "SSS Undo/Redo preserves an explicit zero weight/thickness independently of inherited legacy surface data");
+            const auto valid = reopened.ToJson(); const auto revision = reopened.Revision();
+            for (const auto field : {"weight", "color", "thicknessWorld", "profile"})
+            {
+                auto invalid = Json::parse(valid); invalid["entities"][0]["material"]["subsurface"].erase(field);
+                expect(!reopened.LoadJson(invalid.dump()) && reopened.ToJson() == valid && reopened.Revision() == revision,
+                    "partial authored SSS blocks reject without mutating document or history");
+            }
+            { auto invalid = Json::parse(valid); invalid["entities"][0]["material"]["subsurface"]["profile"] = 1.5;
+                expect(!reopened.LoadJson(invalid.dump()) && reopened.ToJson() == valid, "SSS profile integer cannot silently truncate a fractional JSON number"); }
+            for (int field = 0; field < 4; ++field)
+            {
+                auto invalid = *reopened.Find(id);
+                if (field == 0) invalid.Material.SubsurfaceWeight = std::numeric_limits<float>::quiet_NaN();
+                if (field == 1) invalid.Material.SubsurfaceColor.X = std::numeric_limits<float>::infinity();
+                if (field == 2) invalid.Material.SubsurfaceThicknessWorld = -1;
+                if (field == 3) invalid.Material.SubsurfaceProfile = 8;
+                expect(!reopened.Update(invalid) && reopened.ToJson() == valid, "invalid SSS ranges and nonfinite values cannot enter scene history");
+            }
+            auto legacy = Json::parse(valid);
+            legacy["entities"][0]["material"].erase("subsurface");
+            legacy["entities"][0]["material"]["graphOverrides"].erase("subsurface");
+            Document old;
+            expect(old.LoadJson(legacy.dump()) && !old.Find(id)->Material.SubsurfaceOverrideEnabled
+                && old.Find(id)->Material.SubsurfaceWeight == 0 && !Json::parse(old.ToJson())["entities"][0]["material"].contains("subsurface"),
+                "old scene instances retain imported canonical subsurface by omitting the new authored block");
+        }
+        {
+            Document skin;
+            const auto id = skin.Create(EntityKind::Model, "Authored Skin"); auto entity = *skin.Find(id);
+            entity.Material.OverrideEnabled = true; entity.Material.SkinOverrideEnabled = true;
+            entity.Material.ShadingModel = jMaterialMapping::ShadingModel::SkinKelemen;
+            entity.Material.SubsurfaceSpace = jMaterialMapping::SubsurfaceSpace::Texture;
+            entity.Material.SpecularWeight = 3; entity.Material.DiffuseOcclusion = .6f; entity.Material.PreScatterWeight = .25f;
+            entity.Material.GraphAsset = "Assets/skin.jmaterial";
+            auto& flags = entity.Material.GraphOverrides.emplace();
+            flags.ShadingModel = flags.SubsurfaceSpace = flags.SpecularWeight = flags.DiffuseOcclusion = flags.PreScatterWeight = true;
+            const auto file = fixture / "skin.jscene"; Document reopened;
+            expect(skin.Update(entity) && skin.Save(file) && reopened.Load(file) && reopened.Entities() == skin.Entities(),
+                "actual scene roundtrip preserves skin model space and all scalar instance overrides");
+            entity.Material.SpecularWeight = entity.Material.DiffuseOcclusion = entity.Material.PreScatterWeight = 0;
+            expect(reopened.Update(entity) && reopened.Undo() && reopened.Find(id)->Material.SpecularWeight == 3
+                && reopened.Redo() && reopened.Find(id)->Material.SkinOverrideEnabled && reopened.Find(id)->Material.SpecularWeight == 0,
+                "skin Undo/Redo preserves explicit zeros independently of missing legacy metadata");
+            const auto valid = reopened.ToJson(); const auto revision = reopened.Revision();
+            for (const auto field : {"shadingModel", "subsurfaceSpace", "specularWeight", "diffuseOcclusion", "preScatterWeight"})
+            {
+                auto invalid = Json::parse(valid); invalid["entities"][0]["material"]["skin"].erase(field);
+                expect(!reopened.LoadJson(invalid.dump()) && reopened.ToJson() == valid && reopened.Revision() == revision,
+                    "partial skin material blocks reject without changing document or history");
+            }
+            for (const auto field : {"shadingModel", "subsurfaceSpace"})
+            {
+                auto invalid = Json::parse(valid); invalid["entities"][0]["material"]["skin"][field] = .5;
+                expect(!reopened.LoadJson(invalid.dump()) && reopened.ToJson() == valid,
+                    "skin enum JSON values cannot silently truncate fractional numbers");
+            }
+            for (int field = 0; field < 5; ++field)
+            {
+                auto invalid = *reopened.Find(id);
+                if (field == 0) invalid.Material.ShadingModel = jMaterialMapping::ShadingModel(2);
+                if (field == 1) invalid.Material.SubsurfaceSpace = jMaterialMapping::SubsurfaceSpace(2);
+                if (field == 2) invalid.Material.SpecularWeight = 9;
+                if (field == 3) invalid.Material.DiffuseOcclusion = std::numeric_limits<float>::infinity();
+                if (field == 4) invalid.Material.PreScatterWeight = -1;
+                expect(!reopened.Update(invalid) && reopened.ToJson() == valid, "invalid skin enum/ranges cannot enter undo history");
+            }
+            auto legacy = Json::parse(valid); legacy["entities"][0]["material"].erase("skin");
+            legacy["entities"][0]["material"]["graphOverrides"].erase("skin"); Document old;
+            expect(old.LoadJson(legacy.dump()) && !old.Find(id)->Material.SkinOverrideEnabled
+                && old.Find(id)->Material.ShadingModel == jMaterialMapping::ShadingModel::StandardPBR
+                && old.Find(id)->Material.SubsurfaceSpace == jMaterialMapping::SubsurfaceSpace::Screen
+                && old.Find(id)->Material.SpecularWeight == 1 && !Json::parse(old.ToJson())["entities"][0]["material"].contains("skin"),
+                "old scenes preserve standard shading and inherited skin metadata without adding a new block");
+        }
+        {
             Document casters;
             std::vector<EntityId> ids;
             for (const auto kind : {EntityKind::Cube, EntityKind::Sphere, EntityKind::Model,

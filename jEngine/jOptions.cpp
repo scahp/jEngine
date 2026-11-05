@@ -41,6 +41,10 @@ static_assert(_countof(GHWRTDebugViewModes) == 14, "GHWRTDebugViewModes count mi
 
 jOptions gOptions;
 
+namespace { jRendererFeatureDiagnostics RendererFeatureDiagnostics; }
+const jRendererFeatureDiagnostics& GetRendererFeatureDiagnostics() { return RendererFeatureDiagnostics; }
+jRendererFeatureDiagnostics& MutableRendererFeatureDiagnostics() { return RendererFeatureDiagnostics; }
+
 jOptions::jOptions()
 	// RHI options
 	: EnableDebuggerLayer(true)
@@ -296,4 +300,99 @@ void RegisterAdvancedShadowConsoleVariables()
     JE_SHADOW_CVAR("volume.max_triangles", VolumeMaxTriangles, "Shadow-volume source triangle cap: integer 1..65536");
     JE_SHADOW_CVAR("volume.range", VolumeRange, "Shadow-volume range: finite 32..1000000 world units");
 #undef JE_SHADOW_CVAR
+}
+
+namespace
+{
+template<typename T> bool ParseRendererFeatureValue(const std::string& text, T& output)
+{
+    if constexpr (std::is_same_v<T, bool>)
+    {
+        if (text == "true" || text == "1") { output = true; return true; }
+        if (text == "false" || text == "0") { output = false; return true; }
+        return false;
+    }
+    else
+    {
+        T candidate{};
+        const auto parsed = std::from_chars(text.data(), text.data() + text.size(), candidate);
+        if (parsed.ec != std::errc{} || parsed.ptr != text.data() + text.size()) return false;
+        output = candidate; return true;
+    }
+}
+template<typename T> std::string RendererFeatureText(T value)
+{
+    if constexpr (std::is_same_v<T, bool>) return value ? "true" : "false";
+    else { std::ostringstream text; text << std::setprecision(std::numeric_limits<T>::max_digits10) << value; return text.str(); }
+}
+class RendererFeatureVariable final : public IConsoleVariable
+{
+    std::string Name, Description;
+    EConsoleVariableType Type;
+    std::function<std::string()> Get;
+    std::function<bool(const std::string&, std::string&)> Set;
+    const std::thread::id Owner = std::this_thread::get_id();
+public:
+    RendererFeatureVariable(const char* name, const char* description, EConsoleVariableType type,
+        std::function<std::string()> get, std::function<bool(const std::string&, std::string&)> set)
+        : Name(name), Description(description), Type(type), Get(std::move(get)), Set(std::move(set))
+    { jConsole::Get().RegisterVariable(this); }
+    ~RendererFeatureVariable() override { jConsole::Get().UnregisterVariable(this); }
+    EConsoleVariableType GetType() const override { return Type; }
+    const std::string& GetName() const override { return Name; }
+    const std::string& GetDescription() const override { return Description; }
+    std::string GetAsString() const override { return Get(); }
+    void SetFromString(const std::string& text) override
+    {
+        if (Owner != std::this_thread::get_id()
+            || (GMainThreadID != std::thread::id{} && GMainThreadID != std::this_thread::get_id()))
+        { jConsole::Get().LogError("Renderer feature settings must change on the engine owner thread."); return; }
+        std::string error;
+        if (!Set(text, error)) jConsole::Get().LogError(Name + ": " + error);
+    }
+};
+template<typename S, typename T> std::unique_ptr<IConsoleVariable> FeatureVariable(const char* name, const char* description,
+    S& storage, T S::* member, bool (*validate)(const S&, S&, std::string&))
+{
+    const auto type = std::is_same_v<T, bool> ? EConsoleVariableType::Bool
+        : std::is_floating_point_v<T> ? EConsoleVariableType::Float : EConsoleVariableType::Int;
+    return std::make_unique<RendererFeatureVariable>(name, description, type,
+        [&storage, member] { return RendererFeatureText(storage.*member); },
+        [&storage, member, validate](const std::string& text, std::string& error)
+        {
+            auto candidate = storage;
+            if (!ParseRendererFeatureValue(text, candidate.*member)) { error = "A complete supported numeric or boolean value is required."; return false; }
+            S output;
+            if (!validate(candidate, output, error)) return false;
+            storage = output; return true;
+        });
+}
+}
+
+void RegisterRendererFeatureConsoleVariables()
+{
+    static const auto variables = []
+    {
+        std::vector<std::unique_ptr<IConsoleVariable>> result;
+        result.push_back(std::make_unique<RendererFeatureVariable>("r.msaa.samples", "Requested Deferred samples: 1, 2 or 4; inspect applied state for fallback",
+            EConsoleVariableType::Int, [] { return std::to_string(gOptions.RequestedMSAASamples); },
+            [](const std::string& text, std::string& error)
+            {
+                int count = 0;
+                if (!ParseRendererFeatureValue(text, count) || (count != 1 && count != 2 && count != 4))
+                { error = "MSAA samples must be exactly 1, 2 or 4."; return false; }
+                gOptions.RequestedMSAASamples = count; return true;
+            }));
+        using S = jSubsurface::Settings;
+        using H = jHiZOcclusion::Settings;
+#define JE_SSS_CVAR(name, field) result.push_back(FeatureVariable("r.sss." name, "Deferred surface diffusion quality; request retained on unsupported renderer", gOptions.Subsurface, &S::field, &jSubsurface::ValidateSettings))
+        JE_SSS_CVAR("enable", Enabled); JE_SSS_CVAR("strength", Strength); JE_SSS_CVAR("radius_scale", RadiusScale);
+        JE_SSS_CVAR("depth_reject_world", DepthRejectWorld); JE_SSS_CVAR("normal_threshold", NormalThreshold); JE_SSS_CVAR("max_radius_pixels", MaxRadiusPixels);
+#undef JE_SSS_CVAR
+#define JE_HIZ_CVAR(name, field) result.push_back(FeatureVariable("r.hiz." name, "Bounded same-frame Hi-Z request; inspect diagnostics for admission/fallback", gOptions.HiZOcclusion, &H::field, &jHiZOcclusion::ValidateSettings))
+        JE_HIZ_CVAR("enable", Enabled); JE_HIZ_CVAR("depth_bias", DepthBias); JE_HIZ_CVAR("max_candidates", MaxCandidates);
+#undef JE_HIZ_CVAR
+        return result;
+    }();
+    (void)variables;
 }

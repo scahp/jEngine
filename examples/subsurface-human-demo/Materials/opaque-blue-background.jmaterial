@@ -1,0 +1,48 @@
+{
+  "baseColor": 1,
+  "format": "jEngineMaterial",
+  "metallic": 0,
+  "nodes": [
+    {
+      "a": 0,
+      "b": 0,
+      "color": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "id": 1,
+      "kind": 0,
+      "texture": "",
+      "value": 1.0,
+      "x": 0.0,
+      "y": 0.0
+    }
+  ],
+  "normal": 0,
+  "roughness": 0,
+  "surface": {
+    "alphaCutoff": 0.5,
+    "alphaMode": "opaque",
+    "anisotropy": 0.0,
+    "clearCoat": 0.0,
+    "clearCoatGloss": 0.0,
+    "doubleSided": false,
+    "emission": [
+      0.529411792755127,
+      0.8078431487083435,
+      0.9803921580314636
+    ],
+    "emissionTexture": "",
+    "ior": 1.5,
+    "legacyPackedMap": false,
+    "metallicRoughnessTexture": "",
+    "opacity": 1.0,
+    "sheen": 0.0,
+    "sheenTint": 0.0,
+    "specularTint": 0.0,
+    "subsurface": 0.0,
+    "transmission": 0.0
+  },
+  "version": 1
+}

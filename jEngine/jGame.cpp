@@ -692,15 +692,24 @@ bool jGame::CanSwitchSceneRenderPipeline(ESceneRenderPipeline target, std::strin
         reason = "A renderer switch is already queued for the next frame.";
         return false;
     }
+    if (target != ESceneRenderPipeline::Deferred)
+        for (const auto* object : jObject::GetStaticRenderObject())
+            if (object && object->MaterialPtr && object->MaterialPtr->Surface &&
+                object->MaterialPtr->Surface->ShadingModel == jSurfaceShadingModel::SkinKelemen)
+            {
+                reason = "SkinKelemen materials currently require the Deferred renderer.";
+                return false;
+            }
     if (target == ESceneRenderPipeline::PathTracing)
         for (const auto* object : jObject::GetStaticRenderObject())
         {
             if (!object || !object->MaterialPtr) continue;
             const auto& material = *object->MaterialPtr;
             if ((material.MappingProgram && material.MappingProgram->Active)
-                || (material.Water && material.Water->Enabled))
+                || (material.Water && material.Water->Enabled)
+                || (material.Surface && material.Surface->ShadingModel == jSurfaceShadingModel::SkinKelemen))
             {
-                reason = "Material mapping nodes and animated water currently require Forward or Deferred rendering.";
+                reason = "Material mapping nodes, animated water and SkinKelemen require raster rendering.";
                 return false;
             }
         }
@@ -1758,6 +1767,7 @@ void jGame::Setup()
 {
  	srand(static_cast<uint32>(time(NULL)));
     RegisterAdvancedShadowConsoleVariables();
+    RegisterRendererFeatureConsoleVariables();
 
 	// Register test console variables
 	{

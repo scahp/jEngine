@@ -32,6 +32,13 @@ JEMaterialSurface JE_ResolveMaterial(JEMaterialContext ctx, bool nativeDiffuseSR
         surface.NormalTS = JE_DecodeNormalTS(NormalTexture.Sample(NormalTextureSampler, ctx.UV).rgb, 1.0);
     if ((mask & 4u) != 0u) surface.Metallic = saturate(RenderObjectParam.Metallic);
     if ((mask & 8u) != 0u) surface.Roughness = saturate(RenderObjectParam.Roughness);
+    if ((mask & 32u) != 0u) surface.SubsurfaceWeight = saturate(MaterialGraphParam.MaterialSubsurfaceColorWeight.w);
+    if ((mask & 64u) != 0u) surface.SubsurfaceColor = saturate(MaterialGraphParam.MaterialSubsurfaceColorWeight.rgb);
+    if ((mask & 128u) != 0u) surface.SubsurfaceThickness = max(MaterialGraphParam.MaterialSubsurfaceParameters.x, 0.0);
+    if ((mask & 256u) != 0u) surface.SubsurfaceProfile = min((uint)MaterialGraphParam.MaterialSubsurfaceParameters.y, 7u);
+    if ((mask & 512u) != 0u) surface.SpecularWeight = clamp(MaterialGraphParam.MaterialSkinParameters.y, 0.0, 8.0);
+    if ((mask & 1024u) != 0u) surface.DiffuseOcclusion = saturate(MaterialGraphParam.MaterialSkinParameters.z);
+    if ((mask & 2048u) != 0u) surface.PreScatterWeight = saturate(MaterialGraphParam.MaterialSkinParameters.w);
     return surface;
 }
 #endif

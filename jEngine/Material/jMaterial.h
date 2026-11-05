@@ -19,11 +19,19 @@ struct jMaterialData
 };
 
 enum class jSurfaceAlphaMode : uint32 { Opaque, Mask, Blend };
+using jSurfaceShadingModel = jMaterialMapping::ShadingModel;
+using jSubsurfaceSpace = jMaterialMapping::SubsurfaceSpace;
 
 struct jSurfaceShading
 {
     float Transmission = 0.f, Ior = 1.5f, ClearCoat = 0.f, ClearCoatGloss = 0.f;
     float Subsurface = 0.f, Anisotropy = 0.f, SpecularTint = 0.f, Sheen = 0.f, SheenTint = 0.f;
+    std::array<float, 3> SubsurfaceColor{1.f, 1.f, 1.f};
+    float SubsurfaceThicknessWorld = 1.f;
+    uint32 SubsurfaceProfile = 0;
+    jSurfaceShadingModel ShadingModel = jSurfaceShadingModel::StandardPBR;
+    jSubsurfaceSpace SubsurfaceSpace = jSubsurfaceSpace::Screen;
+    float SpecularWeight = 1.f, DiffuseOcclusion = 1.f, PreScatterWeight = 1.f;
     jSurfaceAlphaMode AlphaMode = jSurfaceAlphaMode::Opaque;
     float AlphaCutoff = .5f;
     bool DoubleSided = false;
@@ -87,8 +95,17 @@ public:
     std::shared_ptr<jMaterialData> MaterialDataPtr;
     std::string SourceMaterialName;
     std::optional<jSurfaceShading> Surface;
+    // Internal coverage compatibility: SSS-only metadata must not opt an old
+    // alpha-tested/stochastic material into explicit opaque surface coverage.
+    // Transient, copied with the material and never serialized.
+    bool SubsurfaceOnlySurface = false;
     std::shared_ptr<const jMaterialMapping::Program> MappingProgram;
-    std::array<Vector4, jMaterialMapping::MaximumValues> MappingValues{};
+    std::array<Vector4, jMaterialMapping::MaximumValues> MappingValues = []
+    {
+        std::array<Vector4, jMaterialMapping::MaximumValues> values;
+        for (auto& value : values) value = Vector4(0.f);
+        return values;
+    }();
     std::array<std::shared_ptr<jTexture>, jMaterialMapping::MaximumTextures> MappingTextures{};
     uint32 MappingOutputOverridesMask = 0;
     std::shared_ptr<IUniformBufferBlock> MappingUniformBuffer;

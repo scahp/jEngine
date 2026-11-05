@@ -36,6 +36,14 @@ constexpr const char* AdvancedShadowKeys[] = {
     "render.shadow.moments.minimumVariance", "render.shadow.moments.bleedReduction", "render.shadow.moments.blurRadius",
     "render.shadow.deep.opacityMultiplier", "render.shadow.deep.tauMax", "render.shadow.deep.maxDistance",
     "render.shadow.volume.maxTriangles", "render.shadow.volume.range"};
+constexpr const char* RendererFeatureKeys[] = {
+    "render.msaa.samples", "render.sss.enabled", "render.sss.strength", "render.sss.radiusScale",
+    "render.sss.depthRejectWorld", "render.sss.normalThreshold", "render.sss.maxRadiusPixels",
+    "render.hiz.enabled", "render.hiz.depthBias", "render.hiz.maxCandidates",
+    "render.textureSubsurface.tileResolution", "render.textureSubsurface.captureResolution",
+    "render.textureSubsurface.gaussianStepScale", "render.textureSubsurface.worldUnitsPerMillimeter",
+    "render.textureSubsurface.enableTransmission", "render.textureSubsurface.transmissionExtinctionPerMillimeter",
+    "render.textureSubsurface.transmissionThicknessScale", "render.textureSubsurface.captureBiasWorld"};
 constexpr const char* SceneKeys[] = {
     "render.environment.enabled", "render.environment.intensity", "render.environment.combineGI", "render.environment.shAsset",
     "render.ppr.enabled", "render.ppr.fillHoles", "render.ppr.plane", "render.ppr.thickness", "render.ppr.normalThreshold",
@@ -52,6 +60,10 @@ struct Prepared
     int Rays;
     jShadowFiltering::Settings ShadowFilter;
     jAdvancedShadows::Settings AdvancedShadows;
+    int MSAASamples = 1;
+    jSubsurface::Settings Subsurface;
+    jTextureSubsurface::Settings TextureSubsurface;
+    jHiZOcclusion::Settings HiZOcclusion;
     jSceneFeatures::Settings SceneFeatures;
     std::string EnvironmentAsset;
     std::map<std::string, EInputKey> Bindings;
@@ -63,9 +75,12 @@ struct Prepared
         Intensity = defaults.SurfelGIIntensity; Rays = defaults.SurfelGIInlineRayCount;
         jShadowFiltering::TryMakeSettings(defaults.ShadowFilterMode, defaults.ShadowFilterRadiusTexels, ShadowFilter);
         SceneFeatures = defaults.SceneFeatures;
+        MSAASamples = defaults.RequestedMSAASamples; Subsurface = defaults.Subsurface; HiZOcclusion = defaults.HiZOcclusion;
+        TextureSubsurface = defaults.TextureSubsurface;
         for (const auto& action : Actions) Bindings.emplace(action.Name, action.Default);
     }
 };
+bool PrepareRendererFeatures(const jEditorProjectConfig& config, Prepared& prepared, std::string& error);
 struct PanelState
 {
     const std::thread::id Owner = std::this_thread::get_id();
@@ -93,6 +108,7 @@ bool KnownKey(const std::string& key)
 {
     if (std::find(RenderKeys.begin(), RenderKeys.end(), key) != RenderKeys.end()) return true;
     if (std::find(std::begin(AdvancedShadowKeys), std::end(AdvancedShadowKeys), key) != std::end(AdvancedShadowKeys)) return true;
+    if (std::find(std::begin(RendererFeatureKeys), std::end(RendererFeatureKeys), key) != std::end(RendererFeatureKeys)) return true;
     if (std::find(std::begin(SceneKeys), std::end(SceneKeys), key) != std::end(SceneKeys)) return true;
     for (const auto& action : Actions) if (key == std::string("input.") + action.Name) return true;
     return false;
@@ -176,6 +192,7 @@ bool Prepare(const jEditorProjectConfig& config, Prepared& prepared, std::string
     if (!jShadowFiltering::TryMakeSettings(shadowMode, shadowRadius, prepared.ShadowFilter))
     { error = "Shadow filtering requires render.shadow.filter 0 or 1 and finite render.shadow.radiusTexels from 0 to 4"; return false; }
     if (!ReadAdvancedShadows(config, prepared.AdvancedShadows, error)) return false;
+    if (!PrepareRendererFeatures(config, prepared, error)) return false;
     if (!ReadSceneFeatures(config, root, prepared.SceneFeatures, prepared.EnvironmentAsset, error)) return false;
     std::map<EInputKey, std::string> used;
     for (const auto& action : Actions)
@@ -221,6 +238,10 @@ void Publish(Prepared&& prepared)
     gOptions.ShadowFilterMode = static_cast<int>(prepared.ShadowFilter.Method);
     gOptions.ShadowFilterRadiusTexels = prepared.ShadowFilter.RadiusTexels;
     gOptions.AdvancedShadows = prepared.AdvancedShadows;
+    gOptions.RequestedMSAASamples = prepared.MSAASamples;
+    gOptions.Subsurface = prepared.Subsurface;
+    gOptions.TextureSubsurface = prepared.TextureSubsurface;
+    gOptions.HiZOcclusion = prepared.HiZOcclusion;
     gOptions.SceneFeatures = prepared.SceneFeatures;
     gOptions.UseSurfelGI = prepared.SurfelGI;
     gOptions.SurfelGIInlineRayEnable = prepared.Inline && GSupportInlineRaytracing;
@@ -302,6 +323,30 @@ bool FeatureUnsigned(const std::map<std::string,std::string>& values,const char*
     {error=std::string(key)+" must be an unsigned integer";return false;}
     out=candidate;return true;
 }
+bool PrepareRendererFeatures(const jEditorProjectConfig& config, Prepared& prepared, std::string& error)
+{
+    auto sss = prepared.Subsurface;
+    auto hiz = prepared.HiZOcclusion;
+    std::uint32_t samples = std::uint32_t(prepared.MSAASamples);
+    const auto& values = config.Settings;
+    if (!FeatureUnsigned(values, "render.msaa.samples", samples, error)) return false;
+    if (samples != 1 && samples != 2 && samples != 4)
+    { error = "render.msaa.samples must be 1, 2 or 4"; return false; }
+    if (!Boolean(values, "render.sss.enabled", sss.Enabled, error)
+        || !FeatureFloat(values, "render.sss.strength", sss.Strength, error)
+        || !FeatureFloat(values, "render.sss.radiusScale", sss.RadiusScale, error)
+        || !FeatureFloat(values, "render.sss.depthRejectWorld", sss.DepthRejectWorld, error)
+        || !FeatureFloat(values, "render.sss.normalThreshold", sss.NormalThreshold, error)
+        || !FeatureFloat(values, "render.sss.maxRadiusPixels", sss.MaxRadiusPixels, error)
+        || !Boolean(values, "render.hiz.enabled", hiz.Enabled, error)
+        || !FeatureFloat(values, "render.hiz.depthBias", hiz.DepthBias, error)
+        || !FeatureUnsigned(values, "render.hiz.maxCandidates", hiz.MaxCandidates, error)) return false;
+    jSubsurface::Settings checkedSSS; jHiZOcclusion::Settings checkedHiZ;
+    if (!jSubsurface::ValidateSettings(sss, checkedSSS, error) || !jHiZOcclusion::ValidateSettings(hiz, checkedHiZ, error)) return false;
+    if (!ReadTextureSubsurface(config, prepared.TextureSubsurface, error)) return false;
+    prepared.MSAASamples = int(samples); prepared.Subsurface = checkedSSS; prepared.HiZOcclusion = checkedHiZ;
+    return true;
+}
 template<std::size_t N> bool FeatureVector(const std::map<std::string,std::string>& values,const char* key,
     std::array<float,N>& out,std::string& error)
 {
@@ -347,6 +392,35 @@ bool FeatureAssetPath(const std::string& value,const fs::path& root,std::string&
 }
 }
 
+bool ReadTextureSubsurface(const jEditorProjectConfig& config, jTextureSubsurface::Settings& output, std::string& error)
+{
+    jTextureSubsurface::Settings candidate;
+    const auto& values = config.Settings;
+    if (!FeatureUnsigned(values, "render.textureSubsurface.tileResolution", candidate.TileResolution, error)
+        || !FeatureUnsigned(values, "render.textureSubsurface.captureResolution", candidate.CaptureResolution, error)
+        || !FeatureFloat(values, "render.textureSubsurface.gaussianStepScale", candidate.GaussianStepScale, error)
+        || !FeatureFloat(values, "render.textureSubsurface.worldUnitsPerMillimeter", candidate.WorldUnitsPerMillimeter, error)
+        || !Boolean(values, "render.textureSubsurface.enableTransmission", candidate.EnableTransmission, error)
+        || !FeatureFloat(values, "render.textureSubsurface.transmissionExtinctionPerMillimeter", candidate.TransmissionExtinctionPerMillimeter, error)
+        || !FeatureFloat(values, "render.textureSubsurface.transmissionThicknessScale", candidate.TransmissionThicknessScale, error)
+        || !FeatureFloat(values, "render.textureSubsurface.captureBiasWorld", candidate.CaptureBiasWorld, error)) return false;
+    return jTextureSubsurface::ValidateSettings(candidate, output, error);
+}
+bool WriteTextureSubsurface(jEditorProjectConfig& config, const jTextureSubsurface::Settings& input, std::string& error)
+{
+    jTextureSubsurface::Settings checked;
+    if (!jTextureSubsurface::ValidateSettings(input, checked, error)) return false;
+    auto candidate = config.Settings;
+    candidate["render.textureSubsurface.tileResolution"] = std::to_string(checked.TileResolution);
+    candidate["render.textureSubsurface.captureResolution"] = std::to_string(checked.CaptureResolution);
+    candidate["render.textureSubsurface.gaussianStepScale"] = FeatureText(checked.GaussianStepScale);
+    candidate["render.textureSubsurface.worldUnitsPerMillimeter"] = FeatureText(checked.WorldUnitsPerMillimeter);
+    candidate["render.textureSubsurface.enableTransmission"] = checked.EnableTransmission ? "true" : "false";
+    candidate["render.textureSubsurface.transmissionExtinctionPerMillimeter"] = FeatureText(checked.TransmissionExtinctionPerMillimeter);
+    candidate["render.textureSubsurface.transmissionThicknessScale"] = FeatureText(checked.TransmissionThicknessScale);
+    candidate["render.textureSubsurface.captureBiasWorld"] = FeatureText(checked.CaptureBiasWorld);
+    config.Settings = std::move(candidate); return true;
+}
 bool ReadAdvancedShadows(const jEditorProjectConfig& config, jAdvancedShadows::Settings& output, std::string& error)
 {
     jAdvancedShadows::Settings candidate;
@@ -717,6 +791,65 @@ void Render(jEditor& editor, jEditorProject* project)
     if (ImGui::CollapsingHeader("Renderer defaults", ImGuiTreeNodeFlags_DefaultOpen))
     {
         BoolWidget("Deferred renderer", "render.deferred", requested.Deferred);
+        const auto& diagnostics = GetRendererFeatureDiagnostics();
+        int samples = requested.MSAASamples == 4 ? 2 : requested.MSAASamples == 2 ? 1 : 0;
+        if (ImGui::Combo("Deferred MSAA samples", &samples, "1x\0" "2x\0" "4x\0"))
+        { state.Draft.Settings["render.msaa.samples"] = std::to_string(samples == 2 ? 4 : samples == 1 ? 2 : 1); state.Changed = true; }
+        ImGui::Text("Requested %dx / applied %dx", requested.MSAASamples, diagnostics.AppliedMSAASamples);
+        if (!diagnostics.MSAASupportReason.empty()) ImGui::TextWrapped("%s", diagnostics.MSAASupportReason.c_str());
+        if (ImGui::TreeNode("Surface diffusion (SSS)"))
+        {
+            BoolWidget("Enable Deferred SSS", "render.sss.enabled", requested.Subsurface.Enabled);
+            const auto quality = [&](const char* label, const char* key, float initial, float low, float high, const char* format = "%.3g")
+            {
+                if (ImGui::SliderFloat(label, &initial, low, high, format))
+                { state.Draft.Settings[key] = FeatureText(initial); state.Changed = true; }
+            };
+            quality("Global SSS strength", "render.sss.strength", requested.Subsurface.Strength, 0, 1);
+            quality("Diffusion radius scale", "render.sss.radiusScale", requested.Subsurface.RadiusScale, 0, 100);
+            quality("Depth rejection (world)", "render.sss.depthRejectWorld", requested.Subsurface.DepthRejectWorld, .00001f, 10000);
+            quality("Normal threshold", "render.sss.normalThreshold", requested.Subsurface.NormalThreshold, -1, 1);
+            quality("Maximum radius (pixels)", "render.sss.maxRadiusPixels", requested.Subsurface.MaxRadiusPixels, 0, jSubsurface::MaximumRadiusPixels);
+            if (ImGui::TreeNode("Texture-space transport"))
+            {
+                const auto& texture = requested.TextureSubsurface;
+                const auto resolution = [&](const char* label, const char* key, uint32_t value, bool capture)
+                {
+                    int index = value == 128 ? 0 : value == 256 ? 1 : value == 512 ? 2 : value == 1024 ? 3 : 4;
+                    const char* choices[] = {"128", "256", "512", "1024", "2048"};
+                    if (ImGui::Combo(label, &index, choices, capture ? 5 : 4))
+                    { state.Draft.Settings[key] = std::to_string(128u << index); state.Changed = true; }
+                };
+                resolution("UV tile resolution", "render.textureSubsurface.tileResolution", texture.TileResolution, false);
+                resolution("Light capture resolution", "render.textureSubsurface.captureResolution", texture.CaptureResolution, true);
+                quality("Gaussian step scale", "render.textureSubsurface.gaussianStepScale", texture.GaussianStepScale, 0, 10);
+                float units = texture.WorldUnitsPerMillimeter;
+                if (ImGui::DragFloat("World units per millimeter", &units, .001f, .00001f, 1000, "%.6g", ImGuiSliderFlags_AlwaysClamp))
+                { state.Draft.Settings["render.textureSubsurface.worldUnitsPerMillimeter"] = FeatureText(units); state.Changed = true; }
+                BoolWidget("Enable thin-surface transmission", "render.textureSubsurface.enableTransmission", texture.EnableTransmission);
+                quality("Transmission extinction / mm", "render.textureSubsurface.transmissionExtinctionPerMillimeter", texture.TransmissionExtinctionPerMillimeter, .001f, 100);
+                quality("Transmission thickness scale", "render.textureSubsurface.transmissionThicknessScale", texture.TransmissionThicknessScale, 0, 10);
+                quality("Capture bias (world)", "render.textureSubsurface.captureBiasWorld", texture.CaptureBiasWorld, 0, 100);
+                ImGui::TextWrapped("Used by materials selecting Texture (UV) diffusion. World-unit conversion is project data; source-specific scale is not assumed for other projects. These requests apply only after Save and Apply.");
+                ImGui::TreePop();
+            }
+            ImGui::TextWrapped("Set material subsurface weight, color, world thickness and profile in Inspector or the material graph. Diffusion uses a bounded 17-sample kernel per axis.");
+            if (!diagnostics.SubsurfaceSupportReason.empty()) ImGui::TextWrapped("%s", diagnostics.SubsurfaceSupportReason.c_str());
+            ImGui::TreePop();
+        }
+        if (ImGui::TreeNode("Hi-Z occlusion"))
+        {
+            BoolWidget("Enable Hi-Z", "render.hiz.enabled", requested.HiZOcclusion.Enabled);
+            float bias = requested.HiZOcclusion.DepthBias;
+            if (ImGui::SliderFloat("Conservative depth bias", &bias, 0, .01f, "%.6g"))
+            { state.Draft.Settings["render.hiz.depthBias"] = FeatureText(bias); state.Changed = true; }
+            int candidates = int(requested.HiZOcclusion.MaxCandidates);
+            if (ImGui::SliderInt("Maximum candidates", &candidates, 1, int(jHiZOcclusion::MaximumCandidates)))
+            { state.Draft.Settings["render.hiz.maxCandidates"] = std::to_string(candidates); state.Changed = true; }
+            ImGui::Text("Admitted candidates: %u | indirect draws: %u", diagnostics.HiZCandidateCount, diagnostics.HiZIndirectDrawCount);
+            if (!diagnostics.HiZSupportReason.empty()) ImGui::TextWrapped("%s", diagnostics.HiZSupportReason.c_str());
+            ImGui::TreePop();
+        }
         if (ImGui::TreeNodeEx("Shadows", ImGuiTreeNodeFlags_DefaultOpen))
         {
             auto advanced = requested.AdvancedShadows;

@@ -581,6 +581,14 @@ bool jRHI_DX12::InitRHI()
         DispatchIndirectSignatureDesc.pArgumentDescs = &IndirectArgumentDesc;
         if (JFAIL(Device->CreateCommandSignature(&DispatchIndirectSignatureDesc, nullptr, IID_PPV_ARGS(&DispatchComputeCommandSignature))))
             return false;
+        IndirectArgumentDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
+        DispatchIndirectSignatureDesc.ByteStride = sizeof(D3D12_DRAW_ARGUMENTS);
+        if (JFAIL(Device->CreateCommandSignature(&DispatchIndirectSignatureDesc, nullptr, IID_PPV_ARGS(&DrawCommandSignature))))
+            return false;
+        IndirectArgumentDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
+        DispatchIndirectSignatureDesc.ByteStride = sizeof(D3D12_DRAW_INDEXED_ARGUMENTS);
+        if (JFAIL(Device->CreateCommandSignature(&DispatchIndirectSignatureDesc, nullptr, IID_PPV_ARGS(&DrawIndexedCommandSignature))))
+            return false;
     }
 
     return true;
@@ -1418,6 +1426,9 @@ std::shared_ptr<jRenderFrameContext> jRHI_DX12::BeginRenderFrame()
     renderFrameContextPtr->FrameIndex = CurrentFrameIndex;
     renderFrameContextPtr->SceneRenderTargetPtr = std::make_shared<jSceneRenderTarget>();
     renderFrameContextPtr->SceneRenderTargetPtr->Create(CurrentSwapchainImage, &jLight::GetLights());
+    renderFrameContextPtr->UseSubpass = renderFrameContextPtr->SceneRenderTargetPtr->UseSubpass;
+    renderFrameContextPtr->UseSubsurface = bool(renderFrameContextPtr->SceneRenderTargetPtr->SubsurfaceMask);
+    renderFrameContextPtr->HasSkinMaterials = renderFrameContextPtr->SceneRenderTargetPtr->HasSkinMaterials;
 	jProfileGPUBeginFrame(renderFrameContextPtr);
 
 	return renderFrameContextPtr;
@@ -1848,32 +1859,56 @@ void jRHI_DX12::DrawElementsInstancedBaseVertex(const std::shared_ptr<jRenderFra
     CommandBuffer_DX12->CommandList->DrawIndexedInstanced(indexCount, instanceCount, startIndex, baseVertexIndex, 0);
 }
 
-void jRHI_DX12::DrawIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type
-	, jBuffer* buffer, int32 startIndex, int32 drawCount) const
+void jRHI_DX12::DrawIndirect(const std::shared_ptr<jRenderFrameContext>& frame, EPrimitiveType type,
+    jBuffer* buffer, int32 startIndex, int32 drawCount) const
 {
-    auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
-    check(CommandBuffer_DX12);
-
+    check(frame && buffer && startIndex >= 0 && drawCount > 0 && DrawCommandSignature);
+    auto* command = static_cast<jCommandBuffer_DX12*>(frame->GetActiveCommandBuffer());
+    auto* arguments = static_cast<jBuffer_DX12*>(buffer);
+    const uint64 offset = uint64(startIndex) * sizeof(D3D12_DRAW_ARGUMENTS);
+    check(offset + uint64(drawCount) * sizeof(D3D12_DRAW_ARGUMENTS) <= buffer->GetBufferSize());
+    TransitionLayout(command, buffer, EResourceLayout::READ_ONLY);
 #if USE_RESOURCE_BARRIER_BATCHER
-    BarrierBatcher->Flush(InRenderFrameContext->GetActiveCommandBuffer());
-    CommandBuffer_DX12->FlushBarrierBatch();
-#endif // USE_RESOURCE_BARRIER_BATCHER
-
-	check(0);
+    BarrierBatcher->Flush(command);
+    command->FlushBarrierBatch();
+#endif
+    command->CommandList->ExecuteIndirect(DrawCommandSignature.Get(), drawCount,
+        arguments->Buffer->Get(), arguments->GetOffset() + offset, nullptr, 0);
 }
 
-void jRHI_DX12::DrawElementsIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type
-	, jBuffer* buffer, int32 startIndex, int32 drawCount) const
+EMSAASamples jRHI_DX12::SelectMSAASamples(uint32 requested)
 {
-    auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
-    check(CommandBuffer_DX12);
+    SelectedMSAASamples = EMSAASamples::COUNT_1;
+    if (requested != 2 && requested != 4) return SelectedMSAASamples;
+    constexpr ETextureFormat formats[] = {ETextureFormat::R11G11B10F,
+        ETextureFormat::RGBA16F, ETextureFormat::RG16F, ETextureFormat::D24_S8};
+    for (const auto format : formats)
+    {
+        D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS levels{};
+        levels.Format = GetDX12TextureFormat(format);
+        levels.SampleCount = requested;
+        if (FAILED(Device->CheckFeatureSupport(D3D12_FEATURE_MULTISAMPLE_QUALITY_LEVELS,
+            &levels, sizeof(levels))) || !levels.NumQualityLevels) return SelectedMSAASamples;
+    }
+    SelectedMSAASamples = static_cast<EMSAASamples>(requested);
+    return SelectedMSAASamples;
+}
 
+void jRHI_DX12::DrawElementsIndirect(const std::shared_ptr<jRenderFrameContext>& frame, EPrimitiveType type,
+    jBuffer* buffer, int32 startIndex, int32 drawCount) const
+{
+    check(frame && buffer && startIndex >= 0 && drawCount > 0 && DrawIndexedCommandSignature);
+    auto* command = static_cast<jCommandBuffer_DX12*>(frame->GetActiveCommandBuffer());
+    auto* arguments = static_cast<jBuffer_DX12*>(buffer);
+    const uint64 offset = uint64(startIndex) * sizeof(D3D12_DRAW_INDEXED_ARGUMENTS);
+    check(offset + uint64(drawCount) * sizeof(D3D12_DRAW_INDEXED_ARGUMENTS) <= buffer->GetBufferSize());
+    TransitionLayout(command, buffer, EResourceLayout::READ_ONLY);
 #if USE_RESOURCE_BARRIER_BATCHER
-    BarrierBatcher->Flush(InRenderFrameContext->GetActiveCommandBuffer());
-    CommandBuffer_DX12->FlushBarrierBatch();
-#endif // USE_RESOURCE_BARRIER_BATCHER
-
-	check(0);
+    BarrierBatcher->Flush(command);
+    command->FlushBarrierBatch();
+#endif
+    command->CommandList->ExecuteIndirect(DrawIndexedCommandSignature.Get(), drawCount,
+        arguments->Buffer->Get(), arguments->GetOffset() + offset, nullptr, 0);
 }
 
 void jRHI_DX12::DispatchCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ) const

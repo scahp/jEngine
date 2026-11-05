@@ -23,4 +23,8 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
             metallic, Environment.IntensityAndPadding.x) * ambientAO;
     }
     Result[p] = float4(clamp(scene.rgb + indirectDiffuse, 0.0, 65000.0), scene.a);
+#if JE_ENVIRONMENT_SUBSURFACE
+    const float4 diffuse = SubsurfaceDiffuse.Load(int3(p, 0));
+    SubsurfaceDiffuseResult[p] = float4(clamp(diffuse.rgb + indirectDiffuse, 0.0, 65000.0), diffuse.a);
+#endif
 }

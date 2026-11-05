@@ -13,7 +13,7 @@ namespace jMaterialMapping
 namespace
 {
 using namespace jEditorTools;
-enum class Type { Scalar, Float2, Float3, Float4, Texture, Visibility };
+enum class Type { Scalar, Float2, Float3, Float4, Texture, Visibility, Profile };
 struct Checked { Type Kind = Type::Scalar; bool TextureValue = false; };
 bool Numeric(Type type) { return type <= Type::Float4; }
 bool Bounded(float value) { return std::isfinite(value) && std::abs(value) <= 1e8f; }
@@ -58,6 +58,7 @@ const char* HlslType(Type type)
     case Type::Float2: return "float2";
     case Type::Float3: return "float3";
     case Type::Float4: return "float4";
+    case Type::Profile: return "uint";
     default: return "";
     }
 }
@@ -73,15 +74,23 @@ public:
         {
             if (!node.Id || node.Id == UINT32_MAX || !Nodes.emplace(node.Id, &node).second)
                 Fail("Material node IDs must be unique nonzero values");
-            if (int(node.Kind) < 0 || int(node.Kind) > int(NodeKind::Horizon)) Fail("Unknown material node kind");
+            if (int(node.Kind) < 0 || int(node.Kind) > int(NodeKind::DiffusionProfile)) Fail("Unknown material node kind");
             if (!Bounded(node.Scalar) || !Bounded(node.Color.X) || !Bounded(node.Color.Y) || !Bounded(node.Color.Z)
                 || !Bounded(node.X) || !Bounded(node.Y)) Fail("Invalid material node number");
             for (float value : node.Parameters) if (!Bounded(value)) Fail("Invalid material node parameter");
             if (!node.Texture.empty() && !SafePath(node.Texture)) Fail("Material textures must be normalized project-relative paths");
             if (uint32_t(node.Semantic) > uint32_t(TextureSemantic::Normal)) Fail("Invalid texture semantic");
+            if (uint32_t(node.NormalSpace) > uint32_t(NormalSpace::World)) Fail("Invalid normal coordinate space");
+            for (float sign : node.InputBasisSignXYZ)
+                if (sign != 1.f && sign != -1.f) Fail("Normal input basis signs must each be +1 or -1");
+            if (node.Kind != NodeKind::TextureSampleNormal && (node.NormalSpace != NormalSpace::Tangent
+                || node.InputBasisSignXYZ != std::array<float, 3>{1, 1, 1} || node.FlipNormalY))
+                Fail("Normal metadata requires a Sample Normal node");
             Result.Active |= node.Kind > NodeKind::Add;
         }
         Result.Active |= Graph.Horizon != 0;
+        Result.Active |= Graph.SubsurfaceWeight || Graph.SubsurfaceColor || Graph.SubsurfaceThickness || Graph.SubsurfaceProfile;
+        Result.Active |= Graph.SpecularWeight || Graph.DiffuseOcclusion || Graph.PreScatterWeight;
         for (const auto& [id, node] : Nodes) Check(id);
         const auto base = Check(Graph.BaseColor).Kind;
         if (!Numeric(base) || base == Type::Float2) Fail("Base Color requires scalar, RGB or RGBA");
@@ -99,6 +108,31 @@ public:
                 Fail("Metallic and Roughness require scalar values; use Channel for a texture sample");
         }
         if (Graph.Horizon && Check(Graph.Horizon).Kind != Type::Visibility) Fail("Horizon output requires a Horizon visibility node");
+        for (const auto output : {Graph.SubsurfaceWeight, Graph.SubsurfaceThickness})
+            if (output && Check(output).Kind != Type::Scalar) Fail("Subsurface weight and thickness require scalar inputs");
+        if (Graph.SubsurfaceColor)
+        {
+            const auto type = Check(Graph.SubsurfaceColor).Kind;
+            if (!Numeric(type) || type == Type::Float2) Fail("Subsurface color requires scalar, RGB or RGBA");
+        }
+        if (Graph.SubsurfaceProfile && Check(Graph.SubsurfaceProfile).Kind != Type::Profile)
+            Fail("Subsurface profile requires a Diffusion Profile node");
+        for (const auto output : {Graph.SpecularWeight, Graph.DiffuseOcclusion, Graph.PreScatterWeight})
+            if (output && Check(output).Kind != Type::Scalar) Fail("Skin specular, occlusion and pre-scatter outputs require scalar inputs");
+        if (Graph.Surface)
+        {
+            const auto& s = Graph.Surface->Shading;
+            if (!Bounded(s.Subsurface) || s.Subsurface < 0 || s.Subsurface > 1
+                || !Bounded(s.SubsurfaceThicknessWorld) || s.SubsurfaceThicknessWorld < 0 || s.SubsurfaceThicknessWorld > 10000
+                || s.SubsurfaceProfile > 7) Fail("Invalid canonical subsurface surface settings");
+            for (float color : s.SubsurfaceColor)
+                if (!Bounded(color) || color < 0 || color > 1) Fail("Subsurface color must be finite linear RGB from 0 to 1");
+            if (uint32_t(s.ShadingModel) > 1 || uint32_t(s.SubsurfaceSpace) > 1
+                || !Bounded(s.SpecularWeight) || s.SpecularWeight < 0 || s.SpecularWeight > 8
+                || !Bounded(s.DiffuseOcclusion) || s.DiffuseOcclusion < 0 || s.DiffuseOcclusion > 1
+                || !Bounded(s.PreScatterWeight) || s.PreScatterWeight < 0 || s.PreScatterWeight > 1)
+                Fail("Invalid canonical skin surface settings");
+        }
         if (!Result.Active) return Result;
 
         Result.Hlsl = "#define JE_HAS_MATERIAL_GRAPH 1\n";
@@ -121,12 +155,29 @@ public:
         }
         const auto metallic = Graph.Metallic ? Expression(Graph.Metallic) : "RenderObjectParam.Metallic";
         const auto roughness = Graph.Roughness ? Expression(Graph.Roughness) : "RenderObjectParam.Roughness";
+        const auto sssWeight = Graph.SubsurfaceWeight ? Expression(Graph.SubsurfaceWeight) : "MaterialGraphParam.MaterialSubsurfaceColorWeight.w";
+        std::string sssColor = Graph.SubsurfaceColor ? Expression(Graph.SubsurfaceColor) : "MaterialGraphParam.MaterialSubsurfaceColorWeight.rgb";
+        if (Graph.SubsurfaceColor)
+        {
+            const auto type = Types.at(Graph.SubsurfaceColor).Kind;
+            if (type == Type::Scalar) sssColor = "(" + sssColor + ").xxx";
+            else if (type == Type::Float4) sssColor += ".rgb";
+        }
+        const auto sssThickness = Graph.SubsurfaceThickness ? Expression(Graph.SubsurfaceThickness) : "MaterialGraphParam.MaterialSubsurfaceParameters.x";
+        const auto sssProfile = Graph.SubsurfaceProfile ? Expression(Graph.SubsurfaceProfile) : "(uint)MaterialGraphParam.MaterialSubsurfaceParameters.y";
+        const auto specularWeight = Graph.SpecularWeight ? Expression(Graph.SpecularWeight) : "MaterialGraphParam.MaterialSkinParameters.y";
+        const auto diffuseOcclusion = Graph.DiffuseOcclusion ? Expression(Graph.DiffuseOcclusion) : "MaterialGraphParam.MaterialSkinParameters.z";
+        const auto preScatterWeight = Graph.PreScatterWeight ? Expression(Graph.PreScatterWeight) : "MaterialGraphParam.MaterialSkinParameters.w";
         const float opacity = Graph.Surface ? Graph.Surface->Opacity : 1.f;
         if (!std::isfinite(opacity) || opacity < 0 || opacity > 1) Fail("Invalid material opacity");
         Result.Hlsl += "JEMaterialSurface JE_EvaluateMaterial(JEMaterialContext ctx)\n{\n" + Body;
         Result.Hlsl += "  JEMaterialSurface surface=(JEMaterialSurface)0;\n  surface.BaseColor=saturate(" + baseColor + ");\n";
         Result.Hlsl += "  surface.NormalTS=JE_SafeNormalTS(" + normal + ");\n  surface.Metallic=saturate(" + metallic + ");\n";
-        Result.Hlsl += "  surface.Roughness=saturate(" + roughness + ");\n  return surface;\n}\n";
+        Result.Hlsl += "  surface.Roughness=saturate(" + roughness + ");\n";
+        Result.Hlsl += "  surface.SubsurfaceWeight=saturate(" + sssWeight + ");\n  surface.SubsurfaceColor=saturate(" + sssColor + ");\n";
+        Result.Hlsl += "  surface.SubsurfaceThickness=clamp(" + sssThickness + ",0.0,10000.0);\n  surface.SubsurfaceProfile=min((uint)(" + sssProfile + "),7u);\n";
+        Result.Hlsl += "  surface.SpecularWeight=clamp(" + specularWeight + ",0.0,8.0);\n  surface.DiffuseOcclusion=saturate(" + diffuseOcclusion + ");\n";
+        Result.Hlsl += "  surface.PreScatterWeight=saturate(" + preScatterWeight + ");\n  surface.ShadingFlags=(uint)MaterialGraphParam.MaterialSkinParameters.x;\n  return surface;\n}\n";
         Body.clear(); Emitted.clear();
         const auto horizon = Graph.Horizon ? Expression(Graph.Horizon) : "float2(1.0,1.0)";
         Result.Hlsl += "float2 JE_EvaluateHorizon(JEMaterialContext ctx,float3 LightDirWS)\n{\n" + Body + "  return " + horizon + ";\n}\n";
@@ -212,6 +263,9 @@ private:
             if (p[0] < .001f || p[0] > 1.5707964f || p[1] < 0 || p[1] > 1 || p[2] < 0 || p[2] > 4 || p[3] != 0)
                 Fail("Horizon needs softness .001..PI/2 radians, AO strength 0..1 and angle scale 0..4");
             result.Kind = Type::Visibility; break;
+        case NodeKind::DiffusionProfile:
+            if (!Integer(p[0], 0, 7)) Fail("Diffusion Profile must be an integer from 0 to 7");
+            result.Kind = Type::Profile; break;
         }
         Checking.erase(id); Types[id] = result; return result;
     }
@@ -265,7 +319,16 @@ private:
         case NodeKind::TextureSample:
             expression = sample(node.InputA, Expression(node.InputB), Nodes.at(node.InputA)->Semantic); break;
         case NodeKind::TextureSampleNormal:
-            expression = "JE_DecodeNormalTS(" + sample(node.InputA, Expression(node.InputB), TextureSemantic::Normal) + ".rgb," + Parameters(node) + ".x)"; break;
+        {
+            auto parameters = node.Parameters;
+            parameters[0] = node.FlipNormalY ? (*node.FlipNormalY ? 1.f : 0.f)
+                : node.NormalSpace == NormalSpace::Tangent ? node.Parameters[0] : 0.f;
+            const auto value = "MaterialGraphParam.Values[" + std::to_string(Value(node.Id, 0, parameters)) + "]";
+            const auto basis = "MaterialGraphParam.Values[" + std::to_string(Value(node.Id, 1,
+                {node.InputBasisSignXYZ[0], node.InputBasisSignXYZ[1], node.InputBasisSignXYZ[2], float(node.NormalSpace)})) + "]";
+            expression = "JE_DecodeMaterialNormal(" + sample(node.InputA, Expression(node.InputB), TextureSemantic::Normal)
+                + ".rgb,ctx," + basis + "," + value + ".x)"; break;
+        }
         case NodeKind::Channel:
         {
             const auto value = Expression(node.InputA);
@@ -311,6 +374,8 @@ private:
                 + "," + TextureName(ao) + "," + SamplerName(ao) + "," + uv + ",mul(transpose(ctx.TBN),LightDirWS)," + Parameters(node) + ")";
             break;
         }
+        case NodeKind::DiffusionProfile:
+            expression = "(uint)" + Parameters(node) + ".x"; break;
         }
         const auto name = "je_node_" + std::to_string(id);
         const auto declaration = type == Type::Visibility ? "float2" : HlslType(type);

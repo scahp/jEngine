@@ -1,3 +1,4 @@
+#include "Features/analyticlightmath.hlsl"
 #include "common.hlsl"
 // Material shader injection point.
 #include "shadowfiltering.hlsl"
@@ -64,11 +65,12 @@ float3 GetDirectionalLightDiffuse(jDirectionalLightUniformBuffer light, float3 n
 
 float3 GetDirectionalLightSpecular(jDirectionalLightUniformBuffer light, float3 reflectLightDir, float3 viewDir)
 {
-    return light.Color * pow(clamp(dot(reflectLightDir, viewDir), 0.0, 1.0), light.SpecularPow) * light.SpecularIntensity;
+    return light.Color * JE_PhongLobe(dot(reflectLightDir, viewDir), light.SpecularPow) * light.SpecularIntensity;
 }
 
 float3 GetDirectionalLight(jDirectionalLightUniformBuffer light, float3 normal, float3 viewDir)
 {
+    if (!any(light.Color > 0.0) || (!any(light.DiffuseIntensity > 0.0) && !any(light.SpecularIntensity > 0.0))) return 0.0;
     float3 lightDir = normalize(-light.Direction);
     float3 reflectLightDir = 2.0 * clamp(dot(lightDir, normal), 0.0, 1.0) * normal - lightDir;
     return (GetDirectionalLightDiffuse(light, normal) + GetDirectionalLightSpecular(light, reflectLightDir, viewDir));
@@ -81,13 +83,15 @@ float3 GetPointLightDiffuse(jPointLightUniformBufferData light, float3 normal, f
 
 float3 GetPointLightSpecular(jPointLightUniformBufferData light, float3 reflectLightDir, float3 viewDir)
 {
-    return light.Color * pow(clamp(dot(reflectLightDir, viewDir), 0.0, 1.0), light.SpecularPow) * light.SpecularIntensity;
+    return light.Color * JE_PhongLobe(dot(reflectLightDir, viewDir), light.SpecularPow) * light.SpecularIntensity;
 }
 
 float3 GetPointLight(jPointLightUniformBufferData light, float3 normal, float3 pixelPos, float3 viewDir)
 {
+    if (!any(light.Color > 0.0) || (!any(light.DiffuseIntensity > 0.0) && !any(light.SpecularIntensity > 0.0))) return 0.0;
     float3 lightDir = light.Position - pixelPos;
     float distanceSqr = dot(lightDir, lightDir);
+    if (light.MaxDistance <= 0.0 || distanceSqr <= 1.0e-12 || distanceSqr >= light.MaxDistance * light.MaxDistance) return 0.0;
     if (distanceSqr <= 0.001f * 0.001f) return 0;
     lightDir = normalize(lightDir);
     float3 reflectLightDir = 2.0 * clamp(dot(lightDir, normal), 0.0, 1.0) * normal - lightDir;
@@ -103,13 +107,15 @@ float3 GetSpotLightDiffuse(jSpotLightUniformBufferData light, float3 normal, flo
 
 float3 GetSpotLightSpecular(jSpotLightUniformBufferData light, float3 reflectLightDir, float3 viewDir)
 {
-    return light.Color * pow(clamp(dot(reflectLightDir, viewDir), 0.0, 1.0), light.SpecularPow) * light.SpecularIntensity;
+    return light.Color * JE_PhongLobe(dot(reflectLightDir, viewDir), light.SpecularPow) * light.SpecularIntensity;
 }
 
 float3 GetSpotLight(jSpotLightUniformBufferData light, float3 normal, float3 pixelPos, float3 viewDir)
 {
+    if (!any(light.Color > 0.0) || (!any(light.DiffuseIntensity > 0.0) && !any(light.SpecularIntensity > 0.0))) return 0.0;
     float3 lightDir = light.Position - pixelPos;
     float distanceSqr = dot(lightDir, lightDir);
+    if (light.MaxDistance <= 0.0 || distanceSqr <= 1.0e-12 || distanceSqr >= light.MaxDistance * light.MaxDistance) return 0.0;
     if (distanceSqr <= 0.001f * 0.001f) return 0;
     lightDir = normalize(lightDir);
     float3 reflectLightDir = 2.0 * clamp(dot(lightDir, normal), 0.0, 1.0) * normal - lightDir;

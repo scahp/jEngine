@@ -2,9 +2,25 @@
 #include "Math/Vector.h"
 #include "Renderer/Features/jSceneFeatureSettings.h"
 #include "Renderer/Features/jAdvancedShadowSettings.h"
+#include "Renderer/Features/jSubsurfaceSettings.h"
+#include "Renderer/Features/jHiZOcclusionSettings.h"
+#include "Renderer/Features/jTextureSubsurfaceSettings.h"
+#include <string>
 
 // Owner-thread registration. Repeated calls reuse the same validated variables.
 void RegisterAdvancedShadowConsoleVariables();
+void RegisterRendererFeatureConsoleVariables();
+
+// Runtime observations are separate from trivially-copyable requested options.
+// Both accessors are used only on the engine owner thread.
+struct jRendererFeatureDiagnostics
+{
+    int AppliedMSAASamples = 1;
+    std::string MSAASupportReason, SubsurfaceSupportReason, HiZSupportReason;
+    uint32 HiZCandidateCount = 0, HiZIndirectDrawCount = 0;
+};
+const jRendererFeatureDiagnostics& GetRendererFeatureDiagnostics();
+jRendererFeatureDiagnostics& MutableRendererFeatureDiagnostics();
 
 enum class EDenoiser : int32
 {
@@ -47,6 +63,10 @@ struct jOptions
     int32 ShadowFilterMode;
     float ShadowFilterRadiusTexels;
     jAdvancedShadows::Settings AdvancedShadows;
+    jSubsurface::Settings Subsurface;
+    jTextureSubsurface::Settings TextureSubsurface;
+    jHiZOcclusion::Settings HiZOcclusion;
+    int32 RequestedMSAASamples = 1;
     jSceneFeatures::Settings SceneFeatures;
     bool UseHWRTDirectLighting;
     int32 HWRTDirectLightingMode;

@@ -49,6 +49,16 @@ struct jSceneRenderTarget : public std::enable_shared_from_this<jSceneRenderTarg
     std::shared_ptr<jRenderTarget> DepthPtr;
     std::shared_ptr<jRenderTarget> LinearDepthPtr;
     std::shared_ptr<jRenderTarget> ResolvePtr;
+    bool UseSubpass = false;
+    bool HasSkinMaterials = false;
+    bool HasTextureSubsurfaceMaterials = false;
+    std::shared_ptr<jRenderTarget> SkinUV;
+    std::vector<std::shared_ptr<jRenderTarget>> SkinIntermediateTargets;
+    std::shared_ptr<jRenderTarget> SubsurfaceMask;
+    std::shared_ptr<jRenderTarget> DiffuseLighting;
+    // Keep original MRTs alive after the HDR/metadata resolve publishes the
+    // single-sample scene consumed by existing post and editor passes.
+    std::vector<std::shared_ptr<jRenderTarget>> MultisampleTargets;
     
     std::shared_ptr<jRenderTarget> GBuffer[5];
 

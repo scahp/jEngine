@@ -562,22 +562,34 @@ void CreateShaderResourceView(jTexture_DX12* InTexture)
     switch(InTexture->Type)
     {
     case ETextureType::TEXTURE_2D:
-        Desc.ViewDimension = ((int32)InTexture->SampleCount > 1) 
-            ? D3D12_SRV_DIMENSION_TEXTURE2DMS : D3D12_SRV_DIMENSION_TEXTURE2D;
-        Desc.Texture2D.MipLevels = InTexture->MipLevel;
-        Desc.Texture2D.MostDetailedMip = 0;
-        Desc.Texture2D.PlaneSlice = 0;
-        Desc.Texture2D.ResourceMinLODClamp = 0.0f;
+        if ((int32)InTexture->SampleCount > 1)
+            Desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DMS;
+        else
+        {
+            Desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+            Desc.Texture2D.MipLevels = InTexture->MipLevel;
+            Desc.Texture2D.MostDetailedMip = 0;
+            Desc.Texture2D.PlaneSlice = 0;
+            Desc.Texture2D.ResourceMinLODClamp = 0.0f;
+        }
         break;
     case ETextureType::TEXTURE_2D_ARRAY:
-        Desc.ViewDimension = ((int32)InTexture->SampleCount > 1) 
-            ? D3D12_SRV_DIMENSION_TEXTURE2DMSARRAY : D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
-        Desc.Texture2DArray.MipLevels = InTexture->MipLevel;
-        Desc.Texture2DArray.MostDetailedMip = 0;
-        Desc.Texture2DArray.PlaneSlice = 0;
-        Desc.Texture2DArray.ResourceMinLODClamp = 0.0f;
-        Desc.Texture2DArray.ArraySize = InTexture->LayerCount;
-        Desc.Texture2DArray.FirstArraySlice = 0;
+        if ((int32)InTexture->SampleCount > 1)
+        {
+            Desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DMSARRAY;
+            Desc.Texture2DMSArray.FirstArraySlice = 0;
+            Desc.Texture2DMSArray.ArraySize = InTexture->LayerCount;
+        }
+        else
+        {
+            Desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+            Desc.Texture2DArray.MipLevels = InTexture->MipLevel;
+            Desc.Texture2DArray.MostDetailedMip = 0;
+            Desc.Texture2DArray.PlaneSlice = 0;
+            Desc.Texture2DArray.ResourceMinLODClamp = 0.0f;
+            Desc.Texture2DArray.ArraySize = InTexture->LayerCount;
+            Desc.Texture2DArray.FirstArraySlice = 0;
+        }
         break;
     case ETextureType::TEXTURE_CUBE:
         Desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;

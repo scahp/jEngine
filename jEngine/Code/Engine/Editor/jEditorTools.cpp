@@ -12,6 +12,7 @@
 #include "Scene/jCamera.h"
 #include "Scene/jMeshObject.h"
 #include "jEngine.h"
+#include "Renderer/Features/jSubsurfaceSettings.h"
 #include "External/PathTracingDataLoader/json.hpp"
 #include "Recast.h"
 #include "DetourNavMesh.h"
@@ -28,6 +29,26 @@ using Json = nlohmann::json;
 namespace
 {
 constexpr size_t MaxMaterialNodes = 256;
+bool CompiledMaterialGraph(const MaterialGraph& graph)
+{
+    return graph.Horizon || graph.SubsurfaceWeight || graph.SubsurfaceColor || graph.SubsurfaceThickness || graph.SubsurfaceProfile
+        || graph.SpecularWeight || graph.DiffuseOcclusion || graph.PreScatterWeight
+        || std::any_of(graph.Nodes.begin(), graph.Nodes.end(), [](const auto& node) { return node.Kind > NodeKind::Add; });
+}
+void SubsurfaceDefaults(const MaterialGraph& graph, MaterialProperties& material)
+{
+    const auto shading = graph.Surface ? graph.Surface->Shading : jSurfaceShading{};
+    material.SubsurfaceOverrideEnabled = graph.Surface.has_value()
+        || graph.SubsurfaceWeight || graph.SubsurfaceColor || graph.SubsurfaceThickness || graph.SubsurfaceProfile;
+    material.SubsurfaceWeight = shading.Subsurface;
+    material.SubsurfaceColor = {shading.SubsurfaceColor[0], shading.SubsurfaceColor[1], shading.SubsurfaceColor[2]};
+    material.SubsurfaceThicknessWorld = shading.SubsurfaceThicknessWorld;
+    material.SubsurfaceProfile = shading.SubsurfaceProfile;
+    material.SkinOverrideEnabled = graph.Surface.has_value() || graph.SpecularWeight || graph.DiffuseOcclusion || graph.PreScatterWeight;
+    material.ShadingModel = shading.ShadingModel; material.SubsurfaceSpace = shading.SubsurfaceSpace;
+    material.SpecularWeight = shading.SpecularWeight; material.DiffuseOcclusion = shading.DiffuseOcclusion;
+    material.PreScatterWeight = shading.PreScatterWeight;
+}
 bool Finite(float value) { return std::isfinite(value) && std::abs(value) <= 1e8f; }
 bool SafeTexture(const std::string& path)
 {
@@ -44,7 +65,11 @@ bool ValidSurface(const MaterialGraph::SurfaceProperties& surface)
     const auto unit = [](float value) { return value >= 0.f && value <= 1.f; };
     const auto radiance = [](float value) { return value >= 0.f && value <= 1e6f; };
     return unit(s.Transmission) && s.Ior >= 1.f && s.Ior <= 4.f && unit(s.ClearCoat) && unit(s.ClearCoatGloss) &&
-        unit(s.Subsurface) && s.Anisotropy >= -1.f && s.Anisotropy <= 1.f && unit(s.SpecularTint) &&
+        unit(s.Subsurface) && unit(s.SubsurfaceColor[0]) && unit(s.SubsurfaceColor[1]) && unit(s.SubsurfaceColor[2])
+        && std::isfinite(s.SubsurfaceThicknessWorld) && s.SubsurfaceThicknessWorld >= 0 && s.SubsurfaceThicknessWorld <= 10000
+        && s.SubsurfaceProfile < 8 && s.Anisotropy >= -1.f && s.Anisotropy <= 1.f && unit(s.SpecularTint) &&
+        uint32_t(s.ShadingModel) <= 1 && uint32_t(s.SubsurfaceSpace) <= 1 && std::isfinite(s.SpecularWeight)
+        && s.SpecularWeight >= 0 && s.SpecularWeight <= 8 && unit(s.DiffuseOcclusion) && unit(s.PreScatterWeight) &&
         unit(s.Sheen) && unit(s.SheenTint) && unit(s.AlphaCutoff) && unit(surface.Opacity) &&
         uint32_t(s.AlphaMode) <= uint32_t(jSurfaceAlphaMode::Blend) &&
         radiance(surface.Emission.X) && radiance(surface.Emission.Y) && radiance(surface.Emission.Z) &&
@@ -58,6 +83,32 @@ MaterialGraph::SurfaceProperties ReadSurface(const Json& json)
     s.Transmission = json.value("transmission", 0.f); s.Ior = json.value("ior", 1.5f);
     s.ClearCoat = json.value("clearCoat", 0.f); s.ClearCoatGloss = json.value("clearCoatGloss", 0.f);
     s.Subsurface = json.value("subsurface", 0.f); s.Anisotropy = json.value("anisotropy", 0.f);
+    if (const auto color = json.find("subsurfaceColor"); color != json.end())
+    {
+        if (!color->is_array() || color->size() != 3) throw std::runtime_error("Subsurface color requires three linear RGB numbers");
+        for (std::size_t i = 0; i < 3; ++i) s.SubsurfaceColor[i] = color->at(i).get<float>();
+    }
+    s.SubsurfaceThicknessWorld = json.value("subsurfaceThicknessWorld", 1.f);
+    if (const auto profile = json.find("subsurfaceProfile"); profile != json.end())
+    {
+        if (!profile->is_number_integer() || profile->get<int64_t>() < 0 || profile->get<uint64_t>() > 7)
+            throw std::runtime_error("Subsurface profile must be an integer from 0 to 7");
+        s.SubsurfaceProfile = profile->get<uint32_t>();
+    }
+    if (const auto skin = json.find("skin"); skin != json.end())
+    {
+        if (!skin->is_object() || skin->size() != 5) throw std::runtime_error("Skin settings require a complete five-field block");
+        const auto enumValue = [](const Json& value)
+        {
+            if (!value.is_number_integer() || value.get<int64_t>() < 0 || value.get<uint64_t>() > 1)
+                throw std::runtime_error("Skin model/space must be an integer from 0 to 1");
+            return value.get<uint32_t>();
+        };
+        s.ShadingModel = jSurfaceShadingModel(enumValue(skin->at("shadingModel")));
+        s.SubsurfaceSpace = jSubsurfaceSpace(enumValue(skin->at("subsurfaceSpace")));
+        s.SpecularWeight = skin->at("specularWeight").get<float>(); s.DiffuseOcclusion = skin->at("diffuseOcclusion").get<float>();
+        s.PreScatterWeight = skin->at("preScatterWeight").get<float>();
+    }
     s.SpecularTint = json.value("specularTint", 0.f); s.Sheen = json.value("sheen", 0.f); s.SheenTint = json.value("sheenTint", 0.f);
     const auto alpha = json.value("alphaMode", std::string("opaque"));
     if (alpha == "mask") s.AlphaMode = jSurfaceAlphaMode::Mask;
@@ -79,11 +130,22 @@ Json WriteSurface(const MaterialGraph::SurfaceProperties& surface)
 {
     const auto& s = surface.Shading;
     const char* alpha = s.AlphaMode == jSurfaceAlphaMode::Mask ? "mask" : s.AlphaMode == jSurfaceAlphaMode::Blend ? "blend" : "opaque";
-    return {{"transmission", s.Transmission}, {"ior", s.Ior}, {"clearCoat", s.ClearCoat}, {"clearCoatGloss", s.ClearCoatGloss},
+    Json result{{"transmission", s.Transmission}, {"ior", s.Ior}, {"clearCoat", s.ClearCoat}, {"clearCoatGloss", s.ClearCoatGloss},
         {"subsurface", s.Subsurface}, {"anisotropy", s.Anisotropy}, {"specularTint", s.SpecularTint}, {"sheen", s.Sheen}, {"sheenTint", s.SheenTint},
         {"alphaMode", alpha}, {"alphaCutoff", s.AlphaCutoff}, {"doubleSided", s.DoubleSided}, {"legacyPackedMap", s.LegacyPackedMap},
         {"opacity", surface.Opacity}, {"emission", {surface.Emission.X, surface.Emission.Y, surface.Emission.Z}},
         {"metallicRoughnessTexture", surface.MetallicRoughnessTexture}, {"emissionTexture", surface.EmissionTexture}};
+    if (s.SubsurfaceColor != std::array<float, 3>{1, 1, 1} || s.SubsurfaceThicknessWorld != 1 || s.SubsurfaceProfile != 0)
+    {
+        result["subsurfaceColor"] = s.SubsurfaceColor;
+        result["subsurfaceThicknessWorld"] = s.SubsurfaceThicknessWorld;
+        result["subsurfaceProfile"] = s.SubsurfaceProfile;
+    }
+    if (s.ShadingModel != jSurfaceShadingModel::StandardPBR || s.SubsurfaceSpace != jSubsurfaceSpace::Screen
+        || s.SpecularWeight != 1 || s.DiffuseOcclusion != 1 || s.PreScatterWeight != 1)
+        result["skin"] = {{"shadingModel", uint32_t(s.ShadingModel)}, {"subsurfaceSpace", uint32_t(s.SubsurfaceSpace)},
+            {"specularWeight", s.SpecularWeight}, {"diffuseOcclusion", s.DiffuseOcclusion}, {"preScatterWeight", s.PreScatterWeight}};
+    return result;
 }
 Json ReadSceneMaterialBindings(const std::filesystem::path& source)
 {
@@ -219,7 +281,7 @@ bool EvaluateMaterial(const MaterialGraph& graph, MaterialProperties& material, 
     error.clear();
     if (graph.Nodes.empty() || graph.Nodes.size() > MaxMaterialNodes) { error = "A material needs 1..256 nodes"; return false; }
     if (graph.Surface && !ValidSurface(*graph.Surface)) { error = "Invalid material surface value or texture path"; return false; }
-    if (graph.Horizon || std::any_of(graph.Nodes.begin(), graph.Nodes.end(), [](const auto& node) { return node.Kind > NodeKind::Add; }))
+    if (CompiledMaterialGraph(graph))
     {
         jMaterialMapping::Program program;
         if (!jMaterialMapping::Compile(graph, program, error)) return false;
@@ -238,6 +300,7 @@ bool EvaluateMaterial(const MaterialGraph& graph, MaterialProperties& material, 
         };
         constant(graph.Metallic, result.Metallic); constant(graph.Roughness, result.Roughness);
         if (graph.Surface) { result.Emissive = graph.Surface->Emission; result.Opacity = graph.Surface->Opacity; }
+        SubsurfaceDefaults(graph, result);
         result.OverrideEnabled = true; material = std::move(result); return true;
     }
     MaterialEvaluator evaluator(graph);
@@ -277,23 +340,41 @@ bool EvaluateMaterial(const MaterialGraph& graph, MaterialProperties& material, 
         result.Emissive = graph.Surface->Emission;
         result.Opacity = graph.Surface->Opacity;
     }
+    SubsurfaceDefaults(graph, result);
     result.OverrideEnabled = true; material = std::move(result); return true;
 }
 bool SaveMaterial(const MaterialGraph& graph, const std::filesystem::path& file, std::string& error)
 {
     MaterialProperties checked; if (!EvaluateMaterial(graph, checked, error)) return false;
     Json nodes = Json::array();
-    const bool dynamic = graph.Horizon || std::any_of(graph.Nodes.begin(), graph.Nodes.end(), [](const auto& node) { return node.Kind > NodeKind::Add; });
+    const bool dynamic = CompiledMaterialGraph(graph);
     for (const auto& n : graph.Nodes)
     {
         Json node{{"id", n.Id}, {"kind", int(n.Kind)}, {"a", n.InputA}, {"b", n.InputB}, {"color", {n.Color.X, n.Color.Y, n.Color.Z}}, {"value", n.Scalar}, {"x", n.X}, {"y", n.Y}, {"texture", n.Texture}};
-        if (dynamic) { node["c"] = n.InputC; node["d"] = n.InputD; node["parameters"] = n.Parameters; node["semantic"] = uint32_t(n.Semantic); }
+        if (dynamic)
+        {
+            node["c"] = n.InputC; node["d"] = n.InputD; node["parameters"] = n.Parameters; node["semantic"] = uint32_t(n.Semantic);
+            if (n.Kind == NodeKind::TextureSampleNormal)
+            {
+                node["normalSpace"] = uint32_t(n.NormalSpace); node["inputBasisSignXYZ"] = n.InputBasisSignXYZ;
+                if (n.FlipNormalY) node["flipNormalY"] = *n.FlipNormalY;
+            }
+        }
         nodes.push_back(std::move(node));
     }
     Json json{{"format", "jEngineMaterial"}, {"version", dynamic ? 2 : 1}, {"nodes", nodes}, {"baseColor", graph.BaseColor},
         {"metallic", graph.Metallic}, {"roughness", graph.Roughness}, {"normal", graph.Normal}};
     if (graph.Surface) json["surface"] = WriteSurface(*graph.Surface);
-    if (dynamic) json["horizon"] = graph.Horizon;
+    if (dynamic)
+    {
+        json["horizon"] = graph.Horizon;
+        if (graph.SubsurfaceWeight || graph.SubsurfaceColor || graph.SubsurfaceThickness || graph.SubsurfaceProfile)
+            json["subsurfaceOutputs"] = {{"weight", graph.SubsurfaceWeight}, {"color", graph.SubsurfaceColor},
+                {"thickness", graph.SubsurfaceThickness}, {"profile", graph.SubsurfaceProfile}};
+        if (graph.SpecularWeight || graph.DiffuseOcclusion || graph.PreScatterWeight)
+            json["skinOutputs"] = {{"specularWeight", graph.SpecularWeight}, {"diffuseOcclusion", graph.DiffuseOcclusion},
+                {"preScatterWeight", graph.PreScatterWeight}};
+    }
     return Write(file, json.dump(2), error);
 }
 bool LoadMaterial(const std::filesystem::path& file, MaterialGraph& graph, std::string& error)
@@ -315,11 +396,23 @@ bool LoadMaterial(const std::filesystem::path& file, MaterialGraph& graph, std::
         result.BaseColor = id(json.at("baseColor")); result.Metallic = id(json.at("metallic")); result.Roughness = id(json.at("roughness"));
         result.Normal = json.contains("normal") ? id(json.at("normal")) : 0;
         result.Horizon = json.contains("horizon") ? id(json.at("horizon")) : 0;
+        if (const auto sss = json.find("subsurfaceOutputs"); sss != json.end())
+        {
+            if (result.Version != 2 || !sss->is_object() || sss->size() != 4) throw std::runtime_error("Subsurface outputs require a complete version-two output block");
+            result.SubsurfaceWeight = id(sss->at("weight")); result.SubsurfaceColor = id(sss->at("color"));
+            result.SubsurfaceThickness = id(sss->at("thickness")); result.SubsurfaceProfile = id(sss->at("profile"));
+        }
+        if (const auto skin = json.find("skinOutputs"); skin != json.end())
+        {
+            if (result.Version != 2 || !skin->is_object() || skin->size() != 3) throw std::runtime_error("Skin outputs require a complete version-two output block");
+            result.SpecularWeight = id(skin->at("specularWeight")); result.DiffuseOcclusion = id(skin->at("diffuseOcclusion"));
+            result.PreScatterWeight = id(skin->at("preScatterWeight"));
+        }
         if (const auto surface = json.find("surface"); surface != json.end()) result.Surface = ReadSurface(*surface);
         for (const auto& j : json.at("nodes"))
         {
             const auto& kind = j.at("kind");
-            if (!kind.is_number_integer() || kind.get<int64_t>() < 0 || kind.get<int64_t>() > int(NodeKind::Horizon))
+            if (!kind.is_number_integer() || kind.get<int64_t>() < 0 || kind.get<int64_t>() > int(NodeKind::DiffusionProfile))
                 throw std::runtime_error("Material node kind must be a supported integer enum");
             MaterialNode node; node.Id = id(j.at("id")); node.Kind = NodeKind(kind.get<int>());
             if (result.Version == 1 && node.Kind > NodeKind::Add) throw std::runtime_error("New material nodes require graph version 2");
@@ -338,6 +431,17 @@ bool LoadMaterial(const std::filesystem::path& file, MaterialGraph& graph, std::
                 if (j.contains("semantic") && (!j["semantic"].is_number_integer() || j["semantic"].get<int64_t>() < 0 || j["semantic"].get<int64_t>() > 2))
                     throw std::runtime_error("Material texture semantic must be a supported integer enum");
                 node.Semantic = jMaterialMapping::TextureSemantic(j.value("semantic", 0u));
+                if (j.contains("normalSpace")) node.NormalSpace = jMaterialMapping::NormalSpace(id(j.at("normalSpace")));
+                if (const auto basis = j.find("inputBasisSignXYZ"); basis != j.end())
+                {
+                    if (!basis->is_array() || basis->size() != 3) throw std::runtime_error("Normal input basis requires three signs");
+                    node.InputBasisSignXYZ = basis->get<std::array<float, 3>>();
+                }
+                if (const auto flip = j.find("flipNormalY"); flip != j.end())
+                {
+                    if (!flip->is_boolean()) throw std::runtime_error("Explicit normal Y flip must be boolean");
+                    node.FlipNormalY = flip->get<bool>();
+                }
             }
             result.Nodes.push_back(node);
         }
@@ -359,8 +463,8 @@ bool DecodeMaterialDataTexture(const std::filesystem::path& file, std::shared_pt
         { error = "Cannot read complete mapping data file"; return false; }
         int width = 0, height = 0, channels = 0;
         if (!stbi_info_from_memory(encoded.data(), int(encoded.size()), &width, &height, &channels)
-            || width <= 0 || height <= 0 || width > 8192 || height > 8192 || uint64_t(width) * height > 16 * 1024 * 1024)
-        { error = "Mapping data image exceeds 16M texels / 8192 per axis or is invalid"; return false; }
+            || width <= 0 || height <= 0 || width > 8192 || height > 8192 || uint64_t(width) * height > 36000000)
+        { error = "Mapping data image exceeds 36,000,000 texels / 8192 per axis or is invalid"; return false; }
         std::unique_ptr<stbi_uc, void(*)(void*)> pixels(stbi_load_from_memory(encoded.data(), int(encoded.size()), &width, &height, &channels, 4), stbi_image_free);
         if (!pixels) { error = "Mapping data image decode failed"; return false; }
         auto image = std::make_shared<jImageData>();
@@ -379,7 +483,7 @@ bool DecodeMaterialDataTexture(const std::filesystem::path& file, std::shared_pt
 }
 namespace
 {
-constexpr size_t MappingCacheBytes = 128 * 1024 * 1024, MappingCacheEntries = 64, MappingWorkerCount = 2;
+constexpr size_t MappingCacheBytes = 256 * 1024 * 1024, MappingCacheEntries = 64, MappingWorkerCount = 2;
 struct MappingImageResult { std::shared_ptr<jImageData> Image; std::string Error; uint64_t Generation = 0; };
 struct MappingImageEntry
 {
@@ -467,7 +571,7 @@ bool IsRawMappingTexture(const jMaterialMapping::TextureBinding& texture, const 
     if (texture.Semantic == jMaterialMapping::TextureSemantic::Color) return false;
     auto extension = path.extension().string();
     std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char c) { return char(std::tolower(c)); });
-    return extension == ".png" || extension == ".tga" || extension == ".bmp";
+    return extension == ".png" || extension == ".tga" || extension == ".bmp" || extension == ".jpg" || extension == ".jpeg";
 }
 }
 uint64_t PollMaterialMappingTexturePreparation()
@@ -496,7 +600,7 @@ uint64_t PollMaterialMappingTexturePreparation()
         // Reject an oversized working set rather than endlessly evict/redecode it.
         const size_t size = result.Image->ImageBulkData.ImageData.size();
         if (!MappingMakeRoom(size, false, key))
-        { entry.Failed = true; entry.Error = "Mapping data preparation exceeds its 128 MiB / 64-entry budget; reduce data-map resolution"; MappingRemoveGroups(key); continue; }
+        { entry.Failed = true; entry.Error = "Mapping data preparation exceeds its 256 MiB / 64-entry budget; reduce data-map resolution"; MappingRemoveGroups(key); continue; }
         entry.Image = std::move(result.Image); entry.Failed = false; entry.Error.clear();
     }
     MappingStartJobs(); return cache.Epoch;
@@ -634,7 +738,12 @@ uint32_t MaterialMappingOverrides(const MaterialProperties& material)
     if (!flags) return 0;
     return (flags->BaseColor ? OverrideBaseColor : 0u) | (flags->NormalTexture ? OverrideNormal : 0u)
         | (flags->Metallic ? OverrideMetallic : 0u) | (flags->Roughness ? OverrideRoughness : 0u)
-        | (flags->BaseColorTexture ? OverrideBaseColorTexture : 0u);
+        | (flags->BaseColorTexture ? OverrideBaseColorTexture : 0u)
+        | (flags->SubsurfaceWeight ? OverrideSubsurfaceWeight : 0u) | (flags->SubsurfaceColor ? OverrideSubsurfaceColor : 0u)
+        | (flags->SubsurfaceThickness ? OverrideSubsurfaceThickness : 0u) | (flags->SubsurfaceProfile ? OverrideSubsurfaceProfile : 0u)
+        | (flags->SpecularWeight ? OverrideSpecularWeight : 0u) | (flags->DiffuseOcclusion ? OverrideDiffuseOcclusion : 0u)
+        | (flags->PreScatterWeight ? OverridePreScatterWeight : 0u) | (flags->ShadingModel ? OverrideShadingModel : 0u)
+        | (flags->SubsurfaceSpace ? OverrideSubsurfaceSpace : 0u);
 }
 
 bool ApplySceneMaterialLibrary(const std::filesystem::path& source, const std::vector<jObject*>& objects,
@@ -700,6 +809,7 @@ bool ApplySceneMaterialLibrary(const std::filesystem::path& source, const std::v
                     ApplyMaterialMapping(*target, mapping, 0);
                     const auto surface = graph.Surface.value_or(MaterialGraph::SurfaceProperties{});
                     target->Surface = surface.Shading;
+                    target->SubsurfaceOnlySurface = false;
                     target->bRaytracingAlphaTest = surface.Shading.AlphaMode == jSurfaceAlphaMode::Mask;
                     target->RaytracingAlphaCutoff = surface.Shading.AlphaCutoff;
                     using Slot = jMaterial::EMaterialTextureType;
@@ -817,6 +927,19 @@ void InheritMaterialGraph(MaterialProperties& instance, const MaterialProperties
     if (!overrides.Metallic) instance.Metallic = defaults.Metallic;
     if (!overrides.Roughness) instance.Roughness = defaults.Roughness;
     if (!overrides.NormalTexture) instance.NormalTexture = defaults.NormalTexture;
+    if (!overrides.SubsurfaceWeight) instance.SubsurfaceWeight = defaults.SubsurfaceWeight;
+    if (!overrides.SubsurfaceColor) instance.SubsurfaceColor = defaults.SubsurfaceColor;
+    if (!overrides.SubsurfaceThickness) instance.SubsurfaceThicknessWorld = defaults.SubsurfaceThicknessWorld;
+    if (!overrides.SubsurfaceProfile) instance.SubsurfaceProfile = defaults.SubsurfaceProfile;
+    instance.SubsurfaceOverrideEnabled = defaults.SubsurfaceOverrideEnabled
+        || overrides.SubsurfaceWeight || overrides.SubsurfaceColor || overrides.SubsurfaceThickness || overrides.SubsurfaceProfile;
+    if (!overrides.ShadingModel) instance.ShadingModel = defaults.ShadingModel;
+    if (!overrides.SubsurfaceSpace) instance.SubsurfaceSpace = defaults.SubsurfaceSpace;
+    if (!overrides.SpecularWeight) instance.SpecularWeight = defaults.SpecularWeight;
+    if (!overrides.DiffuseOcclusion) instance.DiffuseOcclusion = defaults.DiffuseOcclusion;
+    if (!overrides.PreScatterWeight) instance.PreScatterWeight = defaults.PreScatterWeight;
+    instance.SkinOverrideEnabled = defaults.SkinOverrideEnabled
+        || overrides.ShadingModel || overrides.SubsurfaceSpace || overrides.SpecularWeight || overrides.DiffuseOcclusion || overrides.PreScatterWeight;
 }
 
 bool AssignSharedMaterial(jEditor& editor, EntityId id, const std::string& path, std::string& error)
@@ -1109,7 +1232,7 @@ constexpr float MaterialNodeWidth = 165;
 const char* MaterialNodeName(NodeKind kind)
 {
     static const char* names[] = {"Color", "Scalar", "Texture", "Multiply", "Add", "UV", "Texture Object", "Texture Sample",
-        "Sample Normal", "Channel", "Parallax", "POM", "Relief", "Interior", "Horizon"};
+        "Sample Normal", "Channel", "Parallax", "POM", "Relief", "Interior", "Horizon", "Diffusion Profile"};
     const auto index = int(kind);
     return index >= 0 && index < int(std::size(names)) ? names[index] : "Invalid";
 }
@@ -1150,7 +1273,7 @@ bool AcceptMaterialInput(NodeKind destination, uint32_t MaterialNode::*input, No
     if (destination == NodeKind::Parallax || destination == NodeKind::POM || destination == NodeKind::Relief
         || destination == NodeKind::Interior || destination == NodeKind::Horizon)
         return input == &MaterialNode::InputA ? MaterialUVKind(source) || source == NodeKind::Add || source == NodeKind::Multiply : source == NodeKind::TextureObject;
-    return source != NodeKind::TextureObject && source != NodeKind::Horizon;
+    return source != NodeKind::TextureObject && source != NodeKind::Horizon && source != NodeKind::DiffusionProfile;
 }
 constexpr float MaterialPinY(int index) { return 41.f + float(index) * 25.f; }
 constexpr struct MaterialOutputPin
@@ -1159,14 +1282,23 @@ constexpr struct MaterialOutputPin
     uint32_t MaterialGraph::*Source;
 } MaterialOutputPins[] = {
     {"Base Color", &MaterialGraph::BaseColor}, {"Normal", &MaterialGraph::Normal},
-    {"Metallic", &MaterialGraph::Metallic}, {"Roughness", &MaterialGraph::Roughness}, {"Horizon", &MaterialGraph::Horizon}
+    {"Metallic", &MaterialGraph::Metallic}, {"Roughness", &MaterialGraph::Roughness}, {"Horizon", &MaterialGraph::Horizon},
+    {"SSS Weight", &MaterialGraph::SubsurfaceWeight}, {"SSS Color", &MaterialGraph::SubsurfaceColor},
+    {"SSS Thickness", &MaterialGraph::SubsurfaceThickness}, {"SSS Profile", &MaterialGraph::SubsurfaceProfile},
+    {"Specular Weight", &MaterialGraph::SpecularWeight}, {"Diffuse Occlusion", &MaterialGraph::DiffuseOcclusion},
+    {"Pre-scatter Weight", &MaterialGraph::PreScatterWeight}
 };
 bool AcceptMaterialOutput(const MaterialOutputPin& pin, NodeKind kind)
 {
     if (pin.Source == &MaterialGraph::Horizon) return kind == NodeKind::Horizon;
+    if (pin.Source == &MaterialGraph::SubsurfaceProfile) return kind == NodeKind::DiffusionProfile;
+    if (pin.Source == &MaterialGraph::SubsurfaceWeight || pin.Source == &MaterialGraph::SubsurfaceThickness
+        || pin.Source == &MaterialGraph::SpecularWeight || pin.Source == &MaterialGraph::DiffuseOcclusion
+        || pin.Source == &MaterialGraph::PreScatterWeight)
+        return kind == NodeKind::Scalar || kind == NodeKind::Channel || kind == NodeKind::Multiply || kind == NodeKind::Add;
     if (pin.Source == &MaterialGraph::Normal)
         return kind == NodeKind::Texture || kind == NodeKind::TextureSampleNormal || kind == NodeKind::Color || kind == NodeKind::Multiply || kind == NodeKind::Add;
-    return kind != NodeKind::Horizon && kind != NodeKind::TextureObject && !MaterialUVKind(kind);
+    return kind != NodeKind::Horizon && kind != NodeKind::TextureObject && kind != NodeKind::DiffusionProfile && !MaterialUVKind(kind);
 }
 
 uint32_t DroppedMaterialNode()
@@ -1247,6 +1379,7 @@ void DrawMaterialValue(ImDrawList& draw, const ImVec2& position, const MaterialN
     if (node.Kind > NodeKind::Add)
     {
         const char* type = node.Kind == NodeKind::TextureObject ? "Texture2D asset" : node.Kind == NodeKind::Horizon ? "GPU visibility + AO"
+            : node.Kind == NodeKind::DiffusionProfile ? "Static diffusion profile"
             : MaterialUVKind(node.Kind) ? "GPU float2 UV" : node.Kind == NodeKind::Channel ? "GPU scalar" : "GPU sampled color";
         draw.AddText(ImVec2(position.x + 7, position.y + MaterialNodeHeight(node.Kind) - 19), IM_COL32(170, 190, 210, 255), type);
         return;
@@ -1301,6 +1434,23 @@ void SurfaceSettings(MaterialGraph::SurfaceProperties& surface)
     auto edited = surface;
     auto& shading = edited.Shading;
     bool changed = ImGui::SliderFloat("Transmission", &shading.Transmission, 0.f, 1.f);
+    changed |= ImGui::SliderFloat("Subsurface weight", &shading.Subsurface, 0, 1);
+    changed |= ImGui::ColorEdit3("Subsurface color (linear)", shading.SubsurfaceColor.data());
+    changed |= ImGui::DragFloat("Subsurface thickness (world)", &shading.SubsurfaceThicknessWorld, .01f, 0, 10000, "%.3g", ImGuiSliderFlags_AlwaysClamp);
+    static const auto profiles = [] { std::array<const char*, 8> names{}; for (size_t i = 0; i < names.size(); ++i) names[i] = jSubsurface::Profiles[i].Name; return names; }();
+    int profile = int(shading.SubsurfaceProfile);
+    if (ImGui::Combo("Subsurface profile", &profile, profiles.data(), int(profiles.size())))
+    { shading.SubsurfaceProfile = uint32(profile); changed = true; }
+    int model = int(shading.ShadingModel), space = int(shading.SubsurfaceSpace);
+    if (ImGui::Combo("Shading model", &model, "Standard PBR\0Skin Kelemen\0"))
+    { shading.ShadingModel = jSurfaceShadingModel(model); changed = true; }
+    if (ImGui::Combo("Subsurface space", &space, "Screen\0Texture (UV)\0"))
+    { shading.SubsurfaceSpace = jSubsurfaceSpace(space); changed = true; }
+    changed |= ImGui::SliderFloat("Specular weight", &shading.SpecularWeight, 0, 8);
+    changed |= ImGui::SliderFloat("Diffuse occlusion", &shading.DiffuseOcclusion, 0, 1);
+    changed |= ImGui::SliderFloat("Pre-scatter weight", &shading.PreScatterWeight, 0, 1);
+    if (shading.ShadingModel == jSurfaceShadingModel::SkinKelemen)
+        ImGui::TextWrapped("Skin Kelemen uses the Roughness output as Beckmann m. Diffuse occlusion affects diffuse/ambient, not specular.");
     changed |= ImGui::SliderFloat("IOR", &shading.Ior, 1.f, 4.f);
     changed |= ImGui::SliderFloat("Clear Coat", &shading.ClearCoat, 0.f, 1.f);
     changed |= ImGui::SliderFloat("Clear Coat Gloss", &shading.ClearCoatGloss, 0.f, 1.f);
@@ -1328,7 +1478,7 @@ void GraphUI(jEditor& editor, Entity e, const jEditorProject* project, const jEd
     const bool library = !s.SceneMaterialRoot.empty();
     ImGui::TextWrapped("Drag Out to a typed input or Material Output pin. Click an input to choose or disconnect its source.");
     static int addKind = 0; ImGui::Combo("New node", &addKind,
-        "Color\0Scalar\0Texture\0Multiply\0Add\0UV\0Texture Object\0Texture Sample\0Sample Normal\0Channel\0Parallax\0POM\0Relief\0Interior\0Horizon\0");
+        "Color\0Scalar\0Texture\0Multiply\0Add\0UV\0Texture Object\0Texture Sample\0Sample Normal\0Channel\0Parallax\0POM\0Relief\0Interior\0Horizon\0Diffusion Profile\0");
     ImGui::BeginDisabled(s.Graph.Nodes.size() >= MaxMaterialNodes);
     if (ImGui::Button("Add node"))
     {
@@ -1339,6 +1489,7 @@ void GraphUI(jEditor& editor, Entity e, const jEditorProject* project, const jEd
         if (node.Kind == NodeKind::POM || node.Kind == NodeKind::Relief) node.Parameters = {.05f, 32, 6, 0};
         if (node.Kind == NodeKind::Interior) node.Parameters = {1, 1, 1, 1};
         if (node.Kind == NodeKind::Horizon) node.Parameters = {.05f, 1, 1, 0};
+        if (node.Kind == NodeKind::DiffusionProfile) node.Parameters = {0, 0, 0, 0};
         s.Graph.Nodes.push_back(node);
     }
     ImGui::EndDisabled();
@@ -1447,7 +1598,22 @@ void GraphUI(jEditor& editor, Entity e, const jEditorProject* project, const jEd
         if (node->Kind == NodeKind::Channel)
         { int channel = int(parameters[0]); if (ImGui::SliderInt("Channel (RGBA)", &channel, 0, 3)) parameters[0] = float(channel); track(); }
         if (node->Kind == NodeKind::TextureSampleNormal)
-        { bool flip = parameters[0] > .5f; if (ImGui::Checkbox("Flip normal Y", &flip)) parameters[0] = flip ? 1.f : 0.f; track(); }
+        {
+            int space = int(node->NormalSpace);
+            if (ImGui::Combo("Normal space", &space, "Tangent\0Object\0World\0")) node->NormalSpace = jMaterialMapping::NormalSpace(space);
+            track();
+            bool flip = node->FlipNormalY.value_or(node->NormalSpace == jMaterialMapping::NormalSpace::Tangent && parameters[0] > .5f);
+            if (ImGui::Checkbox("Flip normal Y", &flip)) node->FlipNormalY = flip;
+            track();
+            for (int axis = 0; axis < 3; ++axis)
+            {
+                const char* labels[] = {"Negate source X", "Negate source Y", "Negate source Z"};
+                bool negate = node->InputBasisSignXYZ[axis] < 0;
+                if (ImGui::Checkbox(labels[axis], &negate)) node->InputBasisSignXYZ[axis] = negate ? -1.f : 1.f;
+                track();
+            }
+            ImGui::TextWrapped("Normal maps are linear data. Object follows the mesh transform; World stays in engine-world axes. Source axis signs are separate from UV V flip. Object/World default to no Y flip; existing Tangent graphs keep their legacy flip.");
+        }
         if (node->Kind == NodeKind::Parallax || node->Kind == NodeKind::POM || node->Kind == NodeKind::Relief)
         {
             ImGui::SliderFloat("Height / depth scale", &parameters[0], 0, 1); track();
@@ -1472,6 +1638,14 @@ void GraphUI(jEditor& editor, Entity e, const jEditorProject* project, const jEd
             ImGui::SliderFloat("Horizon angle scale", &parameters[2], 0, 4); track();
             ImGui::TextWrapped("Connect baked Layer 0, Layer 1 and AO textures. Horizon visibility is a separate output; it is never multiplied into albedo.");
         }
+        if (node->Kind == NodeKind::DiffusionProfile)
+        {
+            static const auto profiles = [] { std::array<const char*, 8> names{}; for (size_t i = 0; i < names.size(); ++i) names[i] = jSubsurface::Profiles[i].Name; return names; }();
+            int profile = int(parameters[0]);
+            if (ImGui::Combo("Diffusion profile", &profile, profiles.data(), int(profiles.size()))) parameters[0] = float(profile);
+            track();
+            ImGui::TextWrapped("Approximate world-unit diffusion presets. Connect to SSS Profile; material thickness bounds the effective radius.");
+        }
         if (activated) { s.Undo.push_back(before); if (s.Undo.size() > 64) s.Undo.erase(s.Undo.begin()); s.Redo.clear(); }
         if (ImGui::Button("Remove node"))
         {
@@ -1485,7 +1659,9 @@ void GraphUI(jEditor& editor, Entity e, const jEditorProject* project, const jEd
             s.SelectedNode = 0;
         }
     }
+    if (!s.Graph.Surface && ImGui::Button("Add surface settings")) { GraphHistory(); s.Graph.Surface.emplace(); }
     if (s.Graph.Surface) SurfaceSettings(*s.Graph.Surface);
+    ImGui::TextWrapped("Surface diffusion requires Deferred and Project Settings > Enable Deferred SSS. Weight 0 or world thickness 0 disables diffusion. The existing PT subsurface scalar remains a separate shading approximation.");
     if (std::any_of(s.Graph.Nodes.begin(), s.Graph.Nodes.end(), [](const auto& value) { return value.Kind > NodeKind::Add; }))
     {
         ImGui::TextWrapped("Mapping nodes render in Deferred / Forward. Path Tracing and HWRT material evaluation do not support these nodes.");
@@ -1515,7 +1691,7 @@ void GraphUI(jEditor& editor, Entity e, const jEditorProject* project, const jEd
         if (s.AssignedGraphHasNormal) defaults.NormalTexture.clear();
         if (path && EvaluateMaterial(s.Graph, defaults, s.Error) && SaveMaterial(s.Graph, *path, s.Error))
         {
-            const bool dynamic = s.Graph.Horizon || std::any_of(s.Graph.Nodes.begin(), s.Graph.Nodes.end(), [](const auto& value) { return value.Kind > NodeKind::Add; });
+            const bool dynamic = CompiledMaterialGraph(s.Graph);
             if (dynamic && !e.Material.GraphOverrides) e.Material.GraphOverrides.emplace();
             if (e.Material.GraphOverrides) InheritMaterialGraph(e.Material, defaults);
             else e.Material = std::move(defaults);

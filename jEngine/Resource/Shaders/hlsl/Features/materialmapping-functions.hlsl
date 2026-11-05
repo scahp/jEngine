@@ -14,6 +14,29 @@ float3 JE_DecodeNormalTS(float3 sampleValue, float flipY)
     if (flipY > 0.5) sampleValue.y = 1.0 - sampleValue.y;
     return JE_SafeNormalTS(sampleValue * 2.0 - 1.0);
 }
+// TBN maps tangent to world. Its rows need not form an orthonormal basis after
+// authored nonuniform scale/shear, so transpose(TBN) is not its inverse.
+float3 JE_WorldNormalToTangent(float3 normalWS, float3x3 basis)
+{
+    const float3 c0 = cross(basis[1], basis[2]);
+    const float3 c1 = cross(basis[2], basis[0]);
+    const float3 c2 = cross(basis[0], basis[1]);
+    const float determinant = dot(basis[0], c0);
+    if (abs(determinant) < 1e-8) return float3(0, 0, 1);
+    return JE_SafeNormalTS(mul(transpose(float3x3(c0, c1, c2)), normalWS) / determinant);
+}
+// basisSpace.xyz is an explicitly authored source-axis sign correction; w is
+// Tangent=0/Object=1/World=2. Samples always come from the linear Normal binding.
+// Object normals use the same inverse-transpose convention as the mesh normal.
+float3 JE_DecodeMaterialNormal(float3 sampleValue, JEMaterialContext ctx, float4 basisSpace, float flipY)
+{
+    const float3 decoded = JE_SafeNormalTS(JE_DecodeNormalTS(sampleValue, flipY) * basisSpace.xyz);
+    const uint space = (uint)basisSpace.w;
+    if (space == 0u) return decoded;
+    const float3 normalWS = space == 1u
+        ? JE_SafeNormalTS(mul(decoded, (float3x3)RenderObjectParam.InvM)) : decoded;
+    return JE_WorldNormalToTangent(normalWS, ctx.TBN);
+}
 float4 JE_LinearColor(float4 value)
 {
     return float4(pow(max(value.rgb, 0.0), 2.2), value.a);

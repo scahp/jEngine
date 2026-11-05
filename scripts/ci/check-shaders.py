@@ -46,7 +46,7 @@ SHADERS.update({name: ('main', 'cs_6_6') for name in (
     'scene-environment', 'scene-ppr-clear', 'scene-ppr-projection',
     'scene-ppr-resolve', 'scene-ppr-resolve-cube', 'scene-atmosphere')})
 SHADERS.update({f'mapping-{recipe}-{path}': ('main', 'ps_6_6')
-                for recipe in ('parallax', 'pom', 'relief', 'horizon', 'interior', 'interior-dual')
+                for recipe in ('parallax', 'pom', 'relief', 'horizon', 'interior', 'interior-dual', 'subsurface', 'normal-object', 'normal-world', 'skin')
                 for path in ('forward', 'gbuffer')})
 
 

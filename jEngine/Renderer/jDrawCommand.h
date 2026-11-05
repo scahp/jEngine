@@ -11,6 +11,7 @@ struct jGraphicsPipelineShader;
 struct jPipelineStateFixedInfo;
 struct jShaderBindingInstance;
 class jMaterial;
+struct jBuffer;
 
 enum class EDrawCommandBindingMode : uint8
 {
@@ -61,7 +62,7 @@ public:
     jRenderPass* RenderPass = nullptr;
     jGraphicsPipelineShader Shader;
     jRenderObject* RenderObject = nullptr;
-    jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
+    const jPipelineStateFixedInfo* PipelineStateFixed = nullptr;
     jPipelineStateInfo* CurrentPipelineStateInfo = nullptr;
     jMaterial* Material = nullptr;
     const jPushConstant* PushConstant = nullptr;
@@ -70,6 +71,10 @@ public:
     bool IsPositionOnly = false;
     int32 SubpassIndex = 0;
     EDrawCommandBindingMode BindingMode = EDrawCommandBindingMode::Standard;
+
+    // Per-view visibility must never modify a shared mesh's indirect buffer.
+    std::shared_ptr<jBuffer> IndirectArgumentsOverride;
+    uint32 IndirectArgumentIndex = 0;
 
     std::shared_ptr<jShaderBindingInstance> OneRenderObjectUniformBuffer;
 
@@ -86,4 +91,3 @@ public:
     virtual void GenerateDrawCommand(jDrawCommand* OutDestDrawCommand, const std::shared_ptr<jRenderFrameContext>& InRenderFrameContextPtr
         , const jView* InView, const jViewLight& InLightView, jRenderPass* InRenderPass, int32 InSubpassIndex) = 0;
 };
-

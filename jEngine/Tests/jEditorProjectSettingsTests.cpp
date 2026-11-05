@@ -61,6 +61,15 @@ int RunEditorProjectSettingsTests()
         advanced.Method = jAdvancedShadows::Representation::ExponentialVariance;
         advanced.MapResolution = 128; advanced.MinimumVariance = 1e-8f;
         expect(Settings::WriteAdvancedShadows(candidate, advanced, error), "encode full independent shadow defaults without losing small variance values");
+        candidate.Settings.insert({{"render.msaa.samples","4"}, {"render.sss.enabled","true"}, {"render.sss.strength","0.6"},
+            {"render.sss.radiusScale","3"}, {"render.sss.depthRejectWorld","0.2"}, {"render.sss.normalThreshold","0.7"},
+            {"render.sss.maxRadiusPixels","24"}, {"render.hiz.enabled","true"}, {"render.hiz.depthBias","0.00002"}, {"render.hiz.maxCandidates","2048"}});
+        jTextureSubsurface::Settings textureTransport;
+        textureTransport.TileResolution = 512; textureTransport.CaptureResolution = 2048; textureTransport.GaussianStepScale = 1.5f;
+        textureTransport.WorldUnitsPerMillimeter = .3f; textureTransport.EnableTransmission = false;
+        textureTransport.TransmissionExtinctionPerMillimeter = .4f; textureTransport.TransmissionThicknessScale = .8f; textureTransport.CaptureBiasWorld = .1f;
+        expect(Settings::WriteTextureSubsurface(candidate, textureTransport, error),
+            "encode bounded texture diffusion with an explicit source-specific world-unit conversion");
         GSupportInlineRaytracing = false; GRHISupportVsync = false;
         const auto documentBeforeSettings = editor.GetDocument().ToJson();
         const auto revisionBeforeSettings = editor.GetDocument().Revision();
@@ -74,6 +83,15 @@ int RunEditorProjectSettingsTests()
             "saved Poisson shadow-map settings apply without changing the scene document or undo revision");
         expect(gOptions.AdvancedShadows == advanced,
             "advanced shadow settings publish the exact saved typed snapshot rather than a UI-only copy");
+        expect(gOptions.RequestedMSAASamples==4&&gOptions.Subsurface.Enabled&&gOptions.Subsurface.Strength==.6f
+            &&gOptions.Subsurface.RadiusScale==3&&gOptions.Subsurface.MaxRadiusPixels==24
+            &&gOptions.HiZOcclusion.Enabled&&gOptions.HiZOcclusion.MaxCandidates==2048&&gOptions.HiZOcclusion.DepthBias==.00002f,
+            "saved MSAA SSS and Hi-Z requests reach actual renderer options without depending on current device capability");
+        expect(gOptions.TextureSubsurface.TileResolution == 512 && gOptions.TextureSubsurface.CaptureResolution == 2048
+            && gOptions.TextureSubsurface.GaussianStepScale == 1.5f && gOptions.TextureSubsurface.WorldUnitsPerMillimeter == .3f
+            && !gOptions.TextureSubsurface.EnableTransmission && gOptions.TextureSubsurface.TransmissionExtinctionPerMillimeter == .4f
+            && gOptions.TextureSubsurface.TransmissionThicknessScale == .8f && gOptions.TextureSubsurface.CaptureBiasWorld == .1f,
+            "saved UV transport settings publish every actual runtime field without silently applying a skin-specific scale");
         expect(!gOptions.SurfelGIInlineRayEnable && !GUseVsync
             && project.GetConfig().Settings.at("render.surfelgi.inline") == "true"
             && project.GetConfig().Settings.at("render.vsync") == "true", "unsupported requested features retained while effective states remain disabled");
@@ -81,6 +99,11 @@ int RunEditorProjectSettingsTests()
         expect(reopened.Open(project.GetProjectFile(), error) && Settings::Validate(reopened, error)
             && reopened.GetConfig().Settings == candidate.Settings && reopened.GetConfig().StartupScene == candidate.StartupScene,
             "saved renderer/input/startup settings survive a real project reopen");
+        jTextureSubsurface::Settings readTexture;
+        expect(Settings::ReadTextureSubsurface(reopened.GetConfig(), readTexture, error)
+            && readTexture.WorldUnitsPerMillimeter == .3f && readTexture.TileResolution == 512
+            && readTexture.CaptureResolution == 2048 && !readTexture.EnableTransmission && readTexture.CaptureBiasWorld == .1f,
+            "real project reopen preserves the texture-transport unit conversion and capture controls");
         gOptions.ShadowFilterMode = 0; gOptions.ShadowFilterRadiusTexels = 1.0f;
         GSupportInlineRaytracing = true; GRHISupportVsync = true;
         expect(Settings::Apply(reopened, editor, error) && gOptions.SurfelGIInlineRayEnable && GUseVsync,
@@ -127,6 +150,7 @@ int RunEditorProjectSettingsTests()
             const int shadowMode = gOptions.ShadowFilterMode;
             const float shadowRadius = gOptions.ShadowFilterRadiusTexels;
             const auto advancedBefore = gOptions.AdvancedShadows;
+            const jOptions allOptionsBefore = gOptions;
             const auto binding = Settings::Binding("camera.forward", EInputKey::W);
             expect(!Settings::Save(project, editor, bad, error) && !error.empty()
                 && project.GetConfig().Settings == validConfig.Settings && project.GetConfig().Name == validConfig.Name
@@ -134,6 +158,7 @@ int RunEditorProjectSettingsTests()
                 && gOptions.UseDeferredRenderer == deferred && gOptions.UseSurfelGI == surfel
                 && gOptions.ShadowFilterMode == shadowMode && gOptions.ShadowFilterRadiusTexels == shadowRadius
                 && gOptions.AdvancedShadows == advancedBefore
+                && gOptions == allOptionsBefore
                 && Settings::Binding("camera.forward", EInputKey::W) == binding, name);
         };
         for (const std::string invalid : {"NaN", "inf", "-1", "8.1", "2garbage", "", " 1", "1 "})
@@ -148,6 +173,26 @@ int RunEditorProjectSettingsTests()
         { auto bad = validConfig; bad.Settings["render.shadow.projection"] = invalid; reject(bad, "advanced shadow enums require complete bounded integers"); }
         for (const std::string invalid : {"NaN", "inf", "0", "1e-9", "1.01", "1x", " 0.2"})
         { auto bad = validConfig; bad.Settings["render.shadow.moments.minimumVariance"] = invalid; reject(bad, "invalid advanced moments preserve manifest runtime and camera state"); }
+        for (const auto pair : {std::pair{"render.msaa.samples","3"}, std::pair{"render.msaa.samples","2.0"},
+            std::pair{"render.sss.enabled","1"}, std::pair{"render.sss.strength","NaN"}, std::pair{"render.sss.radiusScale","101"},
+            std::pair{"render.sss.depthRejectWorld","0"}, std::pair{"render.sss.normalThreshold","1.1"}, std::pair{"render.sss.maxRadiusPixels","65"},
+            std::pair{"render.hiz.depthBias","-0.1"}, std::pair{"render.hiz.maxCandidates","16385"}, std::pair{"render.hiz.maxCandidates","1.5"}})
+        { auto bad=validConfig;bad.Settings[pair.first]=pair.second;reject(bad,"invalid quality MSAA and Hi-Z values retain disk, all requested options and camera bindings transactionally"); }
+        for (const auto pair : {std::pair{"render.textureSubsurface.tileResolution","96"}, std::pair{"render.textureSubsurface.captureResolution","4096"},
+            std::pair{"render.textureSubsurface.gaussianStepScale","11"}, std::pair{"render.textureSubsurface.worldUnitsPerMillimeter","0"},
+            std::pair{"render.textureSubsurface.worldUnitsPerMillimeter","NaN"}, std::pair{"render.textureSubsurface.enableTransmission","1"},
+            std::pair{"render.textureSubsurface.transmissionExtinctionPerMillimeter","0"}, std::pair{"render.textureSubsurface.transmissionThicknessScale","-1"},
+            std::pair{"render.textureSubsurface.captureBiasWorld","101"}})
+        { auto bad = validConfig; bad.Settings[pair.first] = pair.second; reject(bad, "invalid UV transport units resolution or physical controls retain manifest and every runtime request"); }
+        {
+            auto bad = validConfig; bad.Settings["render.textureSubsurface.worldUnitsPerMillimeter"] = "NaN";
+            auto retained = textureTransport;
+            expect(!Settings::ReadTextureSubsurface(bad, retained, error) && retained.WorldUnitsPerMillimeter == .3f && retained.TileResolution == 512,
+                "failed texture transport read preserves the caller's last validated snapshot");
+            auto invalid = textureTransport; invalid.TileResolution = 96; auto retainedConfig = validConfig;
+            expect(!Settings::WriteTextureSubsurface(retainedConfig, invalid, error) && retainedConfig.Settings == validConfig.Settings,
+                "failed texture transport write preserves all existing known and unknown project entries");
+        }
         for (const auto pair : {std::pair{"render.shadow.resolution", "96"}, std::pair{"render.shadow.cascade.count", "5"},
             std::pair{"render.shadow.volume.maxTriangles", "65537"}, std::pair{"render.shadow.deep.tauMax", "33"},
             std::pair{"render.shadow.cascade.stabilize", "1"}})
@@ -186,9 +231,28 @@ int RunEditorProjectSettingsTests()
             && gOptions.SurfelGIInlineRayCount == defaults.SurfelGIInlineRayCount && !GUseVsync
             && gOptions.ShadowFilterMode == defaults.ShadowFilterMode && gOptions.ShadowFilterRadiusTexels == defaults.ShadowFilterRadiusTexels
             && gOptions.AdvancedShadows == defaults.AdvancedShadows
+            && gOptions.RequestedMSAASamples==1&&!gOptions.Subsurface.Enabled&&!gOptions.HiZOcclusion.Enabled
+            && gOptions.TextureSubsurface.WorldUnitsPerMillimeter == 1.f
+            && gOptions.TextureSubsurface.TileResolution == defaults.TextureSubsurface.TileResolution
             && Settings::Binding("camera.forward", EInputKey::I) == EInputKey::W, "omitted known settings restore engine defaults rather than previous project values");
         expect(Settings::ConsumePresentModeChange(), "resetting VSync defaults also schedules frame-boundary refresh");
         RegisterAdvancedShadowConsoleVariables(); RegisterAdvancedShadowConsoleVariables();
+        RegisterRendererFeatureConsoleVariables(); RegisterRendererFeatureConsoleVariables();
+        auto* msaa=jConsole::Get().FindVariable("r.msaa.samples");auto* sssStrength=jConsole::Get().FindVariable("r.sss.strength");
+        auto* hizCandidates=jConsole::Get().FindVariable("r.hiz.max_candidates");
+        expect(msaa&&sssStrength&&hizCandidates,"real MSAA SSS and Hi-Z console adapters register idempotently");
+        if(msaa&&sssStrength&&hizCandidates)
+        {
+            msaa->SetFromString("2");sssStrength->SetFromString("0.75");hizCandidates->SetFromString("123");
+            expect(gOptions.RequestedMSAASamples==2&&gOptions.Subsurface.Strength==.75f&&gOptions.HiZOcclusion.MaxCandidates==123,
+                "actual quality console adapters publish validated request values");
+            const jOptions accepted=gOptions;
+            msaa->SetFromString("3");sssStrength->SetFromString("NaN");hizCandidates->SetFromString("16385");
+            expect(gOptions==accepted,"invalid feature console values retain all previous requested options");
+            std::thread foreignFeature([&]{msaa->SetFromString("4");});foreignFeature.join();
+            expect(gOptions==accepted,"foreign threads cannot publish renderer requests through the console");
+            gOptions.RequestedMSAASamples=defaults.RequestedMSAASamples;gOptions.Subsurface=defaults.Subsurface;gOptions.HiZOcclusion=defaults.HiZOcclusion;
+        }
         auto* representation = jConsole::Get().FindVariable("r.shadow.representation");
         auto* variance = jConsole::Get().FindVariable("r.shadow.moments.min_variance");
         expect(representation&&variance,"validated advanced shadow console variables register idempotently");

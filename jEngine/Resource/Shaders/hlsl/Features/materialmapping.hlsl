@@ -16,6 +16,14 @@ struct JEMaterialSurface
     float3 NormalTS;
     float Metallic;
     float Roughness;
+    float SubsurfaceWeight;
+    float3 SubsurfaceColor;
+    float SubsurfaceThickness;
+    uint SubsurfaceProfile;
+    float SpecularWeight;
+    float DiffuseOcclusion;
+    float PreScatterWeight;
+    uint ShadingFlags;
 };
 
 #endif

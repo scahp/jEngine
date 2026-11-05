@@ -6,6 +6,7 @@
 #include <optional>
 #include "Renderer/Features/jSceneFeatureSettings.h"
 #include "Renderer/Features/jAdvancedShadowSettings.h"
+#include "Renderer/Features/jTextureSubsurfaceSettings.h"
 
 class jEditor;
 class jEditorProject;
@@ -43,6 +44,10 @@ bool WriteSceneFeatures(jEditorProjectConfig& config, const jSceneFeatures::Sett
 // are transactional; unrelated project settings survive unchanged.
 bool ReadAdvancedShadows(const jEditorProjectConfig& config, jAdvancedShadows::Settings& output, std::string& error);
 bool WriteAdvancedShadows(jEditorProjectConfig& config, const jAdvancedShadows::Settings& input, std::string& error);
+// Optional project defaults, including explicit world-units/mm conversion.
+// Missing keys use engine defaults; validation/failure preserves the output.
+bool ReadTextureSubsurface(const jEditorProjectConfig& config, jTextureSubsurface::Settings& output, std::string& error);
+bool WriteTextureSubsurface(jEditorProjectConfig& config, const jTextureSubsurface::Settings& input, std::string& error);
 // Owner-thread ImGui controls only; callers own document/history/save/publish.
 // No kind means independent global defaults. A per-light edit rejects illegal
 // combinations; global controls explain any incompatible effective light type.

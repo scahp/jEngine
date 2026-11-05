@@ -232,6 +232,7 @@ public:
 	}
 
 	virtual EMSAASamples GetSelectedMSAASamples() const override { return SelectedMSAASamples; }
+    virtual EMSAASamples SelectMSAASamples(uint32 InRequestedSamples) override;
 	virtual jQueryPool* GetQueryTimePool(ECommandBufferType InType) const override { return QueryPoolTime[(int32)InType]; }
 	virtual jQueryPool* GetQueryOcclusionPool() const override { return QueryPoolOcclusion; }
 	virtual jSwapchain* GetSwapchain() const override { return Swapchain; }

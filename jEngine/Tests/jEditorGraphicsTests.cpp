@@ -43,6 +43,25 @@ int RunEditorGraphicsTests()
         expect(shader.GetCompiledShader() == nullptr && destroyed == 1,
             "failed shader initialization destroys its partial native stage before pipeline publication");
     }
+    {
+        std::unique_ptr<jPipelineStateInfo> prepared;
+        {
+            jPipelineStateFixedInfo setup;
+            setup.Viewports.emplace_back(0.f, 0.f, 320.f, 180.f);
+            setup.Scissors.emplace_back(0, 0, 320, 180);
+            jPipelineStateInfo temporary(&setup, jGraphicsPipelineShader{}, {}, nullptr, {});
+            prepared = std::make_unique<jPipelineStateInfo>(std::move(temporary));
+            setup.Viewports[0].Width = 17;
+            expect(prepared->PipelineStateFixed != &setup && prepared->FixedStateSnapshot &&
+                prepared->PipelineStateFixed->Viewports[0].Width == 320,
+                "cached graphics pipelines freeze their setup state before stack storage changes");
+        }
+        const jPipelineStateInfo copy(*prepared);
+        prepared.reset();
+        expect(copy.FixedStateSnapshot && copy.PipelineStateFixed->Viewports[0].Width == 320 &&
+            copy.PipelineStateFixed->Scissors[0].Extent.y == 180,
+            "prepared fixed raster state outlives both setup and the original command holder");
+    }
     expect(sizeof(RenderObjectUniformBuffer) == 192 && offsetof(RenderObjectUniformBuffer, BaseColorOpacity) == 144 &&
         offsetof(RenderObjectUniformBuffer, EmissiveOverride) == 160 && offsetof(RenderObjectUniformBuffer, SurfaceFlags) == 176 &&
         offsetof(RenderObjectUniformBuffer, IndexElementSize) == 184 && offsetof(RenderObjectUniformBuffer, SurfacePadding) == 188,
@@ -51,11 +70,16 @@ int RunEditorGraphicsTests()
         && offsetof(ViewUniformBuffer, SHCoefficients) == 368
         && offsetof(ViewUniformBuffer, MaterialViewDirection) == 544,
         "shared view preserves existing offsets and adds aligned environment/material context");
-    expect(sizeof(jMaterialGraphUniformBuffer) == 1184
+    expect(uint32(EMSAASamples::COUNT_2) == 2 && uint32(EMSAASamples::COUNT_4) == 4,
+        "MSAA counts match native sample-count flags and graphics argument values");
+    expect(sizeof(jMaterialGraphUniformBuffer) == 1232
         && offsetof(jMaterialGraphUniformBuffer, OutputOverridesMask) == 1024
         && offsetof(jMaterialGraphUniformBuffer, WaterWavesA) == 1040
-        && offsetof(jMaterialGraphUniformBuffer, WaterControl) == 1168,
-        "mapping constants and water waves share an aligned material block");
+        && offsetof(jMaterialGraphUniformBuffer, WaterControl) == 1168
+        && offsetof(jMaterialGraphUniformBuffer, MaterialSubsurfaceColorWeight) == 1184
+        && offsetof(jMaterialGraphUniformBuffer, MaterialSubsurfaceParameters) == 1200
+        && offsetof(jMaterialGraphUniformBuffer, MaterialSkinParameters) == 1216,
+        "mapping, water, diffusion and skin preserve aligned material offsets");
     jShadowFiltering::Settings filtering;
     expect(jShadowFiltering::TryMakeSettings(1, 4.0f, filtering) &&
         filtering.Method == jShadowFiltering::Mode::Poisson16 && filtering.RadiusTexels == 4.0f,

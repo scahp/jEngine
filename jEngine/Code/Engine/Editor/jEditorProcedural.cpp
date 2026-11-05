@@ -342,7 +342,7 @@ struct Adapter
             }
             material->bRaytracingAlphaTest = true;
             if (render->MaterialPtr && !render->MaterialPtr->IsRaytracingAlphaTestEnabled() &&
-                g_rhi->RaytracingScene && render->IsSupportRaytracing())
+                g_rhi && g_rhi->RaytracingScene && render->IsSupportRaytracing())
                 g_rhi->RaytracingScene->MarkBLASDirty(render);
             render->MaterialPtr = std::move(material);
         }

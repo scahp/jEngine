@@ -5,6 +5,15 @@
 void FillMaterialWaterShaderParameters(const jMaterialWaterState* water,
     jMaterialGraphUniformBuffer& parameters)
 {
+    // This helper may receive a reused or poisoned block. Missing, disabled or
+    // invalid Water must always publish a neutral state, without touching graph
+    // values, override masks or the appended subsurface parameters.
+    parameters.WaterControl = Vector4(0.f);
+    for (size_t i = 0; i < 4; ++i)
+    {
+        parameters.WaterWavesA[i] = Vector4(0.f);
+        parameters.WaterWavesB[i] = Vector4(0.f);
+    }
     if (!water || !water->Enabled || !std::isfinite(water->TimeSeconds)
         || water->Settings.Waves.size() > 4) return;
     std::string error;

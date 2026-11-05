@@ -22,6 +22,7 @@
 #include "jOptions.h"
 #include "Scene/jCamera.h"
 #include "Scene/jObject.h"
+#include "Scene/jRenderObject.h"
 #include "RHI/jRHI.h"
 #include <fstream>
 #include <future>
@@ -516,6 +517,120 @@ void MaterialInspector(jEditor& editor, Entity& entity)
         flags ? &flags->NormalTexture : nullptr);
     if (flags) ResetMaterialParameter(document, entity, "Normal texture", flags->NormalTexture,
         material.NormalTexture, defaults.NormalTexture);
+    if (ImGui::TreeNode("Subsurface material"))
+    {
+        auto shown = material;
+        if (flags)
+        {
+            if (!flags->SubsurfaceWeight) shown.SubsurfaceWeight = defaults.SubsurfaceWeight;
+            if (!flags->SubsurfaceColor) shown.SubsurfaceColor = defaults.SubsurfaceColor;
+            if (!flags->SubsurfaceThickness) shown.SubsurfaceThicknessWorld = defaults.SubsurfaceThicknessWorld;
+            if (!flags->SubsurfaceProfile) shown.SubsurfaceProfile = defaults.SubsurfaceProfile;
+        }
+        else if (!material.SubsurfaceOverrideEnabled)
+        {
+            const auto* object = editor.ObjectForEntity(entity.Id);
+            if (object && !object->RenderObjects.empty() && object->RenderObjects[0]->MaterialPtr && object->RenderObjects[0]->MaterialPtr->Surface)
+            {
+                const auto& surface = *object->RenderObjects[0]->MaterialPtr->Surface;
+                shown.SubsurfaceWeight = surface.Subsurface;
+                shown.SubsurfaceColor = {surface.SubsurfaceColor[0], surface.SubsurfaceColor[1], surface.SubsurfaceColor[2]};
+                shown.SubsurfaceThicknessWorld = surface.SubsurfaceThicknessWorld; shown.SubsurfaceProfile = surface.SubsurfaceProfile;
+            }
+        }
+        const auto finishSSS = [&](bool changed, bool* overridden, const char* label)
+        {
+            if (changed)
+            {
+                material.SubsurfaceOverrideEnabled = true;
+                material.SubsurfaceWeight = shown.SubsurfaceWeight; material.SubsurfaceColor = shown.SubsurfaceColor;
+                material.SubsurfaceThicknessWorld = shown.SubsurfaceThicknessWorld; material.SubsurfaceProfile = shown.SubsurfaceProfile;
+                if (overridden) *overridden = true;
+            }
+            FinishMaterialProperty(document, entity, changed, label);
+        };
+        finishSSS(ImGui::SliderFloat("Subsurface weight", &shown.SubsurfaceWeight, 0, 1), flags ? &flags->SubsurfaceWeight : nullptr, "Subsurface weight");
+        if (flags) ResetMaterialParameter(document, entity, "SSS weight", flags->SubsurfaceWeight, material.SubsurfaceWeight, defaults.SubsurfaceWeight);
+        finishSSS(ImGui::ColorEdit3("Subsurface color", &shown.SubsurfaceColor.X), flags ? &flags->SubsurfaceColor : nullptr, "Subsurface color");
+        if (flags) ResetMaterialParameter(document, entity, "SSS color", flags->SubsurfaceColor, material.SubsurfaceColor, defaults.SubsurfaceColor);
+        finishSSS(ImGui::DragFloat("Thickness (world)", &shown.SubsurfaceThicknessWorld, .01f, 0, 10000, "%.3g", ImGuiSliderFlags_AlwaysClamp),
+            flags ? &flags->SubsurfaceThickness : nullptr, "Subsurface thickness");
+        if (flags) ResetMaterialParameter(document, entity, "SSS thickness", flags->SubsurfaceThickness, material.SubsurfaceThicknessWorld, defaults.SubsurfaceThicknessWorld);
+        static const auto profiles = [] { std::array<const char*, 8> names{}; for (size_t i = 0; i < names.size(); ++i) names[i] = jSubsurface::Profiles[i].Name; return names; }();
+        int profile = int(shown.SubsurfaceProfile);
+        const bool profileChanged = ImGui::Combo("Diffusion profile", &profile, profiles.data(), int(profiles.size()));
+        if (profileChanged) shown.SubsurfaceProfile = uint32_t(profile);
+        finishSSS(profileChanged, flags ? &flags->SubsurfaceProfile : nullptr, "Subsurface profile");
+        if (flags) ResetMaterialParameter(document, entity, "SSS profile", flags->SubsurfaceProfile, material.SubsurfaceProfile, defaults.SubsurfaceProfile);
+        if (material.SubsurfaceOverrideEnabled && ImGui::Button("Inherit subsurface"))
+        {
+            material.SubsurfaceOverrideEnabled = false;
+            if (flags) flags->SubsurfaceWeight = flags->SubsurfaceColor = flags->SubsurfaceThickness = flags->SubsurfaceProfile = false;
+            document.Update(entity, "Inherit subsurface material");
+        }
+        ImGui::TextWrapped("Deferred surface diffusion requires Project Settings > Enable Deferred SSS. Thickness uses scene world units; 0 disables diffusion. Presets approximate surface scattering, not hidden-surface transmission. PT keeps its existing subsurface approximation.");
+        const auto& reason = GetRendererFeatureDiagnostics().SubsurfaceSupportReason;
+        if (!reason.empty()) ImGui::TextWrapped("%s", reason.c_str());
+        ImGui::TreePop();
+    }
+    if (ImGui::TreeNode("Skin shading"))
+    {
+        auto shown = material;
+        if (flags)
+        {
+            if (!flags->ShadingModel) shown.ShadingModel = defaults.ShadingModel;
+            if (!flags->SubsurfaceSpace) shown.SubsurfaceSpace = defaults.SubsurfaceSpace;
+            if (!flags->SpecularWeight) shown.SpecularWeight = defaults.SpecularWeight;
+            if (!flags->DiffuseOcclusion) shown.DiffuseOcclusion = defaults.DiffuseOcclusion;
+            if (!flags->PreScatterWeight) shown.PreScatterWeight = defaults.PreScatterWeight;
+        }
+        else if (!material.SkinOverrideEnabled)
+        {
+            const auto* object = editor.ObjectForEntity(entity.Id);
+            if (object && !object->RenderObjects.empty() && object->RenderObjects[0]->MaterialPtr && object->RenderObjects[0]->MaterialPtr->Surface)
+            {
+                const auto& surface = *object->RenderObjects[0]->MaterialPtr->Surface;
+                shown.ShadingModel = surface.ShadingModel; shown.SubsurfaceSpace = surface.SubsurfaceSpace;
+                shown.SpecularWeight = surface.SpecularWeight; shown.DiffuseOcclusion = surface.DiffuseOcclusion;
+                shown.PreScatterWeight = surface.PreScatterWeight;
+            }
+        }
+        const auto finishSkin = [&](bool changed, bool* overridden, const char* label)
+        {
+            if (changed)
+            {
+                material.SkinOverrideEnabled = true;
+                material.ShadingModel = shown.ShadingModel; material.SubsurfaceSpace = shown.SubsurfaceSpace;
+                material.SpecularWeight = shown.SpecularWeight; material.DiffuseOcclusion = shown.DiffuseOcclusion;
+                material.PreScatterWeight = shown.PreScatterWeight;
+                if (overridden) *overridden = true;
+            }
+            FinishMaterialProperty(document, entity, changed, label);
+        };
+        int model = int(shown.ShadingModel), space = int(shown.SubsurfaceSpace);
+        const bool modelChanged = ImGui::Combo("Shading model", &model, "Standard PBR\0Skin Kelemen\0");
+        if (modelChanged) shown.ShadingModel = jMaterialMapping::ShadingModel(model);
+        finishSkin(modelChanged, flags ? &flags->ShadingModel : nullptr, "Shading model");
+        if (flags) ResetMaterialParameter(document, entity, "Shading model", flags->ShadingModel, material.ShadingModel, defaults.ShadingModel);
+        const bool spaceChanged = ImGui::Combo("Subsurface space", &space, "Screen\0Texture (UV)\0");
+        if (spaceChanged) shown.SubsurfaceSpace = jMaterialMapping::SubsurfaceSpace(space);
+        finishSkin(spaceChanged, flags ? &flags->SubsurfaceSpace : nullptr, "Subsurface space");
+        if (flags) ResetMaterialParameter(document, entity, "Subsurface space", flags->SubsurfaceSpace, material.SubsurfaceSpace, defaults.SubsurfaceSpace);
+        finishSkin(ImGui::SliderFloat("Specular weight", &shown.SpecularWeight, 0, 8), flags ? &flags->SpecularWeight : nullptr, "Specular weight");
+        if (flags) ResetMaterialParameter(document, entity, "Specular weight", flags->SpecularWeight, material.SpecularWeight, defaults.SpecularWeight);
+        finishSkin(ImGui::SliderFloat("Diffuse occlusion", &shown.DiffuseOcclusion, 0, 1), flags ? &flags->DiffuseOcclusion : nullptr, "Diffuse occlusion");
+        if (flags) ResetMaterialParameter(document, entity, "Diffuse occlusion", flags->DiffuseOcclusion, material.DiffuseOcclusion, defaults.DiffuseOcclusion);
+        finishSkin(ImGui::SliderFloat("Pre-scatter weight", &shown.PreScatterWeight, 0, 1), flags ? &flags->PreScatterWeight : nullptr, "Pre-scatter weight");
+        if (flags) ResetMaterialParameter(document, entity, "Pre-scatter weight", flags->PreScatterWeight, material.PreScatterWeight, defaults.PreScatterWeight);
+        if (material.SkinOverrideEnabled && ImGui::Button("Inherit skin shading"))
+        {
+            material.SkinOverrideEnabled = false;
+            if (flags) flags->ShadingModel = flags->SubsurfaceSpace = flags->SpecularWeight = flags->DiffuseOcclusion = flags->PreScatterWeight = false;
+            document.Update(entity, "Inherit skin shading");
+        }
+        ImGui::TextWrapped("Skin Kelemen interprets Roughness as Beckmann m. Texture diffusion uses UVs and requires its renderer support; these material controls alone do not reproduce the original full Skin pipeline.");
+        ImGui::TreePop();
+    }
     if (ImGui::Button("Material graph")) State().ShowTools = true;
 }
 void Inspector(jEditor& editor)

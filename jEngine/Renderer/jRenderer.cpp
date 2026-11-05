@@ -34,7 +34,9 @@
 #include "jPrimitiveUtil.h"
 #include "jRenderer.h"
 #include "jSceneRenderTargets.h"
+#include "jSkinShading.h"
 #include "jAdvancedShadowPass.h"
+#include "jHiZOcclusionPass.h"
 #include "jSpotLightDrawCommandGenerator.h"
 #include "Shader/jShaderParameterSet.h"
 
@@ -221,7 +223,7 @@ void IRenderer::DebugPasses()
 		jRenderPassInfo renderPassInfo;
 		const int32 LightPassAttachmentIndex = (int32)renderPassInfo.Attachments.size();
 
-		//if (UseForwardRenderer || gOptions.UseSubpass)
+		//if (UseForwardRenderer || RenderFrameContextPtr->UseSubpass)
 		{
 			jAttachment color = {
 				.RenderTargetPtr = RenderFrameContextPtr->SceneRenderTargetPtr->FinalColorPtr,
@@ -334,6 +336,8 @@ void jRenderer::Setup()
     SCOPE_CPU_PROFILE(Setup);
 
     FrameIndex = g_rhi->GetCurrentFrameIndex();
+    if (RenderFrameContextPtr->HasSkinMaterials)
+        RenderFrameContextPtr->SkinEnergyLUT = jSkinShading::AcquireEnergyLUT(RenderFrameContextPtr);
 #ifdef ENABLE_EDITOR_FEATURES
     jEditorProcedural::PrepareRenderResources(RenderFrameContextPtr);
 #endif
@@ -618,9 +622,25 @@ void jRenderer::SetupBasePass()
         }
     }
 
+    if (RenderFrameContextPtr->UseSubsurface)
+    {
+        for (const auto& target : {RenderFrameContextPtr->SceneRenderTargetPtr->SubsurfaceMask,
+            RenderFrameContextPtr->SceneRenderTargetPtr->DiffuseLighting})
+            renderPassInfo.Attachments.push_back({.RenderTargetPtr = target,
+                .LoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE,
+                .StencilLoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_DONTCARE,
+                .RTClearValue = jRTClearValue(0.f, 0.f, 0.f, 0.f),
+                .InitialLayout = EResourceLayout::UNDEFINED, .FinalLayout = EResourceLayout::COLOR_ATTACHMENT});
+    }
+    if (RenderFrameContextPtr->SceneRenderTargetPtr->SkinUV)
+        renderPassInfo.Attachments.push_back({.RenderTargetPtr = RenderFrameContextPtr->SceneRenderTargetPtr->SkinUV,
+            .LoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE,
+            .StencilLoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_DONTCARE,
+            .RTClearValue = jRTClearValue(0.f, 0.f, 0.f, 0.f),
+            .InitialLayout = EResourceLayout::UNDEFINED, .FinalLayout = EResourceLayout::COLOR_ATTACHMENT});
     const int32 LightPassAttachmentIndex = (int32)renderPassInfo.Attachments.size();
 
-    if (RenderFrameContextPtr->UseForwardRenderer || gOptions.UseSubpass)
+    if (RenderFrameContextPtr->UseForwardRenderer || RenderFrameContextPtr->UseSubpass)
     {
         // BasePass explicitly transitions the forward color target before begin;
         // setup can still see the previous frame's sampled layout here.
@@ -676,7 +696,7 @@ void jRenderer::SetupBasePass()
         }
         renderPassInfo.Subpasses.push_back(subpass);
     }
-    if (!RenderFrameContextPtr->UseForwardRenderer && gOptions.UseSubpass)
+    if (!RenderFrameContextPtr->UseForwardRenderer && RenderFrameContextPtr->UseSubpass)
     {
         // Second subpass, Lighting pass
         jSubpass subpass;
@@ -701,7 +721,8 @@ void jRenderer::SetupBasePass()
     //////////////////////////////////////////////////////////////////////////
     BaseRenderPass = (jRenderPass_Vulkan*)g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
 
-    auto GetOrCreateShaderFunc = [UseForwardRenderer = RenderFrameContextPtr->UseForwardRenderer](const jRenderObject* InRenderObject, const jMaterial* InOverrideMaterial = nullptr)
+    auto GetOrCreateShaderFunc = [UseForwardRenderer = RenderFrameContextPtr->UseForwardRenderer, UseSubsurface = RenderFrameContextPtr->UseSubsurface, HasSkin = RenderFrameContextPtr->HasSkinMaterials,
+        HasSkinUV = bool(RenderFrameContextPtr->SceneRenderTargetPtr->SkinUV)](const jRenderObject* InRenderObject, const jMaterial* InOverrideMaterial = nullptr)
         {
             jGraphicsPipelineShader Shaders;
             jShaderInfo shaderInfo;
@@ -759,6 +780,9 @@ void jRenderer::SetupBasePass()
                 ShaderPermutationPS.SetIndex<jShaderGBufferPixelShader::USE_SRGB_ALBEDO_TEXTURE>(IsUseSRGBAlbedoTexture);
                 ShaderPermutationPS.SetIndex<jShaderGBufferPixelShader::USE_VARIABLE_SHADING_RATE>(USE_VARIABLE_SHADING_RATE_TIER2);
                 ShaderPermutationPS.SetIndex<jShaderGBufferPixelShader::USE_PBR>(ENABLE_PBR);
+                ShaderPermutationPS.SetIndex<jShaderGBufferPixelShader::USE_SUBSURFACE>(UseSubsurface);
+                ShaderPermutationPS.SetIndex<jShaderGBufferPixelShader::USE_SKIN_MATERIAL>(HasSkin);
+                ShaderPermutationPS.SetIndex<jShaderGBufferPixelShader::USE_SKIN_UV>(HasSkinUV);
                 Shaders.PixelShader = ResolveMaterialMappingShader(
                     jShaderGBufferPixelShader::CreateShader(ShaderPermutationPS), Material);
             }
@@ -1113,6 +1137,20 @@ void jRenderer::BasePass()
 
     const bool UseHWRTDirectLighting = IsUseHWRTDirectLighting();
 
+    HiZOcclusionFrame = std::make_shared<jHiZOcclusion::Frame>();
+    std::string hiZError;
+    if (HiZOcclusionFrame->BuildAndRecord(RenderFrameContextPtr, View, BasePasses, gOptions.HiZOcclusion, hiZError))
+        for (auto& command : BasePasses)
+            if (const auto arguments = HiZOcclusionFrame->ArgumentsFor(command.RenderObject))
+            {
+                command.IndirectArgumentsOverride = arguments.Buffer;
+                command.IndirectArgumentIndex = arguments.ArgumentIndex;
+            }
+    auto& diagnostics = MutableRendererFeatureDiagnostics();
+    diagnostics.HiZSupportReason = HiZOcclusionFrame->Stats().Diagnostic;
+    diagnostics.HiZCandidateCount = HiZOcclusionFrame->Stats().CandidateCount;
+    diagnostics.HiZIndirectDrawCount = HiZOcclusionFrame->Stats().Active ? diagnostics.HiZCandidateCount : 0;
+
     {
         SCOPE_CPU_PROFILE(BasePass);
         SCOPE_GPU_PROFILE(RenderFrameContextPtr, BasePass);
@@ -1128,7 +1166,16 @@ void jRenderer::BasePass()
             {
                 g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[i]->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
             }
+            if (RenderFrameContextPtr->UseSubsurface)
+            {
+                g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->SubsurfaceMask->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
+                g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DiffuseLighting->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
+            }
         }
+
+        if (RenderFrameContextPtr->SceneRenderTargetPtr->SkinUV)
+            g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(),
+                RenderFrameContextPtr->SceneRenderTargetPtr->SkinUV->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
 
         {
             auto NewLayout = RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture()->IsDepthOnlyFormat() ? EResourceLayout::DEPTH_ATTACHMENT : EResourceLayout::DEPTH_STENCIL_ATTACHMENT;
@@ -1136,7 +1183,7 @@ void jRenderer::BasePass()
         }
 
         PreparedDeferredLights subpassLights;
-        if (!RenderFrameContextPtr->UseForwardRenderer && gOptions.UseSubpass && !UseHWRTDirectLighting)
+        if (!RenderFrameContextPtr->UseForwardRenderer && RenderFrameContextPtr->UseSubpass && !UseHWRTDirectLighting)
             subpassLights = PrepareDeferredLights(RenderFrameContextPtr, View, BaseRenderPass, 1);
         FlushPreparedPassTransitions(RenderFrameContextPtr);
         //BasepassOcclusionTest.BeginQuery(RenderFrameContextPtr->GetActiveCommandBuffer());
@@ -1149,7 +1196,7 @@ void jRenderer::BasePass()
             }
 
             // Draw Light : subpass 1
-            if (!RenderFrameContextPtr->UseForwardRenderer && gOptions.UseSubpass && !UseHWRTDirectLighting)
+            if (!RenderFrameContextPtr->UseForwardRenderer && RenderFrameContextPtr->UseSubpass && !UseHWRTDirectLighting)
             {
                 g_rhi->NextSubpass(RenderFrameContextPtr->GetActiveCommandBuffer());
                 for (const auto& command : subpassLights.Commands) command.Draw();
@@ -1158,7 +1205,7 @@ void jRenderer::BasePass()
             BaseRenderPass->EndRenderPass();
         }
 
-        if (!RenderFrameContextPtr->UseForwardRenderer && !gOptions.UseSubpass)
+        if (!RenderFrameContextPtr->UseForwardRenderer && !RenderFrameContextPtr->UseSubpass)
         {
             if (UseHWRTDirectLighting)
             {
@@ -1186,7 +1233,7 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
     SCOPE_GPU_PROFILE(RenderFrameContextPtr, LightingPass);
     DEBUG_EVENT(RenderFrameContextPtr, "LightingPass");
 
-    if (!gOptions.UseSubpass)
+    if (!RenderFrameContextPtr->UseSubpass)
     {
         g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
         g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::DEPTH_STENCIL_READ_ONLY);
@@ -1200,9 +1247,9 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
     PreparedDeferredLights prepared;
 
     {
-        const int32 SubpassIndex = (!RenderFrameContextPtr->UseForwardRenderer && gOptions.UseSubpass) ? 1 : 0;
+        const int32 SubpassIndex = (!RenderFrameContextPtr->UseForwardRenderer && RenderFrameContextPtr->UseSubpass) ? 1 : 0;
 
-        if (!gOptions.UseSubpass)
+        if (!RenderFrameContextPtr->UseSubpass)
         {
             const jRTClearValue ClearColor = jRTClearValue(0.0f, 0.0f, 0.0f, 1.0f);
             const jRTClearValue ClearDepth = jRTClearValue(1.0f, 0);
@@ -1227,6 +1274,16 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
                 .FinalLayout = EResourceLayout::COLOR_ATTACHMENT
             };
             renderPassInfo.Attachments.push_back(color);
+
+            if (RenderFrameContextPtr->UseSubsurface)
+            {
+                auto diffuse = color;
+                diffuse.RenderTargetPtr = RenderFrameContextPtr->SceneRenderTargetPtr->DiffuseLighting;
+                diffuse.LoadStoreOp = EAttachmentLoadStoreOp::LOAD_STORE;
+                g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DiffuseLighting->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
+                diffuse.InitialLayout = EResourceLayout::COLOR_ATTACHMENT;
+                renderPassInfo.Attachments.push_back(diffuse);
+            }
 
             const int32 DepthAttachmentIndex = (int32)renderPassInfo.Attachments.size();
             renderPassInfo.Attachments.push_back(depth);
@@ -1253,14 +1310,14 @@ void jRenderer::DeferredLightPass_TodoRefactoring(jRenderPass* InRenderPass)
         }
 
         prepared = PrepareDeferredLights(RenderFrameContextPtr, View, InRenderPass, SubpassIndex);
-        if (!gOptions.UseSubpass)
+        if (!RenderFrameContextPtr->UseSubpass)
         {
             FlushPreparedPassTransitions(RenderFrameContextPtr);
             InRenderPass->BeginRenderPass(RenderFrameContextPtr->GetActiveCommandBuffer());
         }
         for (const auto& command : prepared.Commands) command.Draw();
 
-        if (!gOptions.UseSubpass)
+        if (!RenderFrameContextPtr->UseSubpass)
         {
             check(InRenderPass);
             InRenderPass->EndRenderPass();
@@ -1328,6 +1385,16 @@ void jRenderer::Render()
         }
 
         BasePass();
+        if (!ResolveMultisampleScene())
+        {
+            MutableRendererFeatureDiagnostics().MSAASupportReason = "Deferred HDR resolve failed; rendering stopped for this frame.";
+            return;
+        }
+        if (!DecodeSkinPostNormals())
+        {
+            MutableRendererFeatureDiagnostics().SubsurfaceSupportReason = "Skin geometric-normal target allocation failed; rendering stopped for this frame.";
+            return;
+        }
 
         if (!RenderFrameContextPtr->UseForwardRenderer && !UseHWRTDirectLighting)
         {
@@ -1509,6 +1576,10 @@ void jRenderer::Render()
         SceneFeaturesPass(sceneFeatures);
     }
 
+    SubsurfacePass();
+    if (RenderFrameContextPtr->HasSkinMaterials && !RenderFrameContextPtr->SkinEnergyLUT)
+        MutableRendererFeatureDiagnostics().SubsurfaceSupportReason +=
+            " Skin energy LUT unavailable: using uncompensated diffuse fallback. " + jSkinShading::GetLastStats().Diagnostic;
     PostProcess();
 
     DebugPasses();

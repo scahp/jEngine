@@ -1,0 +1,8 @@
+# These source assets and the portable MTL adapter have byte-level receipts.
+Assets/InfiniteHead/Infinite-Level_02.OBJ -text
+Assets/InfiniteHead/Infinite-Level_02.mtl -text
+Assets/InfiniteHead/*.jpg -text
+Assets/InfiniteHead/*.png -text
+# Launch/download helpers must also run from a Windows-created checkout.
+*.command text eol=lf
+*.py text eol=lf

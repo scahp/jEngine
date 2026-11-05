@@ -65,6 +65,20 @@ BEGIN_SHADER_PARAMETER_SET(jSceneReflectionClearParameters)
     SHADER_RW_TEXTURE2D_UINT(Projection)
 END_SHADER_PARAMETER_SET()
 
+BEGIN_SHADER_PARAMETER_SET(jSceneEnvironmentSubsurfaceParameters)
+    SHADER_UNIFORM_BUFFER(jSceneFeatureViewData, FeatureView)
+    SHADER_UNIFORM_BUFFER(jSceneEnvironmentData, Environment)
+    SHADER_TEXTURE2D_SRV(SceneColor)
+    SHADER_TEXTURE2D_SRV(SceneDepth)
+    SHADER_TEXTURE2D_SRV(SceneNormal)
+    SHADER_TEXTURE2D_SRV(SceneAlbedo)
+    SHADER_TEXTURE2D_SRV(SceneMaterial)
+    SHADER_TEXTURE2D_SRV(SceneAmbientOcclusion)
+    SHADER_RW_TEXTURE2D(Result)
+    SHADER_TEXTURE2D_SRV(SubsurfaceDiffuse)
+    SHADER_RW_TEXTURE2D(SubsurfaceDiffuseResult)
+END_SHADER_PARAMETER_SET()
+
 BEGIN_SHADER_PARAMETER_SET(jSceneReflectionProjectionParameters)
     SHADER_UNIFORM_BUFFER(jSceneFeatureViewData, FeatureView)
     SHADER_UNIFORM_BUFFER(jSceneReflectionData, Reflection)
@@ -316,7 +330,34 @@ void jRenderer::SceneFeaturesPass(const jSceneFeatures::Settings& input)
             p.SceneNormal = {scene.GBuffer[0]->GetTexture()}; p.SceneAlbedo = {scene.GBuffer[1]->GetTexture()};
             p.SceneMaterial = {scene.GBuffer[2]->GetTexture()}; p.SceneAmbientOcclusion = {scene.GBuffer[4]->GetTexture()};
             p.Result = {result->GetTexture()};
-            environmentRecorded = DispatchFeature(frame, "SceneEnvironmentCS",
+            if (frame->UseSubsurface && scene.DiffuseLighting)
+            {
+                auto info = scene.DiffuseLighting->Info;
+                info.TextureCreateFlag |= ETextureCreateFlag::UAV;
+                info.ResourceName = jNameStatic("SubsurfaceDiffuseWithEnvironment");
+                auto diffuse = jRenderTargetPool::GetRenderTarget(info);
+                if (diffuse)
+                {
+                    jSceneEnvironmentSubsurfaceParameters s;
+                    s.FeatureView = p.FeatureView; s.Environment = p.Environment;
+                    s.SceneColor = p.SceneColor; s.SceneDepth = p.SceneDepth; s.SceneNormal = p.SceneNormal;
+                    s.SceneAlbedo = p.SceneAlbedo; s.SceneMaterial = p.SceneMaterial;
+                    s.SceneAmbientOcclusion = p.SceneAmbientOcclusion; s.Result = p.Result;
+                    s.SubsurfaceDiffuse = {scene.DiffuseLighting->GetTexture()};
+                    s.SubsurfaceDiffuseResult = {diffuse->GetTexture()};
+                    g_rhi->TransitionLayout(command, scene.DiffuseLighting->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+                    g_rhi->TransitionLayout(command, diffuse->GetTexture(), EResourceLayout::UAV);
+                    environmentRecorded = DispatchFeature(frame, "SceneEnvironmentSubsurfaceCS",
+                        SceneFeaturePass::Environment, s, width, height, "#define JE_ENVIRONMENT_SUBSURFACE 1\n");
+                    if (environmentRecorded)
+                    {
+                        scene.MultisampleTargets.push_back(scene.DiffuseLighting);
+                        scene.DiffuseLighting = diffuse;
+                    }
+                    else diffuse->Return();
+                }
+            }
+            else environmentRecorded = DispatchFeature(frame, "SceneEnvironmentCS",
                 SceneFeaturePass::Environment, p, width, height);
             if (environmentRecorded) std::swap(source, result);
         }

@@ -262,7 +262,7 @@ const std::shared_ptr<jShaderBindingInstance>& jRenderObject::CreateShaderBindin
             ubo.EmissiveOverride = Vector4(MaterialPtr->Emissive, 1.0f);
             ubo.Metallic = MaterialPtr->MetallicFactor;
             ubo.Roughness = MaterialPtr->RoughnessFactor;
-            if (const auto& surface = MaterialPtr->Surface)
+            if (const auto& surface = MaterialPtr->Surface; surface && !MaterialPtr->SubsurfaceOnlySurface)
             {
                 using Slot = jMaterial::EMaterialTextureType;
                 ubo.SurfaceFlags = 1u | (MaterialPtr->TexData[int(Slot::Metallic)].Texture ? 2u : 0u)

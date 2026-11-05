@@ -3,6 +3,8 @@
 #include "jMaterialWater.h"
 #include "RHI/jRHI.h"
 #include "Shader/jCommonShaderParameters.h"
+#include <cstring>
+#include <type_traits>
 
 namespace
 {
@@ -126,9 +128,28 @@ const std::shared_ptr<jShaderBindingInstance>& jMaterial::CreateShaderBindingIns
             mappingParameters[i]->Texture = MappingTextures[i] ? MappingTextures[i].get() : GWhiteTexture.get();
             mappingParameters[i]->SamplerState = GetTextureSamplerState(EMaterialTextureType::Albedo);
         }
-        jMaterialGraphUniformBuffer graphParameters{};
-        for (size_t i = 0; i < MappingValues.size(); ++i) graphParameters.Values[i] = MappingValues[i];
+        jMaterialGraphUniformBuffer graphParameters;
+        // Vector4's user-provided default constructor intentionally leaves its
+        // components untouched, so aggregate braces do not zero this payload.
+        static_assert(std::is_trivially_copyable_v<jMaterialGraphUniformBuffer>);
+        std::memset(&graphParameters, 0, sizeof(graphParameters));
+        const size_t valueCount = MappingProgram && MappingProgram->Active
+            ? std::min<size_t>(MappingProgram->ValueCount, MappingValues.size()) : 0;
+        for (size_t i = 0; i < valueCount; ++i) graphParameters.Values[i] = MappingValues[i];
         graphParameters.OutputOverridesMask = MappingOutputOverridesMask;
+        const auto surface = Surface.value_or(jSurfaceShading{});
+        const auto bounded = [](float value, float low, float high, float fallback)
+        { return std::isfinite(value) ? std::clamp(value, low, high) : fallback; };
+        graphParameters.MaterialSubsurfaceColorWeight = Vector4(
+            bounded(surface.SubsurfaceColor[0], 0, 1, 1), bounded(surface.SubsurfaceColor[1], 0, 1, 1),
+            bounded(surface.SubsurfaceColor[2], 0, 1, 1), bounded(surface.Subsurface, 0, 1, 0));
+        graphParameters.MaterialSubsurfaceParameters = Vector4(bounded(surface.SubsurfaceThicknessWorld, 0, 10000, 1),
+            float(surface.SubsurfaceProfile < 8 ? surface.SubsurfaceProfile : 0), 0, 0);
+        const uint32 shadingModel = uint32(surface.ShadingModel) <= 1 ? uint32(surface.ShadingModel) : 0;
+        const uint32 subsurfaceSpace = uint32(surface.SubsurfaceSpace) <= 1 ? uint32(surface.SubsurfaceSpace) : 0;
+        graphParameters.MaterialSkinParameters = Vector4(float(shadingModel | (subsurfaceSpace << 8)),
+            bounded(surface.SpecularWeight, 0, 8, 1), bounded(surface.DiffuseOcclusion, 0, 1, 1),
+            bounded(surface.PreScatterWeight, 0, 1, 1));
         FillMaterialWaterShaderParameters(Water.get(), graphParameters);
         MappingUniformBuffer = std::shared_ptr<IUniformBufferBlock>(g_rhi->CreateUniformBufferBlock(
             jNameStatic("MaterialGraphParameters"), frameMaterial ? jLifeTimeType::OneFrame : jLifeTimeType::MultiFrame, sizeof(graphParameters)));
