@@ -29,7 +29,7 @@ The table uses the labels shown on the canvas. A question mark marks an optional
 | UV | None | Mesh float2 UV with scale and offset. |
 | Texture Object | None | Project-relative **Texture path** and **Texture data** encoding. Connect this to texture inputs. |
 | Texture Sample | Texture, UV | RGBA sampled at the supplied coordinates. |
-| Sample Normal | Texture, UV | Normal map decoded to a signed, normalized tangent-space float3. |
+| Sample Normal | Texture, UV | Linear normal data decoded from an explicitly selected Tangent, Object or World space, then converted to signed tangent-space float3 for the material output. |
 | Channel | Value | One component of a numeric input: R=0, G=1, B=2, A=3, within that input's actual width. |
 | Parallax / POM / Relief | UV, Height | View-dependent float2 coordinates. Relief uses the **Height** pin for its depth map too. |
 | Interior | UV, Color, Depth?, Backdrop? | RGBA from a virtual room, or dual-depth relief when **Depth?** is connected. |
@@ -60,7 +60,7 @@ These defaults are assigned by **Add node**. Values in saved files are validated
 | --- | --- | --- |
 | UV | **UV scale** `(1,1)`; **UV offset** `(0,0)` | UI controls span −10,000…10,000 per component. |
 | Channel | **Channel (RGBA)** `0` | Integer within the input width; RGBA permits 0…3. |
-| Sample Normal | **Flip normal Y** enabled | On/off. The result is signed tangent-space XYZ. |
+| Sample Normal | **Normal space** Tangent; **Flip normal Y** enabled for legacy Tangent, off by default for Object/World; **Negate source X/Y/Z** off | Space Tangent=0, Object=1, World=2; each source-axis sign is +1 or −1. An explicit Y-flip choice is saved independently. |
 | Parallax | **Height / depth scale** `0.05`; **Bounded steps** `4`; **Flip height V** off | Scale 0…1; integer steps 1…128. Refinement is reserved and must be zero. |
 | POM | Scale `0.05`; steps `32`; **Refinements** `6`; **Flip height V** off | Scale 0…1; steps 1…128; integer refinements 0…8. |
 | Relief | Scale `0.05`; steps `32`; refinements `6`; **Dual depth (R front / G back)** off | Same scale/step/refinement limits as POM; dual-depth on/off. |
@@ -70,6 +70,8 @@ These defaults are assigned by **Add node**. Values in saved files are validated
 Parallax iteratively offsets the supplied UV using the centered red height channel. POM traces a normalized depth interval, then refines the first hit. Relief can use a single red channel, or front/back RG: **R stores `1 − frontDepth`, G stores backDepth**, both normalized to 0…1. A conventional color image is not a dual-depth asset.
 
 Interior without Depth uses a box-room projection. Connecting an RG Depth asset selects the dual-depth recipe, with a bounded 128-step trace and six refinements. If Backdrop is absent, the Color texture also supplies the background. These recipes are raster surface illusions; they do not create traversable rooms, occluders or new mesh intersections.
+
+For an object-space normal map, choose **Object** and the source's actual axis signs. The normal follows the full mesh transform, including its mesh-local transform, parent and nonuniform scale. **World** means the decoded direction is already in engine-world axes and stays world-fixed when the object rotates. A texture named “world normal” can instead contain a source-rest/object-space bake; confirm its source convention before choosing. UV V flip, source-axis signs and normal Y flip are separate settings. Existing saved Sample Normal nodes with no space metadata retain Tangent and their original Y flip. These graph normal modes do not change the native Inspector normal-texture slot's Tangent interpretation.
 
 ## Connect baked Horizon maps
 
@@ -87,9 +89,9 @@ Horizon compares the direction from the surface toward the primary directional l
 
 ## Data preparation, reimport and overrides
 
-Linear/Normal PNG, TGA and BMP mapping sources use a separate uncompressed RGBA8 preparation path. It preserves the decoded channels, including Horizon alpha, with one mip level and no automatic mip generation. Accepted files are nonempty and at most **32 MiB**, at most **8192 pixels per axis**, and at most **16M texels**. This path does not add precision beyond the source's decoded 8-bit channels.
+Linear/Normal PNG, TGA, BMP and JPEG (`.jpg` / `.jpeg`) mapping sources use a separate uncompressed RGBA8 preparation path. It preserves the decoded channels, including Horizon alpha, with one mip level and no automatic mip generation. Accepted files are nonempty and at most **32 MiB**, at most **8192 pixels per axis**, and at most **36,000,000 texels** (including an original 6000×6000 map). This path does not add precision beyond the source's decoded 8-bit channels. JPEG's source compression remains lossy; decoding adds no gamma conversion or further block compression for Linear/Normal consumers.
 
-Up to two CPU decode jobs run concurrently. The owner thread uploads prepared resources and publishes a material only after its required data is ready. The retained decoded-image cache holds at most 64 entries / 128 MiB; worker temporaries and GPU allocations are additional memory. A graph whose pinned data working set exceeds the preparation budget reports an error rather than partially replacing the material. Color textures and other formats keep the engine's existing loading policy.
+Up to two CPU decode jobs run concurrently. The owner thread uploads prepared resources and publishes a material only after its required data is ready. The retained decoded-image cache holds at most 64 entries / 256 MiB; decoder scratch, simultaneous decoded/copy buffers and GPU allocations are additional memory. A graph whose pinned data working set exceeds the preparation budget reports an error rather than partially replacing the material. Color textures and other formats keep the engine's existing loading policy.
 
 Reimport the graph or its changed texture through the project's asset workflow. File identity and explicit invalidation prevent an older decode from replacing a newer generation. While preparation is pending, or if a new graph/resource fails, the existing material remains in use. Initial imports keep their original material until the graph is ready. Cancellation retires outstanding decode work without publishing it; a later explicit reimport can retry.
 

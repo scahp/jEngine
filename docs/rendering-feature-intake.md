@@ -71,9 +71,23 @@ Existing Single/Cube/Depth defaults retain the original path. Advanced resources
 
 Usage: [Advanced shadows](manual/advanced-shadows.md). Evidence, performance scope and limitations: [implementation report](reports/advanced-shadows.md). Try the [saved sample project](../examples/advanced-shadow-demo/README.md).
 
+## Selected SSS / MSAA / Hi-Z — Screen and human-reference verification
+
+The user selected **12, 22 and 24**, including material-authored SSS properties and nodes. Native Vulkan verification on macOS passed **127 rendered frames / 183 GPU checks** across the generic Screen SSS, MSAA and Hi-Z groups, with zero Vulkan/Metal validation problems and preserved preferences. This proves those fixtures rather than the original Shadows Skin pipeline or a human-mesh comparison. Windows-targeted DXIL compilation passed; Windows native execution is unverified. No performance improvement is inferred from correctness checks.
+
+| No. | Selected feature | Delivered engine integration |
+| --- | --- | --- |
+| 12 | Surface diffusion SSS | Verified Screen path: material weight/color/world thickness/eight profiles and graph/instance data feed Deferred direct+SH diffuse filtering, with existing SSGI/SurfelGI unchanged. The separately verified human reference adds explicit Object/World graph normals, original linear Spec/AO, Skin Kelemen material properties, UV diffusion and measured capture/transmission: 76 frames / 142 checks. Skin Kelemen requires Deferred; original pixel parity is not claimed. |
+| 22 | Deferred per-sample MSAA | Validated 1x/2x/4x requests, capability-dependent applied count, multisample GBuffer/lighting/resolve integration and preserved subpass/memoryless requests. Forward falls back to 1x with a reason. |
+| 24 | Hi-Z occlusion | Same-frame mesh depth, maximum pyramid and bounded indexed indirect arguments; conservative draw admission and direct-draw fallback. Hi-Z defaults off and rejects multisample coverage. |
+
+SSS and Hi-Z default off, with MSAA requesting 1x. The [feature guide](manual/material-diffusion-msaa-hiz.md) documents exact material/profile controls, project/console keys and support limits; the [implementation report](reports/material-diffusion-msaa-hiz.md) records actual captures, readbacks and platform scope. SSS passed39frames/140checks, Hi-Z51/23 and MSAA37/20, including combined4x SSS, geometry-derived witnesses and actual per-sample lighting/resolve checks. Applied MSAA above1x explicitly bypasses Hi-Z. Runtime diagnostics remain separate from saved requests.
+
+The [human Skin sample](../examples/subsurface-human-demo/README.md) and [reference audit](reports/skin-reference-audit.md) publish the separate **76-frame / 142-check** corrected native receipt, six actual images and six saved comparison projects, with zero validation problems and preserved preferences. UV transport isolates one shadow-enabled directional/point key with no diffuse GI/environment, explicit opaque graph coverage and Skin profile 0. Unsupported views and ambiguous eye/silhouette/missing-capture footprints keep Screen fallback locally. Source-normal basis, pre-scatter split and units are saved data; the provisional roughness scale is not a pixel-perfect source calibration.
+
 ## Remaining decisions
 
-No item below is authorized by this batch. Hi-Z and light-indexed shading remain prototypes in their reference branches.
+The nine items below remain unselected. Historical reference branches are not current engine feature claims; the selected Hi-Z integration is tracked separately above.
 
 | No. | Feature / source branch | Recommended engine module and decision |
 | --- | --- | --- |
@@ -82,15 +96,12 @@ No item below is authorized by this batch. Hi-Z and light-indexed shading remain
 | 4 | BSDF / jEngine `PathTracingBSDF` | Shared sampling/evaluation/PDF library. Preserve current index/binding fixes and repair refraction math. |
 | 5 | Russian Roulette / jEngine `PathTracingBSDF` | Unbiased integrator termination; repair throughput compensation and compare against a reference. |
 | 6 | PCSS / `master` | Extend shared shadow filtering. Define light size, depth units and penumbra limits. |
-| 12 | Skin SSS / `Skin` | Diffusion profile and shared scattering pass. Choose texture-space or screen-space evaluation. |
 | 13 | Cosmetic layers / `Physically-based-cosmetic` | Material layer optics, masks and thickness; requires the skin/shading contract. |
 | 16 | Radiosity / `RadiosityCornellBox` | Bounded cancellable offline bake, or retain as research. Choose output asset and scene scope. |
-| 22 | Deferred per-sample MSAA / `MSAA_And_Antialiasing` | Multisample GBuffer/lighting/resolve policy; set a quality/cost target. |
 | 23 | 2D SDF text / `SDF` | Optional scalable text atlas/rendering module; this source is not a 3D distance-field renderer. |
-| 24 | Hi-Z / `HiZOcclusion` | **Prototype:** reusable depth pyramid, followed by bounded visibility/indirect-draw integration. |
 | 25 | Light-indexed rendering / `LightIndexedDeferredRendering` | **Prototype:** evaluate pixel light indices as another light-grid consumer; source renderer `Do` is empty. |
 
-Twelve numbered choices remain. For general scenes, the next coherent group is **2 Forward+ and 3 OIT**, followed by a separately designed Hi-Z visibility module. For Path Tracing quality, decide **4 BSDF and 5 Russian Roulette** together.
+Nine numbered choices remain: **2, 3, 4, 5, 6, 13, 16, 23 and 25**. For general scenes, the next coherent decision group is **2 Forward+ and 3 OIT**. For Path Tracing quality, decide **4 BSDF and 5 Russian Roulette** together.
 
 ### CSM history and current runtime
 
@@ -137,7 +148,7 @@ The selected advanced-shadow batch restores CSM through the current RHI and shar
 | `MSAA_And_Antialiasing` | `dde92aeaa0f5b33f06e62348e7b9a1a84636dd53` |
 | `LightIndexedDeferredRendering` | `02c0ac0b022bbb8a48160b4fe7b886c0c8c997c6` |
 
-Re-read source at the pinned reference before implementing a selected feature. Hi-Z and light-indexed shading are explicitly scoped prototypes; the table does not treat them as completed engine culling or renderer modules.
+Re-read source at the pinned reference before implementing a selected feature. The historical Hi-Z and light-indexed branches were scoped prototypes; current Hi-Z integration is tracked above, while light-indexed rendering remains an undecided prototype.
 
 ## Earlier PCF validation and delivery
 

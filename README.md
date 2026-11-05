@@ -104,6 +104,10 @@ code push and on PRs targeting `main`. Build artifacts and logs are kept for fiv
 [Advanced shadows](docs/manual/advanced-shadows.md) — CSM, VSM/ESM/EVSM, shadow volumes, Deep, dual-paraboloid and PSM.
 [Validation and captures](docs/reports/advanced-shadows.md) · [Shadow sample project](examples/advanced-shadow-demo/README.md)
 
+[Material diffusion, Deferred MSAA and Hi-Z](docs/manual/material-diffusion-msaa-hiz.md) — material authoring, requested/applied settings and support limits. [Native validation and captures](docs/reports/material-diffusion-msaa-hiz.md).
+
+[Human Skin reference sample](examples/subsurface-human-demo/README.md) — original head/normal/Spec-AO maps, Skin Kelemen BRDF and UV diffusion/transmission, with six saved comparison projects. The [reference audit and actual images](docs/reports/skin-reference-audit.md) record a separate 76-frame / 142-check native pass; the generic Screen SSS/MSAA/Hi-Z receipt is 127/183. Source screenshot pixel parity is not claimed.
+
 [JaehoGameStudio](docs/game-studio.md) — shared AI development roles, pinned as a Git submodule in `tools/JaehoGameStudio`.
 
 ## Third party libraries

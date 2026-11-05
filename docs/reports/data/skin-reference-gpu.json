@@ -1,0 +1,2051 @@
+{
+  "success": true,
+  "engine_sha256": "abf07d491289c3300ad7b2173dac91c6a6da47e1a1303833f9542b078e8880f3",
+  "api": "vulkan",
+  "cases": {
+    "subsurface-human": {
+      "exit_code": 0,
+      "validation_problems": [],
+      "pass_lines": 142,
+      "subsurface-human_report": {
+        "captures": {
+          "human-global-zero": {
+            "available": true,
+            "distinctColorsAtMost1024": 1024,
+            "height": 720,
+            "litPixels": 837616,
+            "maximumRgb": 255,
+            "meanRgb": [
+              162.14395073784723,
+              191.413994140625,
+              206.1232562934028
+            ],
+            "minimumRgb": 0,
+            "opaquePixels": 921600,
+            "pixelHash": "6084418550400101568",
+            "png": "../images/skin-reference/human-global-zero.png",
+            "pngSaved": true,
+            "readback": true,
+            "width": 1280
+          },
+          "human-half-weight": {
+            "available": true,
+            "distinctColorsAtMost1024": 1024,
+            "height": 720,
+            "litPixels": 839890,
+            "maximumRgb": 255,
+            "meanRgb": [
+              161.78516493055557,
+              191.07925021701388,
+              205.79177734375
+            ],
+            "minimumRgb": 0,
+            "opaquePixels": 921600,
+            "pixelHash": "2912755182823952106",
+            "png": "../images/skin-reference/human-half-weight.png",
+            "pngSaved": true,
+            "readback": true,
+            "width": 1280
+          },
+          "human-off": {
+            "available": true,
+            "distinctColorsAtMost1024": 1024,
+            "height": 720,
+            "litPixels": 837616,
+            "maximumRgb": 255,
+            "meanRgb": [
+              162.14395073784723,
+              191.413994140625,
+              206.1232562934028
+            ],
+            "minimumRgb": 0,
+            "opaquePixels": 921600,
+            "pixelHash": "6084418550400101568",
+            "png": "../images/skin-reference/human-off.png",
+            "pngSaved": true,
+            "readback": true,
+            "width": 1280
+          },
+          "human-on": {
+            "available": true,
+            "distinctColorsAtMost1024": 1024,
+            "height": 720,
+            "litPixels": 817650,
+            "maximumRgb": 255,
+            "meanRgb": [
+              160.75120551215278,
+              190.2304568142361,
+              205.02732421875
+            ],
+            "minimumRgb": 0,
+            "opaquePixels": 921600,
+            "pixelHash": "8614522363578598427",
+            "png": "../images/skin-reference/human-on.png",
+            "pngSaved": true,
+            "readback": true,
+            "width": 1280
+          },
+          "human-transmission-off": {
+            "available": true,
+            "distinctColorsAtMost1024": 1024,
+            "height": 720,
+            "litPixels": 817606,
+            "maximumRgb": 255,
+            "meanRgb": [
+              160.74810763888888,
+              190.23039605034722,
+              205.0273198784722
+            ],
+            "minimumRgb": 0,
+            "opaquePixels": 921600,
+            "pixelHash": "10698108650255756278",
+            "png": "../images/skin-reference/human-transmission-off.png",
+            "pngSaved": true,
+            "readback": true,
+            "width": 1280
+          },
+          "human-uv-unfiltered": {
+            "available": true,
+            "distinctColorsAtMost1024": 1024,
+            "height": 720,
+            "litPixels": 813315,
+            "maximumRgb": 255,
+            "meanRgb": [
+              160.5529079861111,
+              190.18763237847222,
+              205.0047092013889
+            ],
+            "minimumRgb": 0,
+            "opaquePixels": 921600,
+            "pixelHash": "14129978743721898559",
+            "png": "../images/skin-reference/human-uv-unfiltered.png",
+            "pngSaved": true,
+            "readback": true,
+            "width": 1280
+          }
+        },
+        "caseCount": 6,
+        "checks": [
+          {
+            "detail": {},
+            "frame": 0,
+            "name": "Infinite-Level_02.OBJ retains the approved source bytes",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 0,
+            "name": "Infinite-Level_02.jpg retains the approved source bytes",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 0,
+            "name": "Infinite-Level_02.mtl retains the approved source bytes",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 0,
+            "name": "Infinite-Level_02_World_NoSmoothUV.jpg retains the approved source bytes",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 0,
+            "name": "SpecularAOMap.png retains the approved source bytes",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 0,
+            "name": "ATTRIBUTION.md retains the approved source bytes",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 0,
+            "name": "provenance.json retains the approved source bytes",
+            "pass": true
+          },
+          {
+            "detail": [
+              {
+                "actual4kDiffuse": true,
+                "actual6kObjectNormal": true,
+                "actualSpecularAO": true,
+                "canonicalOpaqueSurface": true,
+                "sourceMaterial": "defaultMat",
+                "textureHeight": 4096,
+                "textureWidth": 4096
+              }
+            ],
+            "frame": 58,
+            "name": "normal engine OBJ/material graph pipeline publishes the real human and all three original skin maps",
+            "pass": true
+          },
+          {
+            "detail": {
+              "actualRasterMeshes": 2,
+              "humanMeshes": 1
+            },
+            "frame": 58,
+            "name": "the actual raster scene contains the source human and one emissive background, with no stand-in skin geometry",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 61,
+            "name": "human-off saves/reopens the actual source geometry and canonical skin/UV material",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "project": "../../../examples/subsurface-human-demo/human-off.jproject",
+              "scene": "Scenes/human-off.jscene"
+            },
+            "frame": 61,
+            "name": "human-off reopens a portable project with exact physical UV/TSM controls",
+            "pass": true
+          },
+          {
+            "detail": {
+              "available": true,
+              "distinctColorsAtMost1024": 1024,
+              "height": 720,
+              "litPixels": 837616,
+              "maximumRgb": 255,
+              "meanRgb": [
+                162.14395073784723,
+                191.413994140625,
+                206.1232562934028
+              ],
+              "minimumRgb": 0,
+              "opaquePixels": 921600,
+              "pixelHash": "6084418550400101568",
+              "png": "../images/skin-reference/human-off.png",
+              "pngSaved": true,
+              "readback": true,
+              "width": 1280
+            },
+            "frame": 61,
+            "name": "human-off captures the actual textured human scene",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 61,
+            "name": "human-off decodes its unmodified actual PNG",
+            "pass": true
+          },
+          {
+            "detail": {
+              "diagnostic": "",
+              "quadratureTerms": 80,
+              "ready": true,
+              "resolution": 64
+            },
+            "frame": 61,
+            "name": "human-off retains the actual source-model energy LUT even with scattering OFF",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 61,
+            "name": "human-off has only current-frame screen fallback output",
+            "pass": true
+          },
+          {
+            "detail": {
+              "diagnostic": "",
+              "passes": 3
+            },
+            "frame": 61,
+            "name": "human-off records the independent screen fallback",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 61,
+            "name": "human-off actual mask/profile reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 61,
+            "name": "human-off original Kelemen diffuse /no SH reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 61,
+            "name": "human-off screen fallback diffuse reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 61,
+            "name": "human-off screen fallback composed HDR reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "current": true,
+              "expected": true
+            },
+            "frame": 61,
+            "name": "human-off publishes only current-frame UV transport",
+            "pass": true
+          },
+          {
+            "detail": {
+              "captureDraws": 1,
+              "computePasses": 23,
+              "logicalTargetBytes": 224460816,
+              "rasterPasses": 2,
+              "surfaces": 1
+            },
+            "frame": 61,
+            "name": "human-off executes bounded actual light capture, UV bake and six-lobe transport",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 1024,
+              "nonfinite": 0,
+              "width": 1024
+            },
+            "frame": 61,
+            "name": "human-off completed UV and atomic rejection flags reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 1024,
+              "nonfinite": 0,
+              "width": 1024
+            },
+            "frame": 61,
+            "name": "human-off actual UV coverage and metric stretch reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 1024,
+              "nonfinite": 0,
+              "width": 1024
+            },
+            "frame": 61,
+            "name": "human-off actual light-entry UV and geometric thickness reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 1024,
+              "nonfinite": 0,
+              "width": 1024
+            },
+            "frame": 61,
+            "name": "human-off finite skin irradiance and encoded transmission reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 61,
+            "name": "human-off completed unweighted diffuse including local fallback reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 61,
+            "name": "human-off final UV diffuse-only HDR composition reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "atomicFlags": 1,
+              "coveredAtlasTexels": 961180,
+              "encodedTransmissionTexels": 178088,
+              "gaussianStepScale": 1.0,
+              "invalidFlagPixels": 0,
+              "localMissingCaptureTexels": 8428,
+              "maximumEncodedTransmission": 0.966796875,
+              "maximumEntryThicknessWorld": 95.1875,
+              "measuredTransmissionEntries": 439616,
+              "minimumEntryThicknessWorld": 0.05023193359375,
+              "overlappingAtlasTexels": 208,
+              "transmissionEnabled": true
+            },
+            "frame": 61,
+            "name": "human-off permits only the real local eye-chart overlap and has no fatal capture/nonfinite rejection",
+            "pass": true
+          },
+          {
+            "detail": {
+              "atomicFlags": 1,
+              "coveredAtlasTexels": 961180,
+              "encodedTransmissionTexels": 178088,
+              "gaussianStepScale": 1.0,
+              "invalidFlagPixels": 0,
+              "localMissingCaptureTexels": 8428,
+              "maximumEncodedTransmission": 0.966796875,
+              "maximumEntryThicknessWorld": 95.1875,
+              "measuredTransmissionEntries": 439616,
+              "minimumEntryThicknessWorld": 0.05023193359375,
+              "overlappingAtlasTexels": 208,
+              "transmissionEnabled": true
+            },
+            "frame": 61,
+            "name": "human-off measures real thin entry-to-exit geometry and GPU transmission",
+            "pass": true
+          },
+          {
+            "detail": {
+              "regions": [
+                "nose",
+                "cheek",
+                "ear-side",
+                "neck"
+              ],
+              "scope": "CPU projection/nearest-surface classification of actual imported triangles; no image is synthesized and all radiometry is read from actual GPU/PNG outputs",
+              "trianglePixelTests": 1742323,
+              "triangles": 17684,
+              "worldMaximum": [
+                69.64051818847656,
+                34.81187057495117,
+                66.33084869384766
+              ],
+              "worldMinimum": [
+                -66.34635925292969,
+                -91.5148696899414,
+                -16.042924880981445
+              ]
+            },
+            "frame": 61,
+            "name": "actual human preserves source scale300 and unmodified model bounds",
+            "pass": true
+          },
+          {
+            "detail": {
+              "correctFraction": 1.0,
+              "correctGpuMaterialPixels": 72679,
+              "eligibleAnatomicalPixels": 72679
+            },
+            "frame": 61,
+            "name": "human-off publishes real source skin profile/weight/thickness metadata",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 61,
+            "name": "human readbacks/classification add no hidden render frames",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 64,
+            "name": "human-on saves/reopens the actual source geometry and canonical skin/UV material",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "project": "../../../examples/subsurface-human-demo/human-on.jproject",
+              "scene": "Scenes/human-on.jscene"
+            },
+            "frame": 64,
+            "name": "human-on reopens a portable project with exact physical UV/TSM controls",
+            "pass": true
+          },
+          {
+            "detail": {
+              "available": true,
+              "distinctColorsAtMost1024": 1024,
+              "height": 720,
+              "litPixels": 817650,
+              "maximumRgb": 255,
+              "meanRgb": [
+                160.75120551215278,
+                190.2304568142361,
+                205.02732421875
+              ],
+              "minimumRgb": 0,
+              "opaquePixels": 921600,
+              "pixelHash": "8614522363578598427",
+              "png": "../images/skin-reference/human-on.png",
+              "pngSaved": true,
+              "readback": true,
+              "width": 1280
+            },
+            "frame": 64,
+            "name": "human-on captures the actual textured human scene",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 64,
+            "name": "human-on decodes its unmodified actual PNG",
+            "pass": true
+          },
+          {
+            "detail": {
+              "diagnostic": "",
+              "quadratureTerms": 80,
+              "ready": true,
+              "resolution": 64
+            },
+            "frame": 64,
+            "name": "human-on retains the actual source-model energy LUT even with scattering OFF",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 64,
+            "name": "human-on has only current-frame screen fallback output",
+            "pass": true
+          },
+          {
+            "detail": {
+              "diagnostic": "",
+              "passes": 3
+            },
+            "frame": 64,
+            "name": "human-on records the independent screen fallback",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 64,
+            "name": "human-on actual mask/profile reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 64,
+            "name": "human-on original Kelemen diffuse /no SH reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 64,
+            "name": "human-on screen fallback diffuse reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 64,
+            "name": "human-on screen fallback composed HDR reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "current": true,
+              "expected": true
+            },
+            "frame": 64,
+            "name": "human-on publishes only current-frame UV transport",
+            "pass": true
+          },
+          {
+            "detail": {
+              "captureDraws": 1,
+              "computePasses": 23,
+              "logicalTargetBytes": 224460816,
+              "rasterPasses": 2,
+              "surfaces": 1
+            },
+            "frame": 64,
+            "name": "human-on executes bounded actual light capture, UV bake and six-lobe transport",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 1024,
+              "nonfinite": 0,
+              "width": 1024
+            },
+            "frame": 64,
+            "name": "human-on completed UV and atomic rejection flags reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 1024,
+              "nonfinite": 0,
+              "width": 1024
+            },
+            "frame": 64,
+            "name": "human-on actual UV coverage and metric stretch reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 1024,
+              "nonfinite": 0,
+              "width": 1024
+            },
+            "frame": 64,
+            "name": "human-on actual light-entry UV and geometric thickness reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 1024,
+              "nonfinite": 0,
+              "width": 1024
+            },
+            "frame": 64,
+            "name": "human-on finite skin irradiance and encoded transmission reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 64,
+            "name": "human-on completed unweighted diffuse including local fallback reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 64,
+            "name": "human-on final UV diffuse-only HDR composition reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "atomicFlags": 1,
+              "coveredAtlasTexels": 961180,
+              "encodedTransmissionTexels": 178088,
+              "gaussianStepScale": 1.0,
+              "invalidFlagPixels": 0,
+              "localMissingCaptureTexels": 8428,
+              "maximumEncodedTransmission": 0.966796875,
+              "maximumEntryThicknessWorld": 95.1875,
+              "measuredTransmissionEntries": 439616,
+              "minimumEntryThicknessWorld": 0.05023193359375,
+              "overlappingAtlasTexels": 208,
+              "transmissionEnabled": true
+            },
+            "frame": 64,
+            "name": "human-on permits only the real local eye-chart overlap and has no fatal capture/nonfinite rejection",
+            "pass": true
+          },
+          {
+            "detail": {
+              "atomicFlags": 1,
+              "coveredAtlasTexels": 961180,
+              "encodedTransmissionTexels": 178088,
+              "gaussianStepScale": 1.0,
+              "invalidFlagPixels": 0,
+              "localMissingCaptureTexels": 8428,
+              "maximumEncodedTransmission": 0.966796875,
+              "maximumEntryThicknessWorld": 95.1875,
+              "measuredTransmissionEntries": 439616,
+              "minimumEntryThicknessWorld": 0.05023193359375,
+              "overlappingAtlasTexels": 208,
+              "transmissionEnabled": true
+            },
+            "frame": 64,
+            "name": "human-on measures real thin entry-to-exit geometry and GPU transmission",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 64,
+            "name": "human-on actual screen UV and render-object identity reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "maximumFallbackHdrError": 0.0,
+              "scope": "Eye-chart backs need not be visible; every encountered invalid footprint is checked.",
+              "visibleFallbackPixels": 5197,
+              "visibleHeadPixels": 199667
+            },
+            "frame": 64,
+            "name": "invalid four-load UV footprints preserve the real screen diffuse instead of selecting an arbitrary donor",
+            "pass": true
+          },
+          {
+            "detail": {
+              "correctFraction": 1.0,
+              "correctGpuMaterialPixels": 72679,
+              "eligibleAnatomicalPixels": 72679
+            },
+            "frame": 64,
+            "name": "human-on publishes real source skin profile/weight/thickness metadata",
+            "pass": true
+          },
+          {
+            "detail": {
+              "formula": "C_OFF + mask * strength * (CompletedDiffuse - OriginalDiffuse); CompletedDiffuse includes local screen fallback",
+              "maximumHdrError": 0.00146484375,
+              "maximumOriginalDiffuseChange": 0.0,
+              "meanHdrError": 5.095528876787423e-06,
+              "samples": 218037,
+              "specularWitnessPixels": 6027
+            },
+            "frame": 64,
+            "name": "actual completed UV diffuse replaces only diffuse and preserves the same original Kelemen specular",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 64,
+            "name": "human readbacks/classification add no hidden render frames",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 67,
+            "name": "human-uv-unfiltered saves/reopens the actual source geometry and canonical skin/UV material",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "project": "../../../examples/subsurface-human-demo/human-uv-unfiltered.jproject",
+              "scene": "Scenes/human-uv-unfiltered.jscene"
+            },
+            "frame": 67,
+            "name": "human-uv-unfiltered reopens a portable project with exact physical UV/TSM controls",
+            "pass": true
+          },
+          {
+            "detail": {
+              "available": true,
+              "distinctColorsAtMost1024": 1024,
+              "height": 720,
+              "litPixels": 813315,
+              "maximumRgb": 255,
+              "meanRgb": [
+                160.5529079861111,
+                190.18763237847222,
+                205.0047092013889
+              ],
+              "minimumRgb": 0,
+              "opaquePixels": 921600,
+              "pixelHash": "14129978743721898559",
+              "png": "../images/skin-reference/human-uv-unfiltered.png",
+              "pngSaved": true,
+              "readback": true,
+              "width": 1280
+            },
+            "frame": 67,
+            "name": "human-uv-unfiltered captures the actual textured human scene",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 67,
+            "name": "human-uv-unfiltered decodes its unmodified actual PNG",
+            "pass": true
+          },
+          {
+            "detail": {
+              "diagnostic": "",
+              "quadratureTerms": 80,
+              "ready": true,
+              "resolution": 64
+            },
+            "frame": 67,
+            "name": "human-uv-unfiltered retains the actual source-model energy LUT even with scattering OFF",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 67,
+            "name": "human-uv-unfiltered has only current-frame screen fallback output",
+            "pass": true
+          },
+          {
+            "detail": {
+              "diagnostic": "",
+              "passes": 3
+            },
+            "frame": 67,
+            "name": "human-uv-unfiltered records the independent screen fallback",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 67,
+            "name": "human-uv-unfiltered actual mask/profile reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 67,
+            "name": "human-uv-unfiltered original Kelemen diffuse /no SH reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 67,
+            "name": "human-uv-unfiltered screen fallback diffuse reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 67,
+            "name": "human-uv-unfiltered screen fallback composed HDR reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "current": true,
+              "expected": true
+            },
+            "frame": 67,
+            "name": "human-uv-unfiltered publishes only current-frame UV transport",
+            "pass": true
+          },
+          {
+            "detail": {
+              "captureDraws": 1,
+              "computePasses": 23,
+              "logicalTargetBytes": 224460816,
+              "rasterPasses": 2,
+              "surfaces": 1
+            },
+            "frame": 67,
+            "name": "human-uv-unfiltered executes bounded actual light capture, UV bake and six-lobe transport",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 1024,
+              "nonfinite": 0,
+              "width": 1024
+            },
+            "frame": 67,
+            "name": "human-uv-unfiltered completed UV and atomic rejection flags reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 1024,
+              "nonfinite": 0,
+              "width": 1024
+            },
+            "frame": 67,
+            "name": "human-uv-unfiltered actual UV coverage and metric stretch reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 1024,
+              "nonfinite": 0,
+              "width": 1024
+            },
+            "frame": 67,
+            "name": "human-uv-unfiltered actual light-entry UV and geometric thickness reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 1024,
+              "nonfinite": 0,
+              "width": 1024
+            },
+            "frame": 67,
+            "name": "human-uv-unfiltered finite skin irradiance and encoded transmission reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 67,
+            "name": "human-uv-unfiltered completed unweighted diffuse including local fallback reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 67,
+            "name": "human-uv-unfiltered final UV diffuse-only HDR composition reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "atomicFlags": 1,
+              "coveredAtlasTexels": 961180,
+              "encodedTransmissionTexels": 0,
+              "gaussianStepScale": 0.0,
+              "invalidFlagPixels": 0,
+              "localMissingCaptureTexels": 8428,
+              "maximumEncodedTransmission": 0.0,
+              "maximumEntryThicknessWorld": 0.0,
+              "measuredTransmissionEntries": 0,
+              "minimumEntryThicknessWorld": 0.0,
+              "overlappingAtlasTexels": 208,
+              "transmissionEnabled": false
+            },
+            "frame": 67,
+            "name": "human-uv-unfiltered permits only the real local eye-chart overlap and has no fatal capture/nonfinite rejection",
+            "pass": true
+          },
+          {
+            "detail": {
+              "atomicFlags": 1,
+              "coveredAtlasTexels": 961180,
+              "encodedTransmissionTexels": 0,
+              "gaussianStepScale": 0.0,
+              "invalidFlagPixels": 0,
+              "localMissingCaptureTexels": 8428,
+              "maximumEncodedTransmission": 0.0,
+              "maximumEntryThicknessWorld": 0.0,
+              "measuredTransmissionEntries": 0,
+              "minimumEntryThicknessWorld": 0.0,
+              "overlappingAtlasTexels": 208,
+              "transmissionEnabled": false
+            },
+            "frame": 67,
+            "name": "human-uv-unfiltered transmission OFF contributes no hidden-entry alpha",
+            "pass": true
+          },
+          {
+            "detail": {
+              "correctFraction": 1.0,
+              "correctGpuMaterialPixels": 72679,
+              "eligibleAnatomicalPixels": 72679
+            },
+            "frame": 67,
+            "name": "human-uv-unfiltered publishes real source skin profile/weight/thickness metadata",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 67,
+            "name": "human readbacks/classification add no hidden render frames",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 70,
+            "name": "human-transmission-off saves/reopens the actual source geometry and canonical skin/UV material",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "project": "../../../examples/subsurface-human-demo/human-transmission-off.jproject",
+              "scene": "Scenes/human-transmission-off.jscene"
+            },
+            "frame": 70,
+            "name": "human-transmission-off reopens a portable project with exact physical UV/TSM controls",
+            "pass": true
+          },
+          {
+            "detail": {
+              "available": true,
+              "distinctColorsAtMost1024": 1024,
+              "height": 720,
+              "litPixels": 817606,
+              "maximumRgb": 255,
+              "meanRgb": [
+                160.74810763888888,
+                190.23039605034722,
+                205.0273198784722
+              ],
+              "minimumRgb": 0,
+              "opaquePixels": 921600,
+              "pixelHash": "10698108650255756278",
+              "png": "../images/skin-reference/human-transmission-off.png",
+              "pngSaved": true,
+              "readback": true,
+              "width": 1280
+            },
+            "frame": 70,
+            "name": "human-transmission-off captures the actual textured human scene",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 70,
+            "name": "human-transmission-off decodes its unmodified actual PNG",
+            "pass": true
+          },
+          {
+            "detail": {
+              "diagnostic": "",
+              "quadratureTerms": 80,
+              "ready": true,
+              "resolution": 64
+            },
+            "frame": 70,
+            "name": "human-transmission-off retains the actual source-model energy LUT even with scattering OFF",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 70,
+            "name": "human-transmission-off has only current-frame screen fallback output",
+            "pass": true
+          },
+          {
+            "detail": {
+              "diagnostic": "",
+              "passes": 3
+            },
+            "frame": 70,
+            "name": "human-transmission-off records the independent screen fallback",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 70,
+            "name": "human-transmission-off actual mask/profile reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 70,
+            "name": "human-transmission-off original Kelemen diffuse /no SH reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 70,
+            "name": "human-transmission-off screen fallback diffuse reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 70,
+            "name": "human-transmission-off screen fallback composed HDR reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "current": true,
+              "expected": true
+            },
+            "frame": 70,
+            "name": "human-transmission-off publishes only current-frame UV transport",
+            "pass": true
+          },
+          {
+            "detail": {
+              "captureDraws": 1,
+              "computePasses": 23,
+              "logicalTargetBytes": 224460816,
+              "rasterPasses": 2,
+              "surfaces": 1
+            },
+            "frame": 70,
+            "name": "human-transmission-off executes bounded actual light capture, UV bake and six-lobe transport",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 1024,
+              "nonfinite": 0,
+              "width": 1024
+            },
+            "frame": 70,
+            "name": "human-transmission-off completed UV and atomic rejection flags reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 1024,
+              "nonfinite": 0,
+              "width": 1024
+            },
+            "frame": 70,
+            "name": "human-transmission-off actual UV coverage and metric stretch reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 1024,
+              "nonfinite": 0,
+              "width": 1024
+            },
+            "frame": 70,
+            "name": "human-transmission-off actual light-entry UV and geometric thickness reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 1024,
+              "nonfinite": 0,
+              "width": 1024
+            },
+            "frame": 70,
+            "name": "human-transmission-off finite skin irradiance and encoded transmission reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 70,
+            "name": "human-transmission-off completed unweighted diffuse including local fallback reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 70,
+            "name": "human-transmission-off final UV diffuse-only HDR composition reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "atomicFlags": 1,
+              "coveredAtlasTexels": 961180,
+              "encodedTransmissionTexels": 0,
+              "gaussianStepScale": 1.0,
+              "invalidFlagPixels": 0,
+              "localMissingCaptureTexels": 8428,
+              "maximumEncodedTransmission": 0.0,
+              "maximumEntryThicknessWorld": 0.0,
+              "measuredTransmissionEntries": 0,
+              "minimumEntryThicknessWorld": 0.0,
+              "overlappingAtlasTexels": 208,
+              "transmissionEnabled": false
+            },
+            "frame": 70,
+            "name": "human-transmission-off permits only the real local eye-chart overlap and has no fatal capture/nonfinite rejection",
+            "pass": true
+          },
+          {
+            "detail": {
+              "atomicFlags": 1,
+              "coveredAtlasTexels": 961180,
+              "encodedTransmissionTexels": 0,
+              "gaussianStepScale": 1.0,
+              "invalidFlagPixels": 0,
+              "localMissingCaptureTexels": 8428,
+              "maximumEncodedTransmission": 0.0,
+              "maximumEntryThicknessWorld": 0.0,
+              "measuredTransmissionEntries": 0,
+              "minimumEntryThicknessWorld": 0.0,
+              "overlappingAtlasTexels": 208,
+              "transmissionEnabled": false
+            },
+            "frame": 70,
+            "name": "human-transmission-off transmission OFF contributes no hidden-entry alpha",
+            "pass": true
+          },
+          {
+            "detail": {
+              "correctFraction": 1.0,
+              "correctGpuMaterialPixels": 72679,
+              "eligibleAnatomicalPixels": 72679
+            },
+            "frame": 70,
+            "name": "human-transmission-off publishes real source skin profile/weight/thickness metadata",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 70,
+            "name": "Gaussian ON/OFF compares the same actual UV lighting, camera and viewport",
+            "pass": true
+          },
+          {
+            "detail": {
+              "meaningfulRegions": 4,
+              "regions": {
+                "cheek": {
+                  "displayChangedPixels": 7332,
+                  "eligiblePixels": 20735,
+                  "gainPixels": 4475,
+                  "hdrChangedPixels": 9376,
+                  "lossPixels": 4431,
+                  "meanMaximumChannelDisplayDelta": 2.6074752833373522,
+                  "meanMaximumChannelHdrDelta": 0.006285862937616331,
+                  "meaningful": true
+                },
+                "ear-side": {
+                  "displayChangedPixels": 2106,
+                  "eligiblePixels": 5945,
+                  "gainPixels": 1697,
+                  "hdrChangedPixels": 3049,
+                  "lossPixels": 1247,
+                  "meanMaximumChannelDisplayDelta": 6.994785534062237,
+                  "meanMaximumChannelHdrDelta": 0.010888873437956866,
+                  "meaningful": true
+                },
+                "neck": {
+                  "displayChangedPixels": 6921,
+                  "eligiblePixels": 34655,
+                  "gainPixels": 5494,
+                  "hdrChangedPixels": 12134,
+                  "lossPixels": 5906,
+                  "meanMaximumChannelDisplayDelta": 1.206377146154956,
+                  "meanMaximumChannelHdrDelta": 0.002493230797067691,
+                  "meaningful": true
+                },
+                "nose": {
+                  "displayChangedPixels": 4765,
+                  "eligiblePixels": 11344,
+                  "gainPixels": 2287,
+                  "hdrChangedPixels": 4547,
+                  "lossPixels": 1879,
+                  "meanMaximumChannelDisplayDelta": 4.600581805359662,
+                  "meanMaximumChannelHdrDelta": 0.007392372830924598,
+                  "meaningful": true
+                }
+              },
+              "thresholds": "region>=64px; >=max(16,1%) pixels with HDRdelta>=.001 and displaydelta>=2; >=16gain/loss with luma delta.0005; meanHDRdelta>=.00015"
+            },
+            "frame": 70,
+            "name": "actual UV Gaussian diffusion visibly redistributes light across at least3anatomical regions",
+            "pass": true
+          },
+          {
+            "detail": {
+              "eligiblePixels": 72679,
+              "maximumDiffuseLuminanceGain": 0.002150034749507904,
+              "positiveTransmissionPixels": 173,
+              "scope": "Same Gaussian and UV capture; only measured front-entry transmission is toggled.",
+              "sourceEntryDiagnostics": {
+                "atomicFlags": 1,
+                "coveredAtlasTexels": 961180,
+                "encodedTransmissionTexels": 178088,
+                "gaussianStepScale": 1.0,
+                "invalidFlagPixels": 0,
+                "localMissingCaptureTexels": 8428,
+                "maximumEncodedTransmission": 0.966796875,
+                "maximumEntryThicknessWorld": 95.1875,
+                "measuredTransmissionEntries": 439616,
+                "minimumEntryThicknessWorld": 0.05023193359375,
+                "overlappingAtlasTexels": 208,
+                "transmissionEnabled": true,
+                "visibleFallbackPixels": 5197
+              },
+              "summedPositiveDiffuseGain": 0.10844194518327673,
+              "unexpectedLossPixels": 0
+            },
+            "frame": 70,
+            "name": "actual finite-key TSM donates light through measured thin human geometry",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 70,
+            "name": "human readbacks/classification add no hidden render frames",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 73,
+            "name": "human-half-weight saves/reopens the actual source geometry and canonical skin/UV material",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "project": "../../../examples/subsurface-human-demo/human-half-weight.jproject",
+              "scene": "Scenes/human-half-weight.jscene"
+            },
+            "frame": 73,
+            "name": "human-half-weight reopens a portable project with exact physical UV/TSM controls",
+            "pass": true
+          },
+          {
+            "detail": {
+              "available": true,
+              "distinctColorsAtMost1024": 1024,
+              "height": 720,
+              "litPixels": 839890,
+              "maximumRgb": 255,
+              "meanRgb": [
+                161.78516493055557,
+                191.07925021701388,
+                205.79177734375
+              ],
+              "minimumRgb": 0,
+              "opaquePixels": 921600,
+              "pixelHash": "2912755182823952106",
+              "png": "../images/skin-reference/human-half-weight.png",
+              "pngSaved": true,
+              "readback": true,
+              "width": 1280
+            },
+            "frame": 73,
+            "name": "human-half-weight captures the actual textured human scene",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 73,
+            "name": "human-half-weight decodes its unmodified actual PNG",
+            "pass": true
+          },
+          {
+            "detail": {
+              "diagnostic": "",
+              "quadratureTerms": 80,
+              "ready": true,
+              "resolution": 64
+            },
+            "frame": 73,
+            "name": "human-half-weight retains the actual source-model energy LUT even with scattering OFF",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 73,
+            "name": "human-half-weight has only current-frame screen fallback output",
+            "pass": true
+          },
+          {
+            "detail": {
+              "diagnostic": "",
+              "passes": 3
+            },
+            "frame": 73,
+            "name": "human-half-weight records the independent screen fallback",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 73,
+            "name": "human-half-weight actual mask/profile reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 73,
+            "name": "human-half-weight original Kelemen diffuse /no SH reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 73,
+            "name": "human-half-weight screen fallback diffuse reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 73,
+            "name": "human-half-weight screen fallback composed HDR reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "current": true,
+              "expected": true
+            },
+            "frame": 73,
+            "name": "human-half-weight publishes only current-frame UV transport",
+            "pass": true
+          },
+          {
+            "detail": {
+              "captureDraws": 1,
+              "computePasses": 23,
+              "logicalTargetBytes": 224460816,
+              "rasterPasses": 2,
+              "surfaces": 1
+            },
+            "frame": 73,
+            "name": "human-half-weight executes bounded actual light capture, UV bake and six-lobe transport",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 1024,
+              "nonfinite": 0,
+              "width": 1024
+            },
+            "frame": 73,
+            "name": "human-half-weight completed UV and atomic rejection flags reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 1024,
+              "nonfinite": 0,
+              "width": 1024
+            },
+            "frame": 73,
+            "name": "human-half-weight actual UV coverage and metric stretch reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 1024,
+              "nonfinite": 0,
+              "width": 1024
+            },
+            "frame": 73,
+            "name": "human-half-weight actual light-entry UV and geometric thickness reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 1024,
+              "nonfinite": 0,
+              "width": 1024
+            },
+            "frame": 73,
+            "name": "human-half-weight finite skin irradiance and encoded transmission reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 73,
+            "name": "human-half-weight completed unweighted diffuse including local fallback reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "height": 720,
+              "nonfinite": 0,
+              "width": 1280
+            },
+            "frame": 73,
+            "name": "human-half-weight final UV diffuse-only HDR composition reads actual finite GPU pixels",
+            "pass": true
+          },
+          {
+            "detail": {
+              "atomicFlags": 1,
+              "coveredAtlasTexels": 961180,
+              "encodedTransmissionTexels": 178088,
+              "gaussianStepScale": 1.0,
+              "invalidFlagPixels": 0,
+              "localMissingCaptureTexels": 8428,
+              "maximumEncodedTransmission": 0.966796875,
+              "maximumEntryThicknessWorld": 95.1875,
+              "measuredTransmissionEntries": 439616,
+              "minimumEntryThicknessWorld": 0.05023193359375,
+              "overlappingAtlasTexels": 208,
+              "transmissionEnabled": true
+            },
+            "frame": 73,
+            "name": "human-half-weight permits only the real local eye-chart overlap and has no fatal capture/nonfinite rejection",
+            "pass": true
+          },
+          {
+            "detail": {
+              "atomicFlags": 1,
+              "coveredAtlasTexels": 961180,
+              "encodedTransmissionTexels": 178088,
+              "gaussianStepScale": 1.0,
+              "invalidFlagPixels": 0,
+              "localMissingCaptureTexels": 8428,
+              "maximumEncodedTransmission": 0.966796875,
+              "maximumEntryThicknessWorld": 95.1875,
+              "measuredTransmissionEntries": 439616,
+              "minimumEntryThicknessWorld": 0.05023193359375,
+              "overlappingAtlasTexels": 208,
+              "transmissionEnabled": true
+            },
+            "frame": 73,
+            "name": "human-half-weight measures real thin entry-to-exit geometry and GPU transmission",
+            "pass": true
+          },
+          {
+            "detail": {
+              "correctFraction": 1.0,
+              "correctGpuMaterialPixels": 72679,
+              "eligibleAnatomicalPixels": 72679
+            },
+            "frame": 73,
+            "name": "human-half-weight publishes real source skin profile/weight/thickness metadata",
+            "pass": true
+          },
+          {
+            "detail": {
+              "halfToFullActualDelta": 0.5006396561762796,
+              "maximumHdrError": 0.0009765625,
+              "meanHdrError": 2.5816619984774045e-05,
+              "samples": 218037
+            },
+            "frame": 73,
+            "name": "authored half weight produces the actual halfway human diffuse blend",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 73,
+            "name": "human readbacks/classification add no hidden render frames",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 76,
+            "name": "human-global-zero saves/reopens the actual source geometry and canonical skin/UV material",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": "",
+              "project": "../../../examples/subsurface-human-demo/human-global-zero.jproject",
+              "scene": "Scenes/human-global-zero.jscene"
+            },
+            "frame": 76,
+            "name": "human-global-zero reopens a portable project with exact physical UV/TSM controls",
+            "pass": true
+          },
+          {
+            "detail": {
+              "available": true,
+              "distinctColorsAtMost1024": 1024,
+              "height": 720,
+              "litPixels": 837616,
+              "maximumRgb": 255,
+              "meanRgb": [
+                162.14395073784723,
+                191.413994140625,
+                206.1232562934028
+              ],
+              "minimumRgb": 0,
+              "opaquePixels": 921600,
+              "pixelHash": "6084418550400101568",
+              "png": "../images/skin-reference/human-global-zero.png",
+              "pngSaved": true,
+              "readback": true,
+              "width": 1280
+            },
+            "frame": 76,
+            "name": "human-global-zero captures the actual textured human scene",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 76,
+            "name": "human-global-zero decodes its unmodified actual PNG",
+            "pass": true
+          },
+          {
+            "detail": {
+              "diagnostic": "",
+              "quadratureTerms": 80,
+              "ready": true,
+              "resolution": 64
+            },
+            "frame": 76,
+            "name": "human-global-zero retains the actual source-model energy LUT even with scattering OFF",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 76,
+            "name": "human-global-zero has only current-frame screen fallback output",
+            "pass": true
+          },
+          {
+            "detail": {
+              "current": false,
+              "expected": false
+            },
+            "frame": 76,
+            "name": "human-global-zero publishes only current-frame UV transport",
+            "pass": true
+          },
+          {
+            "detail": {
+              "maximumDisplayByteDifference": 0,
+              "tolerance": 1
+            },
+            "frame": 76,
+            "name": "global zero and material OFF reproduce the same actual human image",
+            "pass": true
+          },
+          {
+            "detail": {},
+            "frame": 76,
+            "name": "human readbacks/classification add no hidden render frames",
+            "pass": true
+          },
+          {
+            "detail": {
+              "error": ""
+            },
+            "frame": 76,
+            "name": "delivered startup project preserves the source skin/UV units and full transmission settings",
+            "pass": true
+          }
+        ],
+        "controlProjects": {
+          "human-global-zero": "../../../examples/subsurface-human-demo/human-global-zero.jproject",
+          "human-half-weight": "../../../examples/subsurface-human-demo/human-half-weight.jproject",
+          "human-off": "../../../examples/subsurface-human-demo/human-off.jproject",
+          "human-on": "../../../examples/subsurface-human-demo/human-on.jproject",
+          "human-transmission-off": "../../../examples/subsurface-human-demo/human-transmission-off.jproject",
+          "human-uv-unfiltered": "../../../examples/subsurface-human-demo/human-uv-unfiltered.jproject"
+        },
+        "copiedSourceFiles": {
+          "ATTRIBUTION.md": {
+            "bytes": 1580,
+            "copiedFNV1a64": 14183235013554013978,
+            "sourceFNV1a64": 14183235013554013978
+          },
+          "Infinite-Level_02.OBJ": {
+            "bytes": 1383204,
+            "copiedFNV1a64": 4114313078085251801,
+            "sourceFNV1a64": 4114313078085251801
+          },
+          "Infinite-Level_02.jpg": {
+            "bytes": 8975275,
+            "copiedFNV1a64": 999348842567738097,
+            "sourceFNV1a64": 999348842567738097
+          },
+          "Infinite-Level_02.mtl": {
+            "bytes": 140,
+            "copiedFNV1a64": 11368524221421002795,
+            "sourceFNV1a64": 11368524221421002795
+          },
+          "Infinite-Level_02_World_NoSmoothUV.jpg": {
+            "bytes": 18297370,
+            "copiedFNV1a64": 14294861417549899043,
+            "sourceFNV1a64": 14294861417549899043
+          },
+          "SpecularAOMap.png": {
+            "bytes": 139507,
+            "copiedFNV1a64": 17539393012203566515,
+            "sourceFNV1a64": 17539393012203566515
+          },
+          "provenance.json": {
+            "bytes": 2246,
+            "copiedFNV1a64": 9481545469593637165,
+            "sourceFNV1a64": 9481545469593637165
+          }
+        },
+        "diffuseOnlyIdentity": {
+          "formula": "C_OFF + mask * strength * (CompletedDiffuse - OriginalDiffuse); CompletedDiffuse includes local screen fallback",
+          "maximumHdrError": 0.00146484375,
+          "maximumOriginalDiffuseChange": 0.0,
+          "meanHdrError": 5.095528876787423e-06,
+          "samples": 218037,
+          "specularWitnessPixels": 6027
+        },
+        "failureCount": 0,
+        "fixtureProject": "../../../examples/subsurface-human-demo/project.jproject",
+        "frameBudget": 192,
+        "globalZeroControl": {
+          "maximumDisplayByteDifference": 0,
+          "tolerance": 1
+        },
+        "halfWeightControl": {
+          "halfToFullActualDelta": 0.5006396561762796,
+          "maximumHdrError": 0.0009765625,
+          "meanHdrError": 2.5816619984774045e-05,
+          "samples": 218037
+        },
+        "humanAsset": {
+          "beckmannRoughnessFormula": "SpecularAOMap.g * 0.5",
+          "cameraPosition": [
+            0,
+            0,
+            -150.63
+          ],
+          "cameraTarget": [
+            0,
+            -20,
+            0
+          ],
+          "diffuseOcclusionFormula": "SpecularAOMap.b",
+          "displayScope": "Raw native output; this harness does not reproduce the old demo's adaptive exposure or legacy fast-bloom U2 tone curve.",
+          "environmentFill": false,
+          "eyePolicy": "Pinned scan has genuine overlapping eye UV charts. Every ambiguous four-load footprint keeps screen diffuse; head UV transport remains active. No anatomical mask or source-byte rewrite is invented.",
+          "farPlane": 1000,
+          "materialGraph": "Materials/reference-skin.jmaterial",
+          "modelTranslation": [
+            0,
+            0,
+            0
+          ],
+          "nearPlane": 10,
+          "normal": "Assets/InfiniteHead/Infinite-Level_02_World_NoSmoothUV.jpg",
+          "normalPolicy": "Generated smooth mesh normals remain separate from the original linear NoSmoothUV object-normal map. Explicit (1,1,-1) input signs match importer MakeLeftHanded; no extra UV/normalY flip.",
+          "pointLightColor": [
+            0.6,
+            0.6,
+            0.6
+          ],
+          "pointLightIntensity": 160000,
+          "pointLightPosition": [
+            273,
+            117,
+            45
+          ],
+          "pointLightRange": 100000,
+          "preScatterWeight": 0.5,
+          "source": "Assets/InfiniteHead/Infinite-Level_02.OBJ",
+          "sourceModelScale": 300.0,
+          "specularAO": "Assets/InfiniteHead/SpecularAOMap.png",
+          "specularWeightFormula": "SpecularAOMap.r * 1.99",
+          "texture": "Assets/InfiniteHead/Infinite-Level_02.jpg",
+          "verticalFovDegrees": 45,
+          "worldUnitsPerMillimeter": 0.3
+        },
+        "materialGpuPixels": {
+          "human-half-weight": {
+            "correctFraction": 1.0,
+            "correctGpuMaterialPixels": 72679,
+            "eligibleAnatomicalPixels": 72679
+          },
+          "human-off": {
+            "correctFraction": 1.0,
+            "correctGpuMaterialPixels": 72679,
+            "eligibleAnatomicalPixels": 72679
+          },
+          "human-on": {
+            "correctFraction": 1.0,
+            "correctGpuMaterialPixels": 72679,
+            "eligibleAnatomicalPixels": 72679
+          },
+          "human-transmission-off": {
+            "correctFraction": 1.0,
+            "correctGpuMaterialPixels": 72679,
+            "eligibleAnatomicalPixels": 72679
+          },
+          "human-uv-unfiltered": {
+            "correctFraction": 1.0,
+            "correctGpuMaterialPixels": 72679,
+            "eligibleAnatomicalPixels": 72679
+          }
+        },
+        "portableStartupProject": "../../../examples/subsurface-human-demo/project.jproject",
+        "preparation": {
+          "frameLimit": 120,
+          "frames": 58,
+          "pendingMappingTextures": 0,
+          "seconds": 9.088260042,
+          "wallTimeLimitSeconds": 30
+        },
+        "renderedFrames": 76,
+        "rhi": "Vulkan",
+        "schemaVersion": 1,
+        "status": "passed",
+        "surfaceMeasurementProjection": {
+          "regions": [
+            "nose",
+            "cheek",
+            "ear-side",
+            "neck"
+          ],
+          "scope": "CPU projection/nearest-surface classification of actual imported triangles; no image is synthesized and all radiometry is read from actual GPU/PNG outputs",
+          "trianglePixelTests": 1742323,
+          "triangles": 17684,
+          "worldMaximum": [
+            69.64051818847656,
+            34.81187057495117,
+            66.33084869384766
+          ],
+          "worldMinimum": [
+            -66.34635925292969,
+            -91.5148696899414,
+            -16.042924880981445
+          ]
+        },
+        "test": "subsurface-human-gpu",
+        "transmissionControl": {
+          "eligiblePixels": 72679,
+          "maximumDiffuseLuminanceGain": 0.002150034749507904,
+          "positiveTransmissionPixels": 173,
+          "scope": "Same Gaussian and UV capture; only measured front-entry transmission is toggled.",
+          "sourceEntryDiagnostics": {
+            "atomicFlags": 1,
+            "coveredAtlasTexels": 961180,
+            "encodedTransmissionTexels": 178088,
+            "gaussianStepScale": 1.0,
+            "invalidFlagPixels": 0,
+            "localMissingCaptureTexels": 8428,
+            "maximumEncodedTransmission": 0.966796875,
+            "maximumEntryThicknessWorld": 95.1875,
+            "measuredTransmissionEntries": 439616,
+            "minimumEntryThicknessWorld": 0.05023193359375,
+            "overlappingAtlasTexels": 208,
+            "transmissionEnabled": true,
+            "visibleFallbackPixels": 5197
+          },
+          "summedPositiveDiffuseGain": 0.10844194518327673,
+          "unexpectedLossPixels": 0
+        },
+        "uvTransport": {
+          "human-half-weight": {
+            "atomicFlags": 1,
+            "coveredAtlasTexels": 961180,
+            "encodedTransmissionTexels": 178088,
+            "gaussianStepScale": 1.0,
+            "invalidFlagPixels": 0,
+            "localMissingCaptureTexels": 8428,
+            "maximumEncodedTransmission": 0.966796875,
+            "maximumEntryThicknessWorld": 95.1875,
+            "measuredTransmissionEntries": 439616,
+            "minimumEntryThicknessWorld": 0.05023193359375,
+            "overlappingAtlasTexels": 208,
+            "transmissionEnabled": true
+          },
+          "human-off": {
+            "atomicFlags": 1,
+            "coveredAtlasTexels": 961180,
+            "encodedTransmissionTexels": 178088,
+            "gaussianStepScale": 1.0,
+            "invalidFlagPixels": 0,
+            "localMissingCaptureTexels": 8428,
+            "maximumEncodedTransmission": 0.966796875,
+            "maximumEntryThicknessWorld": 95.1875,
+            "measuredTransmissionEntries": 439616,
+            "minimumEntryThicknessWorld": 0.05023193359375,
+            "overlappingAtlasTexels": 208,
+            "transmissionEnabled": true
+          },
+          "human-on": {
+            "atomicFlags": 1,
+            "coveredAtlasTexels": 961180,
+            "encodedTransmissionTexels": 178088,
+            "gaussianStepScale": 1.0,
+            "invalidFlagPixels": 0,
+            "localMissingCaptureTexels": 8428,
+            "maximumEncodedTransmission": 0.966796875,
+            "maximumEntryThicknessWorld": 95.1875,
+            "measuredTransmissionEntries": 439616,
+            "minimumEntryThicknessWorld": 0.05023193359375,
+            "overlappingAtlasTexels": 208,
+            "transmissionEnabled": true,
+            "visibleFallbackPixels": 5197
+          },
+          "human-transmission-off": {
+            "atomicFlags": 1,
+            "coveredAtlasTexels": 961180,
+            "encodedTransmissionTexels": 0,
+            "gaussianStepScale": 1.0,
+            "invalidFlagPixels": 0,
+            "localMissingCaptureTexels": 8428,
+            "maximumEncodedTransmission": 0.0,
+            "maximumEntryThicknessWorld": 0.0,
+            "measuredTransmissionEntries": 0,
+            "minimumEntryThicknessWorld": 0.0,
+            "overlappingAtlasTexels": 208,
+            "transmissionEnabled": false
+          },
+          "human-uv-unfiltered": {
+            "atomicFlags": 1,
+            "coveredAtlasTexels": 961180,
+            "encodedTransmissionTexels": 0,
+            "gaussianStepScale": 0.0,
+            "invalidFlagPixels": 0,
+            "localMissingCaptureTexels": 8428,
+            "maximumEncodedTransmission": 0.0,
+            "maximumEntryThicknessWorld": 0.0,
+            "measuredTransmissionEntries": 0,
+            "minimumEntryThicknessWorld": 0.0,
+            "overlappingAtlasTexels": 208,
+            "transmissionEnabled": false
+          }
+        },
+        "validationScope": "Caller collects actual Vulkan/Metal/DX12 messages. This harness creates no replacement renderer; readbacks/capture/CPU surface classification are outside frame timing.",
+        "visibleAnatomy": {
+          "cheek": {
+            "displayChangedPixels": 7332,
+            "eligiblePixels": 20735,
+            "gainPixels": 4475,
+            "hdrChangedPixels": 9376,
+            "lossPixels": 4431,
+            "meanMaximumChannelDisplayDelta": 2.6074752833373522,
+            "meanMaximumChannelHdrDelta": 0.006285862937616331,
+            "meaningful": true
+          },
+          "ear-side": {
+            "displayChangedPixels": 2106,
+            "eligiblePixels": 5945,
+            "gainPixels": 1697,
+            "hdrChangedPixels": 3049,
+            "lossPixels": 1247,
+            "meanMaximumChannelDisplayDelta": 6.994785534062237,
+            "meanMaximumChannelHdrDelta": 0.010888873437956866,
+            "meaningful": true
+          },
+          "neck": {
+            "displayChangedPixels": 6921,
+            "eligiblePixels": 34655,
+            "gainPixels": 5494,
+            "hdrChangedPixels": 12134,
+            "lossPixels": 5906,
+            "meanMaximumChannelDisplayDelta": 1.206377146154956,
+            "meanMaximumChannelHdrDelta": 0.002493230797067691,
+            "meaningful": true
+          },
+          "nose": {
+            "displayChangedPixels": 4765,
+            "eligiblePixels": 11344,
+            "gainPixels": 2287,
+            "hdrChangedPixels": 4547,
+            "lossPixels": 1879,
+            "meanMaximumChannelDisplayDelta": 4.600581805359662,
+            "meanMaximumChannelHdrDelta": 0.007392372830924598,
+            "meaningful": true
+          }
+        }
+      }
+    }
+  },
+  "checkout_preferences_preserved": true
+}
