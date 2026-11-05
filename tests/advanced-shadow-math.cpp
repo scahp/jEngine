@@ -31,6 +31,13 @@ bool ContainsCorners(const Mat4& matrix,const FrustumCorners& corners)
     for(const auto& corner:corners){Vec3 p;if(!ProjectPoint(matrix,corner,p)||std::abs(p[0])>1.000001||std::abs(p[1])>1.000001||p[2]<-.000001||p[2]>1.000001)return false;}
     return true;
 }
+FrustumCorners Box(const Vec3& minimum,const Vec3& maximum)
+{
+    FrustumCorners result;
+    for(std::size_t corner=0;corner<8;++corner)for(std::size_t axis=0;axis<3;++axis)
+        result[corner][axis]=(corner&(1<<axis))?maximum[axis]:minimum[axis];
+    return result;
+}
 TriangleMesh Cube()
 {
     return {{{-1,-1,-1},{1,-1,-1},{1,1,-1},{-1,1,-1},{-1,-1,1},{1,-1,1},{1,1,1},{-1,1,1}},
@@ -86,6 +93,158 @@ void TestMatricesAndCascades()
     input.NearDistance=1;input.Corners={};Check(!BuildCascades(input,result,error),"degenerate receiver frustum is rejected");
     input.Corners=Frustum(1,101);input.LightDirection={0,0,0};Check(!BuildCascades(input,result,error),"zero light direction is rejected");
 }
+void TestDirectionalFit()
+{
+    std::string error;
+    const std::array<FrustumCorners,1> receivers{Box({-200,0,100},{200,0,500})};
+    const std::array<FrustumCorners,1> casters{Box({-50,0,200},{50,100,300})};
+    DirectionalFitInput input;input.ViewCorners=Frustum(1,1000);input.ReceiverBoxes=receivers;input.CasterBoxes=casters;
+    input.Resolution=256;input.CasterPadding=20;DirectionalFitResult fit;
+    const bool made=BuildDirectionalFit(input,fit,error);
+    Check(made&&fit.ReceiverBoxCount==1&&fit.OverlappingCasterBoxCount==1,"directional scene fit accepts planar receivers and real caster bounds");
+    if(!made)return;
+    const auto baseline=fit;
+    Check(Near(fit.LightSpaceMaximum[2]-fit.LightSpaceMinimum[2],120)&&ContainsCorners(fit.WorldToShadow,receivers[0])&&ContainsCorners(fit.WorldToShadow,casters[0]),
+        "fitted depth covers the receiver, upstream caster and configured padding without the legacy 20000-unit range");
+    Vec3 blocker,receiver;ProjectPoint(fit.WorldToShadow,{0,100,250},blocker);ProjectPoint(fit.WorldToShadow,{0,0,250},receiver);
+    double newEsm=0,oldEsm=0,newVsm=0,oldVsm=0,moment=0;Vec2 moments;
+    EsmMoment(blocker[2],32,moment,error);EsmVisibility(moment,receiver[2]-.001,32,newEsm,error);
+    const double oldReceiver=(10000.0-10)/19990,oldBlocker=(10000.0-100-10)/19990;
+    EsmMoment(oldBlocker,32,moment,error);EsmVisibility(moment,oldReceiver-.001,32,oldEsm,error);
+    VsmMoments(blocker[2],moments,error);VsmVisibility(moments,receiver[2]-.001,1e-5,.2,newVsm,error);
+    VsmMoments(oldBlocker,moments,error);VsmVisibility(moments,oldReceiver-.001,1e-5,.2,oldVsm,error);
+    Check(newEsm<.01&&oldEsm>.85&&newVsm<.01&&oldVsm>.2,
+        "same exponents, variance and bias retain actual blocker contrast after scene depth fitting");
+    Check(100/fit.WorldUnitsPerTexel[0]>16&&100/(6144.0/256)<7,
+        "100-unit caster has room for the seven-tap filter instead of the legacy 4.17-texel footprint");
+    auto movedReceivers=receivers,movedCasters=casters;const double shift=.1*fit.WorldUnitsPerTexel[0];
+    for(auto& point:movedReceivers[0])point[0]+=shift;for(auto& point:movedCasters[0])point[0]+=shift;
+    auto moved=input;moved.ReceiverBoxes=movedReceivers;moved.CasterBoxes=movedCasters;DirectionalFitResult stable,unstable;
+    bool steady=BuildDirectionalFit(moved,stable,error);
+    for(std::size_t i=0;i<16;++i)steady&=float(stable.WorldToShadow[i])==float(fit.WorldToShadow[i]);
+    moved.Stabilize=false;steady&=BuildDirectionalFit(moved,unstable,error)&&std::abs(unstable.WorldToShadow[12]-fit.WorldToShadow[12])>1e-6;
+    Check(steady,"texel-center snapping prevents subtexel fit motion while the unstabilized fit moves");
+    auto reverse=input;reverse.ReverseZ=true;DirectionalFitResult reversed;bool reverseOk=BuildDirectionalFit(reverse,reversed,error);
+    for(const auto& point:casters[0]){Vec3 a,b;reverseOk&=ProjectPoint(fit.WorldToShadow,point,a)&&ProjectPoint(reversed.WorldToShadow,point,b)&&Near(a[2]+b[2],1)&&Near(a[0],b[0])&&Near(a[1],b[1]);}
+    Check(reverseOk,"directional fit reverse-Z preserves XY and reverses producer depth only");
+    const std::array<FrustumCorners,2> offCamera{casters[0],Box({-50,1200,200},{50,1300,300})};
+    auto off=input;off.CasterBoxes=offCamera;
+    Check(BuildDirectionalFit(off,fit,error)&&fit.OverlappingCasterBoxCount==2&&fit.LightSpaceMinimum[2]<=-1320&&ContainsCorners(fit.WorldToShadow,offCamera[1]),
+        "off-camera caster above the view retains its shadow on a visible receiver");
+    const std::array<FrustumCorners,2> disjoint{casters[0],Box({5000,100000,200},{5100,100100,300})};
+    off.CasterBoxes=disjoint;
+    Check(BuildDirectionalFit(off,fit,error)&&fit.OverlappingCasterBoxCount==1&&Near(fit.LightSpaceMinimum[2],baseline.LightSpaceMinimum[2]),
+        "far off-axis caster does not inflate the fitted receiver depth interval");
+    const std::array<FrustumCorners,2> downstream{casters[0],Box({-50,-1000,200},{50,-900,300})};
+    off.CasterBoxes=downstream;
+    Check(BuildDirectionalFit(off,fit,error)&&fit.OverlappingCasterBoxCount==1&&Near(fit.LightSpaceMaximum[2],baseline.LightSpaceMaximum[2]),
+        "caster behind every receiver does not extend the shadow far plane");
+    const std::array<FrustumCorners,1> hugeFloor{Box({-5000,0,-5000},{5000,0,5000})};auto cropped=input;cropped.ReceiverBoxes=hugeFloor;
+    Check(BuildDirectionalFit(cropped,fit,error)&&fit.LightSpaceMaximum[0]-fit.LightSpaceMinimum[0]<2100&&
+        fit.LightSpaceMaximum[1]-fit.LightSpaceMinimum[1]<1100,"receiver extent is intersected with the bounded view rather than fitting an entire distant floor");
+    const auto rejects=[&](const DirectionalFitInput& invalid)
+    {
+        auto retained=baseline;
+        return !BuildDirectionalFit(invalid,retained,error)&&retained.WorldToShadow==baseline.WorldToShadow&&
+            retained.LightSpaceMinimum==baseline.LightSpaceMinimum&&retained.LightSpaceMaximum==baseline.LightSpaceMaximum&&
+            retained.WorldUnitsPerTexel==baseline.WorldUnitsPerTexel&&retained.ReceiverBoxCount==baseline.ReceiverBoxCount&&
+            retained.OverlappingCasterBoxCount==baseline.OverlappingCasterBoxCount;
+    };
+    auto invalid=input;invalid.ReceiverBoxes={};Check(rejects(invalid),"empty receiver input retains the complete last valid fit");
+    invalid=input;invalid.CasterBoxes={};Check(rejects(invalid),"empty caster input retains the complete last valid fit");
+    auto badReceiver=receivers;badReceiver[0][0][0]=std::numeric_limits<double>::quiet_NaN();invalid=input;invalid.ReceiverBoxes=badReceiver;
+    Check(rejects(invalid),"nonfinite receiver corner is rejected transactionally");
+    auto badCaster=casters;badCaster[0][0][1]=std::numeric_limits<double>::infinity();invalid=input;invalid.CasterBoxes=badCaster;
+    Check(rejects(invalid),"nonfinite caster corner is rejected transactionally");
+    invalid=input;invalid.LightDirection={0,0,0};Check(rejects(invalid),"zero directional ray cannot publish a fit");
+    invalid=input;invalid.Resolution=0;bool invalidSettings=rejects(invalid);invalid=input;invalid.CasterPadding=-1;invalidSettings&=rejects(invalid);
+    Check(invalidSettings,"invalid resolution or negative padding preserves the last fit");
+    const std::vector<FrustumCorners> overBudget(MaximumDirectionalFitBoxes+1,receivers[0]);invalid=input;invalid.ReceiverBoxes=overBudget;
+    bool bounded=rejects(invalid);invalid=input;invalid.CasterBoxes=overBudget;bounded&=rejects(invalid);
+    Check(bounded,"both receiver and caster box counts have a hard admission budget");
+    const std::array<FrustumCorners,1> outside{Box({5000,0,200},{5100,0,300})};invalid=input;invalid.ReceiverBoxes=outside;
+    Check(rejects(invalid),"receiver outside the view does not produce a misleading empty fit");
+    invalid=input;invalid.CasterBoxes=outside;Check(rejects(invalid),"caster with no overlapping light footprint fails without changing output");
+    const std::array<FrustumCorners,1> line{Box({0,0,200},{0,0,300})},coplanar{Box({-50,0,200},{50,0,300})};
+    invalid=input;invalid.ReceiverBoxes=line;bool degenerate=rejects(invalid);invalid=input;invalid.CasterBoxes=coplanar;invalid.CasterPadding=0;degenerate&=rejects(invalid);
+    Check(degenerate,"zero-area receiver and zero-depth coplanar fits fail explicitly");
+}
+
+void TestNativeDirectionalFit()
+{
+    // The actual moment-map regression scene, independent of the old
+    // directional camera's +/-3072 XY and 10..20000 depth defaults.
+    constexpr double pi=3.14159265358979323846;
+    const Vec3 eye{0,220,-800},target{0,80,300};
+    auto forward=Sub(target,eye);const double forwardLength=Length(forward);for(auto& value:forward)value/=forwardLength;
+    auto right=Cross({0,1,0},forward);const double rightLength=Length(right);for(auto& value:right)value/=rightLength;
+    const auto up=Cross(forward,right);
+    const double tangent=std::tan(65*pi/360),aspect=1280.0/720.0,rx=55*pi/180,ry=-20*pi/180;
+    DirectionalFitInput input;input.Resolution=256;input.CasterPadding=250;
+    input.LightDirection={-std::sin(rx)*std::sin(ry),-std::cos(rx),-std::sin(rx)*std::cos(ry)};
+    for(std::size_t i=0;i<8;++i)
+    {
+        const double distance=i<4?1.0:1600.0,sx=(i&1)?1.0:-1.0,sy=(i&2)?-1.0:1.0;
+        for(std::size_t axis=0;axis<3;++axis)
+            input.ViewCorners[i][axis]=eye[axis]+distance*(forward[axis]+sx*tangent*aspect*right[axis]+sy*tangent*up[axis]);
+    }
+    const std::array<Vec3,3> centers{{{-100,70,60},{100,70,130},{30,50,-100}}};
+    std::array<FrustumCorners,3> casters;
+    for(std::size_t i=0;i<casters.size();++i)
+    {
+        Vec3 minimum,maximum;for(std::size_t axis=0;axis<3;++axis){minimum[axis]=centers[i][axis]-50;maximum[axis]=centers[i][axis]+50;}
+        casters[i]=Box(minimum,maximum);
+    }
+    const std::array<FrustumCorners,4> receivers{Box({-750,0,-800},{750,0,800}),casters[0],casters[1],casters[2]};
+    input.ReceiverBoxes=receivers;input.CasterBoxes=casters;
+    std::string error;DirectionalFitResult result;
+    const bool made=BuildDirectionalFit(input,result,error);
+    const double span=result.LightSpaceMaximum[2]-result.LightSpaceMinimum[2];
+    bool contained=made;for(const auto& box:casters)contained&=ContainsCorners(result.WorldToShadow,box);
+    Check(contained&&result.ReceiverBoxCount==4&&result.OverlappingCasterBoxCount==3&&std::isfinite(span)&&span>500&&span<4000&&
+        result.WorldUnitsPerTexel[0]<6144.0/256&&result.WorldUnitsPerTexel[1]<6144.0/256,
+        "native sloped sun, 1500x1600 floor and three 100-unit cubes retain a finite tight scene fit");
+    if(!made)return;
+    const auto baseline=result;
+    const double groundDistance=-centers[0][1]/input.LightDirection[1];
+    const double entryDistance=50/std::max({std::abs(input.LightDirection[0]),std::abs(input.LightDirection[1]),std::abs(input.LightDirection[2])});
+    Vec3 ground,entry,projectedGround,projectedEntry;
+    for(std::size_t axis=0;axis<3;++axis)
+    {
+        ground[axis]=centers[0][axis]+input.LightDirection[axis]*groundDistance;
+        entry[axis]=centers[0][axis]-input.LightDirection[axis]*entryDistance;
+    }
+    double esm=1,vsm=1,moment=0;Vec2 moments;
+    bool contrast=ProjectPoint(result.WorldToShadow,ground,projectedGround)&&ProjectPoint(result.WorldToShadow,entry,projectedEntry);
+    contrast=contrast&&Near(projectedGround[0],projectedEntry[0])&&Near(projectedGround[1],projectedEntry[1])&&projectedGround[2]>projectedEntry[2]&&
+        EsmMoment(projectedEntry[2],32,moment,error)&&EsmVisibility(moment,projectedGround[2]-.001,32,esm,error)&&
+        VsmMoments(projectedEntry[2],moments,error)&&VsmVisibility(moments,projectedGround[2]-.001,1e-5,.2,vsm,error);
+    Check(contrast&&esm<.1&&vsm<.01,
+        "native cube entry and its ground receiver preserve occlusion with unchanged exponent, variance and bias");
+    Vec3 upstreamMinimum,upstreamMaximum,upstreamCenter;
+    for(std::size_t axis=0;axis<3;++axis)
+    {
+        upstreamCenter[axis]=ground[axis]-input.LightDirection[axis]*2000;
+        upstreamMinimum[axis]=upstreamCenter[axis]-10;upstreamMaximum[axis]=upstreamCenter[axis]+10;
+    }
+    const std::array<FrustumCorners,4> withOffCamera{casters[0],casters[1],casters[2],Box(upstreamMinimum,upstreamMaximum)};
+    auto offCamera=input;offCamera.CasterBoxes=withOffCamera;
+    Check(Dot(Sub(upstreamCenter,eye),forward)>1600&&BuildDirectionalFit(offCamera,result,error)&&result.OverlappingCasterBoxCount==4&&
+        result.LightSpaceMinimum[2]<baseline.LightSpaceMinimum[2]&&ContainsCorners(result.WorldToShadow,withOffCamera[3]),
+        "sloped off-camera caster past the view far plane still casts into the visible floor footprint");
+    // Move only along the light's X axis: this is provably disjoint in shadow
+    // XY rather than relying on a point being outside the camera frustum.
+    auto lightX=Cross({0,1,0},input.LightDirection);const double lightXLength=Length(lightX);for(auto& value:lightX)value/=lightXLength;
+    std::array<FrustumCorners,1> disjoint{casters[0]};
+    for(auto& point:disjoint[0])for(std::size_t axis=0;axis<3;++axis)point[axis]+=lightX[axis]*10000;
+    auto empty=input;empty.CasterBoxes=disjoint;result=baseline;
+    Check(!BuildDirectionalFit(empty,result,error)&&result.WorldToShadow==baseline.WorldToShadow&&
+        result.LightSpaceMinimum==baseline.LightSpaceMinimum&&result.LightSpaceMaximum==baseline.LightSpaceMaximum&&
+        result.WorldUnitsPerTexel==baseline.WorldUnitsPerTexel&&result.ReceiverBoxCount==baseline.ReceiverBoxCount&&
+        result.OverlappingCasterBoxCount==baseline.OverlappingCasterBoxCount,
+        "sloped zero-overlap caster fails and preserves every field of the last valid scene fit");
+}
+
 void TestPerspectiveAndParaboloid()
 {
     std::string error;PerspectiveInput input;input.Corners=Frustum();input.CameraViewProjection=Camera();input.LightDirection={3,-2,-1};
@@ -263,6 +422,63 @@ void TestVolumes()
     input={distant.Positions,distant.Indices,{-8e8,0,0},true,true,32};
     Check(BuildShadowVolume(input,result,error)&&ClosedOriented(result),"valid large light and mesh coordinates normalize their derived vector beyond one billion units");
 }
+void TestPerspectiveMomentDepth()
+{
+    std::string error;double converted=.432,nearDepth=-1,farDepth=-1;
+    Check(PerspectiveMomentDepth(0,10,500,nearDepth,error)&&nearDepth==0&&
+        PerspectiveMomentDepth(1,10,500,farDepth,error)&&farDepth==1,
+        "perspective moment conversion preserves exact near and far endpoints");
+    const auto ndcAtDistance=[](double distance){return 500*(distance-10)/(distance*490);};
+    Check(PerspectiveMomentDepth(ndcAtDistance(255),10,500,converted,error)&&Near(converted,.5),
+        "light-view midpoint maps to half linear depth rather than the far-biased NDC midpoint");
+    const double blockerNdc=ndcAtDistance(400),receiverNdc=ndcAtDistance(410);double blocker,receiver;
+    const bool pair=PerspectiveMomentDepth(blockerNdc,10,500,blocker,error)&&PerspectiveMomentDepth(receiverNdc,10,500,receiver,error);
+    Check(pair&&receiverNdc-blockerNdc<.001&&Near(blocker,390.0/490)&&Near(receiver,400.0/490)&&receiver-blocker>.02,
+        "400/410-unit point and spot shadow pair retains its physical depth separation after normalization");
+    if(pair)
+    {
+        Vec2 moments;double before=0,after=1;
+        Check(VsmMoments(blockerNdc,moments,error)&&VsmVisibility(moments,receiverNdc-.001,1e-5,.2,before,error)&&
+            VsmMoments(blocker,moments,error)&&VsmVisibility(moments,receiver-.001,1e-5,.2,after,error)&&before==1&&after<.01,
+            "linear point/spot VSM recovers the far blocker with unchanged bias, variance and bleeding reduction");
+        double moment;
+        Check(EsmMoment(blockerNdc,32,moment,error)&&EsmVisibility(moment,receiverNdc-.001,32,before,error)&&
+            EsmMoment(blocker,32,moment,error)&&EsmVisibility(moment,receiver-.001,32,after,error)&&before==1&&after<.6,
+            "linear point/spot ESM restores meaningful far attenuation at the unchanged exponent32");
+        Vec4 evsm;
+        Check(EvsmMoments(blockerNdc,32,8,evsm,error)&&EvsmVisibility(evsm,receiverNdc-.001,32,8,1e-5,.2,before,error)&&
+            EvsmMoments(blocker,32,8,evsm,error)&&EvsmVisibility(evsm,receiver-.001,32,8,1e-5,.2,after,error)&&before==1&&after<.01,
+            "linear point/spot EVSM recovers the far blocker with both existing warp exponents");
+    }
+    else
+    {
+        Check(false,"linear point/spot VSM pair conversion failed");
+        Check(false,"linear point/spot ESM pair conversion failed");
+        Check(false,"linear point/spot EVSM pair conversion failed");
+    }
+    bool ordered=true;double previous=-1;
+    for(int i=0;i<=100;++i)
+    {
+        const double distance=10+490*i/100.0,ndc=ndcAtDistance(distance);double scaled;
+        ordered&=PerspectiveMomentDepth(ndc,10,500,converted,error)&&converted>=previous&&Near(converted,i/100.0)&&
+            PerspectiveMomentDepth(ndc,170,8500,scaled,error)&&Near(converted,scaled);
+        previous=converted;
+    }
+    Check(ordered,"linear moment depth is monotonic, matches world-distance fractions and is invariant to scene-unit scaling");
+    const auto rejects=[&](double depth,double nearDistance,double farDistance)
+    {converted=.432;return !PerspectiveMomentDepth(depth,nearDistance,farDistance,converted,error)&&converted==.432&&!error.empty();};
+    const double nan=std::numeric_limits<double>::quiet_NaN(),infinity=std::numeric_limits<double>::infinity();
+    Check(rejects(-.01,10,500)&&rejects(1.01,10,500)&&rejects(nan,10,500)&&rejects(infinity,10,500),
+        "out-of-range or nonfinite perspective depth preserves output");
+    Check(rejects(.5,0,500)&&rejects(.5,-1,500)&&rejects(.5,nan,500)&&rejects(.5,infinity,500),
+        "nonpositive or nonfinite light near distance preserves output");
+    Check(rejects(.5,10,10)&&rejects(.5,10,9)&&rejects(.5,10,nan)&&rejects(.5,10,infinity),
+        "unordered or nonfinite light far distance preserves output");
+    const double maximum=std::numeric_limits<double>::max(),minimum=std::numeric_limits<double>::denorm_min();
+    Check(PerspectiveMomentDepth(1,minimum,maximum,converted,error)&&converted==1&&
+        PerspectiveMomentDepth(.5,maximum/2,maximum,converted,error)&&Near(converted,1.0/3),
+        "finite extreme near/far ratios avoid far-endpoint cancellation and intermediate overflow");
+}
 void TestMomentsAndDeep()
 {
     std::string error;Vec2 moments;double visibility=0;
@@ -298,6 +514,6 @@ void TestMomentsAndDeep()
 }
 int main()
 {
-    TestMatricesAndCascades();TestPerspectiveAndParaboloid();TestNativePerspectiveFixture();TestSubdivision();TestVolumes();TestMomentsAndDeep();
+    TestMatricesAndCascades();TestDirectionalFit();TestNativeDirectionalFit();TestPerspectiveAndParaboloid();TestNativePerspectiveFixture();TestSubdivision();TestVolumes();TestPerspectiveMomentDepth();TestMomentsAndDeep();
     std::cout<<"Advanced shadow math: "<<passed<<'/'<<(passed+failed)<<" passed\n";return failed?1:0;
 }

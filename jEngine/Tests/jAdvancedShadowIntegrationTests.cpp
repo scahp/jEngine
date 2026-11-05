@@ -15,12 +15,14 @@
 #include "Shader/jAdvancedShadowShaderParameters.h"
 #include "jEngine.h"
 #include "jOptions.h"
+#include "lodepng.h"
 #include "External/PathTracingDataLoader/json.hpp"
 #include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
 #include <cstring>
+#include <cstdlib>
 #include <fstream>
 #include <functional>
 #include <limits>
@@ -116,7 +118,8 @@ struct FloatImage
     Json Summary;
 };
 
-enum class SceneCase { Legacy, Normal, Cascades, MovedCascades, DeepHalf, DeepThreeQuarter,
+enum class SceneCase { Legacy, ShadowOff, PointShadowOff, PointMoments, SpotShadowOff, SpotMoments,
+    Normal, Cascades, MovedCascades, DeepHalf, DeepThreeQuarter,
     Dual, Perspective, Volume, InsideVolume, InvalidVolume, OverrideIsolation };
 struct Case
 {
@@ -126,6 +129,152 @@ struct Case
     Pipeline Renderer = Pipeline::Deferred;
     bool Profile = false;
 };
+
+bool IsPointMomentCase(SceneCase scene) { return scene == SceneCase::PointShadowOff || scene == SceneCase::PointMoments; }
+bool IsSpotMomentCase(SceneCase scene) { return scene == SceneCase::SpotShadowOff || scene == SceneCase::SpotMoments; }
+bool IsShadowOff(SceneCase scene)
+{ return scene == SceneCase::ShadowOff || scene == SceneCase::PointShadowOff || scene == SceneCase::SpotShadowOff; }
+
+Json MatrixValues(const Matrix& matrix);
+Json VectorValues(const Vector& value);
+Json VectorValues(const Vector4& value);
+
+struct ReceiverBox { Vector Minimum, Maximum; };
+
+std::optional<ReceiverBox> FixtureWorldBounds(const jObject* object)
+{
+    if (!object) return {};
+    ReceiverBox box{Vector(std::numeric_limits<float>::max()), Vector(-std::numeric_limits<float>::max())};
+    size_t vertices = 0;
+    for (const auto* mesh : object->RenderObjects)
+    {
+        const auto geometry = mesh ? mesh->GeometryDataPtr : nullptr;
+        const auto stream = geometry ? geometry->VertexStream_PositionOnlyPtr : nullptr;
+        if (!stream || stream->Params.empty() || stream->ElementCount <= 0) return {};
+        const auto& parameter = stream->Params.front();
+        const size_t stride = parameter->Stride > 0 ? size_t(parameter->Stride) : sizeof(float) * 3;
+        const size_t count = size_t(stream->ElementCount);
+        if (stride < sizeof(float) * 3 || count > 1000000 || parameter->Attributes.empty()
+            || parameter->Attributes.front().UnderlyingType != EBufferElementType::FLOAT
+            || parameter->GetBufferSize() < (count - 1) * stride + sizeof(float) * 3) return {};
+        const auto* bytes = static_cast<const unsigned char*>(parameter->GetBufferData());
+        for (size_t i = 0; i < count; ++i)
+        {
+            float xyz[3]; std::memcpy(xyz, bytes + i * stride, sizeof(xyz));
+            const auto point = mesh->World.TransformPoint(Vector(xyz[0], xyz[1], xyz[2]));
+            if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z)) return {};
+            box.Minimum.x = std::min(box.Minimum.x, point.x); box.Maximum.x = std::max(box.Maximum.x, point.x);
+            box.Minimum.y = std::min(box.Minimum.y, point.y); box.Maximum.y = std::max(box.Maximum.y, point.y);
+            box.Minimum.z = std::min(box.Minimum.z, point.z); box.Maximum.z = std::max(box.Maximum.z, point.z);
+            ++vertices;
+        }
+    }
+    return vertices ? std::optional<ReceiverBox>(box) : std::nullopt;
+}
+
+bool RayHitsFixtureBox(const Vector& origin, const Vector& direction, float maximumT, const ReceiverBox& box)
+{
+    float first = .0001f, last = maximumT;
+    const std::array<float, 3> o{origin.x, origin.y, origin.z}, d{direction.x, direction.y, direction.z};
+    const std::array<float, 3> minimum{box.Minimum.x, box.Minimum.y, box.Minimum.z};
+    const std::array<float, 3> maximum{box.Maximum.x, box.Maximum.y, box.Maximum.z};
+    for (size_t axis = 0; axis < 3; ++axis)
+    {
+        if (std::abs(d[axis]) < 1e-8f)
+        { if (o[axis] < minimum[axis] || o[axis] > maximum[axis]) return false; continue; }
+        float a = (minimum[axis] - o[axis]) / d[axis], b = (maximum[axis] - o[axis]) / d[axis];
+        if (a > b) std::swap(a, b);
+        first = std::max(first, a); last = std::min(last, b);
+        if (first > last) return false;
+    }
+    return last >= first;
+}
+
+Json FloorReceiverRois(const fs::path& path, const jEditor& editor, const jCamera& camera,
+    const std::array<EntityId, 3>& casterIds, EntityId lightEntity, const jLight* light)
+{
+    unsigned char* decoded = nullptr; unsigned width = 0, height = 0;
+    const auto pngError = LodePNG_decode32_file(&decoded, &width, &height, jEditorAssetPath::ToUtf8(path).c_str());
+    const std::unique_ptr<unsigned char, decltype(&std::free)> rgba(decoded, &std::free);
+    Json result{{"png", path.generic_string()}, {"decodeError", pngError}, {"width", width}, {"height", height},
+        {"patchRadiusPixels", 2}, {"luminanceUnits", "Rec.709 luma of actual 8-bit post-tonemap scene RGB"},
+        {"cameraVP", MatrixValues(camera.ViewProjection)}, {"cameraPosition", VectorValues(camera.Pos)},
+        {"receivers", Json::array()}};
+    if (pngError || !rgba || !width || !height || !light) return result;
+    const bool positional = light->Type == ELightType::POINT || light->Type == ELightType::SPOT;
+    const auto direction = light->Type == ELightType::POINT ? Vector::ZeroVector : light->GetDirection().GetNormalize();
+    const auto position = light->GetPosition();
+    result["lightDirection"] = VectorValues(direction);
+    result["lightPosition"] = VectorValues(position);
+    result["lightType"] = int(light->Type);
+    if (const auto* authored = editor.GetDocument().Find(lightEntity))
+        result["lightRadiometry"] = {{"color", {authored->Light.Color.X, authored->Light.Color.Y, authored->Light.Color.Z}},
+            {"intensity", authored->Light.Intensity}, {"range", authored->Light.Range},
+            {"innerConeDegrees", authored->Light.InnerConeDegrees}, {"outerConeDegrees", authored->Light.OuterConeDegrees}};
+    std::vector<ReceiverBox> boxes;
+    std::vector<size_t> boxIndices;
+    for (size_t i = 0; i < casterIds.size(); ++i)
+        if (auto box = FixtureWorldBounds(editor.ObjectForEntity(casterIds[i])))
+        { boxes.push_back(*box); boxIndices.push_back(i); }
+    result["knownCasterBounds"] = boxes.size();
+    result["casterBounds"] = Json::array();
+    for (size_t i = 0; i < boxes.size(); ++i)
+        result["casterBounds"].push_back({{"casterIndex", boxIndices[i]},
+            {"minimum", VectorValues(boxes[i].Minimum)}, {"maximum", VectorValues(boxes[i].Maximum)}});
+    const auto cameraVisible = [&](const Vector& world) {
+        for (const auto& box : boxes)
+            if (RayHitsFixtureBox(camera.Pos, world - camera.Pos, .99999f, box)) return false;
+        return true;
+    };
+    const auto patch = [&](const Vector& world) -> Json {
+        Json value{{"world", VectorValues(world)}, {"valid", false}, {"geometricallyVisible", cameraVisible(world)}};
+        const auto clip = camera.ViewProjection.Transform(Vector4(world, 1));
+        if (!std::isfinite(clip.w) || clip.w <= 1e-7f || !std::isfinite(clip.x) || !std::isfinite(clip.y)
+            || !std::isfinite(clip.z) || clip.z < 0 || clip.z > clip.w) return value;
+        const double px = (double(clip.x) / clip.w * .5 + .5) * width;
+        const double py = (.5 - double(clip.y) / clip.w * .5) * height;
+        const int x = int(std::floor(px)), y = int(std::floor(py));
+        value["projectedPixel"] = {px, py}; value["pixel"] = {x, y};
+        if (x < 2 || y < 2 || x + 2 >= int(width) || y + 2 >= int(height)) return value;
+        double sum = 0, minimum = 255, maximum = 0;
+        for (int dy = -2; dy <= 2; ++dy) for (int dx = -2; dx <= 2; ++dx)
+        {
+            const auto* p = rgba.get() + (size_t(y + dy) * width + size_t(x + dx)) * 4;
+            const double luminance = .2126 * p[0] + .7152 * p[1] + .0722 * p[2];
+            sum += luminance; minimum = std::min(minimum, luminance); maximum = std::max(maximum, luminance);
+        }
+        value["samples"] = 25; value["meanLuminance"] = sum / 25;
+        value["minimumLuminance"] = minimum; value["maximumLuminance"] = maximum;
+        value["valid"] = value["geometricallyVisible"].get<bool>();
+        return value;
+    };
+    for (size_t i = 0; i < boxes.size(); ++i)
+    {
+        const auto center = (boxes[i].Minimum + boxes[i].Maximum) * .5f;
+        const auto ray = positional ? (center - position).GetNormalize() : direction;
+        if (ray.y >= -.05f) continue;
+        const auto receiver = center + ray * (-center.y / ray.y);
+        auto value = patch(receiver);
+        value["casterIndex"] = boxIndices[i];
+        value["construction"] = positional ? "Actual fixture caster center projected from positional light to floor y=0"
+            : "Actual fixture caster center projected along directional ray to floor y=0";
+        result["receivers"].push_back(value);
+    }
+    std::vector<Vector> candidates;
+    if (positional) candidates.emplace_back(-250, 0, -100);
+    for (const auto& candidate : {Vector(-450, 0, -100), Vector(-450, 0, 200),
+        Vector(450, 0, -100), Vector(450, 0, 200), Vector(0, 0, -400)}) candidates.push_back(candidate);
+    for (const auto& world : candidates)
+    {
+        bool shadowed = false;
+        const auto toLight = positional ? position - world : -direction;
+        for (const auto& box : boxes) shadowed |= RayHitsFixtureBox(world, toLight, positional ? .99999f : 1000000.f, box);
+        if (shadowed) continue;
+        const auto value = patch(world);
+        if (value.value("valid", false)) { result["litControl"] = value; break; }
+    }
+    return result;
+}
 
 struct Run
 {
@@ -138,7 +287,7 @@ struct Run
     bool SavedCasterFlagsCorrect = true, SavedLightModesCorrect = true, RuntimeCasterFlagsCorrect = true;
     size_t ReopenedScenes = 0;
     Vector CameraPosition{0, 220, -800}, CameraTarget{0, 80, 300};
-    EntityId Floor = 0, Sun = 0, Point = 0, Camera = 0;
+    EntityId Floor = 0, Sun = 0, Point = 0, Spot = 0, RoiLight = 0, Camera = 0;
     std::array<EntityId, 3> Casters{};
     std::array<EntityId, 2> Layers{};
     std::array<EntityId, 4> Witnesses{};
@@ -222,7 +371,11 @@ struct Run
             && image.value("width", 0) > 0 && image.value("height", 0) > 0
             && image.value("litPixels", size_t(0)) > 4 && finite
             && !image.value("pixelHash", std::string{}).empty(), name + " has actual finite nonblack scene pixels", image);
-        Report["captures"][name] = image; Images[name] = image; return image;
+        Report["captures"][name] = image; Images[name] = image;
+        if (FixtureReady && g_Engine->Game.MainCamera)
+            Report["receiverRois"][name] = FloorReceiverRois(path, *g_Editor,
+                *g_Engine->Game.MainCamera, Casters, RoiLight, g_Editor->LightForEntity(RoiLight));
+        Progress(); return image;
     }
     void Different(const std::string& before, const std::string& after, const std::string& reason)
     {
@@ -262,6 +415,83 @@ struct Run
         return result;
     }
 };
+
+void CheckVisibleMomentOcclusion(Run& run, const std::string& shadowOn, const std::string& shadowOff)
+{
+    constexpr double MinimumContrast = .25, MinimumControlLuminance = 20, MaximumControlLuminance = 235, LitTolerance = .10;
+    Json metrics{{"shadowOn", shadowOn}, {"shadowOff", shadowOff}, {"minimumReceiverContrast", MinimumContrast},
+        {"minimumOffLuminance", MinimumControlLuminance}, {"litRelativeTolerance", LitTolerance},
+        {"maximumOffLuminanceExclusive", MaximumControlLuminance},
+        {"receiverComparisons", Json::array()}};
+    bool available = run.Report.contains("receiverRois") && run.Report["receiverRois"].contains(shadowOn)
+        && run.Report["receiverRois"].contains(shadowOff);
+    size_t validReceivers = 0, occludedReceivers = 0;
+    bool litStable = false;
+    const auto sameCoordinates = [](const Json& a, const Json& b) {
+        if (!a.contains("world") || !b.contains("world") || !a.contains("pixel") || !b.contains("pixel")
+            || a["pixel"] != b["pixel"]) return false;
+        for (size_t axis = 0; axis < 3; ++axis)
+            if (std::abs(a["world"][axis].get<double>() - b["world"][axis].get<double>()) > 1e-4) return false;
+        return true;
+    };
+    if (available)
+    {
+        const auto& on = run.Report["receiverRois"][shadowOn];
+        const auto& off = run.Report["receiverRois"][shadowOff];
+        available = on.value("decodeError", 1u) == 0 && off.value("decodeError", 1u) == 0
+            && on.value("width", 0) == off.value("width", 0) && on.value("height", 0) == off.value("height", 0);
+        bool sameContext = on.contains("cameraVP") && off.contains("cameraVP")
+            && on.contains("lightDirection") && off.contains("lightDirection")
+            && on.contains("lightPosition") && off.contains("lightPosition")
+            && on.value("lightType", -1) == off.value("lightType", -2)
+            && on.value("lightRadiometry", Json::object()) == off.value("lightRadiometry", Json::object())
+            && on.contains("casterBounds") && off.contains("casterBounds") && on["casterBounds"] == off["casterBounds"];
+        if (sameContext)
+        {
+            for (size_t i = 0; i < 16; ++i)
+                sameContext &= std::abs(on["cameraVP"][i].get<double>() - off["cameraVP"][i].get<double>()) <= 1e-5;
+            for (size_t i = 0; i < 3; ++i)
+            {
+                sameContext &= std::abs(on["lightDirection"][i].get<double>() - off["lightDirection"][i].get<double>()) <= 1e-5;
+                sameContext &= std::abs(on["lightPosition"][i].get<double>() - off["lightPosition"][i].get<double>()) <= 1e-5;
+            }
+        }
+        metrics["sameCameraLightAndCasterGeometry"] = sameContext;
+        available &= sameContext;
+        if (available && on.contains("receivers") && off.contains("receivers"))
+            for (size_t i = 0; i < std::min(on["receivers"].size(), off["receivers"].size()); ++i)
+            {
+                const auto& a = on["receivers"][i]; const auto& b = off["receivers"][i];
+                const double baseline = b.value("meanLuminance", 0.0);
+                const bool valid = a.value("valid", false) && b.value("valid", false)
+                    && a.value("casterIndex", 99u) == b.value("casterIndex", 99u)
+                    && sameCoordinates(a, b) && baseline >= MinimumControlLuminance && baseline < MaximumControlLuminance;
+                const double ratio = baseline > 0 ? a.value("meanLuminance", 0.0) / baseline : 1.0;
+                const double contrast = 1.0 - ratio;
+                validReceivers += valid; occludedReceivers += valid && contrast >= MinimumContrast;
+                metrics["receiverComparisons"].push_back({{"casterIndex", a.value("casterIndex", 99u)},
+                    {"validSameReceiver", valid}, {"onMeanLuminance", a.value("meanLuminance", 0.0)},
+                    {"offMeanLuminance", baseline}, {"onOffRatio", ratio}, {"contrast", contrast},
+                    {"world", a.value("world", Json::array())}, {"pixel", a.value("pixel", Json::array())}});
+            }
+        if (available && on.contains("litControl") && off.contains("litControl"))
+        {
+            const auto& a = on["litControl"]; const auto& b = off["litControl"];
+            const double baseline = b.value("meanLuminance", 0.0);
+            const double ratio = baseline > 0 ? a.value("meanLuminance", 0.0) / baseline : 0.0;
+            litStable = a.value("valid", false) && b.value("valid", false) && sameCoordinates(a, b)
+                && baseline >= MinimumControlLuminance && baseline < MaximumControlLuminance && std::abs(ratio - 1.0) <= LitTolerance;
+            metrics["litControl"] = {{"onMeanLuminance", a.value("meanLuminance", 0.0)},
+                {"offMeanLuminance", baseline}, {"onOffRatio", ratio}, {"stable", litStable},
+                {"world", a.value("world", Json::array())}, {"pixel", a.value("pixel", Json::array())}};
+        }
+    }
+    metrics["validReceiverCount"] = validReceivers; metrics["meaningfullyOccludedReceivers"] = occludedReceivers;
+    metrics["controlAvailable"] = available;
+    run.Report["visibleOcclusionControls"][shadowOn] = metrics;
+    run.Expect(available && validReceivers >= 2 && occludedReceivers >= 2 && litStable,
+        shadowOn + " retains visible occlusion on known floor receivers while the lit control stays unchanged", metrics);
+}
 
 Json MatrixValues(const Matrix& matrix)
 {
@@ -419,6 +649,7 @@ void MakeFixture(Run& run, jEditor& editor)
         run.Layers[i] = editor.CreateEntity(EntityKind::Terrain, "Transparent optical-depth layer " + std::to_string(i));
     for (size_t i = 0; i < run.Witnesses.size(); ++i)
         run.Witnesses[i] = editor.CreateEntity(EntityKind::Cube, "Cascade depth witness " + std::to_string(i));
+    run.Spot = editor.CreateEntity(EntityKind::SpotLight, "Dormant spot light / perspective moment witness");
     Change(editor, run.Floor, [](Entity& e) {
         e.Local = {}; e.Terrain.Resolution = 17; e.Terrain.SizeX = 1500; e.Terrain.SizeZ = 1600;
         e.ShadowCaster = false;
@@ -446,6 +677,12 @@ void MakeFixture(Run& run, jEditor& editor)
     Change(editor, run.Point, [](Entity& e) {
         e.Local = {}; e.Local.Position = {0, 180, 0}; e.Light.Range = 900; e.Light.Intensity = 0; e.Light.CastShadows = false;
     });
+    Change(editor, run.Spot, [](Entity& e) {
+        e.Local = {}; e.Local.Position = {0, 240, 250};
+        e.Local.RotationDegrees = {RadianToDegree(std::atan2(250.f, 240.f)), 0, 0};
+        e.Light.Range = 900; e.Light.InnerConeDegrees = 45; e.Light.OuterConeDegrees = 60;
+        e.Light.Intensity = 0; e.Light.CastShadows = false;
+    });
     Change(editor, run.Camera, [](Entity& e) {
         e.Local = {}; e.Local.Position = {0, 220, -800}; e.Camera.Primary = true;
         e.Camera.VerticalFovDegrees = 65; e.Camera.NearPlane = 1; e.Camera.FarPlane = 1800;
@@ -468,11 +705,13 @@ void ConfigureCase(Run& run, jEditor& editor, const Case& test)
     gOptions.AdvancedShadows = test.Shadow;
     run.CameraPosition = Vector(0, 220, -800); run.CameraTarget = Vector(0, 80, 300);
     const bool deep = test.Scene == SceneCase::DeepHalf || test.Scene == SceneCase::DeepThreeQuarter;
+    const bool cubesCastShadows = !deep && !IsShadowOff(test.Scene);
+    run.RoiLight = run.Sun;
     const bool volume = test.Scene == SceneCase::Volume || test.Scene == SceneCase::InsideVolume
         || test.Scene == SceneCase::InvalidVolume || test.Scene == SceneCase::OverrideIsolation;
     const bool invalid = test.Scene == SceneCase::InvalidVolume || test.Scene == SceneCase::OverrideIsolation;
     Change(editor, run.Floor, [&](Entity& e) { e.ShadowCaster = invalid; });
-    for (auto id : run.Casters) Change(editor, id, [&](Entity& e) { e.ShadowCaster = !deep; });
+    for (auto id : run.Casters) Change(editor, id, [&](Entity& e) { e.ShadowCaster = cubesCastShadows; });
     for (auto id : run.Layers) Change(editor, id, [](Entity& e) { e.ShadowCaster = true; });
     // Authoring lights rotate their local -Y ray direction, unlike cameras'
     // local +Z forward vector. Identity therefore gives an exact downward sun.
@@ -485,12 +724,25 @@ void ConfigureCase(Run& run, jEditor& editor, const Case& test)
         Change(editor, run.Point, [](Entity& e) { e.Light.CastShadows = true; e.Light.Intensity = 1800; });
         if (test.Scene == SceneCase::Dual)
         {
+            run.RoiLight = run.Point;
             Change(editor, run.Sun, [](Entity& e) { e.Light.Intensity = 0; e.Light.CastShadows = false; });
             const std::array<Vec3, 3> points{{{0, 65, 150}, {0, 65, -150}, {140, 130, 0}}};
             for (size_t i = 0; i < points.size(); ++i) Change(editor, run.Casters[i], [&](Entity& e) {
                 e.Local.Position = points[i]; e.Local.Scale = {3, 3, 3};
             });
         }
+    }
+    if (IsPointMomentCase(test.Scene) || IsSpotMomentCase(test.Scene))
+    {
+        run.RoiLight = IsPointMomentCase(test.Scene) ? run.Point : run.Spot;
+        Change(editor, run.Sun, [](Entity& e) { e.Light.Intensity = 0; e.Light.CastShadows = false; });
+        Change(editor, run.RoiLight, [](Entity& e) {
+            e.Local.Position = {0, 240, 250}; e.Light.Range = 900;
+            // One fixed physical intensity for the whole OFF/VSM/ESM/EVSM
+            // group. OFF luma calibration guards enforce readable, unclipped
+            // controls; representation-specific brightness tuning is forbidden.
+            e.Light.Intensity = 60000; e.Light.CastShadows = true;
+        });
     }
     if (test.Scene == SceneCase::Cascades || test.Scene == SceneCase::MovedCascades)
     {
@@ -523,7 +775,7 @@ void ConfigureCase(Run& run, jEditor& editor, const Case& test)
         Change(editor, run.Sun, [&](Entity& e) { e.Light.ShadowOverride = sun; });
         Change(editor, run.Point, [&](Entity& e) { e.Light.ShadowOverride = point; });
     }
-    else for (auto id : {run.Sun, run.Point}) Change(editor, id, [&](Entity& e) {
+    else for (auto id : {run.Sun, run.Point, run.Spot}) Change(editor, id, [&](Entity& e) {
         if (e.Light.CastShadows) e.Light.ShadowOverride = test.Shadow;
     });
     const auto cameraForward = (run.CameraTarget - run.CameraPosition).GetNormalize();
@@ -555,9 +807,9 @@ void ConfigureCase(Run& run, jEditor& editor, const Case& test)
         return entity && entity->ShadowCaster.has_value() && *entity->ShadowCaster == expected;
     };
     casterFlags &= casterMatches(run.Floor, invalid);
-    for (auto id : run.Casters) casterFlags &= casterMatches(id, !deep);
+    for (auto id : run.Casters) casterFlags &= casterMatches(id, cubesCastShadows);
     for (auto id : run.Layers) casterFlags &= casterMatches(id, true);
-    for (auto id : {run.Sun, run.Point})
+    for (auto id : {run.Sun, run.Point, run.Spot})
     {
         const auto* saved = reopened.Find(id);
         const auto* authored = editor.GetDocument().Find(id);
@@ -587,7 +839,11 @@ void FinalizeReusableExample(Run& run, size_t expectedScenes)
         "Choose Forward in the viewport renderer menu for scenes whose names start with forward-; otherwise use Deferred.\n\n"
         "| Feature | Scene files |\n| --- | --- |\n"
         "| CSM | deferred-csm4, deferred-csm4-camera-moved, forward-csm4 |\n"
-        "| VSM / ESM / EVSM | deferred-vsm-*, deferred-esm-*, deferred-evsm-*, forward-evsm |\n"
+        "| VSM / ESM / EVSM | deferred-vsm-*, deferred-esm-*, deferred-evsm-*, forward-vsm, forward-esm, forward-evsm |\n"
+        "| Cascaded moments | deferred-csm4-vsm, deferred-csm4-evsm |\n"
+        "| Same-geometry shadow-OFF controls | deferred-shadow-off, forward-shadow-off |\n"
+        "| Point perspective moments | deferred-point-shadow-off, deferred-point-vsm, deferred-point-esm, deferred-point-evsm |\n"
+        "| Spot perspective moments | forward-spot-shadow-off, forward-spot-vsm, forward-spot-esm, forward-spot-evsm |\n"
         "| Deep opacity layers | deferred-deep-half, deferred-deep-three-quarter, forward-deep |\n"
         "| Dual Paraboloid | deferred-dual-front-back-seam, forward-dual |\n"
         "| Perspective shadow map | deferred-psm |\n"
@@ -599,7 +855,9 @@ void FinalizeReusableExample(Run& run, size_t expectedScenes)
         "Deep scenes contain exactly two flat layers at authored opacity 0.5 or 0.75; opaque cubes remain visible but do not cast.\n\n"
         "PSM may explicitly report a fitted-projection fallback for an unsafe configuration. "
         "The saved examples target the two raster renderers. Native measurements, diagnostics and raw scene captures "
-        "are in advanced-shadows-gpu-report.json and PNGs in the parent output directory.\n";
+        "are in advanced-shadows-gpu-report.json and PNGs in the parent output directory. "
+        "The report's receiverRois and visibleOcclusionControls compare projected floor patches against same-geometry "
+        "shadow-OFF images, while checking a separate lit patch stays unchanged.\n";
     output.close();
     jEditorProject reopened;
     const bool loaded = reopened.Open(run.ProjectFile, error);
@@ -668,13 +926,13 @@ void ValidateOutput(Run& run, jEditor& editor, const Case& test)
         unownedStaticObjects += !run.BaseEntities.contains(editor.EntityForObject(object));
     size_t unownedLights = 0;
     for (const auto* light : jLight::GetLights())
-        unownedLights += light != editor.LightForEntity(run.Sun) && light != editor.LightForEntity(run.Point);
+        unownedLights += light != editor.LightForEntity(run.Sun) && light != editor.LightForEntity(run.Point)
+            && light != editor.LightForEntity(run.Spot);
     run.Expect(unownedStaticObjects == 0 && unownedLights == 0,
         test.Name + " renders only the owned authored fixture world",
         {{"unownedStaticObjects", unownedStaticObjects}, {"unownedLights", unownedLights},
             {"registeredStaticObjects", jObject::GetStaticObject().size()}, {"registeredLights", jLight::GetLights().size()}});
-    const bool pointCase = test.Scene == SceneCase::Dual;
-    const auto* source = editor.LightForEntity(pointCase ? run.Point : run.Sun);
+    const auto* source = editor.LightForEntity(run.RoiLight);
     const auto* stats = LightStats(source);
     Json detail = stats ? Json{{"active", stats->Active}, {"projectionFallback", stats->ProjectionFallback},
         {"rasterPasses", stats->RasterPasses}, {"computePasses", stats->ComputePasses},
@@ -682,10 +940,28 @@ void ValidateOutput(Run& run, jEditor& editor, const Case& test)
         {"additionalTargetBytes", stats->AdditionalTargetBytes}, {"diagnostic", stats->Diagnostic}} : Json::object();
     run.Report["cases"].push_back({{"name", test.Name}, {"actualRenderer", g_Engine->Game.GetActiveSceneRenderPipelineName()}, {"light", detail}});
     run.Expect(g_Engine->Game.GetActiveSceneRenderPipeline() == test.Renderer, test.Name + " uses its actual requested raster renderer");
-    if (test.Scene == SceneCase::Legacy)
+    if (test.Scene == SceneCase::Legacy || IsShadowOff(test.Scene))
     {
         bool active = false; for (const auto& value : jAdvancedShadows::GetLastFrameStats().Lights) active |= value.Active;
-        run.Expect(!active, test.Name + " preserves the original default shadow path"); return;
+        run.Expect(!active, test.Name + " preserves the original default shadow path");
+        if (IsShadowOff(test.Scene))
+            run.Expect(jObject::GetShadowCasterRenderObject().empty(),
+                test.Name + " disables actual casters while preserving all visible fixture geometry");
+        if (test.Scene == SceneCase::PointShadowOff || test.Scene == SceneCase::SpotShadowOff)
+        {
+            const auto& rois = run.Report["receiverRois"][test.Name];
+            size_t readable = 0;
+            if (rois.contains("receivers")) for (const auto& probe : rois["receivers"])
+                readable += probe.value("valid", false) && probe.value("meanLuminance", 0.0) >= 20
+                    && probe.value("meanLuminance", 255.0) < 235;
+            const auto lit = rois.value("litControl", Json::object());
+            run.Expect(readable >= 2 && lit.value("valid", false) && lit.value("meanLuminance", 0.0) >= 20
+                && lit.value("meanLuminance", 255.0) < 235,
+                test.Name + " calibrates fixed positional lighting with readable unclipped OFF receivers",
+                {{"intensity", 60000}, {"readableReceivers", readable}, {"litControl", lit},
+                    {"luminanceMinimumInclusive", 20}, {"luminanceMaximumExclusive", 235}});
+        }
+        return;
     }
     if (test.Scene == SceneCase::InvalidVolume || test.Scene == SceneCase::OverrideIsolation)
     {
@@ -892,12 +1168,18 @@ int RunAdvancedShadowIntegrationGpuTests(const char* ownedOutputDirectory)
         add("deferred-legacy", {}, SceneCase::Legacy, Pipeline::Deferred, true);
         add("deferred-csm4", TestSettings(Method::Depth, Projection::Cascaded), SceneCase::Cascades, Pipeline::Deferred, true);
         add("deferred-csm4-camera-moved", TestSettings(Method::Depth, Projection::Cascaded), SceneCase::MovedCascades);
+        add("deferred-shadow-off", {}, SceneCase::ShadowOff);
         for (auto pair : {std::pair{Method::Variance, "vsm"}, {Method::Exponential, "esm"}, {Method::ExponentialVariance, "evsm"}})
         {
             auto settings = TestSettings(pair.first); settings.BlurRadius = 0;
             add(std::string("deferred-") + pair.second + "-unblurred", settings);
             settings.BlurRadius = 3; add(std::string("deferred-") + pair.second + "-blurred", settings);
         }
+        add("deferred-csm4-vsm", TestSettings(Method::Variance, Projection::Cascaded));
+        add("deferred-csm4-evsm", TestSettings(Method::ExponentialVariance, Projection::Cascaded));
+        add("deferred-point-shadow-off", {}, SceneCase::PointShadowOff);
+        for (auto pair : {std::pair{Method::Variance, "vsm"}, {Method::Exponential, "esm"}, {Method::ExponentialVariance, "evsm"}})
+            add(std::string("deferred-point-") + pair.second, TestSettings(pair.first), SceneCase::PointMoments);
         add("deferred-deep-half", TestSettings(Method::Deep), SceneCase::DeepHalf);
         add("deferred-deep-three-quarter", TestSettings(Method::Deep), SceneCase::DeepThreeQuarter);
         auto dual = TestSettings(); dual.PointProjection = jAdvancedShadows::PointProjection::DualParaboloid;
@@ -908,8 +1190,14 @@ int RunAdvancedShadowIntegrationGpuTests(const char* ownedOutputDirectory)
         add("deferred-volume-nonmanifold-fallback", TestSettings(Method::ShadowVolume), SceneCase::InvalidVolume);
         add("per-light-override-isolation", {}, SceneCase::OverrideIsolation);
         add("forward-legacy", {}, SceneCase::Legacy, Pipeline::Forward, true);
+        add("forward-shadow-off", {}, SceneCase::ShadowOff, Pipeline::Forward);
         add("forward-csm4", TestSettings(Method::Depth, Projection::Cascaded), SceneCase::Cascades, Pipeline::Forward);
+        add("forward-vsm", TestSettings(Method::Variance), SceneCase::Normal, Pipeline::Forward);
+        add("forward-esm", TestSettings(Method::Exponential), SceneCase::Normal, Pipeline::Forward);
         add("forward-evsm", TestSettings(Method::ExponentialVariance), SceneCase::Normal, Pipeline::Forward, true);
+        add("forward-spot-shadow-off", {}, SceneCase::SpotShadowOff, Pipeline::Forward);
+        for (auto pair : {std::pair{Method::Variance, "vsm"}, {Method::Exponential, "esm"}, {Method::ExponentialVariance, "evsm"}})
+            add(std::string("forward-spot-") + pair.second, TestSettings(pair.first), SceneCase::SpotMoments, Pipeline::Forward);
         add("forward-dual", dual, SceneCase::Dual, Pipeline::Forward);
         add("forward-deep", TestSettings(Method::Deep), SceneCase::DeepHalf, Pipeline::Forward);
         add("forward-volume", TestSettings(Method::ShadowVolume), SceneCase::Volume, Pipeline::Forward);
@@ -927,7 +1215,13 @@ int RunAdvancedShadowIntegrationGpuTests(const char* ownedOutputDirectory)
             const auto before = "deferred-" + method + "-unblurred", after = "deferred-" + method + "-blurred";
             run.Expect(run.AtlasHashes.count(before) && run.AtlasHashes.count(after)
                 && run.AtlasHashes[before] != run.AtlasHashes[after], method + " blur changes actual GPU moment texels");
+            CheckVisibleMomentOcclusion(run, after, "deferred-shadow-off");
+            CheckVisibleMomentOcclusion(run, "forward-" + method, "forward-shadow-off");
+            CheckVisibleMomentOcclusion(run, "deferred-point-" + method, "deferred-point-shadow-off");
+            CheckVisibleMomentOcclusion(run, "forward-spot-" + method, "forward-spot-shadow-off");
         }
+        CheckVisibleMomentOcclusion(run, "deferred-csm4-vsm", "deferred-shadow-off");
+        CheckVisibleMomentOcclusion(run, "deferred-csm4-evsm", "deferred-shadow-off");
         run.Different("deferred-deep-half", "deferred-deep-three-quarter", "authored opacity changes real Deep shadow scene pixels");
         run.Different("deferred-legacy", "deferred-csm4", "selected CSM changes actual Deferred scene output");
         run.Different("forward-legacy", "forward-evsm", "selected EVSM changes actual Forward scene output");

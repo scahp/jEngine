@@ -26,15 +26,14 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
 
 #if JE_ADVANCED_SHADOW_PASS == 0
     const uint representation = (uint)AdvancedShadow.ModeParams.x;
-    const float depth = JE_ReadAdvancedShadowDepth(p);
-    // A bounded depth gradient provides the planar receiver variance term.
-    // Neighbors stay in the same cascade/face tile, including the atlas edge.
-    const float2 gradient = 0.5 * float2(
-        JE_ReadAdvancedShadowDepth(clamp(p + int2(1, 0), firstPixel, lastPixel))
-            - JE_ReadAdvancedShadowDepth(clamp(p - int2(1, 0), firstPixel, lastPixel)),
-        JE_ReadAdvancedShadowDepth(clamp(p + int2(0, 1), firstPixel, lastPixel))
-            - JE_ReadAdvancedShadowDepth(clamp(p - int2(0, 1), firstPixel, lastPixel)));
-    ShadowResult[pixel] = JE_EncodeShadowMoments(depth, gradient, representation,
+    const float depth = JE_ShadowMomentDepth(JE_ReadAdvancedShadowDepth(p), representation,
+        (uint)AdvancedShadow.ModeParams.y, (uint)AdvancedShadow.CameraPositionAndType.w,
+        AdvancedShadow.LightPositionAndNear.w, AdvancedShadow.FarAndDeepParams.x);
+    // This image stores already rasterized nearest depths. Neighbor differences
+    // cross silhouettes/clear texels and are not a triangle's ddx/ddy; adding
+    // them as slope variance causes severe light bleeding. Encode point moments
+    // here; the following filter computes the actual neighborhood distribution.
+    ShadowResult[pixel] = JE_EncodeShadowMoments(depth, representation,
         AdvancedShadow.FarAndDeepParams.y, AdvancedShadow.FarAndDeepParams.z);
 #elif JE_ADVANCED_SHADOW_PASS == 1 || JE_ADVANCED_SHADOW_PASS == 2
     const int radius = clamp((int)AdvancedShadow.FilterParams.w, 0, 8);

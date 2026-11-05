@@ -5,6 +5,7 @@
 #include "jDrawCommand.h"
 #include "jSceneRenderTargets.h"
 #include "Material/jMaterial.h"
+#include "Material/jMaterialWater.h"
 #include "Core/jLog.h"
 #include "RHI/jRenderTargetPool.h"
 #include "RHI/jResourceBarrierBatcher.h"
@@ -356,49 +357,155 @@ struct Frame::Impl
     std::size_t GeometryWork = 0;
     std::size_t GeometryOutputWork = 0;
 
+    struct SceneBox
+    {
+        Math::FrustumCorners Corners;
+        bool Caster = false;
+    };
+    std::vector<SceneBox> SceneBoxes;
+    bool SceneBoxesPrepared = false;
+    std::string SceneBoxError;
+
+    const Bounds* LocalBounds(const jRenderObject& object)
+    {
+        if (!object.GeometryDataPtr) return nullptr;
+        const auto stream = object.GeometryDataPtr->VertexStream_PositionOnlyPtr;
+        if (!stream || stream->Params.empty() || stream->ElementCount <= 0) return nullptr;
+        auto bounds = BoundsCache.find(stream.get());
+        if (bounds == BoundsCache.end() || bounds->second.Source.expired())
+        {
+            const auto& parameter = stream->Params.front();
+            const auto count = std::size_t(stream->ElementCount);
+            const auto stride = parameter->Stride > 0 ? std::size_t(parameter->Stride) : sizeof(float) * 3;
+            if (count > MaximumFrameInputTriangles * 3 || count / 3 > MaximumFrameInputTriangles - GeometryWork
+                || stride < sizeof(float) * 3 || parameter->Attributes.empty()
+                || parameter->Attributes.front().UnderlyingType != EBufferElementType::FLOAT
+                || parameter->GetBufferSize() < (count - 1) * stride + sizeof(float) * 3) return nullptr;
+            GeometryWork += count / 3;
+            Bounds entry;
+            entry.Source = stream;
+            entry.Minimum.fill(std::numeric_limits<double>::max());
+            entry.Maximum.fill(std::numeric_limits<double>::lowest());
+            const auto* bytes = static_cast<const unsigned char*>(parameter->GetBufferData());
+            if (!bytes) return nullptr;
+            for (std::size_t i = 0; i < count; ++i)
+            {
+                float xyz[3]; std::memcpy(xyz, bytes + i * stride, sizeof(xyz));
+                for (int axis = 0; axis < 3; ++axis)
+                {
+                    if (!std::isfinite(xyz[axis])) return nullptr;
+                    entry.Minimum[axis] = std::min(entry.Minimum[axis], double(xyz[axis]));
+                    entry.Maximum[axis] = std::max(entry.Maximum[axis], double(xyz[axis]));
+                }
+            }
+            if (BoundsCache.size() >= 256) BoundsCache.erase(BoundsCache.begin());
+            bounds = BoundsCache.insert_or_assign(stream.get(), std::move(entry)).first;
+        }
+        return &bounds->second;
+    }
+
+    bool WorldBox(const jRenderObject& object, Math::FrustumCorners& corners)
+    {
+        if (!object.GeometryDataPtr || object.HasInstancing() || object.GeometryDataPtr->IndirectCommandBufferPtr)
+            return false;
+        const auto* bounds = LocalBounds(object);
+        if (!bounds) return false;
+        auto minimum = bounds->Minimum, maximum = bounds->Maximum;
+        if (object.MaterialPtr && object.MaterialPtr->Water && object.MaterialPtr->Water->Enabled)
+        {
+            // Match the raster deformation rather than fitting its flat base mesh.
+            jWaterSimulation::Bounds water;
+            std::string error;
+            if (!jWaterSimulation::ConservativeBounds(object.MaterialPtr->Water->Settings,
+                {float(minimum[0]), float(minimum[2])}, {float(maximum[0]), float(maximum[2])}, water, error)) return false;
+            for (int axis = 0; axis < 3; ++axis)
+            { minimum[axis] = water.Min[axis]; maximum[axis] = water.Max[axis]; }
+        }
+        const auto world = ToMath(object.World);
+        for (int corner = 0; corner < 8; ++corner)
+        {
+            Math::Vec4 local;
+            for (int axis = 0; axis < 3; ++axis)
+                local[axis] = (corner & (1 << axis)) ? maximum[axis] : minimum[axis];
+            local[3] = 1;
+            const auto point = Math::Transform(world, local);
+            if (!std::isfinite(point[3]) || std::abs(point[3] - 1) > 1e-5) return false;
+            for (int axis = 0; axis < 3; ++axis)
+            {
+                if (!std::isfinite(point[axis])) return false;
+                corners[corner][axis] = point[axis];
+            }
+        }
+        return true;
+    }
+
+    bool MomentBoxes(const jCamera& camera, double maximumDistance,
+        std::vector<Math::FrustumCorners>& receivers, std::vector<Math::FrustumCorners>& casters,
+        std::string& error)
+    {
+        if (!SceneBoxesPrepared)
+        {
+            SceneBoxesPrepared = true;
+            const auto& objects = jObject::GetStaticRenderObject();
+            if (objects.size() > Math::MaximumDirectionalFitBoxes)
+                SceneBoxError = "Directional moment fit exceeds its 4096 scene-mesh bound; keeping existing shadows";
+            else
+            {
+                const auto& shadowCasters = jObject::GetShadowCasterRenderObject();
+                const std::set<const jRenderObject*> casterSet(shadowCasters.begin(), shadowCasters.end());
+                for (const auto* object : objects)
+                {
+                    if (!object || !object->GeometryDataPtr) continue;
+                    SceneBox box;
+                    if (!WorldBox(*object, box.Corners))
+                    {
+                        SceneBoxError = "Directional moment fit needs retained bounded non-instanced geometry within its CPU budget; keeping existing shadows";
+                        SceneBoxes.clear(); break;
+                    }
+                    box.Caster = casterSet.contains(object);
+                    SceneBoxes.push_back(box);
+                }
+            }
+        }
+        if (!SceneBoxError.empty()) { error = SceneBoxError; return false; }
+        const auto forward = camera.GetForwardVector().GetNormalize();
+        for (const auto& box : SceneBoxes)
+        {
+            // Retain off-camera casters: fitting will test their light-space XY
+            // overlap, not their visibility from the main camera.
+            if (box.Caster) casters.push_back(box.Corners);
+            double minimum = std::numeric_limits<double>::max(), maximum = std::numeric_limits<double>::lowest();
+            std::array<bool, 4> outside{true, true, true, true};
+            for (const auto& point : box.Corners)
+            {
+                const Vector world{float(point[0]), float(point[1]), float(point[2])};
+                const double distance = (world - camera.Pos).DotProduct(forward);
+                minimum = std::min(minimum, distance); maximum = std::max(maximum, distance);
+                const auto clip = camera.ViewProjection.Transform(Vector4(world, 1));
+                outside[0] &= clip.x < -clip.w; outside[1] &= clip.x > clip.w;
+                outside[2] &= clip.y < -clip.w; outside[3] &= clip.y > clip.w;
+            }
+            if (maximum >= camera.Near && minimum <= maximumDistance
+                && std::none_of(outside.begin(), outside.end(), [](bool value) { return value; }))
+                receivers.push_back(box.Corners);
+        }
+        return true;
+    }
+
     bool PositiveCasterDomain(const Math::Mat4& projection)
     {
         for (const auto* object : jObject::GetShadowCasterRenderObject())
         {
             if (!object || !object->GeometryDataPtr) continue;
             if (object->MaterialPtr && object->MaterialPtr->Water) return false;
-            const auto stream = object->GeometryDataPtr->VertexStream_PositionOnlyPtr;
-            if (!stream || stream->Params.empty() || stream->ElementCount <= 0) return false;
-            auto bounds = BoundsCache.find(stream.get());
-            if (bounds == BoundsCache.end() || bounds->second.Source.expired())
-            {
-                const auto& parameter = stream->Params.front();
-                const auto count = std::size_t(stream->ElementCount);
-                const auto stride = parameter->Stride > 0 ? std::size_t(parameter->Stride) : sizeof(float) * 3;
-                if (count > MaximumFrameInputTriangles * 3 || count / 3 > MaximumFrameInputTriangles - GeometryWork
-                    || stride < sizeof(float) * 3 || parameter->Attributes.empty()
-                    || parameter->Attributes.front().UnderlyingType != EBufferElementType::FLOAT
-                    || parameter->GetBufferSize() < (count - 1) * stride + sizeof(float) * 3) return false;
-                GeometryWork += count / 3;
-                Bounds entry;
-                entry.Source = stream;
-                entry.Minimum.fill(std::numeric_limits<double>::max());
-                entry.Maximum.fill(std::numeric_limits<double>::lowest());
-                const auto* bytes = static_cast<const unsigned char*>(parameter->GetBufferData());
-                for (std::size_t i = 0; i < count; ++i)
-                {
-                    float xyz[3]; std::memcpy(xyz, bytes + i * stride, sizeof(xyz));
-                    for (int axis = 0; axis < 3; ++axis)
-                    {
-                        if (!std::isfinite(xyz[axis])) return false;
-                        entry.Minimum[axis] = std::min(entry.Minimum[axis], double(xyz[axis]));
-                        entry.Maximum[axis] = std::max(entry.Maximum[axis], double(xyz[axis]));
-                    }
-                }
-                if (BoundsCache.size() >= 256) BoundsCache.erase(BoundsCache.begin());
-                bounds = BoundsCache.insert_or_assign(stream.get(), std::move(entry)).first;
-            }
+            const auto* bounds = LocalBounds(*object);
+            if (!bounds) return false;
             const auto transform = Math::Multiply(projection, ToMath(object->World));
             for (int corner = 0; corner < 8; ++corner)
             {
                 Math::Vec4 local;
                 for (int axis = 0; axis < 3; ++axis)
-                    local[axis] = (corner & (1 << axis)) ? bounds->second.Maximum[axis] : bounds->second.Minimum[axis];
+                    local[axis] = (corner & (1 << axis)) ? bounds->Maximum[axis] : bounds->Minimum[axis];
                 local[3] = 1;
                 const auto clip = Math::Transform(transform, local);
                 if (!std::isfinite(clip[3]) || clip[3] <= 1e-6) return false;
@@ -435,7 +542,9 @@ struct Frame::Impl
         const float maximumDistance = settings.Method == Representation::Deep ? settings.DeepMaxDistance : settings.MaxDistance;
         if (light.Type == ELightType::DIRECTIONAL)
         {
-            if (settings.DirectionalProjection == Projection::Single)
+            const bool moments = settings.Method == Representation::Variance
+                || settings.Method == Representation::Exponential || settings.Method == Representation::ExponentialVariance;
+            if (settings.DirectionalProjection == Projection::Single && !moments)
                 value.ShadowVP[0] = light.GetLightCamra()->Projection * light.GetLightCamra()->View;
             else
             {
@@ -451,7 +560,23 @@ struct Frame::Impl
                     for (int axis = 0; axis < 3; ++axis)
                         frustum[i + 4][axis] = frustum[i][axis] + fraction * (ToVec(corners[i])[axis] - frustum[i][axis]);
                 }
-                if (settings.DirectionalProjection == Projection::Cascaded)
+                std::vector<Math::FrustumCorners> receiverBoxes, casterBoxes;
+                Math::DirectionalFitInput fit;
+                if (moments && settings.DirectionalProjection != Projection::Perspective)
+                {
+                    if (!MomentBoxes(camera, farDistance, receiverBoxes, casterBoxes, error)) return false;
+                    fit.ReceiverBoxes = receiverBoxes; fit.CasterBoxes = casterBoxes;
+                    fit.LightDirection = ToVec(light.GetDirection()); fit.Resolution = settings.MapResolution;
+                    fit.CasterPadding = settings.CasterPadding; fit.Stabilize = settings.CascadeStabilize;
+                }
+                if (settings.DirectionalProjection == Projection::Single)
+                {
+                    fit.ViewCorners = frustum;
+                    Math::DirectionalFitResult fitted;
+                    if (!Math::BuildDirectionalFit(fit, fitted, error)) return false;
+                    value.ShadowVP[0] = ToMatrix(fitted.WorldToShadow);
+                }
+                else if (settings.DirectionalProjection == Projection::Cascaded)
                 {
                     Math::CascadeInput input;
                     input.Corners = frustum; input.NearDistance = camera.Near; input.FarDistance = farDistance;
@@ -462,7 +587,19 @@ struct Frame::Impl
                     if (!Math::BuildCascades(input, result, error)) return false;
                     value.ModeParams.y = 1; value.ModeParams.z = float(result.Count);
                     for (uint32 i = 0; i < result.Count; ++i)
-                    { value.ShadowVP[i] = ToMatrix(result.Cascades[i].WorldToShadow); value.CascadeSplits.v[i] = float(result.Splits[i + 1]); }
+                    {
+                        auto matrix = result.Cascades[i].WorldToShadow;
+                        if (moments)
+                        {
+                            fit.ViewCorners = result.Cascades[i].Corners;
+                            Math::DirectionalFitResult fitted;
+                            std::string fitError;
+                            if (Math::BuildDirectionalFit(fit, fitted, fitError)) matrix = fitted.WorldToShadow;
+                            // Empty receiver/caster splits retain their conservative
+                            // cascade projection; they must not invalidate other splits.
+                        }
+                        value.ShadowVP[i] = ToMatrix(matrix); value.CascadeSplits.v[i] = float(result.Splits[i + 1]);
+                    }
                     value.AtlasParams.x = 2; value.AtlasParams.y = 2;
                 }
                 else
@@ -527,15 +664,21 @@ struct Frame::Impl
         else
         {
             const int count = light.Type == ELightType::POINT ? 6 : 1;
+            const auto* firstCamera = light.GetLightCamra();
+            if (!firstCamera || !std::isfinite(firstCamera->Near) || !std::isfinite(firstCamera->Far)
+                || firstCamera->Near <= 0 || firstCamera->Far <= firstCamera->Near)
+            { error = "Advanced perspective shadows require finite ordered light near/far planes"; return false; }
             for (int i = 0; i < count; ++i)
             {
                 const auto* lightCamera = light.GetLightCamra(i);
+                if (!lightCamera || lightCamera->Near != firstCamera->Near || lightCamera->Far != firstCamera->Far)
+                { error = "Advanced cube faces must share the same light-depth interval"; return false; }
                 // GetLightCamra returns the regular camera as well as its explicit
                 // reverse-Z alternative. New encoders consistently use regular Z.
                 value.ShadowVP[i] = lightCamera->Projection * lightCamera->View;
             }
-            value.LightPositionAndNear.w = light.GetLightCamra()->Near;
-            value.FarAndDeepParams.x = light.GetLightCamra()->Far;
+            value.LightPositionAndNear.w = firstCamera->Near;
+            value.FarAndDeepParams.x = firstCamera->Far;
             if (count == 6)
             { value.ModeParams.y = 4; value.ModeParams.z = 6; value.AtlasParams.x = 3; value.AtlasParams.y = 2; }
         }

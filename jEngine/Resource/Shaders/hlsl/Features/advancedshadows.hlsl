@@ -26,6 +26,23 @@ float JE_ShadowExponent(float exponent)
     return isfinite(exponent) ? clamp(exponent, 0.1, 40.0) : 20.0;
 }
 
+float JE_ShadowMomentDepth(float projectedDepth, uint representation, uint projection,
+    uint lightKind, float nearDistance, float farDistance)
+{
+    const bool momentMethod = representation >= JE_SHADOW_VSM && representation <= JE_SHADOW_EVSM;
+    const bool perspectiveLight = projection == JE_SHADOW_PROJECTION_CUBE_ATLAS
+        || (projection == JE_SHADOW_PROJECTION_SINGLE && lightKind == 2u);
+    if (!momentMethod || !perspectiveLight) return projectedDepth;
+    // Ordinary perspective Z = F/(F-N) - FN/((F-N)*viewZ).
+    // Return (viewZ-N)/(F-N), identically for generation and receivers. Applying
+    // a linear-depth bias/variance floor directly to compressed NDC Z erases
+    // distant shadows even before moment filtering.
+    const float d = saturate(projectedDepth);
+    const float n = max(nearDistance, 1.0e-6);
+    const float f = max(farDistance, n + 1.0e-6);
+    return saturate(n * d / max(f * (1.0 - d) + n * d, n));
+}
+
 float JE_ReduceShadowLightBleeding(float visibility, float amount)
 {
     const float reduction = isfinite(amount) ? clamp(amount, 0.0, 0.999) : 0.0;
@@ -56,6 +73,8 @@ float4 JE_EncodeShadowMoments(float depth, uint mode, float positiveExponent, fl
 float4 JE_EncodeShadowMoments(float depth, float2 depthGradient, uint mode,
     float positiveExponent, float negativeExponent)
 {
+    // Only genuine within-primitive raster derivatives belong here. Differences
+    // of adjacent nearest-depth texels include discontinuities and are invalid.
     float4 moments = JE_EncodeShadowMoments(depth, mode, positiveExponent, negativeExponent);
     const float derivativeVariance = 0.25 * dot(depthGradient, depthGradient);
     if (mode == JE_SHADOW_VSM)

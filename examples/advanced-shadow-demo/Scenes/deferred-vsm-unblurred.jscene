@@ -1365,6 +1365,109 @@
         ]
       },
       "visible": false
+    },
+    {
+      "animation": {
+        "duration": 1.0,
+        "enabled": false,
+        "keys": [],
+        "loop": true
+      },
+      "assetId": "",
+      "camera": {
+        "farPlane": 10000.0,
+        "nearPlane": 0.10000000149011612,
+        "primary": false,
+        "verticalFovDegrees": 60.0
+      },
+      "id": 18,
+      "kind": "SpotLight",
+      "light": {
+        "castShadows": false,
+        "color": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "innerConeDegrees": 45.0,
+        "intensity": 0.0,
+        "outerConeDegrees": 60.0,
+        "range": 900.0
+      },
+      "locked": false,
+      "material": {
+        "baseColor": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "baseColorTexture": "",
+        "emissive": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "graphAsset": "",
+        "metallic": 0.0,
+        "normalTexture": "",
+        "opacity": 1.0,
+        "overrideEnabled": false,
+        "roughness": 0.5
+      },
+      "meshLocalTransforms": [],
+      "name": "Dormant spot light / perspective moment witness",
+      "navigation": {
+        "agentHeight": 180.0,
+        "agentRadius": 25.0,
+        "cellSize": 50.0,
+        "enabled": false,
+        "maxSlopeDegrees": 45.0
+      },
+      "parent": 0,
+      "particles": {
+        "color": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "enabled": true,
+        "gravity": [
+          0.0,
+          -98.0,
+          0.0
+        ],
+        "lifetime": 2.0,
+        "maxParticles": 1024,
+        "seed": 1,
+        "size": 5.0,
+        "spawnRate": 30.0,
+        "speed": 100.0
+      },
+      "sourceAsset": "",
+      "terrain": {
+        "heights": [],
+        "resolution": 17,
+        "sizeX": 1000.0,
+        "sizeZ": 1000.0
+      },
+      "transform": {
+        "position": [
+          0.0,
+          240.0,
+          250.0
+        ],
+        "rotationDegrees": [
+          46.16913604736328,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "visible": true
     }
   ],
   "format": "jEngineScene",

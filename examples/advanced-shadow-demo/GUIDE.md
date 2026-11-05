@@ -7,7 +7,11 @@ Each scene stores renderable shadowCaster flags and explicit settings on every a
 | Feature | Scene files |
 | --- | --- |
 | CSM | deferred-csm4, deferred-csm4-camera-moved, forward-csm4 |
-| VSM / ESM / EVSM | deferred-vsm-*, deferred-esm-*, deferred-evsm-*, forward-evsm |
+| VSM / ESM / EVSM | deferred-vsm-*, deferred-esm-*, deferred-evsm-*, forward-vsm, forward-esm, forward-evsm |
+| Cascaded moments | deferred-csm4-vsm, deferred-csm4-evsm |
+| Same-geometry shadow-OFF controls | deferred-shadow-off, forward-shadow-off |
+| Point perspective moments | deferred-point-shadow-off, deferred-point-vsm, deferred-point-esm, deferred-point-evsm |
+| Spot perspective moments | forward-spot-shadow-off, forward-spot-vsm, forward-spot-esm, forward-spot-evsm |
 | Deep opacity layers | deferred-deep-half, deferred-deep-three-quarter, forward-deep |
 | Dual Paraboloid | deferred-dual-front-back-seam, forward-dual |
 | Perspective shadow map | deferred-psm |
@@ -16,4 +20,4 @@ Each scene stores renderable shadowCaster flags and explicit settings on every a
 
 All names above are Scenes/<name>.jscene. The normal receiver does not cast shadows; the intentional rejection controls enable its open-mesh caster flag to exercise a diagnosed fallback. The mixed override control keeps a separate point light's VSM active. Deep scenes contain exactly two flat layers at authored opacity 0.5 or 0.75; opaque cubes remain visible but do not cast.
 
-PSM may explicitly report a fitted-projection fallback for an unsafe configuration. The saved examples target the two raster renderers. [Native measurements, diagnostics and raw scene captures](../../docs/reports/advanced-shadows.md) document the verified run.
+PSM may explicitly report a fitted-projection fallback for an unsafe configuration. The saved examples target the two raster renderers. [Native measurements, diagnostics and raw scene captures](../../docs/reports/advanced-shadows.md) document the verified run. The report's receiverRois and visibleOcclusionControls compare projected floor patches against same-geometry shadow-OFF images, while checking a separate lit patch stays unchanged.

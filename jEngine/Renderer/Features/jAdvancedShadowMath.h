@@ -21,6 +21,7 @@ using Vec4 = std::array<double, 4>;
 using Mat4 = std::array<double, 16>;
 using FrustumCorners = std::array<Vec3, 8>; // near 0..3, corresponding far 4..7.
 inline constexpr std::uint32_t MaximumCascades = 4;
+inline constexpr std::size_t MaximumDirectionalFitBoxes = 4096;
 inline constexpr std::size_t MaximumVolumeTriangles = 65536;
 inline constexpr std::size_t MaximumDeepLayers = 64;
 inline constexpr double MaximumMomentExponent = 40.0; // Float4 second moments stay finite.
@@ -53,6 +54,33 @@ struct CascadeResult
     std::array<Cascade, MaximumCascades> Cascades{};
 };
 bool BuildCascades(const CascadeInput& input, CascadeResult& output, std::string& error);
+
+struct DirectionalFitInput
+{
+    FrustumCorners ViewCorners{}; // Actual view clipped to the shadow distance.
+    // Borrowed eight-corner world boxes, conservative for the geometry drawn
+    // (including shader deformation). Planar receiver/caster boxes are valid.
+    std::span<const FrustumCorners> ReceiverBoxes, CasterBoxes;
+    Vec3 LightDirection{0.0, -1.0, 0.0}; // Direction travelled by light rays.
+    std::uint32_t Resolution = 512;
+    double CasterPadding = 1000.0;
+    bool Stabilize = true, ReverseZ = false;
+};
+struct DirectionalFitResult
+{
+    Mat4 WorldToShadow = Identity();
+    // Final light-basis world-coordinate bounds. Z is signed; its difference
+    // is the actual producer depth range, independent of the legacy camera.
+    Vec3 LightSpaceMinimum{}, LightSpaceMaximum{};
+    Vec2 WorldUnitsPerTexel{};
+    std::uint32_t ReceiverBoxCount = 0, OverlappingCasterBoxCount = 0;
+};
+// Fit receiver XY/Z to the view, then retain all XY-overlapping casters toward
+// the light even when they are outside the camera. Extend the near side by
+// CasterPadding; the far side remains the receiver interval. Stable fits add a
+// texel guard and snap their XY center in the fixed light basis.
+// Empty/missing relevant bounds, invalid values or budgets leave output intact.
+bool BuildDirectionalFit(const DirectionalFitInput& input, DirectionalFitResult& output, std::string& error);
 
 struct PerspectiveInput
 {
@@ -145,8 +173,15 @@ struct VolumeMesh
 bool BuildShadowVolume(const VolumeInput& input, VolumeMesh& output, std::string& error,
     const VolumeLimits& limits = {});
 
-// Shared CPU references: canonical forward projected depth [0,1]. Producer and
-// receiver must use the same depth mapping (including projective PSM depth).
+// Point/spot moment-map depth: forward perspective NDC [0,1] converted to
+// (lightViewDistance-near)/(far-near). Near/far are finite positive light-view
+// distances with far>near. Invalid input preserves output. This is separate
+// from radial dual-paraboloid and projective PSM depth mappings.
+bool PerspectiveMomentDepth(double ndcDepth, double nearDistance, double farDistance,
+    double& output, std::string& error);
+
+// Shared CPU references: normalized producer depth [0,1]. Producer and receiver
+// must use the same depth mapping (including linear point/spot or PSM depth).
 // Exponents are [0.1,40]. Encoders return point moments (zero depth gradient).
 // Readers accept linearly filtered/derivative-expanded second moments; EVSM's
 // minimum depth variance is scaled by each receiver warp derivative squared.

@@ -74,6 +74,10 @@ Dual Paraboloid projects point-light shadows into two hemispheres. Its geometry 
 
 VSM filters depth moments; ESM uses an exponential depth encoding; EVSM uses positive and negative exponential moments. These are alternatives to repeated depth comparisons, with their own blur and visibility controls. They can produce light bleeding or overly dark transitions when poorly tuned.
 
+Directional Single and CSM moment projections fit the current view and actual receiver bounds, retaining upstream casters outside the camera when their light-space footprint overlaps. This avoids spending a low-resolution tile on the legacy camera's fixed 6,144-world-unit width and 19,990-unit depth interval. Fitting admits up to 4,096 scene meshes and shares the bounded CPU position-scan cache; unavailable geometry or exhausted preparation budgets report the existing-shadow fallback. Water uses conservative analytic bounds.
+
+Moment encoding and sampling use the same depth metric. Directional orthographic fits use normalized linear light depth. Point Cube and Spot convert perspective device depth to normalized linear light-view depth before applying moment bias/variance; Dual already uses linear radial depth. PSM keeps its projective ordering. The compute conversion reads one nearest-depth sample and does not treat differences across silhouettes as surface derivatives.
+
 Try **Variance (VSM)** with a small **Moment blur radius** first. Increase **Light bleed reduction** carefully. For ESM or EVSM, start with the supplied exponents rather than immediately using the maximum.
 
 | Control | Default | Accepted values |

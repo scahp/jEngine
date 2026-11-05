@@ -67,6 +67,17 @@ bool Basis(const Vec3& direction, Vec3& x, Vec3& y, Vec3& z)
     if (!Unit(Cross(up,z),x)) return false;
     y=Cross(z,x); return true;
 }
+bool ProjectBounds(const FrustumCorners& points,const Vec3& x,const Vec3& y,const Vec3& z,Vec3& lower,Vec3& upper)
+{
+    lower.fill(std::numeric_limits<double>::infinity());upper.fill(-std::numeric_limits<double>::infinity());
+    for(const auto& point:points)
+    {
+        if(!Finite(point))return false;
+        const Vec3 local{Dot(x,point),Dot(y,point),Dot(z,point)};
+        for(std::size_t axis=0;axis<3;++axis){lower[axis]=std::min(lower[axis],local[axis]);upper[axis]=std::max(upper[axis],local[axis]);}
+    }
+    return true;
+}
 Mat4 View(const Vec3& eye,const Vec3& x,const Vec3& y,const Vec3& z)
 {
     return {x[0],y[0],z[0],0,x[1],y[1],z[1],0,x[2],y[2],z[2],0,
@@ -170,6 +181,75 @@ bool BuildCascades(const CascadeInput& input,CascadeResult& output,std::string& 
             input.ReverseZ,cascade.WorldToShadow,cascade.WorldUnitsPerTexel))
             return Reject(error,"CSM light-space fitting is degenerate.");
     }
+    output=candidate;return true;
+}
+bool BuildDirectionalFit(const DirectionalFitInput& input,DirectionalFitResult& output,std::string& error)
+{
+    error.clear();Vec3 x,y,z;
+    if(!FrustumValid(input.ViewCorners)||!Basis(input.LightDirection,x,y,z)||
+        input.ReceiverBoxes.empty()||input.CasterBoxes.empty()||input.ReceiverBoxes.size()>MaximumDirectionalFitBoxes||
+        input.CasterBoxes.size()>MaximumDirectionalFitBoxes||input.Resolution<4||input.Resolution>16384||
+        !std::isfinite(input.CasterPadding)||input.CasterPadding<0.0||input.CasterPadding>1.0e5)
+        return Reject(error,"Directional fitting requires a finite view/light, nonempty bounded receiver/caster boxes and valid resolution/padding.");
+    Vec3 viewLo,viewHi;
+    if(!ProjectBounds(input.ViewCorners,x,y,z,viewLo,viewHi))return Reject(error,"Directional view corners are invalid.");
+    DirectionalFitResult candidate;
+    candidate.LightSpaceMinimum.fill(std::numeric_limits<double>::infinity());
+    candidate.LightSpaceMaximum.fill(-std::numeric_limits<double>::infinity());
+    for(const auto& box:input.ReceiverBoxes)
+    {
+        Vec3 lower,upper;
+        if(!ProjectBounds(box,x,y,z,lower,upper))return Reject(error,"Directional receiver box is nonfinite/out of bounds.");
+        bool intersects=true;
+        for(std::size_t axis=0;axis<3;++axis)
+        {lower[axis]=std::max(lower[axis],viewLo[axis]);upper[axis]=std::min(upper[axis],viewHi[axis]);intersects&=lower[axis]<=upper[axis];}
+        if(!intersects)continue;
+        ++candidate.ReceiverBoxCount;
+        for(std::size_t axis=0;axis<3;++axis)
+        {candidate.LightSpaceMinimum[axis]=std::min(candidate.LightSpaceMinimum[axis],lower[axis]);candidate.LightSpaceMaximum[axis]=std::max(candidate.LightSpaceMaximum[axis],upper[axis]);}
+    }
+    if(!candidate.ReceiverBoxCount)return Reject(error,"Directional fitting has no receiver bounds overlapping the view.");
+    for(std::size_t axis=0;axis<2;++axis)
+    {
+        const double extent=candidate.LightSpaceMaximum[axis]-candidate.LightSpaceMinimum[axis];
+        if(!std::isfinite(extent)||extent<=1.0e-9)return Reject(error,"Directional receiver footprint is degenerate.");
+        double half=extent*.5,center=candidate.LightSpaceMinimum[axis]+half;
+        if(input.Stabilize)
+        {
+            // Reserve a texel around the raw intersection before snapping. A
+            // half-texel center move cannot clip the original receiver bounds.
+            half*=double(input.Resolution)/double(input.Resolution-2);
+            const double texel=2.0*half/input.Resolution;
+            center=std::round(center/texel)*texel;
+        }
+        candidate.LightSpaceMinimum[axis]=center-half;
+        candidate.LightSpaceMaximum[axis]=center+half;
+        candidate.WorldUnitsPerTexel[axis]=2.0*half/input.Resolution;
+    }
+    // Off-camera casters can still shadow visible receivers. Only reject a
+    // caster for a disjoint light-XY footprint or if it is entirely downstream
+    // of every receiver; never clip its near depth to the camera's depth box.
+    for(const auto& box:input.CasterBoxes)
+    {
+        Vec3 lower,upper;
+        if(!ProjectBounds(box,x,y,z,lower,upper))return Reject(error,"Directional caster box is nonfinite/out of bounds.");
+        if(upper[0]<candidate.LightSpaceMinimum[0]||lower[0]>candidate.LightSpaceMaximum[0]||
+            upper[1]<candidate.LightSpaceMinimum[1]||lower[1]>candidate.LightSpaceMaximum[1]||
+            lower[2]>candidate.LightSpaceMaximum[2])continue;
+        ++candidate.OverlappingCasterBoxCount;
+        candidate.LightSpaceMinimum[2]=std::min(candidate.LightSpaceMinimum[2],lower[2]);
+    }
+    if(!candidate.OverlappingCasterBoxCount)return Reject(error,"Directional fitting has no overlapping upstream caster bounds.");
+    candidate.LightSpaceMinimum[2]-=input.CasterPadding;
+    const auto& lower=candidate.LightSpaceMinimum;const auto& upper=candidate.LightSpaceMaximum;
+    const double depthRange=upper[2]-lower[2];
+    if(!std::isfinite(depthRange)||depthRange<=1.0e-9)return Reject(error,"Directional fitted depth interval is degenerate.");
+    const double sx=2.0/(upper[0]-lower[0]),sy=2.0/(upper[1]-lower[1]);
+    const double sz=(input.ReverseZ?-1.0:1.0)/depthRange;
+    candidate.WorldToShadow={sx*x[0],sy*y[0],sz*z[0],0,sx*x[1],sy*y[1],sz*z[1],0,
+        sx*x[2],sy*y[2],sz*z[2],0,-.5*sx*(upper[0]+lower[0]),-.5*sy*(upper[1]+lower[1]),
+        input.ReverseZ?upper[2]/depthRange:-lower[2]/depthRange,1};
+    if(!MatrixFinite(candidate.WorldToShadow))return Reject(error,"Directional fitted matrix overflowed.");
     output=candidate;return true;
 }
 bool BuildPerspectiveShadowMap(const PerspectiveInput& input,PerspectiveResult& output,std::string& error)
@@ -384,6 +464,19 @@ bool SubdivideForDualParaboloid(std::span<const Vec3> positions,std::span<const 
     return Reject(error,"Dual paraboloid subdivision did not converge.");
 }
 
+bool PerspectiveMomentDepth(double ndcDepth,double nearDistance,double farDistance,double& output,std::string& error)
+{
+    error.clear();
+    if(!Depth(ndcDepth)||!std::isfinite(nearDistance)||!std::isfinite(farDistance)||nearDistance<=0.0||farDistance<=nearDistance)
+        return Reject(error,"Perspective moment depth requires finite NDC [0,1] and positive near<far distances.");
+    // Equivalent to near*d/(far-d*(far-near)), but this positive weighted
+    // denominator avoids subtractive cancellation at the far endpoint.
+    const double numerator=nearDistance*ndcDepth;
+    const double denominator=farDistance*(1.0-ndcDepth)+numerator;
+    const double candidate=numerator/denominator;
+    if(!Depth(candidate))return Reject(error,"Perspective moment depth conversion is not finite in [0,1].");
+    output=candidate;return true;
+}
 bool VsmMoments(double depth,Vec2& output,std::string& error)
 {error.clear();if(!Depth(depth))return Reject(error,"VSM depth must be finite in [0,1].");output={depth,depth*depth};return true;}
 bool EsmMoment(double depth,double exponent,double& output,std::string& error)

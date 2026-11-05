@@ -61,7 +61,7 @@ The user selected **1, 17, 18, 19, 20 and 21**. These now share a pure CPU math 
 | No. | Feature | Delivered engine integration |
 | --- | --- | --- |
 | 1 | CSM restoration | One to four practical splits, texel stabilization, bounded distance/padding and an atlas in the current Vulkan/DX12 RHI. |
-| 17 | VSM / ESM / EVSM | FP32 moment encoding, tile-clamped separable blur, explicit exponents, variance and light-bleeding controls. |
+| 17 | VSM / ESM / EVSM | Scene/view-fitted directional maps, consistent linear Point/Spot depth, FP32 moments and bounded blur; actual receiver contrast verified against shadows OFF. |
 | 18 | Shadow volumes | Welded closed-manifold geometry, finite capped extrusion, z-fail stencil and per-light visibility mask; explicit fallback for unsupported geometry. |
 | 19 | Deep shadows | Eight additive optical-depth bins in two half-float targets, using authored scalar material opacity. |
 | 20 | Dual-paraboloid point shadows | Two-hemisphere atlas with bounded conforming subdivision and seam sampling; cube fallback on invalid geometry or budget exhaustion. |

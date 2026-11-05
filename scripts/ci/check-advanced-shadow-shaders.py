@@ -156,6 +156,8 @@ void main(uint3 id : SV_DispatchThreadID)
         uvDepth = float3(clipPosition.x * 0.5 + 0.5, 0.5 - clipPosition.y * 0.5, clipPosition.z);
         inside = true;
     }
+    uvDepth.z = JE_ShadowMomentDepth(uvDepth.z, representation, projection,
+        (uint)AdvancedShadow.CameraPositionAndType.w, AdvancedShadow.LightPositionAndNear.w, AdvancedShadow.FarAndDeepParams.x);
     float visibility = inside ? JE_SampleAdvancedShadowRect(AdvancedShadowMap, DeepShadow0, DeepShadow1,
         AdvancedShadowMapSampler, uvDepth, JE_ShadowAtlasRect(face, uint2(AdvancedShadow.AtlasParams.xy)),
         representation, AdvancedShadow.FarAndDeepParams.y, AdvancedShadow.FarAndDeepParams.z,
@@ -255,6 +257,25 @@ def check_volume_fixed_depth(path):
     return {"noDiscard": True, "noDepthReplacement": True, "noFragDepthOutput": True}
 
 
+def check_point_moment_encoding(path):
+    # A conversion texel reads only its own nearest depth. A second-moment
+    # slope term derived from neighboring depth texels is not a raster derivative.
+    data = path.read_bytes()
+    words = struct.unpack("<" + "I" * (len(data) // 4), data)
+    if words[0] != 0x07230203:
+        raise ValueError(f"Not SPIR-V: {path}")
+    position, fetches = 5, 0
+    while position < len(words):
+        count, opcode = words[position] >> 16, words[position] & 0xFFFF
+        if not count or position + count > len(words):
+            raise ValueError("Invalid point moment encoding SPIR-V instruction")
+        fetches += opcode == 95  # OpImageFetch, bundled Khronos SPIRV-Headers.
+        position += count
+    if fetches != 1:
+        raise ValueError(f"Point moment encoding must fetch only its center depth, found {fetches} image fetches")
+    return {"nearestDepthImageFetches": fetches}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
@@ -300,6 +321,7 @@ def main():
         if set(contracts) - reflected:
             raise ValueError(f"Unreflected CPU layouts: {sorted(set(contracts) - reflected)}")
         report["volume_ps_fixed_function_depth"] = check_volume_fixed_depth(output / "vulkan/shadow-volume-ps.spv")
+        report["point_moment_encoding"] = check_point_moment_encoding(output / "vulkan/shadow-compute-0.spv")
         negative = json.loads((output / "vulkan/cpu-layout.json").read_text())
         negative["jAdvancedShadowData"]["fields"]["FilterParams"] += 4
         try:

@@ -9,6 +9,8 @@ float JE_SampleAdvancedShadowFace(jAdvancedShadowData data, Texture2D shadowMap,
     Texture2D deepShadow0, Texture2D deepShadow1, SamplerState filtering,
     float3 projected, uint face)
 {
+    projected.z = JE_ShadowMomentDepth(projected.z, (uint)data.ModeParams.x, (uint)data.ModeParams.y,
+        (uint)data.CameraPositionAndType.w, data.LightPositionAndNear.w, data.FarAndDeepParams.x);
     return JE_SampleAdvancedShadowRect(shadowMap, deepShadow0, deepShadow1, filtering,
         projected, JE_ShadowAtlasRect(face, uint2(data.AtlasParams.xy)),
         (uint)data.ModeParams.x, data.FarAndDeepParams.y, data.FarAndDeepParams.z,
@@ -23,7 +25,10 @@ float JE_SampleAdvancedLightShadow(jAdvancedShadowData data, Texture2D shadowMap
     if (data.SamplingParams.z <= 0.5 || !all(isfinite(worldPosition))) return 1.0;
     const uint representation = (uint)data.ModeParams.x;
     const uint projection = (uint)data.ModeParams.y;
-    if (representation == JE_SHADOW_DEEP)
+    const bool singleDirectionalMoments = projection == JE_SHADOW_PROJECTION_SINGLE
+        && representation >= JE_SHADOW_VSM && representation <= JE_SHADOW_EVSM
+        && data.CameraPositionAndType.w < 0.5;
+    if (representation == JE_SHADOW_DEEP || singleDirectionalMoments)
     {
         const float viewDepth = dot(worldPosition - data.CameraPositionAndType.xyz,
             data.CameraForwardAndOpacity.xyz);

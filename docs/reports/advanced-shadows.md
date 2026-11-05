@@ -4,6 +4,26 @@
 
 [Controls and limitations](../manual/advanced-shadows.md) · [Openable sample project](../../examples/advanced-shadow-demo/README.md) · [Measurement data](data/advanced-shadows.json) · [Remaining twelve choices](../rendering-feature-intake.md#remaining-decisions)
 
+## Visibility correction
+
+The original 115-frame / 213-check receipt did **not** establish visible VSM/ESM/EVSM shadows. Its tests accepted nonconstant moment maps and successful blur dispatches even though the three blurred captures had identical pixels and no receiver shadows. The user's report reproduced a real defect. Those images are retained below as negative controls; they fail the new visibility criterion.
+
+The fixed pipeline fits directional moment maps to actual scene/view bounds, removes false variance from neighboring silhouette/clear-depth differences, and linearizes perspective moment depth consistently for Point Cube and Spot. The original directional geometry, camera, exponents, variance and three-texel blur remain unchanged. New Point/Spot controls use one fixed intensity per light group, shared by every OFF/ON case.
+
+The latest native receipt is **157 frames / 38 cases / 343 passed checks / zero Vulkan or Metal validation problems**. Fourteen comparisons check three real floor receiver patches against the same geometry with light shadows OFF. All 14 preserve the unshadowed witness and darken all three intended receivers by at least 25%. The old three captures darken none of them.
+
+| Single directional representation | Original receiver contrast | Fixed receiver contrast, three patches |
+| --- | ---: | --- |
+| VSM, blur 3 | 0% | 100%, 100%, 100% |
+| ESM, blur 3 | 0% | 80.7%, 80.4%, 73.5% |
+| EVSM, blur 3 | 0% | 100%, 100%, 100% |
+
+These are contrasts of actual 8-bit scene luminance against matched shadows-OFF pixels, not physical transmittance or a universal quality score. Receiver identity, camera, light pose/radiometry, caster bounds and an unclipped OFF signal are checked. The JSON contains raw means, world/pixel coordinates and historical rejection results.
+
+| Original missing shadow | Fixed VSM |
+| --- | --- |
+| ![Original VSM failure](images/moment-shadows/before-vsm.png) | ![Fixed VSM](images/advanced-shadows/deferred-vsm-blurred.png) |
+
 ## Delivered behavior
 
 | No. | Feature | Engine behavior |
@@ -19,25 +39,25 @@ Projection and representation are separate. Forward and Deferred share the same 
 
 Open **Window → Project settings → Renderer defaults → Shadows** for defaults, or select a light and use **Inspector → Light → Override shadow settings**. The override replaces the whole advanced settings set for that light. **Inspector → Shadow casting** controls whether an object casts; a receiver-only floor remains visible and receives shadows. Project, scene/prefab save/load and Undo/Redo use the existing editor document. Old documents without the optional fields inherit their original behavior.
 
-The [sample](../../examples/advanced-shadow-demo/README.md) contains 24 actual saved diagnostic scenes. Its startup is the CSM scene. Each scene stores caster flags and explicit active-light settings; use the saved primary camera through Play. Select Forward beside the viewport for `forward-*` scenes. No external asset download is required.
+The [sample](../../examples/advanced-shadow-demo/README.md) contains 38 actual saved diagnostic scenes. Its startup is the CSM scene. Each scene stores caster flags and explicit active-light settings; use the saved primary camera through Play. Select Forward beside the viewport for `forward-*` scenes. No external asset download is required.
 
 ## Verified scope
 
-The final native run used **Apple M4, 16 GiB RAM, macOS 26.6.2**, Debug, Vulkan through stable MoltenVK, Khronos validation and Metal API validation. It rendered **115 actual frames across 24 cases**, passed **213 checks**, and reported **zero Vulkan/Metal validation problems**. Checkout preferences/INI were preserved. The executable SHA-256 and portable numerical receipt are in the measurement JSON.
+The final native run used **Apple M4, 16 GiB RAM, macOS 26.6.2**, Debug, Vulkan through stable MoltenVK, Khronos validation and Metal API validation. It rendered **157 actual frames across 38 cases**, passed **343 checks**, and reported **zero Vulkan/Metal validation problems**. Checkout preferences/INI were preserved. The executable SHA-256 and portable numerical receipt are in the measurement JSON.
 
 The native checks exercised:
 
 - Real CSM atlas occupancy/splits and a camera move; actual post-perspective PSM with a nonconstant atlas.
-- Nonconstant VSM/ESM/EVSM floating-point targets and actual blur changes, with finite values.
+- Nonconstant VSM/ESM/EVSM floating-point targets and actual blur changes, plus same-geometry OFF/ON receiver contrast in Forward/Deferred, CSM moments, Point Cube and Spot.
 - Dual front/back hemispheres and seam coverage, including actual generated geometry.
 - Two Deep layers with opacity 0.5: measured transmittance **0.250138**, expected **0.25**. At opacity 0.75: measured **0.062569**, expected **0.0625**. These are actual GPU optical-bin readbacks.
 - A closed volume mask containing both shadow and light, a camera inside the volume, deliberate open-mesh rejection and an independent healthy light override.
 - Forward CSM, EVSM, Deep, Dual and Volume rendering; returning to legacy shadows reproduced the baseline pixel hash exactly.
-- Reloading all 24 saved scenes, caster/mode persistence, normal authoring-runtime publication without test-only caster setters, and the saved CSM project startup.
+- Reloading all 38 saved scenes, caster/mode persistence, normal authoring-runtime publication without test-only caster setters, and the saved CSM project startup.
 
-Related checks passed: the linked rendering-feature CPU group including eight real mesh-slice adapter checks; both standalone CTest shadow targets; **95** pure math and **218** settings checks under ASan/UBSan; **130** actual document checks under ASan/UBSan; **15** isolated production object-flag checks under ASan/UBSan. The sanitizer scopes are narrower than an instrumented full-engine GPU run. Five malformed advanced-shadow CLI forms failed before initialization.
+Related checks passed: the linked rendering-feature CPU group including eight real mesh-slice adapter checks; both standalone CTest shadow targets; **130** pure math and **218** settings checks under ASan/UBSan; **130** actual document checks under ASan/UBSan; **15** isolated production object-flag checks under ASan/UBSan. The sanitizer scopes are narrower than an instrumented full-engine GPU run. Five malformed advanced-shadow CLI forms failed before initialization.
 
-The shader checker compiled **37 production DXIL/SPIR-V variants**, checked four CPU/SPIR-V layouts, rejected a negative ABI control, and checked that the volume pixel shader cannot discard or write fragment depth. The advanced block is 544 bytes; view/material/object layouts remain 560/1184/192 bytes. Native Visual Studio project entries and XML were checked.
+The shader checker compiled **37 production DXIL/SPIR-V variants**, checked four CPU/SPIR-V layouts, rejected a negative ABI control, checked that the volume pixel shader cannot discard or write fragment depth, and confirmed that point-moment conversion reads only one center depth texel. The advanced block is 544 bytes; view/material/object layouts remain 560/1184/192 bytes. Native Visual Studio project entries and XML were checked.
 
 **Windows C++ compilation and physical DX12/Vulkan execution were not run in this local macOS batch.** DXIL compilation does not establish Windows runtime correctness. Separate synchronization validation was not enabled. Hosted CI, push and main integration remain deferred under the current batching policy.
 
@@ -47,10 +67,10 @@ These observations compare **feature off/on in the same new executable**. They a
 
 | Path | Legacy median | Advanced median | Observed difference |
 | --- | ---: | ---: | ---: |
-| Deferred, four-cascade Depth | 8.432 ms | 8.478 ms | +0.046 ms |
-| Forward, EVSM | 8.423 ms | 8.163 ms | −0.259 ms |
+| Deferred, four-cascade Depth | 8.581 ms | 8.511 ms | −0.070 ms |
+| Forward, EVSM | 7.833 ms | 8.180 ms | +0.347 ms |
 
-The timer covers owner-thread input/update/visibility/render/present/event-poll latency. Debug validation and presentation pacing are included; these are **not GPU-only costs**. The short samples cluster around an 8 ms presentation interval. The negative Forward difference is ordinary variation and does not establish a speedup. Large-scene preparation latency and Windows performance were not measured. Raw samples remain in the JSON.
+The timer covers owner-thread input/update/visibility/render/present/event-poll latency. Debug validation and presentation pacing are included; these are **not GPU-only costs**. The short samples cluster around an 8 ms presentation interval. The small negative Deferred difference is ordinary variation and does not establish a speedup. Large-scene preparation latency and Windows performance were not measured. Raw samples remain in the JSON.
 
 The native fixture used **256-pixel tiles**. Its additional targets were 5 MiB for CSM4, 1.25 MiB for a single unblurred depth/moment map, 2.25 MiB with moment blur scratch, 1 MiB for Deep's two bin targets, 2.5 MiB for Dual depth, and 14.06 MiB for a 1280×720 volume depth/stencil-plus-mask set.
 
@@ -66,9 +86,12 @@ Admission is bounded to **16 advanced lights/view**, **192 MiB of additional tar
 - Used compatible depth/stencil layouts and explicit render-pass depth/stencil dependencies. A standalone receiver-depth pass supports Deferred subpasses as well as Forward volume rendering.
 - Corrected DX12 depth-clamp polarity and stencil masks; supported VertexID-only draws and valid empty descriptor/root layouts in both backends.
 - Used a no-output/no-discard volume pixel shader so depth clamp retains capped geometry. FP32 atlas filtering uses explicit bounded loads rather than assuming hardware linear-filter support.
+- Fitted directional Single/CSM moment domains to receiver/view bounds with off-camera caster retention and conservative Water bounds. Removed the invalid compute neighbor-gradient variance. Point/Spot encoding and readers now share a stable inverse-perspective depth conversion; bias and variance operate in linear light-depth units.
 - Restored PSM virtual slide-back so empty near-view space does not collapse distant casters into a subpixel strip. Unsafe caster-domain fits report the orthographic fallback.
 
 ## Limits
+
+Directional moment fitting admits 4,096 retained scene meshes and shares the CPU geometry preparation budget; unsupported or unavailable bounds keep existing shadows with a diagnostic. Point Cube retains its existing near-10/far-500 face-camera interval; this correction establishes consistent moment units within that interval. Spot uses its authored light-camera interval.
 
 These are raster features. Path Tracing and HWRT direct-lighting rays retain their existing shadow evaluation. Forward keeps its existing first-light-per-type direct-light model.
 
@@ -100,4 +123,4 @@ These are unmodified 1280×720 scene readbacks from the final run, not an art or
 | --- | --- |
 | ![Dual](images/advanced-shadows/deferred-dual-front-back-seam.png) | ![Forward EVSM](images/advanced-shadows/forward-evsm.png) |
 
-Local detailed receipts are ignored build output under `build/advanced-shadows/`: `native-final/verification.json`, `root/feature-cpu-delivery.log`, `root/ctest-delivery.log`, `root/cli-delivery.json` and `shader-checks/report.json`. The committed measurement JSON preserves the final native numerical receipt with machine-local paths made portable.
+Local detailed receipts are ignored build output under `build/advanced-shadows/`: `moment-visibility/verification.json`, `moment-diagnosis/feature-cpu.log`, `moment-diagnosis/ctest.log`, `moment-diagnosis/negative-controls.json` and `shader-checks/report.json`. The committed measurement JSON preserves the current native receipt and historical negative controls with machine-local paths made portable. The earlier `native-final/` receipt remains a historical record of the insufficient 213-check validation.
