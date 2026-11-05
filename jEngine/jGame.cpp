@@ -1632,6 +1632,9 @@ void jGame::Update(float deltaTime)
 	// Update main camera
 	if (MainCamera)
 	{
+#ifdef ENABLE_EDITOR_FEATURES
+		MainCamera->ProjectionAspectOverride = GetAuthoringSceneAspect();
+#endif
 		MainCamera->UpdateCamera();
 
 		gOptions.CameraPos = MainCamera->Pos;

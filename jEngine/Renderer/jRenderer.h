@@ -39,10 +39,18 @@ public:
     virtual void Render() {}
     virtual void DebugPasses();
     virtual void UIPass();
+    void RequestObjectPick(int32 mouseX, int32 mouseY);
 
 	std::shared_ptr<jRenderFrameContext> RenderFrameContextPtr;
 	jView View;
 	std::vector<std::shared_ptr<jTexture>> DebugRTs;
+
+protected:
+    void HitObjectPass();
+    void ReadbackHitObject(const std::shared_ptr<jRenderTarget>& target, bool authoring, bool toggleSelection);
+    bool bObjectPickRequested = false;
+    int32 PickMouseX = 0;
+    int32 PickMouseY = 0;
 };
 
 class jRenderer : public IRenderer
@@ -77,11 +85,6 @@ public:
     virtual std::shared_ptr<jTexture> Denoise(const std::shared_ptr<jTexture>& InTexture, const char* InDenoiser, int32 InKernelSize, float InKernelSigma, float InBilateralSigma);
     virtual std::shared_ptr<jTexture> BlurSSGI(const std::shared_ptr<jRenderTarget>& InRenderTarget);
 
-    // Object Picking
-    virtual void HitObjectPass();
-    void RequestObjectPick(int32 mouseX, int32 mouseY);
-    void ReadbackHitObject();
-
     virtual void PostProcess();
 
     void SetupShadowPass();
@@ -101,11 +104,6 @@ public:
 
     // Current FrameIndex
     int32 FrameIndex = 0;
-
-    // Object Picking
-    bool bObjectPickRequested = false;
-    int32 PickMouseX = 0;
-    int32 PickMouseY = 0;
 
     // Thread per task for PassSetup
     const int32 MaxPassSetupTaskPerThreadCount = 100;

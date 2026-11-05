@@ -491,7 +491,7 @@ Mesh BuildTerrain(const TerrainProperties& terrain)
     for (const auto& v : source.Vertices) { result.Positions.push_back(v.Position); result.Normals.push_back(v.Normal); }
     result.Indices = std::move(source.Indices); return result;
 }
-bool FindTerrainHit(const Mesh& mesh, const Vector& origin, const Vector& direction, Vector& hit)
+bool FindTerrainHit(const Mesh& mesh, const Vector& origin, const Vector& direction, Vector& hit, Vector* normal)
 {
     float closest = std::numeric_limits<float>::infinity();
     const auto vertex = [&](uint32_t index)
@@ -514,7 +514,11 @@ bool FindTerrainHit(const Mesh& mesh, const Vector& origin, const Vector& direct
         const float v = direction.DotProduct(q) / det;
         if (v < 0 || u + v > 1) continue;
         const float distance = ac.DotProduct(q) / det;
-        if (distance >= 0 && distance < closest) closest = distance;
+        if (distance >= 0 && distance < closest)
+        {
+            closest = distance;
+            if (normal) *normal = ab.CrossProduct(ac).GetNormalize();
+        }
     }
     if (!std::isfinite(closest)) return false;
     hit = origin + direction * closest;

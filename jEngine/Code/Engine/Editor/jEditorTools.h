@@ -62,7 +62,7 @@ bool BakeNavigation(const Mesh& mesh, const jEditorAuthoring::NavigationProperti
 bool PaintTerrain(jEditorAuthoring::TerrainProperties& terrain, float x, float z,
     float radius, float strength, int mode); // raise, lower, flatten, smooth
 // Mesh must come from BuildTerrain. Origin, direction and hit are terrain-local.
-bool FindTerrainHit(const Mesh& mesh, const Vector& origin, const Vector& direction, Vector& hit);
+bool FindTerrainHit(const Mesh& mesh, const Vector& origin, const Vector& direction, Vector& hit, Vector* normal = nullptr);
 bool Render(jEditor& editor, const jEditorProject* project, const jEditorAssetRegistry* registry);
 bool RenderTerrainBrush(jEditor& editor, const jCamera& camera, const ImVec2& position, const ImVec2& size, bool hovered);
 void FinishTerrainStroke(jEditor& editor);

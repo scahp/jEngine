@@ -22,14 +22,21 @@ Matrix jCamera::CreateView() const
 
 Matrix jCamera::CreateProjection() const
 {
+    const float width = GetProjectionWidth();
+    const float height = static_cast<float>(Height);
     if (IsPerspectiveProjection)
     {
         if (IsInfinityFar)
-            return jCameraUtil::CreatePerspectiveMatrixFarAtInfinity((float)Width, (float)Height, FOVRad, Near);
-        return jCameraUtil::CreatePerspectiveMatrix((float)Width, (float)Height, FOVRad, Near, Far);
+            return jCameraUtil::CreatePerspectiveMatrixFarAtInfinity(width, height, FOVRad, Near);
+        return jCameraUtil::CreatePerspectiveMatrix(width, height, FOVRad, Near, Far);
     }
 
-    return jCameraUtil::CreateOrthogonalMatrix((float)Width, (float)Height, Near, Far);
+    return jCameraUtil::CreateOrthogonalMatrix(width, height, Near, Far);
+}
+
+float jCamera::GetProjectionWidth() const
+{
+    return ProjectionAspectOverride > 0.0f ? ProjectionAspectOverride * Height : static_cast<float>(Width);
 }
 
 void jCamera::BindCamera(const jShader* shader) const
@@ -94,7 +101,7 @@ void jCamera::UpdateCamera()
     if (IsPerspectiveProjection)
     {
         #if USE_REVERSEZ_PERSPECTIVE_SHADOW
-        ReverseZProjection = jCameraUtil::CreateReverseZPerspectiveMatrix((float)Width, (float)Height, FOVRad, Near, Far);
+        ReverseZProjection = jCameraUtil::CreateReverseZPerspectiveMatrix(GetProjectionWidth(), (float)Height, FOVRad, Near, Far);
         #else
         ReverseZProjection = Projection;
         #endif
@@ -119,7 +126,7 @@ void jCamera::GetRectInNDCSpace(Vector& OutPosMin, Vector& OutPosMax, const Matr
 
     if (IsPerspectiveProjection)
     {
-        const float InvAspect = ((float)Width / (float)Height);
+        const float InvAspect = GetProjectionWidth() / static_cast<float>(Height);
         const float length = tanf(FOVRad * 0.5f);
         Vector targetVec = GetForwardVector().GetNormalize();
         Vector rightVec = GetRightVector().GetNormalize() * length * InvAspect;
@@ -142,7 +149,7 @@ void jCamera::GetRectInNDCSpace(Vector& OutPosMin, Vector& OutPosMax, const Matr
     }
     else
     {
-        const float w = (float)Width;
+        const float w = GetProjectionWidth();
         const float h = (float)Height;
 
         Vector targetVec = GetForwardVector().GetNormalize();
@@ -227,7 +234,7 @@ void jCamera::GetFrustumVertexInWorld(Vector* OutVertexArray) const
 
     if (IsPerspectiveProjection)
     {
-        const float InvAspect = ((float)Width / (float)Height);
+        const float InvAspect = GetProjectionWidth() / static_cast<float>(Height);
         const float length = tanf(FOVRad * 0.5f);
         Vector targetVec = GetForwardVector().GetNormalize();
         Vector rightVec = GetRightVector().GetNormalize() * length * InvAspect;
@@ -250,7 +257,7 @@ void jCamera::GetFrustumVertexInWorld(Vector* OutVertexArray) const
     }
     else
     {
-        const float w = (float)Width;
+        const float w = GetProjectionWidth();
         const float h = (float)Height;
 
         Vector targetVec = GetForwardVector().GetNormalize();

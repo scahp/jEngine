@@ -21,7 +21,7 @@ using Json = nlohmann::json;
 using jEditorAssetPath::FromUtf8;
 using jEditorAssetPath::ToUtf8;
 constexpr size_t MaxThumbnails = 64, MaxThumbnailRequests = 8;
-enum class Operation { None, NewFolder, Import, Rename, Move, Trash, Settings, Reimport, Activate, Refresh, CancelScan };
+enum class Operation { None, NewFolder, Import, Rename, Move, Trash, Settings, Reimport, Activate, SelectInstances, ReplaceSelection, SetStartupScene, Refresh, CancelScan };
 struct Request { Operation Type = Operation::None; std::string Id, Source; bool Folder = false; };
 struct ThumbnailRequest { std::string Key, Id; fs::path File, ProjectRoot; bool Material = false; };
 struct ThumbnailResult { ThumbnailRequest Request; jEditorThumbnail Pixels; std::string Error; };
@@ -29,7 +29,7 @@ struct ThumbnailEntry { void* Handle = nullptr; uint32_t Width = 0, Height = 0; 
 struct FolderRow { std::string Path, Label; int Depth = 0; bool Children = false; };
 struct Panel
 {
-    std::string ProjectToken, ProjectRoot, Folder, Selected, Status, SettingsWarning;
+    std::string ProjectToken, ProjectRoot, Folder, Selected, Status, SettingsWarning, RevealId;
     uint64_t CatalogRevision = UINT64_MAX, Frame = 0;
     bool StatusError = false, FilterDirty = true, FoldersDirty = true, OpenModal = false;
     int KindFilter = 0;
@@ -47,6 +47,9 @@ struct Panel
     double LastUpload = 0;
     size_t VisiblePreviews = 0;
     Request Modal;
+    jEditorAssetRegistry::ImportPlan ImportPreview;
+    std::string ImportError;
+    bool ImportChecked = false;
     std::vector<Request> Deferred;
     char Name[512]{}, SourceFile[2048]{}, Destination[2048]{};
     float Scale = 1;
@@ -177,6 +180,7 @@ void Open(Request request, const std::string& destination = {})
     Copy(s.Name, sizeof(s.Name), ToUtf8(FromUtf8(s.Modal.Source).filename()));
     if (s.Modal.Type == Operation::NewFolder) Copy(s.Name, sizeof(s.Name), "New Folder");
     s.SourceFile[0] = 0;
+    s.ImportPreview.Files.clear(); s.ImportError.clear(); s.ImportChecked = false;
     Copy(s.Destination, sizeof(s.Destination), destination.empty() ? ToUtf8(FromUtf8(s.Modal.Source).parent_path()) : destination);
     s.Scale = 1; s.FlipUVs = true; s.GenerateNormals = true;
     if (s.Modal.Type == Operation::Settings)
@@ -227,8 +231,9 @@ bool Execute(jEditor& editor, jEditorProject& project, jEditorAssetRegistry& reg
     case Operation::NewFolder:
         ok = registry.CreateFolder(ToUtf8((FromUtf8(s.Destination) / FromUtf8(s.Name))), error); break;
     case Operation::Import:
-        if (!FromUtf8(s.SourceFile).is_absolute()) { error = "Choose an absolute source file path."; break; }
-        ok = registry.ImportFile(FromUtf8(s.SourceFile), ToUtf8((FromUtf8(s.Destination) / FromUtf8(s.SourceFile).filename())), error); break;
+        ok = registry.ImportBundle(s.ImportPreview, error);
+        if (!ok) { s.ImportError = error; s.ImportChecked = false; }
+        break;
     case Operation::Rename:
     case Operation::Move:
     {
@@ -259,7 +264,13 @@ bool Execute(jEditor& editor, jEditorProject& project, jEditorAssetRegistry& reg
     catch (const std::exception& exception) { error = exception.what(); }
     if (!ok) { Message(error.empty() ? "Asset operation failed." : error, true); return false; }
     Invalidate(editor, registry, before);
-    if (request.Type != Operation::Trash) Message("Asset operation completed.");
+    if (request.Type == Operation::Import)
+    {
+        const auto reused = std::count_if(s.ImportPreview.Files.begin(), s.ImportPreview.Files.end(),
+            [](const auto& file) { return file.Status == jEditorAssetRegistry::ImportStatus::Reuse; });
+        Message("Imported " + std::to_string(s.ImportPreview.Files.size() - reused) + " files. Reused " + std::to_string(reused) + " dependencies.");
+    }
+    else if (request.Type != Operation::Trash) Message("Asset operation completed.");
     else Message(s.Status);
     s.CatalogRevision = UINT64_MAX; s.FilterDirty = true; s.FoldersDirty = true; s.Discovered.clear();
     if (request.Type == Operation::NewFolder)
@@ -306,12 +317,34 @@ void FolderTree(jEditorProject& project)
         ImGui::Unindent(float(row.Depth) * 12); ImGui::PopID();
     }
 }
-void AssetMenu(const jEditorAssetRecord& asset)
+bool IsStartupScene(const jEditorProject& project, const jEditorAssetRecord& asset)
+{
+    return asset.Kind == jEditorAssetKind::Scene && asset.SourcePath == project.GetConfig().StartupScene;
+}
+void AssetMenu(const jEditorProject& project, const jEditorAssetRecord& asset, bool canReplaceSelection, bool playing)
 {
     if (!ImGui::BeginPopupContextItem("asset_menu")) return;
-    if ((asset.Kind == jEditorAssetKind::Model || asset.Kind == jEditorAssetKind::Scene)
-        && ImGui::MenuItem(asset.Kind == jEditorAssetKind::Model ? "Add model instance" : "Open scene", nullptr, false, !asset.Missing))
+    const char* action = nullptr;
+    switch (asset.Kind)
+    {
+    case jEditorAssetKind::Model: action = "Add model instance"; break;
+    case jEditorAssetKind::Prefab: action = "Instantiate prefab"; break;
+    case jEditorAssetKind::Scene: action = "Open scene"; break;
+    default: break;
+    }
+    if (action && ImGui::MenuItem(action, nullptr, false, !asset.Missing && !playing))
         State().Deferred.push_back({Operation::Activate, asset.Id, asset.SourcePath});
+    if (asset.Kind == jEditorAssetKind::Model)
+    {
+        if (ImGui::MenuItem("Select Instances", nullptr, false, !playing))
+            State().Deferred.push_back({Operation::SelectInstances, asset.Id, asset.SourcePath});
+        if (ImGui::MenuItem("Replace Asset on Selection", nullptr, false,
+            canReplaceSelection && !playing && !asset.Missing && asset.MissingDependencies.empty()))
+            State().Deferred.push_back({Operation::ReplaceSelection, asset.Id, asset.SourcePath});
+    }
+    if (asset.Kind == jEditorAssetKind::Scene && Lower(ToUtf8(FromUtf8(asset.SourcePath).extension())) == ".jscene" &&
+        ImGui::MenuItem("Set as Startup Scene", nullptr, IsStartupScene(project, asset), !asset.Missing && !playing))
+        State().Deferred.push_back({Operation::SetStartupScene, asset.Id, asset.SourcePath});
     if (ImGui::MenuItem("Reimport", nullptr, false, !asset.Missing)) State().Deferred.push_back({Operation::Reimport, asset.Id, asset.SourcePath});
     if (asset.Kind == jEditorAssetKind::Model && ImGui::MenuItem("Import settings")) Open({Operation::Settings, asset.Id, asset.SourcePath});
     if (ImGui::MenuItem("Rename")) Open({Operation::Rename, asset.Id, asset.SourcePath});
@@ -319,7 +352,7 @@ void AssetMenu(const jEditorAssetRecord& asset)
     if (ImGui::MenuItem("Move to trash")) Open({Operation::Trash, asset.Id, asset.SourcePath});
     ImGui::EndPopup();
 }
-void Grid(jEditorProject& project, std::string& selected)
+void Grid(jEditorProject& project, std::string& selected, bool canReplaceSelection, bool playing)
 {
     auto& s = State();
     if (s.FilterDirty)
@@ -340,6 +373,11 @@ void Grid(jEditorProject& project, std::string& selected)
     const int columns = std::max(1, static_cast<int>(ImGui::GetContentRegionAvail().x / 108));
     if (!ImGui::BeginTable("asset_tiles", columns, ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_NoSavedSettings)) return;
     ImGuiListClipper clip; clip.Begin(static_cast<int>((s.Filtered.size() + columns - 1) / columns), rowHeight);
+    if (!s.RevealId.empty())
+    {
+        const auto tile = std::find_if(s.Filtered.begin(), s.Filtered.end(), [&](size_t i) { return s.Assets[i].Id == s.RevealId; });
+        if (tile != s.Filtered.end()) clip.IncludeItemByIndex(static_cast<int>(tile - s.Filtered.begin()) / columns);
+    }
     while (clip.Step()) for (int row = clip.DisplayStart; row < clip.DisplayEnd; ++row)
     {
         ImGui::TableNextRow(ImGuiTableRowFlags_None, rowHeight);
@@ -353,11 +391,12 @@ void Grid(jEditorProject& project, std::string& selected)
             ImGui::InvisibleButton("asset", ImVec2(width, tileHeight));
             const auto minimum = ImGui::GetItemRectMin(), maximum = ImGui::GetItemRectMax();
             const bool hovered = ImGui::IsItemHovered();
+            if (asset.Id == s.RevealId) { ImGui::SetScrollHereY(); s.RevealId.clear(); }
             if (ImGui::IsItemClicked()) { selected = asset.Id; s.Selected = selected; }
             if (hovered && ImGui::IsMouseDoubleClicked(0)) s.Deferred.push_back({Operation::Activate, asset.Id, asset.SourcePath});
             if (ImGui::BeginDragDropSource())
             { ImGui::SetDragDropPayload("JENGINE_ASSET", asset.Id.c_str(), asset.Id.size() + 1); ImGui::TextUnformatted(asset.SourcePath.c_str()); ImGui::EndDragDropSource(); }
-            AssetMenu(asset);
+            AssetMenu(project, asset, canReplaceSelection, playing);
             auto* draw = ImGui::GetWindowDrawList();
             const auto background = selected == asset.Id ? ImGui::GetColorU32(ImGuiCol_Header)
                 : hovered ? ImGui::GetColorU32(ImGuiCol_FrameBgHovered) : ImGui::GetColorU32(ImGuiCol_FrameBg);
@@ -375,6 +414,9 @@ void Grid(jEditorProject& project, std::string& selected)
             if (width > 8.f)
                 draw->AddText(ImGui::GetFont(), ImGui::GetFontSize(), ImVec2(clipRect.x, clipRect.y),
                     asset.Missing ? IM_COL32(255, 120, 100, 255) : ImGui::GetColorU32(ImGuiCol_Text), label.c_str(), nullptr, width - 8, &clipRect);
+            if (IsStartupScene(project, asset))
+                draw->AddText(ImVec2(minimum.x + 6, minimum.y + tileHeight - ImGui::GetTextLineHeight() - 4),
+                    IM_COL32(255, 208, 105, 255), "Startup");
             if (hovered)
             {
                 ImGui::BeginTooltip(); ImGui::TextUnformatted(asset.SourcePath.c_str());
@@ -396,6 +438,7 @@ void Details(jEditorProject& project, const std::string& selected)
     const auto* asset = Find(selected); if (!asset) return;
     ImGui::TextWrapped("%s", ToUtf8(FromUtf8(asset->SourcePath).filename()).c_str());
     ImGui::TextDisabled("%s", jEditorAssetKindName(asset->Kind));
+    if (IsStartupScene(project, *asset)) ImGui::TextColored(ImVec4(1, .82f, .41f, 1), "Startup Scene");
     const auto preview = Thumbnail(*asset, project, true);
     const auto available = ImGui::GetContentRegionAvail();
     const float edge = std::min({160.f, available.x, std::max(48.f, available.y - ImGui::GetStyle().ItemSpacing.y)});
@@ -427,8 +470,43 @@ void Modal(jEditor& editor, jEditorProject& project, jEditorAssetRegistry& regis
     {
     case Operation::NewFolder: ImGui::InputText("Folder name", s.Name, sizeof(s.Name)); break;
     case Operation::Import:
-        ImGui::InputText("Source file (absolute)", s.SourceFile, sizeof(s.SourceFile));
-        ImGui::InputText("Project folder", s.Destination, sizeof(s.Destination)); break;
+    {
+        ImGui::SetNextItemWidth(360);
+        const bool sourceEdited = ImGui::InputText("Source file (absolute)", s.SourceFile, sizeof(s.SourceFile));
+        ImGui::SetNextItemWidth(360);
+        const bool destinationEdited = ImGui::InputText("Project folder", s.Destination, sizeof(s.Destination));
+        if (sourceEdited || destinationEdited) { s.ImportPreview.Files.clear(); s.ImportError.clear(); s.ImportChecked = false; }
+        if (ImGui::Button("Check files"))
+        {
+            try
+            {
+                const auto source = FromUtf8(s.SourceFile);
+                s.ImportChecked = registry.InspectImport(source, ToUtf8(FromUtf8(s.Destination) / source.filename()),
+                    s.ImportPreview, s.ImportError);
+            }
+            catch (const std::exception& exception) { s.ImportChecked = false; s.ImportError = exception.what(); }
+        }
+        if (!s.ImportError.empty()) ImGui::TextColored(ImVec4(1,.4f,.3f,1), "%s", s.ImportError.c_str());
+        if (!s.ImportPreview.Files.empty())
+        {
+            ImGui::SeparatorText("Files and dependencies");
+            ImGui::BeginChild("Import files", ImVec2(500, 160), true, ImGuiWindowFlags_HorizontalScrollbar);
+            ImGuiListClipper clip;
+            clip.Begin(static_cast<int>(s.ImportPreview.Files.size()));
+            while (clip.Step()) for (int index = clip.DisplayStart; index < clip.DisplayEnd; ++index)
+            {
+                const auto& file = s.ImportPreview.Files[index];
+                using Status = jEditorAssetRegistry::ImportStatus;
+                const char* status = file.Status == Status::Copy ? "Copy" : file.Status == Status::Reuse ? "Reuse"
+                    : file.Status == Status::Missing ? "Missing" : "Conflict";
+                if (file.Issue.empty()) ImGui::Text("%s  %s", status, file.Destination.c_str());
+                else ImGui::TextColored(ImVec4(1,.4f,.3f,1), "%s  %s  (%s)", status, file.Destination.c_str(), file.Issue.c_str());
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s\n%s", ToUtf8(file.Source).c_str(), file.Issue.c_str());
+            }
+            ImGui::EndChild();
+        }
+        break;
+    }
     case Operation::Rename: ImGui::InputText("New name", s.Name, sizeof(s.Name)); break;
     case Operation::Move: ImGui::InputText("Destination folder", s.Destination, sizeof(s.Destination)); break;
     case Operation::Trash: ImGui::TextWrapped("Move this item to recoverable project trash? Referenced files are kept safe."); break;
@@ -441,11 +519,14 @@ void Modal(jEditor& editor, jEditorProject& project, jEditorAssetRegistry& regis
         break;
     default: break;
     }
-    if (s.StatusError && !s.Status.empty()) ImGui::TextColored(ImVec4(1,.4f,.3f,1), "%s", s.Status.c_str());
-    if (ImGui::Button(request.Type == Operation::Trash ? "Move to trash" : "Apply"))
-        if (Execute(editor, project, registry, request, selected)) { s.Modal = {}; ImGui::CloseCurrentPopup(); }
+    if (request.Type != Operation::Import && s.StatusError && !s.Status.empty()) ImGui::TextColored(ImVec4(1,.4f,.3f,1), "%s", s.Status.c_str());
+    ImGui::BeginDisabled(request.Type == Operation::Import && (!s.ImportChecked || !s.ImportPreview.Ready()));
+    const char* apply = request.Type == Operation::Import ? "Import" : request.Type == Operation::Trash ? "Move to trash" : "Apply";
+    if (ImGui::Button(apply))
+        if (Execute(editor, project, registry, request, selected)) { s.Modal = {}; s.ImportPreview.Files.clear(); ImGui::CloseCurrentPopup(); }
+    ImGui::EndDisabled();
     ImGui::SameLine();
-    if (ImGui::Button("Cancel")) { s.Modal = {}; ImGui::CloseCurrentPopup(); }
+    if (ImGui::Button("Cancel")) { s.Modal = {}; s.ImportPreview.Files.clear(); ImGui::CloseCurrentPopup(); }
     ImGui::EndPopup();
 }
 }
@@ -559,8 +640,17 @@ void RenderTexturePreview(const jEditorProject* project, const jEditorAssetRegis
     }
 }
 
+void Reveal(const jEditorAssetRecord& asset)
+{
+    auto& s = State();
+    s.RevealId = asset.Id;
+    s.Folder = ToUtf8(FromUtf8(asset.SourcePath).parent_path());
+    s.Search.Clear(); s.KindFilter = 0; s.FilterDirty = true; s.FoldersDirty = true;
+    for (auto folder = FromUtf8(s.Folder); !folder.empty(); folder = folder.parent_path())
+        s.Expanded.insert(ToUtf8(folder));
+}
 void Render(jEditor& editor, jEditorProject& project, jEditorAssetRegistry& registry,
-    std::string& selected, const ActivateAsset& activate)
+    std::string& selected, bool canReplaceSelection, const AssetAction& action)
 {
     auto& s = State();
     if (s.ProjectToken != project.GetConfig().Id + "|" + ToUtf8(project.GetRoot()))
@@ -574,14 +664,16 @@ void Render(jEditor& editor, jEditorProject& project, jEditorAssetRegistry& regi
     if (work.Active) { ImGui::SameLine(); if (ImGui::Button("Cancel scan")) s.Deferred.push_back({Operation::CancelScan}); }
     if (s.Search.Draw("Search", 220)) s.FilterDirty = true;
     ImGui::SameLine(); ImGui::SetNextItemWidth(130);
-    if (ImGui::Combo("Kind", &s.KindFilter, "All\0Models\0Textures\0Materials\0Scenes\0Shaders\0Data\0")) s.FilterDirty = true;
+    if (ImGui::Combo("Kind", &s.KindFilter, "All\0Models\0Textures\0Materials\0Scenes\0Shaders\0Data\0Prefabs\0")) s.FilterDirty = true;
     ImGui::BeginChild("asset_body", ImVec2(0, -ImGui::GetFrameHeightWithSpacing()), false);
     ImGui::BeginChild("asset_folders", ImVec2(170, 0), true); FolderTree(project); ImGui::EndChild();
     ImGui::SameLine();
     const float available = ImGui::GetContentRegionAvail().x;
     const bool details = Find(selected) && available >= 390.f;
     const float gridWidth = details ? available - std::clamp(available * .33f, 150.f, 230.f) - ImGui::GetStyle().ItemSpacing.x : 0;
-    ImGui::BeginChild("asset_grid", ImVec2(gridWidth, 0), true); Grid(project, selected); ImGui::EndChild();
+    ImGui::BeginChild("asset_grid", ImVec2(gridWidth, 0), true);
+    Grid(project, selected, canReplaceSelection, editor.GetDocument().IsPlaying());
+    ImGui::EndChild();
     if (details) { ImGui::SameLine(); ImGui::BeginChild("asset_details", ImVec2(0, 0), true); Details(project, selected); ImGui::EndChild(); }
     ImGui::EndChild(); s.Selected = selected;
     if (!s.Status.empty()) ImGui::TextColored(s.StatusError ? ImVec4(1,.4f,.3f,1) : ImGui::GetStyleColorVec4(ImGuiCol_Text), "%s", s.Status.c_str());
@@ -590,16 +682,19 @@ void Render(jEditor& editor, jEditorProject& project, jEditorAssetRegistry& regi
     {
         if (request.Type == Operation::Refresh) { registry.ScanAsync(); s.Discovered.clear(); s.FoldersDirty = true; }
         else if (request.Type == Operation::CancelScan) registry.CancelScan();
-        else if (request.Type == Operation::Activate)
+        else if (request.Type == Operation::Reimport) Execute(editor, project, registry, request, selected);
+        else if (const auto* asset = registry.FindById(request.Id); asset && action)
         {
-            const auto* asset = registry.FindById(request.Id);
-            if (asset && !asset->Missing && (asset->Kind == jEditorAssetKind::Model || asset->Kind == jEditorAssetKind::Scene))
+            const auto snapshot = *asset;
+            switch (request.Type)
             {
-                if (activate) activate(request.Id);
-                else if (asset->Kind == jEditorAssetKind::Model) editor.AddModel(asset->SourcePath, asset->Id, asset->Revision);
+            case Operation::Activate: if (!snapshot.Missing) action(Action::Activate, snapshot); break;
+            case Operation::SelectInstances: action(Action::SelectInstances, snapshot); break;
+            case Operation::ReplaceSelection: action(Action::ReplaceSelection, snapshot); break;
+            case Operation::SetStartupScene: action(Action::SetStartupScene, snapshot); break;
+            default: break;
             }
         }
-        else if (request.Type == Operation::Reimport) Execute(editor, project, registry, request, selected);
     }
     Modal(editor, project, registry, selected);
 }
@@ -612,14 +707,16 @@ void Shutdown()
     // A project swap can happen after this frame's asset draw list was built.
     // Keep those IDs alive; the next owner Tick retires them before any new draw.
     for (const auto& entry : s.Thumbnails) if (entry.second.Handle) s.Retired.push_back(entry.second.Handle);
-    s.Thumbnails.clear(); s.Assets.clear(); s.ProjectToken.clear(); s.Modal = {}; s.OpenModal = false;
+    s.Thumbnails.clear(); s.Assets.clear(); s.ProjectToken.clear(); s.RevealId.clear();
+    s.Modal = {}; s.OpenModal = false; s.ImportPreview.Files.clear();
 }
 }
 #else
 namespace jEditorAssetPanel
 {
 void Tick(jEditor&, jEditorProject&, jEditorAssetRegistry&) {}
-void Render(jEditor&, jEditorProject&, jEditorAssetRegistry&, std::string&, const ActivateAsset&) {}
+void Render(jEditor&, jEditorProject&, jEditorAssetRegistry&, std::string&, bool, const AssetAction&) {}
+void Reveal(const jEditorAssetRecord&) {}
 void RenderTexturePreview(const jEditorProject*, const jEditorAssetRegistry*, const std::string&, const ImVec2&) {}
 void Shutdown() {}
 }

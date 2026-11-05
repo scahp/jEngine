@@ -100,6 +100,7 @@ public:
 
 	// Pick request state (set by mouse click, consumed by renderer)
 	bool bPickRequested = false;
+	bool PickToggleSelection = false;
 	int32 PickMouseX = 0;
 	int32 PickMouseY = 0;
 

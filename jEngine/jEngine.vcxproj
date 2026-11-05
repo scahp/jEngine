@@ -402,6 +402,8 @@ xcopy /y /i "$(JEngineDxcDirectory)\dxil.dll" "$(OutDir)"</Command>
     <ClCompile Include="Code\Engine\Editor\jEditorTools.cpp"></ClCompile>
     <ClCompile Include="Code\Engine\Editor\jEditorRuntime.cpp"></ClCompile>
     <ClCompile Include="Code\Engine\Editor\jEditorUiRenderer.cpp"></ClCompile>
+    <ClCompile Include="Code\Engine\Editor\jEditorCapture.cpp"></ClCompile>
+    <ClCompile Include="Code\Engine\Editor\jEditorCaptureEncoding.cpp"></ClCompile>
     <ClCompile Include="Code\Engine\Editor\jEditorStartup.cpp"></ClCompile>
     <ClCompile Include="Code\Engine\Editor\jEditorDocument.cpp"></ClCompile>
     <ClCompile Include="FileLoader\jManagedTextureCache.cpp"></ClCompile>

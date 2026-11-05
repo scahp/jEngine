@@ -156,6 +156,17 @@ namespace
         return true;
     }
 
+    bool ImportStamp(const fs::path& path, jEditorAssetFingerprint& stamp)
+    {
+        std::error_code ec;
+        const auto size = fs::file_size(path, ec);
+        if (ec) return false;
+        const auto modified = fs::last_write_time(path, ec);
+        if (ec) return false;
+        stamp = {size, static_cast<std::int64_t>(modified.time_since_epoch().count()), {}};
+        return true;
+    }
+
     Json FingerprintJson(const jEditorAssetFingerprint& value)
     { return {{"size", value.Size}, {"modified", value.Modified}, {"hash", value.Hash}}; }
 
@@ -165,7 +176,8 @@ namespace
         if (ext == ".obj" || ext == ".gltf" || ext == ".glb" || ext == ".fbx" || ext == ".dae" || ext == ".ply") return jEditorAssetKind::Model;
         if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".dds" || ext == ".hdr" || ext == ".tga" || ext == ".bmp") return jEditorAssetKind::Texture;
         if (ext == ".mtl" || ext == ".jmaterial") return jEditorAssetKind::Material;
-        if (ext == ".jscene" || ext == ".jprefab" || ext == ".prefab" || ext == ".scene") return jEditorAssetKind::Scene;
+        if (ext == ".jprefab" || ext == ".prefab") return jEditorAssetKind::Prefab;
+        if (ext == ".jscene" || ext == ".scene") return jEditorAssetKind::Scene;
         if (ext == ".hlsl" || ext == ".hlsli" || ext == ".vert" || ext == ".frag" || ext == ".glsl") return jEditorAssetKind::Shader;
         return jEditorAssetKind::Data;
     }
@@ -331,11 +343,26 @@ namespace
             while (std::getline(input, line))
             {
                 const auto words = Words(line);
-                if (extension == ".obj" && words.size() > 1 && words[0] == "mtllib")
-                    local.insert(local.end(), words.begin() + 1, words.end());
-                else if (extension == ".mtl" && words.size() > 1
-                    && (Lower(words[0]).rfind("map_", 0) == 0 || Lower(words[0]) == "bump" || Lower(words[0]) == "disp" || Lower(words[0]) == "decal"))
-                    local.push_back(MaterialTextureFilename(words, root, relative));
+                if (extension == ".obj" && words.size() > 1 && Lower(words[0]) == "mtllib")
+                {
+                    size_t first = 1;
+                    for (size_t last = 1; last < words.size(); ++last)
+                    {
+                        if (!Lower(words[last]).ends_with(".mtl")) continue;
+                        std::string library = words[first];
+                        for (size_t word = first + 1; word <= last; ++word) library += ' ' + words[word];
+                        local.push_back(std::move(library));
+                        first = last + 1;
+                    }
+                    local.insert(local.end(), words.begin() + first, words.end());
+                }
+                else if (extension == ".mtl" && words.size() > 1)
+                {
+                    const auto command = Lower(words[0]);
+                    if (command.starts_with("map_") || command == "bump" || command == "disp"
+                        || command == "decal" || command == "refl" || command == "norm")
+                        local.push_back(MaterialTextureFilename(words, root, relative));
+                }
                 else if (Kind(path) == jEditorAssetKind::Shader)
                 {
                     const auto include = line.find("#include");
@@ -380,6 +407,7 @@ const char* jEditorAssetKindName(jEditorAssetKind kind)
     case jEditorAssetKind::Texture: return "Texture";
     case jEditorAssetKind::Material: return "Material";
     case jEditorAssetKind::Scene: return "Scene";
+    case jEditorAssetKind::Prefab: return "Prefab";
     case jEditorAssetKind::Shader: return "Shader";
     default: return "Data";
     }
@@ -873,19 +901,163 @@ bool jEditorAssetRegistry::CreateFolder(const std::string& path, std::string& er
     return true;
 }
 
+bool jEditorAssetRegistry::ImportPlan::Ready() const
+{
+    return !Files.empty() && std::all_of(Files.begin(), Files.end(), [](const ImportEntry& entry) {
+        return entry.Status == ImportStatus::Copy || entry.Status == ImportStatus::Reuse;
+    });
+}
+
+bool jEditorAssetRegistry::InspectImport(const fs::path& source, const std::string& destination,
+    ImportPlan& plan, std::string& error) const try
+{
+    plan.Files.clear();
+    if (!State->IsOwner() || State->Stopping || !State->Allowed(destination)) { error = "Import destination must be inside project Assets or Scenes"; return false; }
+    if (!source.is_absolute() || Excluded(source.filename())) { error = "Choose an absolute path to an asset file"; return false; }
+    if (!jEditorProject::ResolveSafe(State->Root, destination, error)) return false;
+    const auto sourceFile = source.lexically_normal();
+    const auto destinationFile = FromUtf8(destination).lexically_normal();
+    const auto destinationFolder = destinationFile.parent_path();
+    const auto boundary = Within(fs::path("Scenes"), destinationFolder) ? fs::path("Scenes") : FromUtf8(State->AssetRoot);
+    auto sourceRoot = sourceFile.parent_path();
+    // An upward reference such as ../Textures can be retained only when the
+    // destination has matching space above it inside the allowed asset tree.
+    for (auto folder = destinationFolder; folder != boundary && folder.has_relative_path(); folder = folder.parent_path())
+        sourceRoot = sourceRoot.parent_path();
+    const auto primary = sourceFile.lexically_relative(sourceRoot);
+    std::vector<fs::path> pending{primary};
+    std::set<fs::path> queued{primary};
+    std::set<std::string> destinations;
+    std::error_code ec;
+    for (size_t i = 0; i < pending.size(); ++i)
+    {
+        const auto relative = pending[i];
+        auto& entry = plan.Files.emplace_back();
+        entry.Source = sourceRoot / relative;
+        entry.Destination = i == 0 ? ToUtf8(destinationFile) : ToUtf8(
+            (destinationFolder / relative.lexically_relative(primary.parent_path().empty() ? fs::path(".") : primary.parent_path())).lexically_normal());
+        const auto conflict = [&](std::string issue) { entry.Status = ImportStatus::Conflict; entry.Issue = std::move(issue); };
+        const auto input = jEditorProject::ResolveSafe(sourceRoot, relative, error);
+        if (!input) { conflict(error); error.clear(); continue; }
+        if (!State->Allowed(entry.Destination)) { conflict("Dependency destination escapes the asset folders"); continue; }
+        const auto target = jEditorProject::ResolveSafe(State->Root, entry.Destination, error);
+        if (!target) { conflict(error); error.clear(); continue; }
+        if (!destinations.insert(Lower(entry.Destination)).second) { conflict("Dependencies share a destination name"); continue; }
+
+        const auto inputStatus = fs::status(*input, ec);
+        if (!fs::exists(inputStatus) && (!ec || ec == std::errc::no_such_file_or_directory))
+        { entry.Status = ImportStatus::Missing; entry.Issue = "Source file is missing"; continue; }
+        if (ec || !fs::is_regular_file(inputStatus) || !ImportStamp(*input, entry.SourceStamp))
+        { conflict("Source must be a readable regular file"); continue; }
+
+        const auto targetStatus = fs::status(*target, ec);
+        if (ec && ec != std::errc::no_such_file_or_directory) conflict("Cannot inspect destination: " + ec.message());
+        else if (fs::exists(targetStatus))
+        {
+            jEditorAssetFingerprint existing, incoming;
+            if (i == 0 || !fs::is_regular_file(targetStatus)) conflict("Destination already exists");
+            else if (!Fingerprint(*input, incoming, error) || !Fingerprint(*target, existing, error))
+            { conflict(error); error.clear(); }
+            else if (incoming.Size != existing.Size || incoming.Hash != existing.Hash) conflict("Destination has different contents");
+            else entry.Status = ImportStatus::Reuse;
+        }
+
+        const auto extension = Lower(ToUtf8(relative.extension()));
+        if (Kind(relative) != jEditorAssetKind::Model && extension != ".mtl") continue;
+        References refs;
+        if (!SourceReferences(sourceRoot, relative, refs, error)) { conflict(error); error.clear(); continue; }
+        for (const auto& path : refs.Paths)
+        {
+            auto dependency = FromUtf8(path);
+            if (queued.insert(dependency).second) pending.push_back(std::move(dependency));
+            if (pending.size() > MaxAssets) { error = "Import has too many dependencies"; return false; }
+        }
+    }
+    error.clear();
+    return true;
+}
+catch (const std::exception& exception) { error = exception.what(); return false; }
+
+bool jEditorAssetRegistry::ImportBundle(const ImportPlan& reviewed, std::string& error)
+{
+    if (!reviewed.Ready()) { error = "Resolve all missing files and conflicts before importing"; return false; }
+    const auto& primary = reviewed.Files.front();
+    ImportPlan current;
+    if (!InspectImport(primary.Source, primary.Destination, current, error)) return false;
+    if (current.Files != reviewed.Files) { error = "Import files changed. Check files again before importing"; return false; }
+
+    struct Copy { fs::path Source, Temporary, Destination; jEditorAssetFingerprint Stamp; bool Published = false; };
+    std::vector<Copy> copies;
+    fs::path staging;
+    std::error_code ec;
+    bool success = false;
+    try
+    {
+        success = [&] {
+            const auto directory = jEditorProject::ResolveSafe(State->Root, fs::path(".jeditor") / ("import-" + NewId()), error);
+            if (!directory) return false;
+            fs::create_directories(directory->parent_path(), ec);
+            if (ec || !fs::create_directory(*directory, ec)) { error = "Cannot create import staging folder"; return false; }
+            staging = *directory;
+            // Copy dependencies first. The model appears in the project only
+            // after all of the files it references have been published.
+            for (auto it = current.Files.rbegin(); it != current.Files.rend(); ++it)
+            {
+                if (it->Status == ImportStatus::Reuse) continue;
+                const auto target = jEditorProject::ResolveSafe(State->Root, it->Destination, error);
+                if (!target) return false;
+                copies.push_back({it->Source, staging / std::to_string(copies.size()), *target, it->SourceStamp});
+                const auto& copy = copies.back();
+                if (!fs::copy_file(copy.Source, copy.Temporary, fs::copy_options::none, ec))
+                { error = "Cannot stage " + ToUtf8(copy.Source) + ": " + ec.message(); return false; }
+                jEditorAssetFingerprint stamp;
+                if (!ImportStamp(copy.Source, stamp) || stamp != copy.Stamp)
+                { error = "Source changed during import: " + ToUtf8(copy.Source); return false; }
+            }
+            for (auto& copy : copies)
+            {
+                fs::create_directories(copy.Destination.parent_path(), ec);
+                if (ec) { error = "Cannot create destination folder: " + ec.message(); return false; }
+#ifdef _WIN32
+                copy.Published = MoveFileExW(copy.Temporary.c_str(), copy.Destination.c_str(), MOVEFILE_WRITE_THROUGH) != FALSE;
+#else
+                fs::create_hard_link(copy.Temporary, copy.Destination, ec);
+                copy.Published = !ec;
+#endif
+                if (!copy.Published) { error = "Cannot publish import file: " + ToUtf8(copy.Destination); return false; }
+            }
+            return true;
+        }();
+    }
+    catch (const std::exception& exception) { error = exception.what(); }
+    for (auto it = copies.rbegin(); it != copies.rend(); ++it)
+    {
+        if (!success && it->Published)
+        {
+            fs::remove(it->Destination, ec);
+            if (ec) error += "\nCould not roll back " + ToUtf8(it->Destination) + ": " + ec.message();
+        }
+        fs::remove(it->Temporary, ec);
+    }
+    if (!staging.empty()) fs::remove(staging, ec);
+    if (success) ScanAsync();
+    return success;
+}
+
 bool jEditorAssetRegistry::ImportFile(const fs::path& source, const std::string& destination, std::string& error)
 {
-    if (!State->IsOwner() || State->Stopping || !State->Allowed(destination)) { error = "Import destination must be inside project Assets or Scenes"; return false; }
-    const auto target = jEditorProject::ResolveSafe(State->Root, destination, error);
-    if (!target) return false;
+    ImportPlan plan;
     std::error_code ec;
-    if (fs::is_symlink(fs::symlink_status(source, ec)) || !fs::is_regular_file(source, ec) || Excluded(source.filename()))
-    { error = "Import source must be a regular asset file"; return false; }
-    if (fs::exists(*target, ec)) { error = "Import destination already exists"; return false; }
-    fs::create_directories(target->parent_path(), ec);
-    if (!ec) fs::copy_file(source, *target, fs::copy_options::none, ec);
-    if (ec) { error = "Cannot import asset: " + ec.message(); return false; }
-    return Scan(error);
+    const auto absolute = fs::absolute(source, ec);
+    if (ec) { error = "Cannot resolve import source: " + ec.message(); return false; }
+    if (!InspectImport(absolute, destination, plan, error)) return false;
+    if (!plan.Ready())
+    {
+        const auto issue = std::find_if(plan.Files.begin(), plan.Files.end(), [](const ImportEntry& entry) { return !entry.Issue.empty(); });
+        if (issue != plan.Files.end()) error = issue->Destination + ": " + issue->Issue;
+        return false;
+    }
+    return ImportBundle(plan, error) && Scan(error);
 }
 
 bool jEditorAssetRegistry::MovePath(const std::string& inputSource, const std::string& inputDestination, std::string& error)

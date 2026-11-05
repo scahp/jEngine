@@ -7,6 +7,7 @@
 #include "jEditorExtensions.h"
 #include "jEditorPackaging.h"
 #include "jEditorAssetPanel.h"
+#include "jEditorCapture.h"
 #include "jEditorProjectSettings.h"
 #include "FileLoader/jEditorAssets.h"
 #include "FileLoader/jEditorAssetPath.h"
@@ -23,6 +24,7 @@
 #include "RHI/jRHI.h"
 #include <fstream>
 #include <future>
+#include <ctime>
 #include <set>
 
 namespace
@@ -32,11 +34,40 @@ using namespace jEditorAuthoring;
 using Json = nlohmann::json;
 enum class Dialog { None, Save, Open, NewProject, OpenProject, Import, SavePrefab, OpenPrefab, Package };
 struct Row { EntityId Id; int Depth; bool Children; std::string Label; };
+struct AssetPlacement
+{
+    std::string Id, Source, Error;
+    uint64_t Revision = 0;
+    std::unique_ptr<Document> Prefab;
+    std::optional<jEditor::PlacementBounds> Bounds;
+    std::optional<jEditor::PlacementHit> Drop;
+};
+struct ModelReplacement
+{
+    struct Target { EntityId Id; std::string Source, AssetId; };
+    jEditorAssetRecord Asset;
+    std::vector<Target> Targets;
+};
+struct CaptureDialog
+{
+    bool Open = false, Video = false, WasBusy = false;
+    int Resolution = 0, Width = 1920, Height = 1080, Fps = 30;
+    jEditorCapture::Format StillFormat = jEditorCapture::Format::Png;
+    char File[2048]{};
+    std::string Error;
+};
 struct Workspace
 {
     bool Visible = true, Runtime = false, ViewHovered = false, ViewFocused = false;
     bool FixedLayout = true, ShowAssets = true, ShowLogs = true, ShowProfiler = false, ShowTools = false;
     bool PaintTerrainInScene = false;
+    bool SurfaceSnap = true, SuppressEditorEscape = false;
+    Vec3 DuplicateOffset{1, 0, 0};
+    std::optional<AssetPlacement> Placement;
+    std::optional<ModelReplacement> Replacement;
+    bool FocusAssets = false;
+    ImGuiTextFilter ReplacementFilter;
+    CaptureDialog Capture;
     bool Docking = true, PlatformWindows = false, DocksInitialized = false;
     std::optional<bool> TestPlatformWindows;
     std::function<void()> IntegrationDraw;
@@ -46,6 +77,7 @@ struct Workspace
     ImVec2 ViewPosition{}, ViewSize{};
     uint64_t RowRevision = ~uint64_t(0), AssetRevision = ~uint64_t(0);
     uint64_t RowSignature = ~uint64_t(0);
+    EntityId HierarchyActive = 0, RangeAnchor = 0, RevealHierarchy = 0, RowSelected = 0;
     ImGuiTextFilter EntityFilter, AssetFilter, LogFilter;
     std::set<EntityId> Collapsed;
     std::vector<Row> Rows;
@@ -92,12 +124,20 @@ void FinishInspectorEdit(jEditor& editor)
 }
 void FinishWorkspaceEdit(jEditor& editor)
 {
+    editor.CancelViewportDuplicateDrag();
     FinishInspectorEdit(editor);
     jEditorTools::FinishTerrainStroke(editor);
+}
+void ClearAssetPlacement(jEditor& editor)
+{
+    State().Placement.reset();
+    State().Replacement.reset();
+    editor.ReleasePlacementModels();
 }
 void GuardUnsaved(jEditor& editor, std::function<void()> action)
 {
     FinishWorkspaceEdit(editor);
+    ClearAssetPlacement(editor);
     if (editor.GetDocument().IsDirty()) { State().Pending = std::move(action); State().UnsavedPrompt = true; }
     else action();
 }
@@ -131,18 +171,22 @@ bool SaveScene(jEditor& editor, const fs::path& path)
     catch (const std::exception& error) { Message(error.what(), true); return false; }
     if (!editor.GetDocument().Save(path)) { Message(editor.GetDocument().LastError(), true); return false; }
     Message("Saved " + jEditorAssetPath::ToUtf8(path));
-    auto& s = State();
-    if (s.Project)
-    {
-        std::error_code ec; const auto relative = fs::relative(path, s.Project->GetRoot(), ec);
-        if (!ec && !relative.empty() && *relative.begin() != "..")
-        {
-            s.Project->EditConfig().StartupScene = jEditorAssetPath::ToUtf8(relative);
-            std::string error;
-            if (!s.Project->Save(error)) Message(error, true);
-        }
-    }
+    if (State().Registry) State().Registry->ScanAsync();
     return true;
+}
+void SetStartupScene(jEditor& editor, const fs::path& path)
+{
+    auto& s = State();
+    if (!s.Project || path.empty()) return;
+    std::error_code ec;
+    const auto relative = fs::relative(path, s.Project->GetRoot(), ec);
+    std::string error;
+    if (ec || !jEditorProject::ResolveSafe(s.Project->GetRoot(), relative, error, true))
+    { Message(error.empty() ? "Choose a saved scene inside this project." : error, true); return; }
+    auto config = s.Project->GetConfig();
+    config.StartupScene = jEditorAssetPath::ToUtf8(relative);
+    if (jEditorProjectSettings::Save(*s.Project, editor, config, error)) Message("Startup scene: " + config.StartupScene);
+    else Message(error, true);
 }
 void LoadLayout()
 {
@@ -183,19 +227,22 @@ void SaveLayout()
     }
     catch (const std::exception& e) { Message(e.what(), true); }
 }
-bool FinishProperty(Document& document, Entity& entity, bool changed, const char* label)
+void FinishProperties(Document& document, std::span<const Entity> edits, const char* label)
 {
     if (ImGui::IsItemActivated() && !document.HasTransaction())
     {
-        if (document.BeginTransaction(label)) { State().OwnPropertyTransaction = true; State().PropertyOwner = entity.Id; }
+        if (document.BeginTransaction(label)) { State().OwnPropertyTransaction = true; State().PropertyOwner = document.SelectedId(); }
     }
-    if (changed && !document.Update(entity, label)) Message(document.LastError(), true);
+    if (!edits.empty() && !document.UpdateMany(edits, label)) Message(document.LastError(), true);
     if (ImGui::IsItemDeactivated() && State().OwnPropertyTransaction)
     {
         if (document.HasTransaction()) document.CommitTransaction();
         State().OwnPropertyTransaction = false; State().PropertyOwner = 0;
     }
-    return changed;
+}
+void FinishProperty(Document& document, Entity& entity, bool changed, const char* label)
+{
+    FinishProperties(document, std::span(&entity, changed ? 1 : 0), label);
 }
 void FinishMaterialProperty(Document& document, Entity& entity, bool changed, const char* label)
 {
@@ -218,10 +265,13 @@ void AddMenu(jEditor& editor)
 void BuildRows(Document& document)
 {
     auto& s = State(); const std::string filter(s.EntityFilter.InputBuf);
-    if (s.RowRevision == document.Revision() && s.CachedEntityFilter == filter) return;
+    const auto selected = filter.empty() ? 0 : document.SelectedId();
+    if (s.RowRevision == document.Revision() && s.CachedEntityFilter == filter && s.RowSelected == selected) return;
     s.RowRevision = document.Revision();
+    s.RowSelected = selected;
     uint64_t signature = std::hash<std::string>{}(filter);
     const auto mix = [&](uint64_t value) { signature ^= value + 0x9e3779b97f4a7c15ull + (signature << 6) + (signature >> 2); };
+    mix(selected);
     std::map<EntityId, std::vector<EntityId>> children;
     for (const auto& [id, entity] : document.Entities()) { mix(id); mix(entity.Parent); mix(std::hash<std::string>{}(entity.Name)); }
     for (auto id : s.Collapsed) mix(id);
@@ -230,7 +280,7 @@ void BuildRows(Document& document)
     for (const auto& [id, entity] : document.Entities()) children[entity.Parent].push_back(id);
     std::set<EntityId> matches;
     if (!filter.empty()) for (const auto& [id, e] : document.Entities())
-        if (s.EntityFilter.PassFilter(e.Name.c_str()))
+        if (id == selected || s.EntityFilter.PassFilter(e.Name.c_str()))
             for (EntityId at = id; at; ) { matches.insert(at); const auto* p = document.Find(at); at = p ? p->Parent : 0; }
     std::function<void(EntityId, int)> visit = [&](EntityId parent, int depth)
     {
@@ -242,6 +292,30 @@ void BuildRows(Document& document)
             if (hasChildren && (!s.Collapsed.count(id) || !filter.empty())) visit(id, depth + 1);
         }
     }; visit(0, 0);
+}
+void SelectHierarchyRow(jEditor& editor, int index)
+{
+    auto& s = State();
+    const auto id = s.Rows[index].Id;
+    const auto& io = ImGui::GetIO();
+    const bool toggle = io.KeyCtrl || io.KeySuper;
+    const auto anchor = std::find_if(s.Rows.begin(), s.Rows.end(), [&](const Row& row) { return row.Id == s.RangeAnchor; });
+    if (io.KeyShift && anchor != s.Rows.end())
+    {
+        const int first = static_cast<int>(anchor - s.Rows.begin());
+        auto selected = toggle ? editor.GetSelectedEntities() : std::vector<EntityId>();
+        std::erase(selected, id);
+        for (int i = std::min(first, index); i <= std::max(first, index); ++i)
+            if (i != index) selected.push_back(s.Rows[i].Id);
+        selected.push_back(id);
+        editor.SetSelectedEntities(selected);
+    }
+    else
+    {
+        if (toggle) editor.ToggleEntitySelection(id);
+        else editor.SelectEntity(id);
+        s.RangeAnchor = id;
+    }
 }
 void Hierarchy(jEditor& editor)
 {
@@ -257,10 +331,22 @@ void Hierarchy(jEditor& editor)
             if (payload->DataSize == sizeof(EntityId)) document.Reparent(*static_cast<const EntityId*>(payload->Data), 0);
         ImGui::EndDragDropTarget();
     }
+    if (s.HierarchyActive != document.SelectedId())
+        s.RangeAnchor = s.RevealHierarchy = document.SelectedId();
+    if (s.RevealHierarchy)
+    {
+        for (const auto* entity = document.Find(s.RevealHierarchy); entity && entity->Parent; entity = document.Find(entity->Parent))
+            if (s.Collapsed.erase(entity->Parent)) s.RowRevision = ~uint64_t(0);
+    }
     BuildRows(document);
     ImGui::TextDisabled("%zu objects | %zu selected", document.Entities().size(), editor.GetSelectedEntities().size());
     ImGui::BeginChild("EntityRows", ImVec2(0, 0), false);
     ImGuiListClipper clip; clip.Begin(static_cast<int>(s.Rows.size()));
+    if (s.RevealHierarchy)
+    {
+        const auto row = std::find_if(s.Rows.begin(), s.Rows.end(), [&](const Row& entry) { return entry.Id == s.RevealHierarchy; });
+        if (row != s.Rows.end()) clip.IncludeItemByIndex(static_cast<int>(row - s.Rows.begin()));
+    }
     while (clip.Step()) for (int i = clip.DisplayStart; i < clip.DisplayEnd; ++i)
     {
         const auto row = s.Rows[i]; const auto* found = document.Find(row.Id); if (!found) continue;
@@ -275,7 +361,8 @@ void Hierarchy(jEditor& editor)
         const auto& selected = editor.GetSelectedEntities();
         const bool active = std::find(selected.begin(), selected.end(), row.Id) != selected.end();
         if (!e->Visible) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(.5f, .5f, .5f, 1));
-        if (ImGui::Selectable(row.Label.c_str(), active)) editor.SelectEntity(row.Id, ImGui::GetIO().KeyCtrl || ImGui::GetIO().KeySuper);
+        if (ImGui::Selectable(row.Label.c_str(), active, 0, ImVec2(0, ImGui::GetFrameHeight()))) SelectHierarchyRow(editor, i);
+        if (row.Id == s.RevealHierarchy) ImGui::SetScrollHereY();
         if (!e->Visible) ImGui::PopStyleColor();
         if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) editor.FocusSelected(Camera());
         if (!document.IsEffectivelyLocked(row.Id) && ImGui::BeginDragDropSource())
@@ -288,7 +375,7 @@ void Hierarchy(jEditor& editor)
         }
         if (ImGui::BeginPopupContextItem())
         {
-            editor.SelectEntity(row.Id);
+            if (!active) { editor.SelectEntity(row.Id); s.RangeAnchor = row.Id; }
             if (ImGui::MenuItem("Focus", "F")) editor.FocusSelected(Camera());
             if (ImGui::MenuItem("Duplicate", "Ctrl+D")) editor.DuplicateSelected();
             Entity edit = *e;
@@ -301,6 +388,8 @@ void Hierarchy(jEditor& editor)
         ImGui::Unindent(row.Depth * 12.0f); ImGui::PopID();
     }
     ImGui::EndChild();
+    s.RevealHierarchy = 0;
+    s.HierarchyActive = document.SelectedId();
 }
 const jEditorAssetRecord* AssetDropTarget()
 {
@@ -408,10 +497,264 @@ void MaterialInspector(jEditor& editor, Entity& entity)
         material.NormalTexture, defaults.NormalTexture);
     if (ImGui::Button("Material graph")) State().ShowTools = true;
 }
+bool HasMaterial(EntityKind kind)
+{
+    return kind == EntityKind::Cube || kind == EntityKind::Sphere || kind == EntityKind::Model || kind == EntityKind::Terrain;
+}
+bool IsLight(EntityKind kind)
+{
+    return kind == EntityKind::PointLight || kind == EntityKind::SpotLight || kind == EntityKind::DirectionalLight;
+}
+bool CanReplaceModels(const Document& document, std::span<const EntityId> ids)
+{
+    return !document.IsPlaying() && !ids.empty() && std::all_of(ids.begin(), ids.end(), [&](EntityId id) {
+        const auto* entity = document.Find(id);
+        return entity && entity->Kind == EntityKind::Model && !document.IsEffectivelyLocked(id);
+    });
+}
+void RequestModelReplacement(jEditor& editor, const jEditorAssetRecord& asset, std::span<const EntityId> ids)
+{
+    auto& s = State(); auto& document = editor.GetDocument();
+    if (s.Placement || s.Replacement) { Message("Finish the pending asset operation first.", true); return; }
+    if (!CanReplaceModels(document, ids) || asset.Kind != jEditorAssetKind::Model || asset.Missing || !asset.MissingDependencies.empty()) return;
+    ModelReplacement replacement;
+    replacement.Asset = asset;
+    for (const auto id : ids)
+    {
+        const auto& entity = *document.Find(id);
+        replacement.Targets.push_back({id, entity.SourceAsset, entity.AssetId});
+    }
+    FinishWorkspaceEdit(editor);
+    s.Replacement = std::move(replacement);
+    Message("Preparing replacement model " + asset.SourcePath);
+}
+void AdvanceModelReplacement(jEditor& editor)
+{
+    auto& s = State(); auto& document = editor.GetDocument();
+    if (!s.Replacement || document.HasTransaction()) return;
+    const auto& replacement = *s.Replacement;
+    const auto* asset = s.Registry ? s.Registry->FindById(replacement.Asset.Id) : nullptr;
+    if (!asset || asset->Missing || !asset->MissingDependencies.empty() ||
+        asset->Revision != replacement.Asset.Revision || asset->SourcePath != replacement.Asset.SourcePath)
+    {
+        Message("Replacement asset changed. Select it again to continue.", true);
+        ClearAssetPlacement(editor);
+        return;
+    }
+    std::vector<EntityId> ids;
+    for (const auto& target : replacement.Targets)
+    {
+        const auto* entity = document.Find(target.Id);
+        if (!entity || entity->AssetId != target.AssetId || entity->SourceAsset != target.Source)
+        {
+            Message("Replacement cancelled because a target changed.", true);
+            ClearAssetPlacement(editor);
+            return;
+        }
+        ids.push_back(target.Id);
+    }
+    const auto result = editor.ReplaceModelAssets(ids, asset->SourcePath, asset->Id, asset->Revision);
+    if (result == jEditor::PlacementReadiness::Pending) return;
+    if (result == jEditor::PlacementReadiness::Ready) Message("Model asset set to " + asset->SourcePath);
+    else Message(editor.LastError(), true);
+    ClearAssetPlacement(editor);
+}
+const jEditorAssetRecord* FindModelAsset(const Entity& entity)
+{
+    const auto& s = State();
+    if (!s.Registry || entity.Kind != EntityKind::Model) return nullptr;
+    return entity.AssetId.empty() ? s.Registry->FindBySourcePath(entity.SourceAsset) : s.Registry->FindById(entity.AssetId);
+}
+void ModelAssetActions(jEditor& editor, std::span<const EntityId> ids)
+{
+    auto& s = State(); auto& document = editor.GetDocument();
+    if (!s.Registry || ids.empty() || !std::all_of(ids.begin(), ids.end(), [&](EntityId id) {
+        return document.Find(id)->Kind == EntityKind::Model;
+    })) return;
+    const auto& active = *document.Find(document.SelectedId());
+    const auto* asset = FindModelAsset(active);
+    const auto& path = asset ? asset->SourcePath : active.SourceAsset;
+    if (!path.empty()) ImGui::TextWrapped("%s", path.c_str());
+    ImGui::BeginDisabled(!asset);
+    if (ImGui::Button(ids.size() == 1 ? "Find in Assets" : "Find Active in Assets"))
+    {
+        jEditorAssetPanel::Reveal(*asset);
+        s.SelectedAsset = asset->Id;
+        s.ShowAssets = s.FocusAssets = true;
+    }
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    ImGui::BeginDisabled(s.Placement || s.Replacement || !CanReplaceModels(document, ids));
+    if (ImGui::Button("Replace Asset")) { s.ReplacementFilter.Clear(); ImGui::OpenPopup("Replace model asset"); }
+    ImGui::EndDisabled();
+    if (ImGui::BeginPopup("Replace model asset"))
+    {
+        ImGui::Text("Replace asset on %zu model%s", ids.size(), ids.size() == 1 ? "" : "s");
+        s.ReplacementFilter.Draw("Search##replacement", 320);
+        std::vector<const jEditorAssetRecord*> models;
+        for (const auto& model : s.Registry->GetAssets())
+            if (model.Kind == jEditorAssetKind::Model && !model.Missing && model.MissingDependencies.empty()
+                && s.ReplacementFilter.PassFilter(model.SourcePath.c_str())) models.push_back(&model);
+        ImGui::BeginChild("Replacement models", ImVec2(380, 200), false, ImGuiWindowFlags_HorizontalScrollbar);
+        if (models.empty()) ImGui::TextDisabled("No available models match.");
+        ImGuiListClipper clip; clip.Begin(static_cast<int>(models.size()));
+        while (clip.Step()) for (int i = clip.DisplayStart; i < clip.DisplayEnd; ++i)
+        {
+            const auto& model = *models[i];
+            ImGui::PushID(model.Id.c_str());
+            if (ImGui::Selectable(model.SourcePath.c_str(), asset && model.Id == asset->Id, ImGuiSelectableFlags_DontClosePopups))
+            {
+                RequestModelReplacement(editor, model, ids);
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::PopID();
+        }
+        ImGui::EndChild();
+        ImGui::EndPopup();
+    }
+}
+template<class Read, class Write, class Widget>
+void BatchField(Document& document, std::span<const EntityId> ids, const char* label, Read read, Write write, Widget widget)
+{
+    if (ids.empty()) return;
+    auto value = read(*document.Find(ids.back()));
+    const bool mixed = std::any_of(ids.begin(), ids.end(), [&](EntityId id) { return read(*document.Find(id)) != value; });
+    if (mixed) ImGui::PushItemFlag(ImGuiItemFlags_MixedValue, true);
+    const bool changed = widget(label, value);
+    if (mixed) ImGui::PopItemFlag();
+    std::vector<Entity> edits;
+    if (changed)
+    {
+        edits.reserve(ids.size());
+        for (const auto id : ids)
+        {
+            edits.push_back(*document.Find(id));
+            write(edits.back(), value);
+        }
+    }
+    FinishProperties(document, edits, label);
+    if (mixed) { ImGui::SameLine(); ImGui::TextDisabled("Mixed"); }
+}
+void MultiInspector(jEditor& editor, std::span<const EntityId> ids)
+{
+    auto& document = editor.GetDocument();
+    const auto all = [&](auto predicate) {
+        return std::all_of(ids.begin(), ids.end(), [&](EntityId id) { return predicate(*document.Find(id)); });
+    };
+    const auto check = [](const char* label, bool& value) { return ImGui::Checkbox(label, &value); };
+    const auto drag = [](float speed, float min, float max) {
+        return [=](const char* label, float& value) { return ImGui::DragFloat(label, &value, speed, min, max, "%.3f", ImGuiSliderFlags_AlwaysClamp); };
+    };
+    const auto color = [](const char* label, Vec3& value) {
+        return ImGui::ColorEdit3(label, &value.X, ImGuiColorEditFlags_NoInputs);
+    };
+    const auto field = [&](const char* label, auto group, auto member, auto widget) {
+        BatchField(document, ids, label, [=](const Entity& e) { return (e.*group).*member; },
+            [=](Entity& e, const auto& value) { (e.*group).*member = value; }, widget);
+    };
+    ImGui::Text("%zu objects selected", ids.size());
+    ModelAssetActions(editor, ids);
+    std::vector<EntityId> lockTargets;
+    for (const auto id : ids)
+    {
+        const auto parent = document.Find(id)->Parent;
+        if (!parent || !document.IsEffectivelyLocked(parent)) lockTargets.push_back(id);
+    }
+    BatchField(document, lockTargets, "Locked", [](const Entity& e) { return e.Locked; },
+        [](Entity& e, bool value) { e.Locked = value; }, check);
+    const bool locked = !all([&](const Entity& e) { return !document.IsEffectivelyLocked(e.Id); });
+    if (locked) ImGui::TextDisabled("Unlock selection to edit shared properties.");
+    ImGui::BeginDisabled(locked);
+    BatchField(document, ids, "Visible", [](const Entity& e) { return e.Visible; },
+        [](Entity& e, bool value) { e.Visible = value; }, check);
+    if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        const auto axes = [&](const char* label, Vec3 Transform::* member, float speed) {
+            ImGui::PushID(label);
+            ImGui::TextUnformatted(label);
+            const auto axis = [&](const char* name, float Vec3::* component) {
+                BatchField(document, ids, name, [=](const Entity& e) { return (e.Local.*member).*component; },
+                    [=](Entity& e, float value) { (e.Local.*member).*component = value; }, drag(speed, 0, 0));
+            };
+            ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * .56f);
+            axis("X", &Vec3::X); axis("Y", &Vec3::Y); axis("Z", &Vec3::Z);
+            ImGui::PopItemWidth();
+            ImGui::PopID();
+        };
+        axes("Position", &Transform::Position, .25f);
+        axes("Rotation (deg)", &Transform::RotationDegrees, .25f);
+        axes("Scale", &Transform::Scale, .01f);
+        if (ImGui::Button("Reset transform"))
+        {
+            std::vector<Entity> edits;
+            for (const auto id : ids) { edits.push_back(*document.Find(id)); edits.back().Local = {}; }
+            if (!document.UpdateMany(edits, "Reset transforms")) Message(document.LastError(), true);
+        }
+    }
+    if (all([](const Entity& e) { return IsLight(e.Kind); }) && ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        field("Color", &Entity::Light, &LightProperties::Color, color);
+        field("Intensity", &Entity::Light, &LightProperties::Intensity, drag(.1f, 0, 100000));
+        if (all([](const Entity& e) { return e.Kind != EntityKind::DirectionalLight; }))
+            field("Range", &Entity::Light, &LightProperties::Range, drag(1, .001f, 100000));
+        if (all([](const Entity& e) { return e.Kind == EntityKind::SpotLight; }))
+        {
+            float maxInner = 89.9f;
+            for (const auto id : ids) maxInner = std::min(maxInner, document.Find(id)->Light.OuterConeDegrees);
+            if (maxInner > 0) field("Inner cone", &Entity::Light, &LightProperties::InnerConeDegrees, drag(.1f, 0, maxInner));
+            float minOuter = 0;
+            for (const auto id : ids) minOuter = std::max(minOuter, document.Find(id)->Light.InnerConeDegrees);
+            if (minOuter < 89.9f) field("Outer cone", &Entity::Light, &LightProperties::OuterConeDegrees, drag(.1f, minOuter, 89.9f));
+        }
+        field("Cast shadows", &Entity::Light, &LightProperties::CastShadows, check);
+    }
+    if (all([](const Entity& e) { return e.Kind == EntityKind::Camera; }) && ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        field("Vertical FOV", &Entity::Camera, &CameraProperties::VerticalFovDegrees, drag(.25f, 5, 170));
+        float maxNear = 10000;
+        for (const auto id : ids) maxNear = std::min(maxNear, std::nextafter(document.Find(id)->Camera.FarPlane, 0.f));
+        if (maxNear > .001f) field("Near", &Entity::Camera, &CameraProperties::NearPlane, drag(.01f, .001f, maxNear));
+        float minFar = .01f;
+        for (const auto id : ids) minFar = std::max(minFar, std::nextafter(document.Find(id)->Camera.NearPlane, FLT_MAX));
+        if (minFar < 1000000) field("Far", &Entity::Camera, &CameraProperties::FarPlane, drag(1, minFar, 1000000));
+        field("Primary", &Entity::Camera, &CameraProperties::Primary, check);
+    }
+    if (all([](const Entity& e) { return HasMaterial(e.Kind); }) && ImGui::CollapsingHeader("Material", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        if (all([](const Entity& e) { return e.Kind == EntityKind::Model; }))
+            field("Override imported material", &Entity::Material, &MaterialProperties::OverrideEnabled, check);
+        const bool imported = !all([](const Entity& e) { return e.Kind != EntityKind::Model || e.Material.OverrideEnabled; });
+        if (imported) ImGui::TextWrapped("Enable material overrides on selected models to edit these values.");
+        ImGui::BeginDisabled(imported);
+        const auto material = [&](const char* label, auto member, bool MaterialGraphOverrides::* flag, auto widget) {
+            BatchField(document, ids, label, [&](const Entity& e) { return editor.ResolveMaterial(e.Material).*member; },
+                [=](Entity& e, const auto& value) {
+                    e.Material.*member = value;
+                    e.Material.OverrideEnabled = true;
+                    if (flag && e.Material.GraphOverrides) (*e.Material.GraphOverrides).*flag = true;
+                }, widget);
+        };
+        material("Base color", &MaterialProperties::BaseColor, &MaterialGraphOverrides::BaseColor, color);
+        material("Emissive", &MaterialProperties::Emissive, nullptr, [](const char* label, Vec3& value) {
+            return ImGui::ColorEdit3(label, &value.X, ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_Float | ImGuiColorEditFlags_NoInputs);
+        });
+        material("Metallic", &MaterialProperties::Metallic, &MaterialGraphOverrides::Metallic, drag(.01f, 0, 1));
+        material("Roughness", &MaterialProperties::Roughness, &MaterialGraphOverrides::Roughness, drag(.01f, .01f, 1));
+        material("Opacity", &MaterialProperties::Opacity, nullptr, drag(.01f, 0, 1));
+        ImGui::EndDisabled();
+    }
+    ImGui::Separator();
+    if (ImGui::Button("Duplicate")) editor.DuplicateSelected(); ImGui::SameLine();
+    if (ImGui::Button("Delete")) editor.DeleteSelected();
+    ImGui::EndDisabled();
+}
 void Inspector(jEditor& editor)
 {
     auto& document = editor.GetDocument(); const auto* selected = document.Find(editor.GetSelectedEntityId());
     if (!selected) { ImGui::TextWrapped("Select an object in Hierarchy or the scene."); return; }
+    auto ids = editor.GetSelectedEntities();
+    std::erase_if(ids, [&](EntityId id) { return !document.Find(id); });
+    if (ids.size() > 1) { MultiInspector(editor, ids); return; }
     Entity e = *selected; ImGui::PushID(static_cast<int>(e.Id));
     char name[256]; std::snprintf(name, sizeof(name), "%s", e.Name.c_str());
     const bool renamed = ImGui::InputText("Name", name, sizeof(name)); if (renamed) e.Name = name;
@@ -419,6 +762,7 @@ void Inspector(jEditor& editor)
     ImGui::TextDisabled("%s | ID %llu", KindName(e.Kind), static_cast<unsigned long long>(e.Id));
     bool visible = e.Visible; if (ImGui::Checkbox("Visible", &visible)) { e.Visible = visible; document.Update(e, "Set visibility"); }
     ImGui::SameLine(); bool locked = e.Locked; if (ImGui::Checkbox("Locked", &locked)) { e.Locked = locked; document.Update(e, "Set lock"); }
+    ModelAssetActions(editor, std::span(&e.Id, 1));
     ImGui::BeginDisabled(document.IsEffectivelyLocked(e.Id));
     if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
     {
@@ -426,16 +770,10 @@ void Inspector(jEditor& editor)
         Vec3Field(document, e, "Rotation (deg)", e.Local.RotationDegrees);
         Vec3Field(document, e, "Scale", e.Local.Scale, .01f);
         if (ImGui::Button("Reset transform")) { e.Local = {}; document.Update(e, "Reset transform"); }
-        int operation = editor.Placement.GizmoOperation == ImGuizmo::ROTATE ? 1 : editor.Placement.GizmoOperation == ImGuizmo::SCALE ? 2 : 0;
-        if (ImGui::Combo("Tool", &operation, "Move\0Rotate\0Scale\0")) editor.Placement.GizmoOperation = operation == 1 ? ImGuizmo::ROTATE : operation == 2 ? ImGuizmo::SCALE : ImGuizmo::TRANSLATE;
-        bool local = editor.Placement.GizmoMode == ImGuizmo::LOCAL;
-        if (ImGui::Checkbox("Local axes", &local)) editor.Placement.GizmoMode = local ? ImGuizmo::LOCAL : ImGuizmo::WORLD;
-        ImGui::SameLine(); ImGui::Checkbox("Snap", &editor.Placement.UseSnap);
-        if (editor.Placement.UseSnap) ImGui::DragFloat3("Move snap", editor.Placement.TranslationSnap, .1f, .001f, 10000);
     }
-    if (e.Kind == EntityKind::Cube || e.Kind == EntityKind::Sphere || e.Kind == EntityKind::Model || e.Kind == EntityKind::Terrain)
+    if (HasMaterial(e.Kind))
         if (ImGui::CollapsingHeader("Material", ImGuiTreeNodeFlags_DefaultOpen)) MaterialInspector(editor, e);
-    if (e.Kind == EntityKind::PointLight || e.Kind == EntityKind::SpotLight || e.Kind == EntityKind::DirectionalLight)
+    if (IsLight(e.Kind))
         if (ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen))
         {
             FinishProperty(document, e, ImGui::ColorEdit3("Color", &e.Light.Color.X), "Light color");
@@ -462,23 +800,453 @@ void Inspector(jEditor& editor)
 }
 void ActivateAsset(jEditor& editor, const jEditorAssetRecord& asset)
 {
-    if (asset.Kind == jEditorAssetKind::Model) editor.AddModel(asset.SourcePath, asset.Id, asset.Revision);
-    else if (asset.Kind == jEditorAssetKind::Scene)
+    if (editor.GetDocument().IsPlaying()) return;
+    if (asset.Kind == jEditorAssetKind::Model)
+    {
+        FinishWorkspaceEdit(editor);
+        if (!editor.AddModel(asset.SourcePath, asset.Id, asset.Revision)) Message(editor.LastError(), true);
+    }
+    else if (asset.Kind == jEditorAssetKind::Prefab || asset.Kind == jEditorAssetKind::Scene)
     {
         std::string error; const auto file = State().Registry->Resolve(asset.Id, error);
-        if (file) GuardUnsaved(editor, [&editor, path = *file] { std::string error; if (!LoadAuthoringScene(editor, path, error)) Message(error, true); });
-        else Message(error, true);
+        if (!file) { Message(error, true); return; }
+        if (asset.Kind == jEditorAssetKind::Scene)
+            GuardUnsaved(editor, [&editor, path = *file] { std::string error; if (!LoadAuthoringScene(editor, path, error)) Message(error, true); });
+        else
+        {
+            FinishWorkspaceEdit(editor);
+            const auto id = editor.GetDocument().InstantiatePrefab(*file);
+            if (id) editor.SelectEntity(id);
+            else Message(editor.GetDocument().LastError(), true);
+        }
     }
 }
 void Assets(jEditor& editor)
 {
     auto& s = State();
     if (!s.Project || !s.Registry) { ImGui::TextWrapped("Create or open a project from File to browse assets."); return; }
-    jEditorAssetPanel::Render(editor, *s.Project, *s.Registry, s.SelectedAsset,
-        [&editor](const std::string& id) {
-            auto& state = State();
-            if (const auto* found = state.Registry->FindById(id)) { const auto snapshot = *found; ActivateAsset(editor, snapshot); }
+    const auto canReplace = !s.Placement && !s.Replacement && CanReplaceModels(editor.GetDocument(), editor.GetSelectedEntities());
+    jEditorAssetPanel::Render(editor, *s.Project, *s.Registry, s.SelectedAsset, canReplace,
+        [&editor](jEditorAssetPanel::Action action, const jEditorAssetRecord& asset) {
+            auto& state = State(); auto& document = editor.GetDocument();
+            if (document.IsPlaying()) return;
+            switch (action)
+            {
+            case jEditorAssetPanel::Action::Activate: ActivateAsset(editor, asset); break;
+            case jEditorAssetPanel::Action::SelectInstances:
+            {
+                std::vector<EntityId> ids;
+                for (const auto& [id, entity] : document.Entities())
+                    if (entity.Kind == EntityKind::Model && (entity.AssetId == asset.Id ||
+                        (entity.AssetId.empty() && entity.SourceAsset == asset.SourcePath))) ids.push_back(id);
+                if (!ids.empty())
+                {
+                    FinishInspectorEdit(editor);
+                    editor.SetSelectedEntities(ids);
+                    state.RevealHierarchy = document.SelectedId();
+                }
+                Message(std::to_string(ids.size()) + " instances of " + asset.SourcePath);
+                break;
+            }
+            case jEditorAssetPanel::Action::ReplaceSelection: RequestModelReplacement(editor, asset, editor.GetSelectedEntities()); break;
+            case jEditorAssetPanel::Action::SetStartupScene:
+            {
+                std::string error;
+                if (const auto path = state.Registry->Resolve(asset.Id, error)) SetStartupScene(editor, *path);
+                else Message(error, true);
+                break;
+            }
+            }
         });
+}
+
+Vector AsVector(const Vec3& value) { return Vector(value.X, value.Y, value.Z); }
+Vec3 AsPosition(const Vector& value) { return {value.x, value.y, value.z}; }
+Vector PlacementPosition(const jEditor::PlacementHit& hit, const jEditor::PlacementBounds& bounds)
+{
+    const Vector minimum = AsVector(bounds.Min), maximum = AsVector(bounds.Max);
+    const Vector normal = AsVector(hit.Normal);
+    const Vector extent = (maximum - minimum) * .5f;
+    const Vector absoluteNormal(std::abs(normal.x), std::abs(normal.y), std::abs(normal.z));
+    return AsVector(hit.Point) + normal * extent.DotProduct(absoluteNormal) - (minimum + maximum) * .5f;
+}
+std::optional<jEditor::PlacementHit> CursorPlacement(jEditor& editor, const jCamera& camera)
+{
+    const auto& s = State();
+    const auto mouse = ImGui::GetMousePos();
+    const float x = 2 * (mouse.x - s.ViewPosition.x) / s.ViewSize.x - 1;
+    const float y = 1 - 2 * (mouse.y - s.ViewPosition.y) / s.ViewSize.y;
+    const Matrix clipToWorld = camera.GetInverseViewProjectionMatrix();
+    const Vector nearPoint = clipToWorld.TransformPoint(Vector(x, y, 0));
+    const Vector direction = clipToWorld.TransformPoint(Vector(x, y, .9f)) - nearPoint;
+    const float range = camera.IsInfinityFar ? FLT_MAX : (clipToWorld.TransformPoint(Vector(x, y, 1)) - nearPoint).Length();
+    return editor.FindPlacementHit(AsPosition(nearPoint), AsPosition(direction), range, s.SurfaceSnap);
+}
+void DrawPlacement(const jCamera& camera, const std::optional<jEditor::PlacementHit>& hit,
+    const AssetPlacement& placement)
+{
+    const auto& s = State();
+    auto& draw = *ImGui::GetWindowDrawList();
+    const ImVec2 min = s.ViewPosition, max(min.x + s.ViewSize.x, min.y + s.ViewSize.y);
+    draw.PushClipRect(min, max, true);
+    const Matrix vp = camera.GetViewProjectionMatrix();
+    const auto project = [&](const Vector& point) -> std::optional<ImVec2> {
+        const auto clip = vp.Transform(Vector4(point.x, point.y, point.z, 1));
+        if (clip.w <= .0001f || clip.z < 0 || clip.z > clip.w) return {};
+        const ImVec2 projected(min.x + (clip.x / clip.w + 1) * .5f * s.ViewSize.x,
+            min.y + (1 - clip.y / clip.w) * .5f * s.ViewSize.y);
+        return std::isfinite(projected.x) && std::isfinite(projected.y) ? std::optional(projected) : std::nullopt;
+    };
+    const ImU32 color = !placement.Error.empty() || !hit ? IM_COL32(255, 114, 99, 255)
+        : placement.Bounds ? IM_COL32(92, 228, 190, 255) : IM_COL32(255, 210, 104, 255);
+    ImVec2 label(min.x + 8, min.y + 8);
+    if (hit)
+    {
+        if (const auto point = project(AsVector(hit->Point)))
+        {
+            draw.AddCircle(*point, 6, color, 12, 2);
+            draw.AddLine(ImVec2(point->x - 10, point->y), ImVec2(point->x + 10, point->y), color);
+            draw.AddLine(ImVec2(point->x, point->y - 10), ImVec2(point->x, point->y + 10), color);
+        }
+        if (placement.Bounds)
+        {
+            const auto origin = PlacementPosition(*hit, *placement.Bounds);
+            const auto low = AsVector(placement.Bounds->Min) + origin, high = AsVector(placement.Bounds->Max) + origin;
+            std::array<std::optional<ImVec2>, 8> corners;
+            for (int i = 0; i < 8; ++i)
+                corners[i] = project(Vector(i & 1 ? high.x : low.x, i & 2 ? high.y : low.y, i & 4 ? high.z : low.z));
+            for (int i = 0; i < 8; ++i) for (const int edge : {1, 2, 4})
+                if (!(i & edge) && corners[i] && corners[i | edge]) draw.AddLine(*corners[i], *corners[i | edge], color, 2);
+        }
+    }
+    const char* text = !placement.Error.empty() ? placement.Error.c_str()
+        : !hit ? "Aim at a surface or the Y=0 work plane"
+        : placement.Drop ? "Preparing placement  |  Esc to cancel"
+        : !placement.Bounds ? "Model bounds load on drop  |  Esc to cancel"
+        : hit->Surface ? "Surface  |  Drop to place  |  Esc to cancel"
+        : "Work plane Y=0  |  Drop to place  |  Esc to cancel";
+    draw.AddRectFilled(ImVec2(label.x - 4, label.y - 2),
+        ImVec2(label.x + ImGui::CalcTextSize(text).x + 4, label.y + ImGui::GetTextLineHeight() + 2), IM_COL32(16, 16, 16, 225));
+    draw.AddText(label, color, text);
+    draw.PopClipRect();
+}
+jEditor::PlacementReadiness UpdatePlacementBounds(jEditor& editor, AssetPlacement& placement, bool prepare)
+{
+    using Readiness = jEditor::PlacementReadiness;
+    if (!placement.Error.empty()) return Readiness::Failed;
+    if (placement.Bounds) return Readiness::Ready;
+    jEditor::PlacementBounds bounds;
+    const auto state = placement.Prefab ? editor.PrefabPlacementBounds(*placement.Prefab, bounds, prepare)
+        : editor.ModelPlacementBounds(placement.Source, placement.Id, placement.Revision, bounds, prepare);
+    if (state == Readiness::Ready) placement.Bounds = bounds;
+    if (state == Readiness::Failed) placement.Error = editor.LastError();
+    return state;
+}
+void AdvancePlacement(jEditor& editor)
+{
+    auto& s = State();
+    if (!s.Placement || !s.Placement->Drop) return;
+    auto& placement = *s.Placement;
+    const auto* asset = s.Registry ? s.Registry->FindById(placement.Id) : nullptr;
+    if (!asset || asset->Missing || asset->Revision != placement.Revision || asset->SourcePath != placement.Source)
+    {
+        Message("Asset changed during placement. Drag the current asset again.", true);
+        ClearAssetPlacement(editor);
+        return;
+    }
+    const auto ready = UpdatePlacementBounds(editor, placement, true);
+    if (ready == jEditor::PlacementReadiness::Pending || editor.GetDocument().HasTransaction()) return;
+    if (ready == jEditor::PlacementReadiness::Failed) Message(placement.Error, true);
+    else
+    {
+        const auto position = AsPosition(PlacementPosition(*placement.Drop, *placement.Bounds));
+        if (placement.Prefab)
+        {
+            auto& doc = editor.GetDocument();
+            const auto id = doc.InstantiatePrefabJson(placement.Prefab->PrefabJson(placement.Prefab->SelectedId()), 0, position);
+            if (id) editor.SelectEntity(id);
+            else Message(doc.LastError(), true);
+        }
+        else if (!editor.AddModel(placement.Source, placement.Id, placement.Revision, position)) Message(editor.LastError(), true);
+    }
+    ClearAssetPlacement(editor);
+}
+void RenderAssetPlacement(jEditor& editor, const jCamera& camera)
+{
+    auto& s = State();
+    if (s.Replacement) return;
+    if (s.Placement && s.Placement->Drop)
+    {
+        DrawPlacement(camera, s.Placement->Drop, *s.Placement);
+        return;
+    }
+    const auto* payload = ImGui::GetDragDropPayload();
+    if (!s.Registry || !payload || !payload->IsDataType("JENGINE_ASSET") || payload->DataSize < 2) return;
+    const std::string id(static_cast<const char*>(payload->Data), static_cast<size_t>(payload->DataSize) - 1);
+    const auto* asset = s.Registry->FindById(id);
+    if (!asset || asset->Missing || (asset->Kind != jEditorAssetKind::Model && asset->Kind != jEditorAssetKind::Prefab)) return;
+    if (!ImGui::BeginDragDropTarget()) return;
+    const auto* accepted = ImGui::AcceptDragDropPayload("JENGINE_ASSET", ImGuiDragDropFlags_AcceptPeekOnly);
+    const bool delivery = accepted && accepted->IsDelivery();
+    ImGui::EndDragDropTarget();
+    if (!accepted) return;
+    if (!s.Placement || s.Placement->Id != asset->Id || s.Placement->Revision != asset->Revision || s.Placement->Source != asset->SourcePath)
+    {
+        auto& placement = s.Placement.emplace();
+        placement.Id = asset->Id;
+        placement.Source = asset->SourcePath;
+        placement.Revision = asset->Revision;
+        if (asset->Kind == jEditorAssetKind::Prefab)
+        {
+            const auto path = s.Registry->Resolve(asset->Id, placement.Error);
+            if (path)
+            {
+                placement.Prefab = std::make_unique<Document>();
+                if (!placement.Prefab->InstantiatePrefab(*path)) placement.Error = placement.Prefab->LastError();
+            }
+        }
+    }
+    auto& placement = *s.Placement;
+    const auto hit = CursorPlacement(editor, camera);
+    UpdatePlacementBounds(editor, placement, false);
+    if (!delivery) { DrawPlacement(camera, hit, placement); return; }
+    if (hit && placement.Error.empty())
+    {
+        placement.Drop = hit;
+        AdvancePlacement(editor);
+        if (s.Placement) DrawPlacement(camera, hit, *s.Placement);
+    }
+    else
+    {
+        Message(placement.Error.empty() ? "No placement surface in range." : placement.Error, true);
+        ClearAssetPlacement(editor);
+    }
+}
+void SceneToolbar(jEditor& editor)
+{
+    auto& s = State();
+    auto& placement = editor.Placement;
+    const auto& style = ImGui::GetStyle();
+    const float comboWidth = std::max(80.0f, ImGui::CalcTextSize("Rotate").x + ImGui::GetFrameHeight() + 2 * style.FramePadding.x);
+    const float buttonWidths = ImGui::CalcTextSize("World").x + ImGui::CalcTextSize("Steps").x +
+        ImGui::CalcTextSize("Ground").x + ImGui::CalcTextSize("Arrange").x + 8 * style.FramePadding.x;
+    const float checkboxWidths = ImGui::CalcTextSize("Grid").x + ImGui::CalcTextSize("Surface").x +
+        2 * (ImGui::GetFrameHeight() + style.ItemInnerSpacing.x);
+    const bool compact = ImGui::GetContentRegionAvail().x < comboWidth + buttonWidths + checkboxWidths + 6 * style.ItemSpacing.x;
+    if (compact)
+    {
+        if (ImGui::Button("Scene tools")) ImGui::OpenPopup("Scene tool controls");
+        if (!ImGui::BeginPopup("Scene tool controls")) return;
+    }
+    const auto sameLine = [&] { if (!compact) ImGui::SameLine(); };
+    const auto edit = [&](auto command) {
+        FinishWorkspaceEdit(editor);
+        if (editor.GetDocument().HasTransaction()) Message("Finish the active transform first.", true);
+        else if (!command()) Message(editor.LastError(), true);
+    };
+    int tool = placement.GizmoOperation == ImGuizmo::ROTATE ? 1 : placement.GizmoOperation == ImGuizmo::SCALE ? 2 : 0;
+    ImGui::SetNextItemWidth(comboWidth);
+    if (ImGui::Combo("##Scene transform tool", &tool, "Move\0Rotate\0Scale\0"))
+        placement.GizmoOperation = tool == 1 ? ImGuizmo::ROTATE : tool == 2 ? ImGuizmo::SCALE : ImGuizmo::TRANSLATE;
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Move / Rotate / Scale (Shift+W / E / R)\nAlt-drag the move gizmo to duplicate");
+    sameLine();
+    const bool local = placement.GizmoMode == ImGuizmo::LOCAL;
+    if (ImGui::Button(local ? "Local" : "World")) placement.GizmoMode = local ? ImGuizmo::WORLD : ImGuizmo::LOCAL;
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Transform axes (Q)");
+    sameLine();
+    ImGui::Checkbox("Grid", &placement.UseSnap);
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Grid snap for transforms and asset placement (Ctrl+G)");
+    sameLine();
+    if (ImGui::Button("Steps")) ImGui::OpenPopup("Grid steps");
+    if (ImGui::BeginPopup("Grid steps"))
+    {
+        ImGui::DragFloat3("Move", placement.TranslationSnap, .1f, .001f, 10000.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
+        ImGui::DragFloat("Rotate (deg)", &placement.RotationSnap, 1.0f, .1f, 180.0f, "%.1f", ImGuiSliderFlags_AlwaysClamp);
+        ImGui::DragFloat3("Scale", placement.ScaleSnap, .01f, .001f, 100.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp);
+        ImGui::EndPopup();
+    }
+    sameLine();
+    ImGui::Checkbox("Surface", &s.SurfaceSnap);
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Place on visible cubes, spheres and terrain. The Y=0 work plane is the fallback.");
+    sameLine();
+    ImGui::BeginDisabled(!editor.GetSelectedEntityId());
+    if (ImGui::Button("Ground")) edit([&] { return editor.PlaceSelectionOnGround(); });
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Place selection on the ground below");
+    sameLine();
+    if (ImGui::Button("Arrange")) ImGui::OpenPopup("Arrange selection");
+    if (ImGui::BeginPopup("Arrange selection"))
+    {
+        ImGui::SetNextItemWidth(160);
+        ImGui::InputFloat3("World offset", &s.DuplicateOffset.X);
+        if (ImGui::Button("Duplicate & Move")) edit([&] { return editor.DuplicateAndMove(s.DuplicateOffset); });
+        if (ImGui::MenuItem("Repeat Last Offset", nullptr, false, editor.CanRepeatDuplicateOffset()))
+            edit([&] { return editor.RepeatDuplicateOffset(); });
+        const auto axes = [&](const char* label, size_t minimum, auto command) {
+            if (!ImGui::BeginMenu(label, editor.GetSelectedEntities().size() >= minimum)) return;
+            const char* names[] = {"World X", "World Y", "World Z"};
+            for (int i = 0; i < 3; ++i)
+                if (ImGui::MenuItem(names[i])) edit([&] { return command(static_cast<jEditor::WorldAxis>(i)); });
+            ImGui::EndMenu();
+        };
+        axes("Align to last selected", 2, [&](auto axis) { return editor.AlignSelection(axis); });
+        axes("Distribute evenly", 3, [&](auto axis) { return editor.DistributeSelection(axis); });
+        ImGui::EndPopup();
+    }
+    ImGui::EndDisabled();
+    if (compact) ImGui::EndPopup();
+}
+
+fs::path CaptureDestination(jEditor& editor, const CaptureDialog& dialog)
+{
+    auto path = jEditorAssetPath::FromUtf8(dialog.File);
+    if (path.empty() || path.filename().empty() || path.filename() == "." || path.filename() == "..") return {};
+    if (path.is_relative()) path = fs::absolute(editor.GetProjectRoot() / path);
+    return path.replace_extension(jEditorCapture::Extension(dialog.Video ? jEditorCapture::Format::Mp4 : dialog.StillFormat));
+}
+void OpenCapture(jEditor& editor, bool video)
+{
+    auto& dialog = State().Capture;
+    dialog.Video = video;
+    dialog.Open = true;
+    dialog.Error.clear();
+    const auto now = std::chrono::system_clock::now();
+    const auto time = std::chrono::system_clock::to_time_t(now);
+    std::tm local{};
+#ifdef _WIN32
+    localtime_s(&local, &time);
+#else
+    localtime_r(&time, &local);
+#endif
+    char date[32]{};
+    std::strftime(date, sizeof(date), "%Y%m%d-%H%M%S", &local);
+    const auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count() % 1000;
+    const auto format = video ? jEditorCapture::Format::Mp4 : dialog.StillFormat;
+    const std::string name = std::string(video ? "Recording-" : "Screenshot-") + date + "-" + std::to_string(milliseconds)
+        + jEditorCapture::Extension(format);
+    const auto path = jEditorAssetPath::ToUtf8(editor.GetProjectRoot() / "Captures" / name);
+    std::snprintf(dialog.File, sizeof(dialog.File), "%s", path.c_str());
+}
+void CaptureMenu(jEditor& editor)
+{
+    using jEditorCapture::Format;
+    using jEditorCapture::Phase;
+    const auto& status = jEditorCapture::GetStatus();
+    const bool idle = status.State == Phase::Idle;
+    auto& workspace = State();
+    if (idle && workspace.Capture.WasBusy)
+        workspace.Status = status.Error.empty() ? "Saved " + jEditorAssetPath::ToUtf8(status.File.filename()) : status.Error;
+    workspace.Capture.WasBusy = !idle;
+    if (ImGui::BeginMenu("Capture"))
+    {
+        if (ImGui::MenuItem("Screenshot...", nullptr, false, idle && g_rhi)) OpenCapture(editor, false);
+        if (ImGui::MenuItem("Record video...", nullptr, false, idle && g_rhi && jEditorCapture::Supports(Format::Mp4)))
+            OpenCapture(editor, true);
+        if (ImGui::MenuItem("Stop recording", nullptr, false, status.State == Phase::Recording)) jEditorCapture::Stop();
+        if (!jEditorCapture::Supports(Format::Mp4)) ImGui::TextDisabled("MP4 recording is available on Windows.");
+        if (idle && !status.File.empty())
+        {
+            ImGui::Separator();
+            if (!status.Error.empty()) ImGui::TextWrapped("%s", status.Error.c_str());
+            else
+            {
+                const auto path = jEditorAssetPath::ToUtf8(status.File);
+                ImGui::TextDisabled("Last capture");
+                ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 420);
+                ImGui::TextUnformatted(path.c_str());
+                ImGui::PopTextWrapPos();
+                if (ImGui::MenuItem("Copy output path")) ImGui::SetClipboardText(path.c_str());
+            }
+        }
+        ImGui::EndMenu();
+    }
+    if (status.State == Phase::Recording)
+    {
+        const int seconds = int(status.Seconds);
+        ImGui::TextColored(ImVec4(1.f, .32f, .27f, 1.f), "REC %02d:%02d", seconds / 60, seconds % 60);
+        if (ImGui::SmallButton("Stop REC")) jEditorCapture::Stop();
+    }
+    else if (!idle) ImGui::TextDisabled("%s", status.State == Phase::Saving ? "Saving capture..." : "Capturing...");
+}
+void CaptureOptions(jEditor& editor)
+{
+    using jEditorCapture::Format;
+    auto& dialog = State().Capture;
+    if (dialog.Open) { ImGui::OpenPopup("Capture output"); dialog.Open = false; }
+    if (!ImGui::BeginPopupModal("Capture output", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
+    ImGui::TextUnformatted(editor.GetDocument().IsPlaying() ? "Capture Game" : "Capture Scene");
+    ImGui::TextDisabled("Fits the rendered view to the output size. UI and selection guides are excluded.");
+    constexpr const char* sizes[] = {"Current render", "1280 x 720", "1920 x 1080", "2560 x 1440", "3840 x 2160", "Custom"};
+    constexpr int dimensions[][2] = {{0, 0}, {1280, 720}, {1920, 1080}, {2560, 1440}, {3840, 2160}};
+    ImGui::SetNextItemWidth(200);
+    ImGui::Combo("Resolution", &dialog.Resolution, sizes, IM_ARRAYSIZE(sizes));
+    int width = SCR_WIDTH, height = SCR_HEIGHT;
+    if (dialog.Resolution == IM_ARRAYSIZE(sizes) - 1)
+    {
+        ImGui::SetNextItemWidth(100); ImGui::InputInt("Width", &dialog.Width, 0);
+        ImGui::SameLine(); ImGui::SetNextItemWidth(100); ImGui::InputInt("Height", &dialog.Height, 0);
+        width = dialog.Width; height = dialog.Height;
+    }
+    else if (dialog.Resolution)
+    {
+        width = dimensions[dialog.Resolution][0]; height = dimensions[dialog.Resolution][1];
+    }
+    else
+    {
+        if (dialog.Video) { width &= ~1; height &= ~1; }
+        ImGui::TextDisabled("%d x %d", width, height);
+    }
+    if (dialog.Video)
+    {
+        ImGui::TextUnformatted("MP4 (H.264)");
+        ImGui::SetNextItemWidth(110); ImGui::InputInt("FPS", &dialog.Fps, 1, 10);
+    }
+    else
+    {
+        struct StillFormat { Format Id; const char* Label; };
+        constexpr StillFormat formats[] = {{Format::Png, "PNG"}, {Format::Jpeg, "JPEG"}, {Format::Bmp, "BMP"}};
+        const auto shown = std::find_if(std::begin(formats), std::end(formats), [&](auto value) { return value.Id == dialog.StillFormat; });
+        ImGui::SetNextItemWidth(150);
+        if (ImGui::BeginCombo("Image format", shown->Label))
+        {
+            for (const auto& format : formats)
+            {
+                if (!jEditorCapture::Supports(format.Id) || !ImGui::Selectable(format.Label, format.Id == dialog.StillFormat)) continue;
+                dialog.StillFormat = format.Id;
+                try
+                {
+                    const auto path = jEditorAssetPath::ToUtf8(CaptureDestination(editor, dialog));
+                    std::snprintf(dialog.File, sizeof(dialog.File), "%s", path.c_str());
+                }
+                catch (const std::exception& error) { dialog.Error = error.what(); }
+            }
+            ImGui::EndCombo();
+        }
+    }
+    ImGui::SetNextItemWidth(440);
+    ImGui::InputText("Output file", dialog.File, sizeof(dialog.File));
+    if (!dialog.Error.empty())
+    {
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 440);
+        ImGui::TextColored(ImVec4(1.f, .35f, .3f, 1.f), "%s", dialog.Error.c_str());
+        ImGui::PopTextWrapPos();
+    }
+    if (ImGui::Button(dialog.Video ? "Start recording" : "Save screenshot"))
+    {
+        try
+        {
+            jEditorCapture::Options options{CaptureDestination(editor, dialog), width, height, dialog.Fps,
+                dialog.Video ? Format::Mp4 : dialog.StillFormat};
+            if (jEditorCapture::Start(std::move(options), dialog.Error))
+            {
+                dialog.WasBusy = true;
+                ImGui::CloseCurrentPopup();
+            }
+        }
+        catch (const std::exception& error) { dialog.Error = error.what(); }
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+    ImGui::EndPopup();
 }
 
 void Logs()
@@ -515,7 +1283,11 @@ void StartPackage(jEditor& editor, const fs::path& output)
     auto& s = State();
     if (!s.Project) { Message("Open a project before packaging.", true); return; }
     if (s.Packaging.valid()) { Message("A package build is already active.", true); return; }
-    if (!SaveScene(editor, SceneDefault(editor))) return;
+    if (s.Project->GetConfig().StartupScene.empty()) { Message("Set a Startup Scene before building a package.", true); return; }
+    const auto startup = s.Project->GetRoot() / jEditorAssetPath::FromUtf8(s.Project->GetConfig().StartupScene);
+    std::error_code ec;
+    if (editor.GetDocument().IsDirty() && fs::equivalent(editor.GetDocument().Path(), startup, ec) &&
+        !SaveScene(editor, editor.GetDocument().Path())) return;
     const auto project = *s.Project;
     const auto binary = s.ExecutablePath;
     const auto resource = fs::current_path() / "Resource";
@@ -567,7 +1339,11 @@ void Dialogs(jEditor& editor)
             }
             case Dialog::OpenProject: ok = OpenAuthoringProject(editor, path, error); break;
             case Dialog::Import: ok = s.Registry && s.Registry->ImportFile(path, s.AssetDestination, error); if (ok) s.Registry->ScanAsync(); break;
-            case Dialog::SavePrefab: ok = editor.GetDocument().SavePrefab(editor.GetSelectedEntityId(), path); error = editor.GetDocument().LastError(); break;
+            case Dialog::SavePrefab:
+                ok = editor.GetDocument().SavePrefab(editor.GetSelectedEntityId(), path);
+                error = editor.GetDocument().LastError();
+                if (ok && s.Registry) s.Registry->ScanAsync();
+                break;
             case Dialog::OpenPrefab: ok = editor.GetDocument().InstantiatePrefab(path) != 0; error = editor.GetDocument().LastError(); break;
             case Dialog::Package: StartPackage(editor, path); break;
             default: break;
@@ -583,7 +1359,17 @@ void Dialogs(jEditor& editor)
 }
 
 bool IsAuthoringWorkspaceVisible() { return State().Visible && !State().Runtime; }
-void SetAuthoringWorkspaceVisible(bool visible) { if (!visible && g_Editor) FinishWorkspaceEdit(*g_Editor); State().Visible = visible; }
+void SetAuthoringWorkspaceVisible(bool visible)
+{
+    if (!visible && g_Editor)
+    {
+        jEditorCapture::Stop();
+        FinishWorkspaceEdit(*g_Editor);
+        ClearAssetPlacement(*g_Editor);
+        g_Editor->Placement.bPickRequested = false;
+    }
+    State().Visible = visible;
+}
 void SetAuthoringRuntimeMode(bool runtime) { State().Runtime = runtime; State().Visible = !runtime; }
 void SetTestPlatformWindows(bool enabled) { if (enabled) State().TestPlatformWindows = true; else State().TestPlatformWindows.reset(); }
 void SetAuthoringIntegrationDrawHook(std::function<void()> draw) { State().IntegrationDraw = std::move(draw); }
@@ -602,6 +1388,7 @@ bool RequestAuthoringWindowClose()
     auto& s = State();
     if (s.Runtime || s.CloseApproved || !g_Editor) return true;
     FinishWorkspaceEdit(*g_Editor);
+    ClearAssetPlacement(*g_Editor);
     if (g_Editor->GetDocument().IsPlaying()) g_Editor->StopPlay();
     if (!g_Editor->GetDocument().IsDirty()) return true;
     s.Visible = true;
@@ -635,6 +1422,12 @@ void SetAuthoringExecutablePath(const std::filesystem::path& path)
 }
 bool IsAuthoringViewportHovered() { return State().ViewHovered; }
 bool IsAuthoringViewportFocused() { return State().ViewFocused; }
+float GetAuthoringSceneAspect()
+{
+    if (!IsAuthoringWorkspaceVisible() || !g_Editor || g_Editor->GetDocument().IsPlaying()) return 0.0f;
+    const auto size = State().ViewSize;
+    return size.x > 0.0f && size.y > 0.0f ? size.x / size.y : 0.0f;
+}
 bool MapAuthoringViewportPoint(double& x, double& y)
 {
     auto& s = State();
@@ -644,6 +1437,7 @@ bool MapAuthoringViewportPoint(double& x, double& y)
     y = (y - s.ViewPosition.y) * SCR_HEIGHT / s.ViewSize.y;
     return x >= 0 && y >= 0 && x < SCR_WIDTH && y < SCR_HEIGHT;
 }
+void RevealAuthoringSelection(const jEditor& editor) { State().RevealHierarchy = editor.GetSelectedEntityId(); }
 bool OpenAuthoringProject(jEditor& editor, const std::filesystem::path& file, std::string& error)
 {
     auto project = std::make_unique<jEditorProject>(); if (!project->Open(file, error)) return false;
@@ -660,6 +1454,9 @@ bool OpenAuthoringProject(jEditor& editor, const std::filesystem::path& file, st
     if (editor.GetDocument().IsPlaying() || editor.GetDocument().HasTransaction()) { error = "Stop Play and finish the active edit before changing projects"; return false; }
     auto registry = std::make_unique<jEditorAssetRegistry>(*project);
     auto& s = State(); jEditorAssetPanel::Shutdown(); if (s.Registry) s.Registry->Shutdown();
+    ClearAssetPlacement(editor);
+    s.SelectedAsset.clear(); s.FocusAssets = false;
+    s.HierarchyActive = s.RangeAnchor = s.RevealHierarchy = 0; s.Collapsed.clear(); s.RowRevision = ~uint64_t(0);
     jEditorExtensions::Shutdown(editor); jEditorTools::Shutdown();
     editor.ResetWorldBindings(true); editor.SetProjectRoot(project->GetRoot());
     if (g_Engine && g_Editor == &editor) g_Engine->Game.ClearImportedSceneForAuthoring();
@@ -681,8 +1478,11 @@ bool LoadAuthoringScene(jEditor& editor, const std::filesystem::path& scene, std
     Document candidate;
     if (!candidate.Load(scene)) { error = candidate.LastError(); return false; }
     if (editor.GetDocument().IsPlaying() || editor.GetDocument().HasTransaction()) { error = "Stop Play and finish the current edit first"; return false; }
+    ClearAssetPlacement(editor);
     jEditorExtensions::Shutdown(editor); jEditorTools::Shutdown();
     if (!editor.GetDocument().LoadJson(candidate.ToJson(), scene)) { error = editor.GetDocument().LastError(); return false; }
+    auto& s = State();
+    s.HierarchyActive = s.RangeAnchor = s.RevealHierarchy = 0; s.Collapsed.clear(); s.RowRevision = ~uint64_t(0);
     editor.SetSelectedEntities({}); Message("Opened scene " + jEditorAssetPath::ToUtf8(scene)); return true;
 }
 void TickAuthoringWorkspace(jEditor& editor, float dt)
@@ -721,17 +1521,37 @@ void TickAuthoringWorkspace(jEditor& editor, float dt)
 void RenderAuthoringWorkspace(jEditor& editor)
 {
     auto& s = State(); auto& document = editor.GetDocument();
+    s.ViewSize = {};
+    s.ViewHovered = s.ViewFocused = false;
     editor.SetViewportInputState(false, false); editor.SetShortcutInputState(false);
     if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) jEditorTools::FinishTerrainStroke(editor);
     if (s.OwnPropertyTransaction && (s.PropertyOwner != editor.GetSelectedEntityId() || !ImGui::IsAnyItemActive())) FinishInspectorEdit(editor);
     editor.SetAuthoringEnabled(true); editor.Placement.EnablePlacementMode = true;
     auto& io = ImGui::GetIO();
+    if (io.AppFocusLost) editor.CancelViewportDuplicateDrag();
+    if (!ImGui::IsKeyDown(ImGuiKey_Escape)) s.SuppressEditorEscape = false;
+    const bool escapePressed = ImGui::IsKeyPressed(ImGuiKey_Escape, false);
+    if (escapePressed && editor.CancelViewportDuplicateDrag()) s.SuppressEditorEscape = true;
+    if ((s.Placement || s.Replacement) && escapePressed)
+    {
+        if (const auto* payload = ImGui::GetDragDropPayload(); payload && payload->IsDataType("JENGINE_ASSET"))
+        {
+            ImGui::ClearDragDrop();
+            ImGui::ClearActiveID();
+        }
+        s.SuppressEditorEscape = true;
+        Message(s.Replacement ? "Asset replacement cancelled." : "Asset placement cancelled.");
+        ClearAssetPlacement(editor);
+    }
+    if (s.Replacement && document.IsPlaying()) ClearAssetPlacement(editor);
+    if (s.Placement && (document.IsPlaying() || (!s.Placement->Drop && !ImGui::GetDragDropPayload()))) ClearAssetPlacement(editor);
     // Platform windows send input through ImGui's backend. Normalize that same
     // event stream for engine shortcuts and camera controls in every viewport.
     for (int key = 0; key < 26; ++key) SetKeyDownState(static_cast<EInputKey>(int(EInputKey::A) + key), ImGui::IsKeyDown(static_cast<ImGuiKey>(int(ImGuiKey_A) + key)));
     for (int key = 0; key < 10; ++key) SetKeyDownState(static_cast<EInputKey>(int(EInputKey::NUM0) + key), ImGui::IsKeyDown(static_cast<ImGuiKey>(int(ImGuiKey_0) + key)));
     const std::pair<EInputKey, ImGuiKey> mapped[] = {{EInputKey::DELETE_KEY, ImGuiKey_Delete}, {EInputKey::ESCAPE, ImGuiKey_Escape}, {EInputKey::SPACE, ImGuiKey_Space}, {EInputKey::ENTER, ImGuiKey_Enter}, {EInputKey::TAB, ImGuiKey_Tab}, {EInputKey::LEFT, ImGuiKey_LeftArrow}, {EInputKey::RIGHT, ImGuiKey_RightArrow}, {EInputKey::UP, ImGuiKey_UpArrow}, {EInputKey::DOWN, ImGuiKey_DownArrow}};
     for (const auto& [engineKey, uiKey] : mapped) SetKeyDownState(engineKey, ImGui::IsKeyDown(uiKey));
+    if (s.SuppressEditorEscape) SetKeyDownState(EInputKey::ESCAPE, false);
     SetKeyDownState(EInputKey::CTRL, io.KeyCtrl || io.KeySuper); SetKeyDownState(EInputKey::ALT, io.KeyAlt); SetKeyDownState(EInputKey::SHIFT, io.KeyShift);
     SetKeyDownState(EInputKey::PLUS, ImGui::IsKeyDown(ImGuiKey_Equal) || ImGui::IsKeyDown(ImGuiKey_KeypadAdd)); SetKeyDownState(EInputKey::MINUS, ImGui::IsKeyDown(ImGuiKey_Minus) || ImGui::IsKeyDown(ImGuiKey_KeypadSubtract));
     g_MouseState[MouseButtonIndex(EMouseButtonType::LEFT)].Down = io.MouseDown[0];
@@ -753,6 +1573,8 @@ void RenderAuthoringWorkspace(jEditor& editor)
             if (ImGui::MenuItem("Open scene", "Ctrl+O")) GuardUnsaved(editor, [] { ShowDialog(Dialog::Open); });
             if (ImGui::MenuItem("Save", "Ctrl+S")) SaveScene(editor, SceneDefault(editor));
             if (ImGui::MenuItem("Save As")) ShowDialog(Dialog::Save, SceneDefault(editor));
+            if (ImGui::MenuItem("Set current as Startup Scene", nullptr, false, s.Project && !document.Path().empty()))
+                SetStartupScene(editor, document.Path());
             ImGui::Separator();
             if (ImGui::MenuItem("New project")) GuardUnsaved(editor, [] { ShowDialog(Dialog::NewProject); });
             if (ImGui::MenuItem("Open project")) GuardUnsaved(editor, [] { ShowDialog(Dialog::OpenProject); });
@@ -789,13 +1611,27 @@ void RenderAuthoringWorkspace(jEditor& editor)
             ImGui::MenuItem("Layout settings", nullptr, &s.ShowSettings);
             if (ImGui::MenuItem("Reset layout")) { s.ResetLayout = true; s.LeftWidth = 245; s.RightWidth = 325; s.BottomHeight = 205; }
             if (ImGui::MenuItem("Save layout")) SaveLayout();
-            if (ImGui::MenuItem("Rendering panels", "F10")) s.Visible = false;
+            if (ImGui::MenuItem("Rendering panels", "F10")) SetAuthoringWorkspaceVisible(false);
             ImGui::EndMenu();
         }
-        if (!document.IsPlaying()) { if (ImGui::Button("Play")) editor.BeginPlay(); }
+        CaptureMenu(editor);
+        if (!document.IsPlaying())
+        {
+            if (ImGui::Button("Play"))
+            {
+                FinishWorkspaceEdit(editor);
+                ClearAssetPlacement(editor);
+                editor.BeginPlay();
+            }
+        }
         else { if (ImGui::Button("Stop")) editor.StopPlay(); }
         ImGui::Text("%s%s | %.1f ms", document.Name().c_str(), document.IsDirty() ? " *" : "", io.Framerate > 0 ? 1000 / io.Framerate : 0);
         ImGui::EndMainMenuBar();
+    }
+    if (s.Visible && !document.IsPlaying() && s.Modal == Dialog::None && !s.UnsavedPrompt)
+    {
+        AdvancePlacement(editor);
+        AdvanceModelReplacement(editor);
     }
     const auto* vp = ImGui::GetMainViewport(); const float top = ImGui::GetFrameHeight() + 3;
 #ifdef IMGUI_HAS_DOCK
@@ -825,45 +1661,75 @@ void RenderAuthoringWorkspace(jEditor& editor)
     const bool docked = s.Docking && jEditorUiRenderer::SupportsDocking();
     const auto flags = s.FixedLayout && !docked ? ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse : ImGuiWindowFlags_None;
     const auto condition = (s.FixedLayout || s.ResetLayout) ? ImGuiCond_Always : ImGuiCond_FirstUseEver;
-    const auto panel = [&](const char* name, float x, float y, float w, float h)
-    { if (!docked) { ImGui::SetNextWindowPos(ImVec2(vp->Pos.x + x, vp->Pos.y + y), condition); ImGui::SetNextWindowSize(ImVec2(w, h), condition); } const bool open = ImGui::Begin(name, nullptr, flags); ImGui::SetWindowFontScale(s.FontScale); return open; };
+    const auto panel = [&](const char* name, float x, float y, float w, float h, ImGuiWindowFlags extraFlags = ImGuiWindowFlags_None)
+    {
+        if (!docked)
+        {
+            ImGui::SetNextWindowPos(ImVec2(vp->Pos.x + x, vp->Pos.y + y), condition);
+            ImGui::SetNextWindowSize(ImVec2(w, h), condition);
+        }
+        const bool open = ImGui::Begin(name, nullptr, flags | extraFlags);
+        ImGui::SetWindowFontScale(s.FontScale);
+        return open;
+    };
     if (panel("Hierarchy", 0, top, left, vp->Size.y - top - bottom)) { if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) editor.SetShortcutInputState(true); Hierarchy(editor); } ImGui::End();
     if (s.OwnPropertyTransaction && s.PropertyOwner != editor.GetSelectedEntityId()) FinishInspectorEdit(editor);
     if (panel("Inspector", vp->Size.x - right, top, right, vp->Size.y - top - bottom)) Inspector(editor); ImGui::End();
     const float viewWidth = std::max(64.0f, vp->Size.x - left - right);
-    if (panel(document.IsPlaying() ? "Game" : "Scene", left, top, viewWidth, vp->Size.y - top - bottom))
+    const bool scene = !document.IsPlaying();
+    const ImGuiWindowFlags viewFlags = scene ? ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse : ImGuiWindowFlags_None;
+    if (scene) ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    const bool viewOpen = panel(scene ? "Scene" : "Game", left, top, viewWidth, vp->Size.y - top - bottom, viewFlags);
+    if (viewOpen && scene) SceneToolbar(editor);
+    auto size = ImGui::GetContentRegionAvail();
+    if (viewOpen && size.x >= 1.0f && size.y >= 1.0f)
     {
-        auto position = ImGui::GetCursorScreenPos(); auto size = ImGui::GetContentRegionAvail();
-        const float aspect = static_cast<float>(SCR_WIDTH) / std::max(1, SCR_HEIGHT);
-        if (size.x / std::max(1.0f, size.y) > aspect) { const float width = size.y * aspect; position.x += (size.x - width) * .5f; size.x = width; }
-        else { const float height = size.x / aspect; position.y += (size.y - height) * .5f; size.y = height; }
-        size.x = std::max(1.0f, size.x); size.y = std::max(1.0f, size.y);
+        auto position = ImGui::GetCursorScreenPos();
+        if (!scene)
+        {
+            const float aspect = static_cast<float>(std::max(1, SCR_WIDTH)) / std::max(1, SCR_HEIGHT);
+            if (size.x / size.y > aspect)
+            {
+                const float width = std::max(1.0f, size.y * aspect);
+                position.x += (size.x - width) * .5f;
+                size.x = width;
+            }
+            else
+            {
+                const float height = std::max(1.0f, size.x / aspect);
+                position.y += (size.y - height) * .5f;
+                size.y = height;
+            }
+        }
         ImGui::SetCursorScreenPos(position); s.ViewPosition = position; s.ViewSize = size;
         if (void* texture = jEditorUiRenderer::ScenePreviewTexture()) ImGui::Image(texture, size);
-        else ImGui::InvisibleButton("Scene surface", size);
+        else ImGui::Dummy(size);
         s.ViewHovered = ImGui::IsItemHovered(); s.ViewFocused = ImGui::IsWindowFocused();
         editor.SetViewportInputState(s.ViewHovered, s.ViewFocused);
         if (s.ViewFocused) editor.SetShortcutInputState(true);
-        if (ImGui::BeginDragDropTarget())
-        {
-            if (const auto* payload = ImGui::AcceptDragDropPayload("JENGINE_ASSET"))
-                if (s.Registry && payload->DataSize > 0)
-                    if (const auto* asset = s.Registry->FindById(static_cast<const char*>(payload->Data))) ActivateAsset(editor, *asset);
-            ImGui::EndDragDropTarget();
-        }
+        auto* camera = Camera();
+        const bool dragging = ImGui::GetDragDropPayload() != nullptr;
+        if (scene && camera) RenderAssetPlacement(editor, *camera);
         auto* sceneDraw = ImGui::GetWindowDrawList();
         sceneDraw->PushClipRect(position, ImVec2(position.x + size.x, position.y + size.y), true);
-        auto* camera = Camera();
-        const bool terrainBrush = s.ShowTools && s.PaintTerrainInScene && camera &&
+        const bool terrainBrush = !dragging && s.ShowTools && s.PaintTerrainInScene && camera &&
             jEditorTools::RenderTerrainBrush(editor, *camera, position, size, s.ViewHovered);
-        if (!terrainBrush) editor.RenderViewportGizmo(camera, position.x, position.y, size.x, size.y);
+        const bool gizmoInput = !dragging && !terrainBrush &&
+            editor.RenderViewportGizmo(camera, position.x, position.y, size.x, size.y);
+        if (dragging || terrainBrush) editor.CancelViewportDuplicateDrag();
         sceneDraw->PopClipRect();
-        if (s.ViewHovered && (terrainBrush || (!ImGuizmo::IsUsing() && !ImGuizmo::IsOver())))
+        if (!dragging && s.ViewHovered && !gizmoInput)
         {
-            if (!terrainBrush && ImGui::IsMouseClicked(0) && !io.KeyAlt)
+            if (!document.IsPlaying() && !terrainBrush && ImGui::IsMouseClicked(0) && !io.KeyAlt)
             {
                 double x = io.MousePos.x, y = io.MousePos.y;
-                if (MapAuthoringViewportPoint(x, y)) { editor.Placement.bPickRequested = true; editor.Placement.PickMouseX = int32(x); editor.Placement.PickMouseY = int32(y); }
+                if (MapAuthoringViewportPoint(x, y))
+                {
+                    editor.Placement.bPickRequested = true;
+                    editor.Placement.PickToggleSelection = io.KeyCtrl || io.KeySuper;
+                    editor.Placement.PickMouseX = int32(x);
+                    editor.Placement.PickMouseY = int32(y);
+                }
             }
             if ((io.MouseDown[1] || (io.KeyAlt && io.MouseDown[0])) && (io.MouseDelta.x || io.MouseDelta.y)) editor.HandleCameraMouseMove(int32(io.MouseDelta.x), int32(io.MouseDelta.y), Camera());
         }
@@ -877,16 +1743,30 @@ void RenderAuthoringWorkspace(jEditor& editor)
             sceneDraw->PopClipRect();
         }
     }
+    else editor.CancelViewportDuplicateDrag();
     ImGui::End();
-    if (s.ShowAssets)
+    if (scene) ImGui::PopStyleVar();
+    if (s.ShowAssets && bottom > 0)
     {
         if (panel("Project tools", 0, vp->Size.y - bottom, vp->Size.x, bottom))
         {
             if (ImGui::BeginTabBar("Project tabs"))
             {
-                if (ImGui::BeginTabItem("Assets")) { Assets(editor); ImGui::EndTabItem(); }
+                if (ImGui::BeginTabItem("Assets", nullptr, s.FocusAssets ? ImGuiTabItemFlags_SetSelected : 0))
+                { s.FocusAssets = false; Assets(editor); ImGui::EndTabItem(); }
                 if (ImGui::BeginTabItem("Console")) { Logs(); ImGui::EndTabItem(); }
-                if (ImGui::BeginTabItem("Imports")) { ImGui::TextWrapped("%s", editor.ImportStatus().c_str()); ImGui::Text("Pending %zu", editor.PendingImportCount()); if (ImGui::Button("Cancel pending imports")) editor.CancelPendingImports(); if (s.Registry) { const auto scan = s.Registry->GetWorkStats(); ImGui::Text("Catalog scan: %s", scan.Active ? "Working" : "Idle"); } ImGui::EndTabItem(); }
+                if (ImGui::BeginTabItem("Imports"))
+                {
+                    ImGui::TextWrapped("%s", editor.ImportStatus().c_str());
+                    ImGui::Text("Pending %zu", editor.PendingImportCount());
+                    if (ImGui::Button("Cancel pending imports")) { ClearAssetPlacement(editor); editor.CancelPendingImports(); }
+                    if (s.Registry)
+                    {
+                        const auto scan = s.Registry->GetWorkStats();
+                        ImGui::Text("Catalog scan: %s", scan.Active ? "Working" : "Idle");
+                    }
+                    ImGui::EndTabItem();
+                }
                 ImGui::EndTabBar();
             }
         }
@@ -915,6 +1795,7 @@ void RenderAuthoringWorkspace(jEditor& editor)
     if (!s.PaintTerrainInScene || !s.ShowTools) jEditorTools::FinishTerrainStroke(editor);
     s.ResetLayout = false;
     Dialogs(editor);
+    CaptureOptions(editor);
     jEditorExtensions::Render(editor);
     jEditorProjectSettings::Render(editor, s.Project.get());
     if (s.IntegrationDraw) s.IntegrationDraw();
@@ -924,8 +1805,9 @@ void RenderAuthoringWorkspace(jEditor& editor)
 }
 void ShutdownAuthoringWorkspace()
 {
+    jEditorCapture::Shutdown();
     auto& s = State(); jEditorAssetPanel::Shutdown(); if (s.Registry) s.Registry->Shutdown();
-    if (g_Editor) jEditorExtensions::Shutdown(*g_Editor);
+    if (g_Editor) { ClearAssetPlacement(*g_Editor); jEditorExtensions::Shutdown(*g_Editor); }
     if (s.Packaging.valid()) s.Packaging.wait();
     jEditorTools::Shutdown(); jEditorUiRenderer::Shutdown();
 }

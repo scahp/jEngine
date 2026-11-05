@@ -5,8 +5,10 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 // Authoring data has no runtime pointers and is edited only by its creating thread.
@@ -146,6 +148,8 @@ public:
     bool RenameScene(const std::string& name);
     EntityId Create(EntityKind kind, const std::string& name = {}, EntityId parent = InvalidEntity);
     bool Update(const Entity& entity, const std::string& label = "Edit properties");
+    bool UpdateMany(std::span<const Entity> entities, const std::string& label);
+    bool SetLocalPositions(const std::vector<std::pair<EntityId, Vec3>>& positions, const std::string& label);
     // A locked entity/subtree cannot be edited, moved, duplicated or deleted.
     bool Reparent(EntityId id, EntityId parent, bool preserveWorld = true);
     EntityId Duplicate(EntityId root);
@@ -177,7 +181,8 @@ public:
     std::string SelectionJson(const std::vector<EntityId>& selection) const;
     std::vector<EntityId> PasteSelectionJson(const std::string& text, EntityId parent = InvalidEntity);
     std::string PrefabJson(EntityId root) const;
-    EntityId InstantiatePrefabJson(const std::string& text, EntityId parent = InvalidEntity);
+    EntityId InstantiatePrefabJson(const std::string& text, EntityId parent = InvalidEntity,
+        std::optional<Vec3> rootPosition = std::nullopt);
     bool Save(const std::filesystem::path& path, bool backup = true);
     bool Load(const std::filesystem::path& path);
     bool SavePrefab(EntityId root, const std::filesystem::path& path);

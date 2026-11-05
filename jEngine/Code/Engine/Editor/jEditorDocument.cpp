@@ -822,19 +822,50 @@ EntityId Document::Create(EntityKind kind, const std::string& name, EntityId par
 }
 bool Document::Update(const Entity& entity, const std::string& label)
 {
+    return UpdateMany(std::span(&entity, 1), label);
+}
+bool Document::UpdateMany(std::span<const Entity> entities, const std::string& label)
+{
     if (!Data->StartEdit()) return false;
-    const Entity* old = Find(entity.Id);
-    if (!old) { Data->Error = "Entity does not exist"; return false; }
-    if (entity.Parent != old->Parent) { Data->Error = "Use Reparent to edit hierarchy"; return false; }
-    if (*old == entity) return true;
-    if (EffectiveFlag(Data->State, entity.Id, true))
+    bool changed = false;
+    std::set<EntityId> ids;
+    for (const auto& entity : entities)
     {
-        Entity unlocked = *old; unlocked.Locked = false;
-        if (!old->Locked || entity != unlocked || (entity.Parent && EffectiveFlag(Data->State, entity.Parent, true)))
-        { Data->Error = "Locked entity cannot be edited"; return false; }
+        if (entities.size() > 1 && !ids.insert(entity.Id).second) { Data->Error = "Duplicate entity in property edit"; return false; }
+        const auto* old = Find(entity.Id);
+        if (!old) { Data->Error = "Entity does not exist"; return false; }
+        if (entity.Parent != old->Parent) { Data->Error = "Use Reparent to edit hierarchy"; return false; }
+        if (*old == entity) continue;
+        if (EffectiveFlag(Data->State, entity.Id, true))
+        {
+            Entity unlocked = *old; unlocked.Locked = false;
+            if (!old->Locked || entity != unlocked || (entity.Parent && EffectiveFlag(Data->State, entity.Parent, true)))
+            { Data->Error = "Locked entity cannot be edited"; return false; }
+        }
+        changed = true;
     }
-    SceneState next = Data->State; next.Entities.at(entity.Id) = entity;
+    if (!changed) return true;
+    SceneState next = Data->State;
+    for (const auto& entity : entities) next.Entities.at(entity.Id) = entity;
     return Data->Apply(std::move(next), label);
+}
+bool Document::SetLocalPositions(const std::vector<std::pair<EntityId, Vec3>>& positions, const std::string& label)
+{
+    if (!Data->StartEdit()) return false;
+    SceneState next = Data->State;
+    bool changed = false;
+    for (const auto& [id, position] : positions)
+    {
+        auto entity = next.Entities.find(id);
+        if (entity == next.Entities.end() || IsEffectivelyLocked(id))
+        {
+            Data->Error = "Cannot move a missing or locked entity";
+            return false;
+        }
+        changed |= entity->second.Local.Position != position;
+        entity->second.Local.Position = position;
+    }
+    return !changed || Data->Apply(std::move(next), label);
 }
 bool Document::Reparent(EntityId id, EntityId parent, bool preserveWorld)
 {
@@ -1165,7 +1196,7 @@ EntityId Document::InstantiatePrefab(const std::filesystem::path& path, EntityId
     if (!ReadFile(path, Data->Bounds.MaxFileBytes, text, Data->Error)) return InvalidEntity;
     return InstantiatePrefabJson(text, parent);
 }
-EntityId Document::InstantiatePrefabJson(const std::string& text, EntityId parent)
+EntityId Document::InstantiatePrefabJson(const std::string& text, EntityId parent, std::optional<Vec3> rootPosition)
 {
     if (!Data->StartEdit()) return InvalidEntity;
     if (parent && (!Find(parent) || IsEffectivelyLocked(parent))) { Data->Error = "Prefab parent is missing or locked"; return InvalidEntity; }
@@ -1182,6 +1213,7 @@ EntityId Document::InstantiatePrefabJson(const std::string& text, EntityId paren
     for (const auto& [id, entity] : prefab.Entities)
     {
         Entity copy = entity; copy.Id = remap.at(id); copy.Parent = id == root ? parent : remap.at(entity.Parent);
+        if (id == root && rootPosition) copy.Local.Position = *rootPosition;
         next.Entities.emplace(copy.Id, std::move(copy));
     }
     next.Selected = remap.at(root);

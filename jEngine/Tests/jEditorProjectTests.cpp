@@ -105,6 +105,53 @@ int RunEditorProjectTests()
         "recent projects use caller-selected storage and deduplicate an open project");
 
     {
+        using Registry = jEditorAssetRegistry;
+        jEditorProject bundleProject;
+        const auto bundleRoot = fixture / "Bundle project";
+        expect(bundleProject.Create(bundleRoot, "Dependency import fixture", error), "asset bundle fixture project is created");
+        const auto source = fixture / "External assets";
+        const auto obj = source / "Meshes/prop.obj";
+        const auto texture = source / "Textures/green tile.png";
+        Text(obj, "mtllib prop material.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
+        Text(source / "Meshes/prop material.mtl", "newmtl green\nmap_Kd -o 0 0 ../Textures/green tile.png\n");
+        Registry imports(bundleProject);
+        Registry::ImportPlan plan;
+        const std::string target = "Assets/Models/prop.obj";
+        expect(imports.InspectImport(obj, target, plan, error) && plan.Files.size() == 3 && !plan.Ready()
+            && plan.Files.back().Status == Registry::ImportStatus::Missing
+            && plan.Files.back().Destination == "Assets/Textures/green tile.png"
+            && !imports.ImportBundle(plan, error) && !fs::exists(bundleRoot / target),
+            "OBJ import previews a missing transitive texture and publishes no files");
+        Pixel(texture, true);
+        Pixel(bundleRoot / "Assets/Textures/green tile.png", true);
+        expect(imports.InspectImport(obj, target, plan, error) && plan.Ready()
+            && plan.Files.back().Status == Registry::ImportStatus::Reuse,
+            "OBJ import preserves sibling texture paths and reuses identical project dependencies");
+        Pixel(bundleRoot / "Assets/Textures/green tile.png");
+        expect(!imports.ImportBundle(plan, error) && !fs::exists(bundleRoot / target)
+            && imports.InspectImport(obj, target, plan, error) && !plan.Ready()
+            && plan.Files.back().Status == Registry::ImportStatus::Conflict,
+            "import rechecks the preview and refuses to overwrite a conflicting texture");
+        Pixel(bundleRoot / "Assets/Textures/green tile.png", true);
+        expect(imports.InspectImport(obj, target, plan, error) && imports.ImportBundle(plan, error)
+            && imports.Scan(error) && fs::is_regular_file(bundleRoot / "Assets/Models/prop material.mtl")
+            && imports.FindBySourcePath(target) && imports.FindBySourcePath(target)->MissingDependencies.empty(),
+            "reviewed OBJ and MTL import together and register with intact texture references");
+        const auto gltf = source / "glTF/prop.gltf";
+        JsonFile(gltf, {{"asset", {{"version", "2.0"}}}, {"buffers", Json::array({{{"uri", "mesh.bin"}, {"byteLength", 4}}})},
+            {"images", Json::array({{{"uri", "maps/green%20tile.png"}}, {{"uri", "data:image/png;base64,AA=="}}})}});
+        Text(gltf.parent_path() / "mesh.bin", "data");
+        Pixel(gltf.parent_path() / "maps/green tile.png");
+        expect(imports.InspectImport(gltf, "Assets/GLTF/prop.gltf", plan, error) && plan.Ready() && plan.Files.size() == 3
+            && imports.ImportBundle(plan, error) && imports.Scan(error)
+            && fs::is_regular_file(bundleRoot / "Assets/GLTF/mesh.bin")
+            && fs::is_regular_file(bundleRoot / "Assets/GLTF/maps/green tile.png"),
+            "glTF import copies URI-decoded images and external buffers while retaining embedded data");
+        expect(imports.InspectImport(obj, "Assets/prop.obj", plan, error) && !plan.Ready() && !fs::exists(bundleRoot / "Assets/prop.obj"),
+            "import blocks upward references that would leave the destination asset root");
+    }
+
+    {
         using jEditorAssetPath::FromUtf8;
         fs::path example;
         const auto copy = fixture / "ShippedStudio";
@@ -296,12 +343,17 @@ int RunEditorProjectTests()
             {"graphOverrides", {{"baseColorTexture", false}}}}}}
     })}};
     JsonFile(directory / "Scenes/startup.jscene", scene);
+    JsonFile(directory / "Assets/Prefabs/fixture.jprefab", {{"format", "jEnginePrefab"}, {"entities", Json::array()}});
     jEditorAssetRegistry registry(project);
     expect(registry.Scan(error), "recursive catalog scans real OBJ MTL glTF graph shader and scene sources");
     const auto* model = registry.FindBySourcePath("Assets/Models/triangle.obj");
     const auto* texture = registry.FindBySourcePath("Assets/Textures/albedo.png");
     const auto* gltf = registry.FindBySourcePath("Assets/Models/model.gltf");
     const auto* shader = registry.FindBySourcePath("Assets/Shaders/custom.hlsl");
+    const auto* prefab = registry.FindBySourcePath("Assets/Prefabs/fixture.jprefab");
+    const auto* startup = registry.FindBySourcePath("Scenes/startup.jscene");
+    expect(prefab && prefab->Kind == jEditorAssetKind::Prefab && startup && startup->Kind == jEditorAssetKind::Scene,
+        "catalog separates placeable prefabs from scene documents");
     expect(model && texture && gltf && shader && !registry.FindBySourcePath("Assets/.env"),
         "catalog classifies assets and excludes secret or runtime state files");
     if (!model || !texture || !gltf || !shader) return failures + 1;

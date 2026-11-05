@@ -10,7 +10,7 @@
 #include <vector>
 #include "jEditorAssetPath.h"
 
-enum class jEditorAssetKind { Model, Texture, Material, Scene, Shader, Data };
+enum class jEditorAssetKind { Model, Texture, Material, Scene, Shader, Data, Prefab };
 const char* jEditorAssetKindName(jEditorAssetKind kind);
 
 struct jEditorAssetFingerprint
@@ -124,6 +124,24 @@ public:
     // Reports this asset plus transitive dependents. GPU/decoded cache refresh is
     // the runtime owner's responsibility using these new revision identities.
     bool Reimport(const std::string& id, std::vector<std::string>& invalidatedIds, std::string& error);
+    enum class ImportStatus { Copy, Reuse, Missing, Conflict };
+    struct ImportEntry
+    {
+        std::filesystem::path Source;
+        std::string Destination;
+        ImportStatus Status = ImportStatus::Copy;
+        std::string Issue;
+        jEditorAssetFingerprint SourceStamp;
+        bool operator==(const ImportEntry&) const = default;
+    };
+    struct ImportPlan
+    {
+        std::vector<ImportEntry> Files; // Primary file first, then transitive dependencies.
+        bool Ready() const;
+    };
+    bool InspectImport(const std::filesystem::path& externalSource, const std::string& destination,
+        ImportPlan& plan, std::string& error) const;
+    bool ImportBundle(const ImportPlan& reviewed, std::string& error);
     bool ImportFile(const std::filesystem::path& externalSource, const std::string& destination,
         std::string& error);
     bool CreateFolder(const std::string& projectRelativePath, std::string& error);

@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "jEditorUiRenderer.h"
+#include "jEditorCapture.h"
 #include "FileLoader/jEditorAssets.h"
 #include "FileLoader/jImageFileLoader.h"
 #include <set>
@@ -8,6 +9,7 @@
 #include "RHI/Vulkan/jRHI_Vulkan.h"
 #include "RHI/Vulkan/jTexture_Vulkan.h"
 #include "Renderer/jSceneRenderTargets.h"
+#include "Scene/jCamera.h"
 #ifdef _WIN32
 #include "RHI/DX12/jImGui_DX12.h"
 #include "RHI/DX12/jRHI_DX12.h"
@@ -19,7 +21,7 @@ namespace jEditorUiRenderer
 {
 namespace
 {
-struct Preview { std::shared_ptr<jTexture> Texture; void* Id = nullptr; };
+struct Preview { std::shared_ptr<jRenderTarget> Target; void* Id = nullptr; };
 std::vector<Preview> Previews;
 void* CurrentPreview = nullptr;
 std::set<void*> Thumbnails;
@@ -43,7 +45,7 @@ void Unregister(void* id)
 #endif
 }
 }
-void PrepareScenePreview(const std::shared_ptr<jRenderFrameContext>& frame)
+void PrepareScenePreview(const std::shared_ptr<jRenderFrameContext>& frame, const jView& view)
 {
     CurrentPreview = nullptr;
     if (!g_rhi || !g_ImGUI || !frame || !frame->SceneRenderTargetPtr ||
@@ -52,25 +54,30 @@ void PrepareScenePreview(const std::shared_ptr<jRenderFrameContext>& frame)
     if (!source || source->Width <= 0 || source->Height <= 0 || frame->FrameIndex > 16) return;
     if (Previews.size() <= frame->FrameIndex) Previews.resize(frame->FrameIndex + 1);
     auto& preview = Previews[frame->FrameIndex];
-    if (!preview.Texture || preview.Texture->Width != source->Width ||
-        preview.Texture->Height != source->Height || preview.Texture->Format != source->Format)
+    if (!preview.Target || preview.Target->Info.Width != source->Width ||
+        preview.Target->Info.Height != source->Height || preview.Target->Info.Format != source->Format)
     {
-        if (preview.Id) { Unregister(preview.Id); preview.Id = nullptr; preview.Texture.reset(); }
+        if (preview.Id) { Unregister(preview.Id); preview.Id = nullptr; preview.Target.reset(); }
         // Old frame users have drained before replacing this generation.
-        preview.Texture = g_rhi->Create2DTexture(source->Width, source->Height, 1, 1,
-            source->Format, ETextureCreateFlag::TransferDst | ETextureCreateFlag::TransferSrc, EResourceLayout::UNDEFINED);
-        preview.Id = preview.Texture ? Register(preview.Texture) : nullptr;
+        const auto texture = g_rhi->Create2DTexture(source->Width, source->Height, 1, 1, source->Format,
+            ETextureCreateFlag::RTV | ETextureCreateFlag::TransferDst | ETextureCreateFlag::TransferSrc, EResourceLayout::UNDEFINED);
+        if (texture)
+        {
+            preview.Target = jRenderTarget::CreateFromTexture(texture);
+            preview.Id = Register(texture);
+        }
     }
     if (!preview.Id) return;
+    auto* texture = preview.Target->GetTexture();
     auto* command = frame->GetActiveCommandBuffer();
     const EResourceLayout restore = source->GetLayout();
     g_rhi->TransitionLayout(command, source, EResourceLayout::TRANSFER_SRC);
-    g_rhi->TransitionLayout(command, preview.Texture.get(), EResourceLayout::TRANSFER_DST);
+    g_rhi->TransitionLayout(command, texture, EResourceLayout::TRANSFER_DST);
     command->FlushBarrierBatch();
     if (g_rhi == g_rhi_vk)
     {
         auto* from = static_cast<jTexture_Vulkan*>(source);
-        auto* to = static_cast<jTexture_Vulkan*>(preview.Texture.get());
+        auto* to = static_cast<jTexture_Vulkan*>(texture);
         VkImageCopy copy{};
         copy.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
         copy.dstSubresource = copy.srcSubresource;
@@ -83,20 +90,24 @@ void PrepareScenePreview(const std::shared_ptr<jRenderFrameContext>& frame)
     else if (g_rhi == g_rhi_dx12)
     {
         auto* from = static_cast<jTexture_DX12*>(source);
-        auto* to = static_cast<jTexture_DX12*>(preview.Texture.get());
+        auto* to = static_cast<jTexture_DX12*>(texture);
         static_cast<jCommandBuffer_DX12*>(command)->CommandList->CopyResource(
             to->Texture->Get(), from->Texture->Get());
     }
 #endif
-    g_rhi->TransitionLayout(command, preview.Texture.get(), EResourceLayout::SHADER_READ_ONLY);
     g_rhi->TransitionLayout(command, source, restore);
+#ifdef ENABLE_EDITOR_FEATURES
+    jEditorCapture::ReadFrame(frame, *texture, view.Camera ? view.Camera->ProjectionAspectOverride : 0.f);
+    DrawSelectionOutline(frame, view, preview.Target);
+#endif
+    g_rhi->TransitionLayout(command, texture, EResourceLayout::SHADER_READ_ONLY);
     command->FlushBarrierBatch();
     CurrentPreview = preview.Id;
 }
 void* ScenePreviewTexture() { return CurrentPreview; }
 std::shared_ptr<jTexture> AcquireScenePreview()
 {
-    for (const auto& preview : Previews) if (preview.Id && preview.Id == CurrentPreview) return preview.Texture;
+    for (const auto& preview : Previews) if (preview.Id && preview.Id == CurrentPreview) return preview.Target->GetTexturePtr();
     return {};
 }
 void* CreateThumbnail(const jEditorThumbnail& pixels)

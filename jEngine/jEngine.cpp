@@ -9,6 +9,7 @@
 #ifdef ENABLE_EDITOR_FEATURES
 #include "Code/Engine/jEditor.h"
 #include "Code/Engine/Editor/jEditorWorkspace.h"
+#include "Code/Engine/Editor/jEditorCapture.h"
 #include "Code/Engine/Editor/jEditorProcedural.h"
 #include "Code/Engine/Editor/jEditorUiRenderer.h"
 #include "Code/Engine/Editor/jEditorProjectSettings.h"
@@ -152,6 +153,7 @@ void jEngine::OnMouseMove(int32 xOffset, int32 yOffset)
 void jEngine::EndOfFrame()
 {
 #ifdef ENABLE_EDITOR_FEATURES
+    jEditorCapture::EndFrame();
     jEditorUiRenderer::RenderPlatformWindows();
 #endif
 	jProfileFrameMark();

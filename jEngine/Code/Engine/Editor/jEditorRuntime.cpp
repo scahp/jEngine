@@ -27,6 +27,106 @@ using namespace jEditorAuthoring;
 Vector V(const Vec3& v) { return Vector(v.X, v.Y, v.Z); }
 Vec3 A(const Vector& v) { return {v.x, v.y, v.z}; }
 bool Finite(const Vector& v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z); }
+constexpr float CubeHalfSize = 10.0f, SphereRadius = 15.0f;
+constexpr float DuplicateDragTolerance = .0001f;
+struct Bounds
+{
+    Vector MinPoint{FLT_MAX}, MaxPoint{-FLT_MAX};
+    bool Valid() const { return MinPoint.x <= MaxPoint.x; }
+    void Include(const Vector& point)
+    {
+        if (!Finite(point)) return;
+        MinPoint = Min(MinPoint, point);
+        MaxPoint = Max(MaxPoint, point);
+    }
+    void Include(const Bounds& bounds, const Matrix& transform)
+    {
+        if (!bounds.Valid()) return;
+        for (int i = 0; i < 8; ++i)
+        {
+            const Vector point(i & 1 ? bounds.MaxPoint.x : bounds.MinPoint.x,
+                i & 2 ? bounds.MaxPoint.y : bounds.MinPoint.y, i & 4 ? bounds.MaxPoint.z : bounds.MinPoint.z);
+            Include(transform.TransformPoint(point));
+        }
+    }
+    jEditor::PlacementBounds Result() const { return Valid() ? jEditor::PlacementBounds{A(MinPoint), A(MaxPoint)} : jEditor::PlacementBounds{}; }
+};
+Bounds ShapeBounds(const Entity& entity)
+{
+    if (entity.Kind == EntityKind::Cube) return {Vector(-CubeHalfSize), Vector(CubeHalfSize)};
+    if (entity.Kind == EntityKind::Sphere) return {Vector(-SphereRadius), Vector(SphereRadius)};
+    if (entity.Kind != EntityKind::Terrain) return {};
+    const auto [low, high] = std::minmax_element(entity.Terrain.Heights.begin(), entity.Terrain.Heights.end());
+    const float x = entity.Terrain.SizeX * .5f, z = entity.Terrain.SizeZ * .5f;
+    return {Vector(-x, entity.Terrain.Heights.empty() ? 0.0f : *low, -z),
+        Vector(x, entity.Terrain.Heights.empty() ? 0.0f : *high, z)};
+}
+void IncludeObjectBounds(Bounds& bounds, const jObject& object, const std::vector<Matrix>& meshLocal, const Matrix& world)
+{
+    for (size_t i = 0; i < object.RenderObjects.size(); ++i)
+    {
+        const auto* mesh = object.RenderObjects[i];
+        if (!mesh || !mesh->GeometryDataPtr) continue;
+        const Matrix matrix = i < meshLocal.size() ? world * meshLocal[i] : world;
+        const auto& vertices = mesh->GetVertices();
+        size_t begin = 0, end = vertices.size();
+        if (const auto* element = dynamic_cast<const jRenderObjectElement*>(mesh))
+        {
+            const auto& part = element->SubMesh;
+            if (part.StartVertex >= 0 && part.EndVertex >= part.StartVertex)
+            {
+                begin = std::min(end, size_t(part.StartVertex) * 3);
+                end = std::min(end, size_t(part.EndVertex) * 3);
+            }
+        }
+        for (size_t v = begin; v + 2 < end; v += 3)
+            bounds.Include(matrix.TransformPoint(Vector(vertices[v], vertices[v + 1], vertices[v + 2])));
+    }
+}
+bool TraceBox(const Vector& origin, const Vector& direction, const Bounds& bounds, float& distance, Vector& normal)
+{
+    float enter = -FLT_MAX, exit = FLT_MAX;
+    Vector enterNormal(0), exitNormal(0);
+    for (int axis = 0; axis < 3; ++axis)
+    {
+        const float d = direction.v[axis];
+        if (std::abs(d) < 1.e-12f)
+        {
+            if (origin.v[axis] < bounds.MinPoint.v[axis] || origin.v[axis] > bounds.MaxPoint.v[axis]) return false;
+            continue;
+        }
+        const float a = (bounds.MinPoint.v[axis] - origin.v[axis]) / d;
+        const float b = (bounds.MaxPoint.v[axis] - origin.v[axis]) / d;
+        if (std::min(a, b) > enter)
+        {
+            enter = std::min(a, b);
+            enterNormal = Vector(0);
+            enterNormal.v[axis] = d > 0 ? -1.0f : 1.0f;
+        }
+        if (std::max(a, b) < exit)
+        {
+            exit = std::max(a, b);
+            exitNormal = Vector(0);
+            exitNormal.v[axis] = d > 0 ? 1.0f : -1.0f;
+        }
+        if (enter > exit || exit < 0) return false;
+    }
+    distance = enter >= 0 ? enter : exit;
+    normal = enter >= 0 ? enterNormal : exitNormal;
+    return distance < FLT_MAX;
+}
+bool TraceSphere(const Vector& origin, const Vector& direction, float& distance, Vector& normal)
+{
+    const float a = direction.DotProduct(direction), b = origin.DotProduct(direction);
+    const float c = origin.DotProduct(origin) - SphereRadius * SphereRadius;
+    const float discriminant = b * b - a * c;
+    if (a <= 0 || discriminant < 0) return false;
+    const float root = std::sqrt(discriminant);
+    distance = (-b - root) / a;
+    if (distance < 0) distance = (-b + root) / a;
+    normal = (origin + direction * distance) / SphereRadius;
+    return distance >= 0;
+}
 Matrix Compose(const Transform& t)
 {
     return Matrix::MakeTranslate(V(t.Position)) * Matrix::MakeRotateZ(DegreeToRadian(t.RotationDegrees.Z))
@@ -139,7 +239,7 @@ struct jEditorRuntime::Impl
         std::string AssetKey;
     };
     struct Borrowed { jObject* Object=nullptr;jObjectID Id=0;jLight* Light=nullptr;bool WasRegistered=false; };
-    struct Prototype { std::shared_ptr<jObject> Object;std::vector<Matrix> MeshLocal; };
+    struct Prototype { std::shared_ptr<jObject> Object;std::vector<Matrix> MeshLocal;std::optional<Bounds> LocalBounds; };
     struct GraphDefaultsEntry { std::optional<MaterialProperties> Material; bool Dirty = true; };
     struct Import { std::string Key,Source,Id;uint64_t Revision=0; };
     jEditor& Editor;
@@ -159,6 +259,20 @@ struct jEditorRuntime::Impl
     struct Upload { Import Job; std::unique_ptr<jModelUploadSession> Session; };
     std::map<std::string,Upload> Uploads;
     std::set<std::string> FailedImports;
+    std::set<std::string> PlacementAssets;
+    struct TerrainTrace { Bounds Box; jEditorTools::Mesh Mesh; };
+    std::map<EntityId,TerrainTrace> PlacementTerrains;
+    uint64_t PlacementTerrainRevision = UINT64_MAX;
+    std::optional<Vec3> LastDuplicateOffset;
+    using WorldPositions = std::vector<std::pair<EntityId, Vector>>;
+    struct DuplicateDrag
+    {
+        Vector StartPivot, Offset{0};
+        std::vector<EntityId> PreviousSelection;
+        WorldPositions Copies;
+    };
+    std::optional<DuplicateDrag> GizmoDuplicate;
+    bool SuppressGizmoUntilRelease = false;
     std::map<EntityId,EntityId> DuplicateOf;
     std::vector<std::shared_ptr<jObject>> RetiredObjects;
     std::vector<std::shared_ptr<jLight>> RetiredLights;
@@ -176,9 +290,60 @@ struct jEditorRuntime::Impl
 
     explicit Impl(jEditor& editor):Editor(editor) {}
     bool Owner() const {return Thread==std::this_thread::get_id();}
+    static std::string Key(const std::string& source, const std::string& id, uint64_t revision)
+    { return source + "|" + id + "|" + std::to_string(revision); }
     std::string Key(const std::string& source,const std::string& id) const {
         const auto revision=Revisions.find(id.empty()?source:id);
-        return source+"|"+id+"|"+std::to_string(revision==Revisions.end()?0:revision->second);
+        return Key(source, id, revision == Revisions.end() ? 0 : revision->second);
+    }
+    bool QueueModel(const std::string& source, const std::string& id, const std::string& key)
+    {
+        if (FailedImports.count(key)) return false;
+        if (Uploads.count(key)) return true;
+        for (const auto& [request, job] : Imports) if (job.Key == key) return true;
+        const auto path = Resolve(source, id);
+        std::error_code error;
+        if (path.empty() || !std::filesystem::is_regular_file(path, error))
+        {
+            Error = "Missing or out-of-project asset: " + source;
+            FailedImports.insert(key);
+            return false;
+        }
+        if (!Importer) Importer = std::make_unique<jAssetImportService>();
+        const auto request = Importer->Request(jEditorAssetPath::ToUtf8(path), jEditorAssetPath::ToUtf8(path.parent_path()));
+        if (request) Imports[request] = {key, source, id, 0};
+        Status = "Preparing model assets on CPU workers; GPU publication remains owner-thread work.";
+        return true;
+    }
+    jEditor::PlacementReadiness GetPlacementPrototype(const std::string& source, const std::string& id,
+        const std::string& key, bool prepare, Prototype*& prototype)
+    {
+        using Readiness = jEditor::PlacementReadiness;
+        if (auto found = Prototypes.find(key); found != Prototypes.end())
+        {
+            prototype = &found->second;
+            return Readiness::Ready;
+        }
+        if (FailedImports.count(key))
+        {
+            Error = "Model unavailable. Reimport " + source + " to retry.";
+            return Readiness::Failed;
+        }
+        if (prepare)
+        {
+            PlacementAssets.insert(key);
+            if (!QueueModel(source, id, key)) return Readiness::Failed;
+        }
+        return Readiness::Pending;
+    }
+    const Bounds& PrototypeBounds(Prototype& prototype)
+    {
+        if (!prototype.LocalBounds)
+        {
+            prototype.LocalBounds.emplace();
+            IncludeObjectBounds(*prototype.LocalBounds, *prototype.Object, prototype.MeshLocal, Matrix(IdentityType));
+        }
+        return *prototype.LocalBounds;
     }
     std::filesystem::path Resolve(const std::string& source,const std::string& id)
     {
@@ -306,7 +471,8 @@ struct jEditorRuntime::Impl
         binding.Last=entity;
         if(entity.Kind==EntityKind::Model)binding.AssetKey=Key(entity.SourceAsset,entity.AssetId);
         const auto duplicate=DuplicateOf.find(entity.Id);
-        if(duplicate!=DuplicateOf.end()&&(entity.Kind==EntityKind::Model||entity.Kind==EntityKind::Cube||entity.Kind==EntityKind::Sphere))if(auto original=Bindings.find(duplicate->second);original!=Bindings.end()&&original->second.Object){
+        if(duplicate!=DuplicateOf.end()&&(entity.Kind==EntityKind::Model||entity.Kind==EntityKind::Cube||entity.Kind==EntityKind::Sphere))if(auto original=Bindings.find(duplicate->second);original!=Bindings.end()&&original->second.Object
+            && original->second.AssetKey == binding.AssetKey && original->second.Last.Material == entity.Material){
             binding.OwnedObject=CloneObject(*original->second.Object);binding.Object=binding.OwnedObject.get();
             binding.MeshLocal=original->second.MeshLocal;binding.MaterialApplied=true;return true;
         }
@@ -329,21 +495,13 @@ struct jEditorRuntime::Impl
         if(prototype==Prototypes.end()){
             if(entity.Kind==EntityKind::Model){
                 if(entity.SourceAsset.empty()&&entity.AssetId.empty()){Error="Model has no reconstructible source asset.";return false;}
-                if(FailedImports.count(key))return false;
-                bool pending=Uploads.count(key)!=0;for(auto& [id,job]:Imports)pending|=job.Key==key;
-                if(!pending){
-                    const auto path=Resolve(entity.SourceAsset,entity.AssetId);
-                    if(path.empty()||!std::filesystem::is_regular_file(path)){Error="Missing or out-of-project asset: "+entity.SourceAsset;FailedImports.insert(key);return false;}
-                    if(!Importer)Importer=std::make_unique<jAssetImportService>();
-                    const auto request=Importer->Request(jEditorAssetPath::ToUtf8(path),jEditorAssetPath::ToUtf8(path.parent_path()));
-                    if(request)Imports[request]={key,entity.SourceAsset,entity.AssetId,0};
-                }
-                Status="Preparing model assets on CPU workers; GPU publication remains owner-thread work.";return false;
+                QueueModel(entity.SourceAsset, entity.AssetId, key);
+                return false;
             }
             if(!g_rhi){Error="A graphics device is required to create primitive geometry.";return false;}
             std::shared_ptr<jObject> object;
-            if(entity.Kind==EntityKind::Cube)object.reset(jPrimitiveUtil::CreateCube(Vector::ZeroVector,Vector(20),Vector::OneVector,Vector4::OneVector));
-            if(entity.Kind==EntityKind::Sphere)object.reset(jPrimitiveUtil::CreateSphere(Vector::ZeroVector,15,32,16,Vector::OneVector,Vector4::OneVector,false,true));
+            if(entity.Kind==EntityKind::Cube)object.reset(jPrimitiveUtil::CreateCube(Vector::ZeroVector,Vector(2 * CubeHalfSize),Vector::OneVector,Vector4::OneVector));
+            if(entity.Kind==EntityKind::Sphere)object.reset(jPrimitiveUtil::CreateSphere(Vector::ZeroVector,SphereRadius,32,16,Vector::OneVector,Vector4::OneVector,false,true));
             if(!object){Error="Unsupported runtime entity kind.";return false;}
             Prototypes[key]={object,MeshMatrices(object.get())};prototype=Prototypes.find(key);
         }
@@ -396,6 +554,164 @@ struct jEditorRuntime::Impl
             if(!ancestor)roots.push_back(id);
         }
         return roots;
+    }
+    std::optional<jEditor::PlacementHit> TraceSurfaces(const Vector& origin, const Vector& direction, float range,
+        const std::set<EntityId>& excluded = {}, EntityId only = 0)
+    {
+        if (PlacementTerrainRevision != Doc.Revision())
+        {
+            PlacementTerrains.clear();
+            PlacementTerrainRevision = Doc.Revision();
+        }
+        std::optional<jEditor::PlacementHit> hit;
+        for (const auto& [id, entity] : Doc.Entities())
+        {
+            if ((only && only != id) || excluded.count(id) ||
+                (entity.Kind != EntityKind::Cube && entity.Kind != EntityKind::Sphere && entity.Kind != EntityKind::Terrain) ||
+                !Doc.IsEffectivelyVisible(id)) continue;
+            Matrix world, inverse;
+            if (!Doc.GetWorldMatrix(id, world.mm, inverse.mm)) continue;
+            const Vector localOrigin = inverse.TransformPoint(origin);
+            const Vector localDirection = inverse.TransformDirection(direction);
+            Vector localNormal(0);
+            float distance = 0;
+            if (entity.Kind == EntityKind::Terrain)
+            {
+                auto entry = PlacementTerrains.find(id);
+                if (entry == PlacementTerrains.end())
+                    entry = PlacementTerrains.emplace(id, TerrainTrace{ShapeBounds(entity), {}}).first;
+                auto& terrain = entry->second;
+                if (!TraceBox(localOrigin, localDirection, terrain.Box, distance, localNormal)) continue;
+                if (terrain.Mesh.Indices.empty()) terrain.Mesh = jEditorTools::BuildTerrain(entity.Terrain);
+                Vector localHit;
+                if (!jEditorTools::FindTerrainHit(terrain.Mesh, localOrigin, localDirection, localHit, &localNormal)) continue;
+                distance = (world.TransformPoint(localHit) - origin).DotProduct(direction);
+            }
+            else if (entity.Kind == EntityKind::Sphere)
+            {
+                if (!TraceSphere(localOrigin, localDirection, distance, localNormal)) continue;
+            }
+            else if (!TraceBox(localOrigin, localDirection, ShapeBounds(entity), distance, localNormal)) continue;
+            if (!(distance >= 0 && distance < range)) continue;
+            Vector normal = inverse.GetTranspose().TransformDirection(localNormal).GetNormalize();
+            if (!Finite(normal) || normal.IsNearlyZero()) continue;
+            if (normal.DotProduct(direction) > 0) normal = -normal;
+            const Vector point = origin + direction * distance;
+            if (!Finite(point)) continue;
+            range = distance;
+            hit = jEditor::PlacementHit{A(point), A(normal), id};
+        }
+        return hit;
+    }
+    WorldPositions SelectedWorldPositions()
+    {
+        WorldPositions result;
+        std::map<EntityId, Matrix> worlds;
+        for (const auto id : SelectionRoots())
+        {
+            const auto world = World(id, worlds);
+            result.emplace_back(id, Vector(world.m30, world.m31, world.m32));
+        }
+        return result;
+    }
+    bool LocalPositions(const WorldPositions& world, std::vector<std::pair<EntityId, Vec3>>& local)
+    {
+        for (const auto& [id, point] : world)
+        {
+            const auto* entity = Doc.Find(id);
+            if (!entity || Doc.IsEffectivelyLocked(id)) { Error = "Selection contains a missing or locked entity."; return false; }
+            Vector position = point;
+            if (entity->Parent)
+            {
+                Matrix parent, inverse;
+                if (!Doc.GetWorldMatrix(entity->Parent, parent.mm, inverse.mm))
+                { Error = "Selection has a parent without an invertible world transform."; return false; }
+                position = inverse.TransformPoint(point);
+            }
+            if (!Finite(position)) { Error = "The resulting position is outside the supported range."; return false; }
+            local.emplace_back(id, A(position));
+        }
+        return true;
+    }
+    bool MoveSelection(const WorldPositions& world, const char* label)
+    {
+        std::vector<std::pair<EntityId, Vec3>> local;
+        if (!LocalPositions(world, local)) return false;
+        if (Doc.SetLocalPositions(local, label)) return true;
+        Error = Doc.LastError();
+        return false;
+    }
+    void RememberDuplicate(EntityId original, EntityId copy)
+    {
+        DuplicateOf[copy] = original;
+        const auto originals = Doc.Children(original), copies = Doc.Children(copy);
+        for (size_t i = 0; i < originals.size() && i < copies.size(); ++i) RememberDuplicate(originals[i], copies[i]);
+    }
+    void ForgetDuplicate(EntityId copy)
+    {
+        DuplicateOf.erase(copy);
+        for (const auto child : Doc.Children(copy)) ForgetDuplicate(child);
+    }
+    bool DuplicateAtOffset(const WorldPositions& source, const Vector& offset, std::vector<EntityId>& copies)
+    {
+        auto world = source;
+        for (auto& [id, point] : world) point += offset;
+        std::vector<std::pair<EntityId, Vec3>> local;
+        if (!LocalPositions(world, local)) return false;
+        for (auto& [id, position] : local)
+        {
+            const auto copy = Doc.Duplicate(id);
+            if (!copy) { Error = Doc.LastError(); return false; }
+            copies.push_back(copy);
+            id = copy;
+        }
+        if (Doc.SetLocalPositions(local, "Move copies")) return true;
+        Error = Doc.LastError();
+        return false;
+    }
+    bool UpdateGizmoDuplicate(const Vector& offset)
+    {
+        auto& drag = *GizmoDuplicate;
+        if (!Finite(offset)) { Error = "Invalid gizmo translation."; return false; }
+        if (drag.Copies.empty())
+        {
+            if (offset.IsNearlyZero(DuplicateDragTolerance) || !ImGui::IsMouseDragging(ImGuiMouseButton_Left)) return true;
+            const auto source = SelectedWorldPositions();
+            if (source.empty() || !Doc.BeginTransaction("Duplicate and move")) { Error = Doc.LastError(); return false; }
+            std::vector<EntityId> copies;
+            if (!DuplicateAtOffset(source, offset, copies)) { Doc.CancelTransaction(); return false; }
+            drag.PreviousSelection = Selected;
+            for (size_t i = 0; i < copies.size(); ++i)
+            {
+                drag.Copies.emplace_back(copies[i], source[i].second);
+                RememberDuplicate(source[i].first, copies[i]);
+            }
+            Editor.SetSelectedEntities(copies);
+        }
+        else
+        {
+            if (offset.IsNearlyEqual(drag.Offset, DuplicateDragTolerance)) return true;
+            auto positions = drag.Copies;
+            for (auto& [id, point] : positions) point += offset;
+            if (!MoveSelection(positions, "Move copies")) return false;
+        }
+        drag.Offset = offset;
+        return true;
+    }
+    void FinishGizmoDuplicate(bool cancel)
+    {
+        auto drag = std::move(*GizmoDuplicate);
+        GizmoDuplicate.reset();
+        if (drag.Copies.empty() || !Doc.HasTransaction()) return;
+        if (!cancel && !drag.Offset.IsNearlyZero(DuplicateDragTolerance))
+        {
+            if (Doc.CommitTransaction()) { LastDuplicateOffset = A(drag.Offset); return; }
+            Error = Doc.LastError();
+        }
+        for (const auto& [id, point] : drag.Copies) ForgetDuplicate(id);
+        Doc.CancelTransaction();
+        Selected = std::move(drag.PreviousSelection);
+        Editor.SelectEntity(Doc.SelectedId(), true);
     }
 };
 
@@ -519,12 +835,12 @@ bool jEditor::CaptureWorldToDocument()
 bool jEditor::SyncDocumentToWorld()
 {
     auto& s=*Runtime->Data;if(!s.Owner()||s.ShuttingDown)return false;
-    s.Poll();s.CollectRetired();
     const auto selectedBeforePublication=s.Doc.SelectedId();
-    std::set<std::string> requiredAssets;
+    auto requiredAssets = s.PlacementAssets;
     for(const auto& [id,e]:s.Doc.Entities())if(e.Kind==EntityKind::Model)requiredAssets.insert(s.Key(e.SourceAsset,e.AssetId));
     for(auto it=s.Imports.begin();it!=s.Imports.end();)if(!requiredAssets.count(it->second.Key)){if(s.Importer)s.Importer->Cancel(it->first);it=s.Imports.erase(it);}else ++it;
     for(auto it=s.Uploads.begin();it!=s.Uploads.end();)if(!requiredAssets.count(it->first)){it->second.Session->Cancel();it=s.Uploads.erase(it);}else ++it;
+    s.Poll();s.CollectRetired();
     for(auto it=s.Bindings.begin();it!=s.Bindings.end();){
         const auto* entity=s.Doc.Find(it->first);
         if(!entity||entity->Kind!=it->second.Last.Kind||entity->SourceAsset!=it->second.Last.SourceAsset||entity->AssetId!=it->second.Last.AssetId){s.Retire(it->second);it=s.Bindings.erase(it);}else ++it;
@@ -564,12 +880,14 @@ bool jEditor::SyncDocumentToWorld()
 void jEditor::ResetWorldBindings(bool newDocument)
 {
     auto& s=*Runtime->Data;if(!s.Owner())return;
+    CancelViewportDuplicateDrag();
     if(s.Importer)s.Importer->CancelAll();s.Imports.clear();
     for(auto& [key,upload]:s.Uploads)upload.Session->Cancel();s.Uploads.clear();
     for(auto& [id,b]:s.Bindings)s.Retire(b);
     s.Bindings.clear();s.CollectRetired(true);s.RestoreBorrowed();
     if(g_rhi&&!s.Prototypes.empty())g_rhi->Flush();
     s.Sources.clear();s.Prototypes.clear();s.GraphDefaults.clear();s.DuplicateOf.clear();s.FailedImports.clear();s.Selected.clear();
+    s.PlacementAssets.clear();s.PlacementTerrains.clear();s.LastDuplicateOffset.reset();
     Placement.Clear();s.Captured=false;s.AppliedRevision=UINT64_MAX;s.Time=0;
     if(newDocument)s.Doc.NewScene();
 }
@@ -581,24 +899,65 @@ void jEditor::ShutdownWorld()
 
 jEditor::EntityId jEditor::EntityForObject(const jObject* object)const
 {
-    if(!object)return 0;for(const auto& [id,b]:Runtime->Data->Bindings)if(b.Object==object)return id;return 0;
+    if (!object) return 0;
+    const auto placed = std::find_if(Placement.PlacedObjects.begin(), Placement.PlacedObjects.end(),
+        [&](const auto& entry) { return entry.Object == object; });
+    const auto* light = placed != Placement.PlacedObjects.end() ? placed->LightPtr : nullptr;
+    for (const auto& [id, binding] : Runtime->Data->Bindings)
+        if (binding.Object == object || (light && binding.Light == light)) return id;
+    return 0;
 }
 jObject* jEditor::ObjectForEntity(EntityId id)const{const auto& b=Runtime->Data->Bindings;auto it=b.find(id);return it==b.end()?nullptr:it->second.Object;}
+std::vector<jRenderObject*> jEditor::GetSelectionRenderObjects() const
+{
+    const auto& s = *Runtime->Data;
+    std::vector<jRenderObject*> meshes;
+    if (!s.Doc.SelectedId() || s.Doc.IsPlaying()) return meshes;
+    std::set<EntityId> selected(s.Selected.begin(), s.Selected.end());
+    selected.insert(s.Doc.SelectedId());
+    for (const auto& [id, binding] : s.Bindings)
+    {
+        if (!binding.Registered || !s.Doc.IsEffectivelyVisible(id)) continue;
+        const auto* ancestor = s.Doc.Find(id);
+        while (ancestor && !selected.contains(ancestor->Id)) ancestor = s.Doc.Find(ancestor->Parent);
+        if (!ancestor) continue;
+        auto* object = binding.Object;
+        if (!object && binding.Light && gOptions.ShowDebugObject)
+            for (const auto& placed : Placement.PlacedObjects)
+                if (placed.LightPtr == binding.Light) { object = placed.Object; break; }
+        if (object && object->Visible) meshes.insert(meshes.end(), object->RenderObjects.begin(), object->RenderObjects.end());
+    }
+    return meshes;
+}
 jLight* jEditor::LightForEntity(EntityId id)const{const auto& b=Runtime->Data->Bindings;auto it=b.find(id);return it==b.end()?nullptr:it->second.Light;}
 jEditor::EntityId jEditor::GetSelectedEntityId()const{return GetDocument().SelectedId();}
 const std::vector<jEditor::EntityId>& jEditor::GetSelectedEntities()const{return Runtime->Data->Selected;}
 bool jEditor::SelectEntity(EntityId id,bool additive)
 {
     auto& s=*Runtime->Data;if(!s.Owner()||!s.Doc.Select(id))return false;
-    if(!additive)s.Selected.clear();if(id&&std::find(s.Selected.begin(),s.Selected.end(),id)==s.Selected.end())s.Selected.push_back(id);
+    if(!additive)s.Selected.clear();
+    if(id){std::erase(s.Selected,id);s.Selected.push_back(id);}
     if(auto* object=ObjectForEntity(id))Placement.SelectObject(object);
     else {Placement.SelectPlacedObject(-1);if(auto* light=LightForEntity(id))for(int i=0;i<(int)Placement.PlacedObjects.size();++i)if(Placement.PlacedObjects[i].LightPtr==light){Placement.SelectedPlacedObjectIndex=i;break;}}
     return true;
 }
+void jEditor::ToggleEntitySelection(EntityId id)
+{
+    auto& s = *Runtime->Data;
+    if (!s.Owner() || !s.Doc.Find(id)) return;
+    if (std::erase(s.Selected, id) == 0) { SelectEntity(id, true); return; }
+    if (s.Doc.SelectedId() == id) SelectEntity(s.Selected.empty() ? 0 : s.Selected.back(), true);
+}
 void jEditor::SetSelectedEntities(const std::vector<EntityId>& ids)
 {
-    auto& s=*Runtime->Data;if(!s.Owner())return;s.Selected.clear();for(auto id:ids)if(s.Doc.Find(id)&&std::find(s.Selected.begin(),s.Selected.end(),id)==s.Selected.end())s.Selected.push_back(id);
-    s.Doc.Select(s.Selected.empty()?0:s.Selected.back());
+    auto& s = *Runtime->Data;
+    if (!s.Owner()) return;
+    std::set<EntityId> seen;
+    std::vector<EntityId> selected;
+    for (const auto id : ids)
+        if (s.Doc.Find(id) && seen.insert(id).second) selected.push_back(id);
+    s.Selected = std::move(selected);
+    SelectEntity(s.Selected.empty() ? 0 : s.Selected.back(), true);
 }
 jEditor::EntityId jEditor::CreateEntity(EntityKind kind,const std::string& name,EntityId parent)
 {
@@ -610,27 +969,276 @@ jEditor::EntityId jEditor::CreateEntity(EntityKind kind,const std::string& name,
         s.Doc.Update(entity,"Place entity");}
     if(transaction)s.Doc.CommitTransaction();if(id)SelectEntity(id);else s.Error=s.Doc.LastError();return id;
 }
-jEditor::EntityId jEditor::AddModel(const std::string& source,const std::string& assetId,uint64_t revision)
+jEditor::EntityId jEditor::AddModel(const std::string& source, const std::string& assetId, uint64_t revision,
+    std::optional<Vec3> position)
 {
-    auto& s=*Runtime->Data;if(!s.Owner())return 0;
+    auto& s = *Runtime->Data;
+    if (!s.Owner()) return 0;
     std::filesystem::path sourcePath;
-    try { sourcePath=jEditorAssetPath::FromUtf8(source); } catch(const std::exception& e) {s.Error=e.what();return 0;}
-    const bool transaction=s.Doc.BeginTransaction("Add model");
-    auto id=s.Doc.Create(EntityKind::Model,jEditorAssetPath::ToUtf8(sourcePath.filename()));
-    if(id){auto entity=*s.Doc.Find(id);entity.SourceAsset=source;entity.AssetId=assetId;if(!s.Doc.Update(entity,"Set model source")){if(transaction)s.Doc.CancelTransaction();return 0;}}
-    if(transaction)s.Doc.CommitTransaction();s.Revisions[assetId.empty()?source:assetId]=revision;SelectEntity(id);return id;
+    try { sourcePath = jEditorAssetPath::FromUtf8(source); }
+    catch (const std::exception& e) { s.Error = e.what(); return 0; }
+    if (!s.Doc.BeginTransaction(position ? "Place model" : "Add model")) { s.Error = s.Doc.LastError(); return 0; }
+    const auto id = s.Doc.Create(EntityKind::Model, jEditorAssetPath::ToUtf8(sourcePath.filename()));
+    if (id)
+    {
+        auto entity = *s.Doc.Find(id);
+        entity.SourceAsset = source;
+        entity.AssetId = assetId;
+        if (position) entity.Local.Position = *position;
+        if (s.Doc.Update(entity, "Set model source and position") && s.Doc.CommitTransaction())
+        {
+            s.Revisions[assetId.empty() ? source : assetId] = revision;
+            SelectEntity(id);
+            return id;
+        }
+    }
+    s.Error = s.Doc.LastError();
+    s.Doc.CancelTransaction();
+    return 0;
+}
+jEditor::PlacementReadiness jEditor::ReplaceModelAssets(std::span<const EntityId> ids, const std::string& source,
+    const std::string& assetId, uint64_t revision)
+{
+    auto& s = *Runtime->Data;
+    if (!s.Owner() || s.Doc.IsPlaying() || s.Doc.HasTransaction() || ids.empty()) return PlacementReadiness::Failed;
+    std::vector<EntityId> changes;
+    for (const auto id : ids)
+    {
+        const auto* entity = s.Doc.Find(id);
+        if (!entity || entity->Kind != EntityKind::Model || s.Doc.IsEffectivelyLocked(id))
+        {
+            s.Error = "Select unlocked models to replace their asset.";
+            return PlacementReadiness::Failed;
+        }
+        if (entity->AssetId != assetId || entity->SourceAsset != source) changes.push_back(id);
+    }
+    if (changes.empty()) return PlacementReadiness::Ready;
+    jEditorRuntime::Impl::Prototype* prototype = nullptr;
+    const auto state = s.GetPlacementPrototype(source, assetId, s.Key(source, assetId, revision), true, prototype);
+    if (state != PlacementReadiness::Ready) return state;
+    std::vector<Entity> edits;
+    edits.reserve(changes.size());
+    for (const auto id : changes)
+    {
+        auto& edit = edits.emplace_back(*s.Doc.Find(id));
+        edit.AssetId = assetId;
+        edit.SourceAsset = source;
+        edit.MeshLocalTransforms.clear(); // These are indexed by the old asset's meshes.
+    }
+    if (!s.Doc.UpdateMany(edits, "Replace model asset"))
+    {
+        s.Error = s.Doc.LastError();
+        return PlacementReadiness::Failed;
+    }
+    s.Revisions[assetId.empty() ? source : assetId] = revision;
+    return PlacementReadiness::Ready;
+}
+std::optional<jEditor::PlacementHit> jEditor::FindPlacementHit(const Vec3& rayOrigin,
+    const Vec3& rayDirection, float range, bool surfaceSnap)
+{
+    auto& s = *Runtime->Data;
+    const Vector origin = V(rayOrigin), direction = V(rayDirection).GetNormalize();
+    if (!s.Owner() || !Finite(origin) || !Finite(direction) || direction.IsNearlyZero() || !(range > 0)) return {};
+    auto hit = surfaceSnap ? s.TraceSurfaces(origin, direction, range) : std::nullopt;
+    if (!hit)
+    {
+        if (std::abs(direction.y) < 1.e-8f) return {};
+        const float distance = -origin.y / direction.y;
+        if (!(distance >= 0 && distance < range)) return {};
+        hit = PlacementHit{A(origin + direction * distance)};
+    }
+    if (!Placement.UseSnap) return hit;
+    const Vector normal = V(hit->Normal);
+    int fixedAxis = 1;
+    for (const int axis : {0, 2})
+        if (std::abs(normal.v[axis]) > std::abs(normal.v[fixedAxis])) fixedAxis = axis;
+    const Vector point = V(hit->Point);
+    Vector snapped = point;
+    for (int axis = 0; axis < 3; ++axis)
+    {
+        const float step = Placement.TranslationSnap[axis];
+        if (axis != fixedAxis && std::isfinite(step) && step > 0)
+            snapped.v[axis] = std::round(point.v[axis] / step) * step;
+    }
+    if (!Finite(snapped) || snapped == point) return hit;
+    snapped.v[fixedAxis] -= normal.DotProduct(snapped - point) / normal.v[fixedAxis];
+    if (!hit->Surface) { hit->Point = A(snapped); return hit; }
+
+    // A rounded point can move off a narrow ledge. Keep the original hit unless
+    // the same surface supports the snapped point at approximately this height.
+    const float reach = std::max(0.01f, (snapped - point).Length());
+    if (const auto resampled = s.TraceSurfaces(snapped + normal * reach, -normal, 2 * reach, {}, hit->Surface);
+        resampled && V(resampled->Normal).DotProduct(normal) > 0.5f) return resampled;
+    return hit;
+}
+jEditor::PlacementReadiness jEditor::ModelPlacementBounds(const std::string& source, const std::string& assetId,
+    uint64_t revision, PlacementBounds& bounds, bool prepare)
+{
+    auto& s = *Runtime->Data;
+    if (!s.Owner()) return PlacementReadiness::Failed;
+    jEditorRuntime::Impl::Prototype* prototype = nullptr;
+    const auto state = s.GetPlacementPrototype(source, assetId, s.Key(source, assetId, revision), prepare, prototype);
+    if (state == PlacementReadiness::Ready) bounds = s.PrototypeBounds(*prototype).Result();
+    return state;
+}
+jEditor::PlacementReadiness jEditor::PrefabPlacementBounds(const Document& prefab, PlacementBounds& bounds, bool prepare)
+{
+    auto& s = *Runtime->Data;
+    const auto* root = prefab.Find(prefab.SelectedId());
+    if (!s.Owner() || !root) return PlacementReadiness::Failed;
+    std::map<EntityId, jEditorRuntime::Impl::Prototype*> models;
+    bool pending = false;
+    for (const auto& [id, entity] : prefab.Entities())
+    {
+        if (entity.Kind != EntityKind::Model || !prefab.IsEffectivelyVisible(id)) continue;
+        jEditorRuntime::Impl::Prototype* model = nullptr;
+        const auto state = s.GetPlacementPrototype(entity.SourceAsset, entity.AssetId,
+            s.Key(entity.SourceAsset, entity.AssetId), prepare, model);
+        if (state == PlacementReadiness::Failed) return state;
+        if (state == PlacementReadiness::Pending) pending = true;
+        else models.emplace(id, model);
+    }
+    if (pending) return PlacementReadiness::Pending;
+    Bounds result;
+    for (const auto& [id, entity] : prefab.Entities())
+    {
+        if (!prefab.IsEffectivelyVisible(id)) continue;
+        Matrix world;
+        if (!prefab.GetWorldMatrix(id, world.mm)) continue;
+        const Matrix relative = Matrix::MakeTranslate(-V(root->Local.Position)) * world;
+        if (const auto model = models.find(id); model != models.end())
+        {
+            const auto& prototype = *model->second;
+            if (!entity.MeshLocalTransforms.empty() && entity.MeshLocalTransforms.size() != prototype.Object->RenderObjects.size())
+            { s.Error = "Prefab model mesh count differs from its saved transforms."; return PlacementReadiness::Failed; }
+            if (entity.MeshLocalTransforms.empty()) IncludeObjectBounds(result, *prototype.Object, prototype.MeshLocal, relative);
+            else
+            {
+                std::vector<Matrix> meshLocal;
+                for (const auto& transform : entity.MeshLocalTransforms) meshLocal.push_back(Compose(transform));
+                IncludeObjectBounds(result, *prototype.Object, meshLocal, relative);
+            }
+        }
+        else result.Include(ShapeBounds(entity), relative);
+    }
+    bounds = result.Result();
+    return PlacementReadiness::Ready;
+}
+void jEditor::ReleasePlacementModels()
+{
+    auto& s = *Runtime->Data;
+    if (!s.Owner() || s.PlacementAssets.empty()) return;
+    s.PlacementAssets.clear();
+    s.AppliedRevision = UINT64_MAX;
+}
+bool jEditor::PlaceSelectionOnGround()
+{
+    auto& s = *Runtime->Data;
+    if (!s.Owner() || s.Doc.IsPlaying() || s.Doc.HasTransaction()) return false;
+    auto positions = s.SelectedWorldPositions();
+    if (positions.empty()) return false;
+    std::map<EntityId, Bounds> roots;
+    for (const auto& [id, point] : positions) roots.try_emplace(id);
+    std::set<EntityId> excluded;
+    std::map<EntityId, Matrix> worlds;
+    for (const auto& [id, entity] : s.Doc.Entities())
+    {
+        auto root = roots.end();
+        for (const Entity* at = &entity; at && root == roots.end(); at = s.Doc.Find(at->Parent)) root = roots.find(at->Id);
+        if (root == roots.end()) continue;
+        excluded.insert(id);
+        if (!s.Doc.IsEffectivelyVisible(id)) continue;
+        const auto world = s.World(id, worlds);
+        if (entity.Kind == EntityKind::Model)
+        {
+            const auto binding = s.Bindings.find(id);
+            if (binding == s.Bindings.end() || !binding->second.Object)
+            { s.Error = "Wait for the selected model to finish importing."; return false; }
+            IncludeObjectBounds(root->second, *binding->second.Object, binding->second.MeshLocal, world);
+        }
+        else root->second.Include(ShapeBounds(entity), world);
+    }
+    jEditorRuntime::Impl::WorldPositions moves;
+    for (auto& [id, point] : positions)
+    {
+        const auto& box = roots.at(id);
+        const float bottom = box.Valid() ? box.MinPoint.y : point.y;
+        Vector origin = box.Valid() ? (box.MinPoint + box.MaxPoint) * .5f : point;
+        origin.y = (box.Valid() ? std::max(point.y, box.MaxPoint.y) : point.y) + .01f;
+        const auto hit = s.TraceSurfaces(origin, -Vector::UpVector, FLT_MAX, excluded);
+        const float offset = (hit ? hit->Point.Y : 0.0f) - bottom;
+        if (std::abs(offset) > .0001f) moves.emplace_back(id, point + Vector::UpVector * offset);
+    }
+    return s.MoveSelection(moves, "Place selection on ground");
 }
 jEditor::EntityId jEditor::DuplicateSelected()
 {
     auto& s=*Runtime->Data;if(!s.Owner())return 0;
     const auto roots=s.SelectionRoots();if(roots.empty())return 0;
     const bool transaction=s.Doc.BeginTransaction("Duplicate selection");std::vector<EntityId> copies;
-    const auto mapCopies=[&](auto&& self,EntityId original,EntityId copy)->void {
-        s.DuplicateOf[copy]=original;const auto oldChildren=s.Doc.Children(original),newChildren=s.Doc.Children(copy);
-        for(size_t i=0;i<oldChildren.size()&&i<newChildren.size();++i)self(self,oldChildren[i],newChildren[i]);
-    };
-    for(auto root:roots){const auto copy=s.Doc.Duplicate(root);if(copy){mapCopies(mapCopies,root,copy);copies.push_back(copy);}}
+    for(auto root:roots){const auto copy=s.Doc.Duplicate(root);if(copy){s.RememberDuplicate(root,copy);copies.push_back(copy);}}
     if(transaction)s.Doc.CommitTransaction();if(copies.empty()){s.Error=s.Doc.LastError();return 0;}SetSelectedEntities(copies);return copies.back();
+}
+bool jEditor::DuplicateAndMove(const Vec3& worldOffset)
+{
+    auto& s = *Runtime->Data;
+    const Vector offset = V(worldOffset);
+    if (!s.Owner() || s.Doc.IsPlaying() || s.Doc.HasTransaction()) return false;
+    if (!Finite(offset) || offset.IsNearlyZero()) { s.Error = "Enter a nonzero world offset."; return false; }
+    const auto positions = s.SelectedWorldPositions();
+    if (positions.empty()) return false;
+    if (!s.Doc.BeginTransaction("Duplicate and move")) { s.Error = s.Doc.LastError(); return false; }
+    std::vector<EntityId> copies;
+    if (!s.DuplicateAtOffset(positions, offset, copies)) { s.Doc.CancelTransaction(); return false; }
+    if (!s.Doc.CommitTransaction())
+    {
+        s.Error = s.Doc.LastError();
+        s.Doc.CancelTransaction();
+        return false;
+    }
+    for (size_t i = 0; i < copies.size(); ++i) s.RememberDuplicate(positions[i].first, copies[i]);
+    s.LastDuplicateOffset = worldOffset;
+    SetSelectedEntities(copies);
+    return true;
+}
+bool jEditor::CanRepeatDuplicateOffset() const { return Runtime->Data->LastDuplicateOffset.has_value(); }
+bool jEditor::RepeatDuplicateOffset()
+{
+    const auto offset = Runtime->Data->LastDuplicateOffset;
+    return offset && DuplicateAndMove(*offset);
+}
+bool jEditor::AlignSelection(WorldAxis axis)
+{
+    auto& s = *Runtime->Data;
+    if (!s.Owner() || s.Doc.IsPlaying() || s.Doc.HasTransaction()) return false;
+    auto positions = s.SelectedWorldPositions();
+    if (positions.size() < 2) { s.Error = "Select two or more independent objects to align."; return false; }
+    const auto index = static_cast<int>(axis);
+    const float target = positions.back().second.v[index];
+    std::erase_if(positions, [index, target](const auto& item) { return item.second.v[index] == target; });
+    for (auto& [id, point] : positions) point.v[index] = target;
+    return s.MoveSelection(positions, "Align selection");
+}
+bool jEditor::DistributeSelection(WorldAxis axis)
+{
+    auto& s = *Runtime->Data;
+    if (!s.Owner() || s.Doc.IsPlaying() || s.Doc.HasTransaction()) return false;
+    auto positions = s.SelectedWorldPositions();
+    if (positions.size() < 3) { s.Error = "Select three or more independent objects to distribute."; return false; }
+    const auto index = static_cast<int>(axis);
+    std::stable_sort(positions.begin(), positions.end(), [index](const auto& a, const auto& b)
+        { return a.second.v[index] < b.second.v[index]; });
+    const float first = positions.front().second.v[index], last = positions.back().second.v[index];
+    jEditorRuntime::Impl::WorldPositions moves;
+    for (size_t i = 1; i + 1 < positions.size(); ++i)
+    {
+        auto [id, point] = positions[i];
+        const float target = std::lerp(first, last, float(i) / float(positions.size() - 1));
+        if (point.v[index] == target) continue;
+        point.v[index] = target;
+        moves.emplace_back(id, point);
+    }
+    return s.MoveSelection(moves, "Distribute selection");
 }
 bool jEditor::DeleteSelected()
 {
@@ -697,7 +1305,9 @@ bool jEditor::FocusSelected(jCamera* camera)
     }
     if(!any)return false;
     const Vector center=(minimum+maximum)*0.5f;const float radius=Max(10.0f,(maximum-minimum).Length()*0.5f);
-    const float distance=radius/Max(0.1f,std::tan(camera->FOVRad*0.5f))*1.25f;
+    const float aspect = camera->GetProjectionWidth() / Max(1, camera->Height);
+    const float horizontalFit = std::clamp(aspect, 0.01f, 1.0f);
+    const float distance = radius / (Max(0.1f, std::tan(camera->FOVRad * 0.5f)) * horizontalFit) * 1.25f;
     Vector forward=camera->GetForwardVector();if(!Finite(forward)||forward.IsNearlyZero())forward=Vector(0,0,1);
     const Vector position=center-forward.GetNormalize()*distance;
     jCamera::SetCamera(camera,position,center,position+Vector::UpVector,camera->FOVRad,camera->Near,Max(camera->Far,distance+radius*2),camera->Width,camera->Height,camera->IsPerspectiveProjection,distance);
@@ -705,7 +1315,9 @@ bool jEditor::FocusSelected(jCamera* camera)
 }
 bool jEditor::BeginPlay()
 {
-    auto& s=*Runtime->Data;if(!s.Owner()||!s.Doc.BeginPlay())return false;s.Time=0;
+    auto& s=*Runtime->Data;if(!s.Owner())return false;
+    CancelViewportDuplicateDrag();
+    if(!s.Doc.BeginPlay())return false;s.Time=0;
     if(s.Camera){auto* c=s.Camera;s.SavedCamera={c->Pos,c->Target,c->Up,c->FOVRad,c->Near,c->Far,c->Distance,true};}return true;
 }
 bool jEditor::StopPlay()
@@ -772,7 +1384,7 @@ void jEditor::ProcessInput(float deltaTime,jCamera* camera)
     if(shift){if(hit(EInputKey::W))Placement.GizmoOperation=ImGuizmo::TRANSLATE;if(hit(EInputKey::E))Placement.GizmoOperation=ImGuizmo::ROTATE;if(hit(EInputKey::R))Placement.GizmoOperation=ImGuizmo::SCALE;return;}
     if(hit(EInputKey::F))FocusSelected(camera);
     if(hit(EInputKey::DELETE_KEY))DeleteSelected();
-    if(hit(EInputKey::ESCAPE))SelectEntity(0);
+    if(hit(EInputKey::ESCAPE)&&s.PlacementAssets.empty())SelectEntity(0);
     if(hit(EInputKey::Q)&&!g_MouseState[MouseButtonIndex(EMouseButtonType::RIGHT)].Down)Placement.GizmoMode=Placement.GizmoMode==ImGuizmo::WORLD?ImGuizmo::LOCAL:ImGuizmo::WORLD;
     if(hit(EInputKey::L)){Placement.CurrentTab=EPlacementTab::LIGHT;Placement.SelectedLightType=EPlacementLightType::POINT;}
     if(hit(EInputKey::K)){Placement.CurrentTab=EPlacementTab::LIGHT;Placement.SelectedLightType=EPlacementLightType::SPOT;}
@@ -818,14 +1430,29 @@ bool jEditor::HandleCameraMouseMove(int32 xOffset,int32 yOffset,jCamera* camera)
     return true;
 }
 
-void jEditor::RenderViewportGizmo(jCamera* camera,float x,float y,float width,float height)
+bool jEditor::CancelViewportDuplicateDrag()
 {
-    auto& s=*Runtime->Data;if(!s.Owner()||!ImGui::GetCurrentContext())return;
+    auto& s = *Runtime->Data;
+    if (!s.Owner() || !s.GizmoDuplicate) return false;
+    s.FinishGizmoDuplicate(true);
+    ImGuizmo::Enable(false);
+    ImGuizmo::Enable(true);
+    s.SuppressGizmoUntilRelease = ImGui::GetCurrentContext() && ImGui::IsMouseDown(ImGuiMouseButton_Left);
+    return true;
+}
+bool jEditor::RenderViewportGizmo(jCamera* camera,float x,float y,float width,float height)
+{
+    auto& s=*Runtime->Data;if(!s.Owner()||!ImGui::GetCurrentContext())return false;
     ImGuizmo::BeginFrame();
+    if (s.SuppressGizmoUntilRelease)
+    {
+        if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) return true;
+        s.SuppressGizmoUntilRelease = false;
+    }
     if(s.GizmoTransaction&&!ImGui::IsMouseDown(0)){s.Doc.CommitTransaction();s.GizmoTransaction=false;}
-    if(!s.Enabled||!camera||!s.Doc.SelectedId())return;
-    const auto roots=s.SelectionRoots();if(roots.empty())return;
-    for(auto id:roots)if(s.Doc.IsEffectivelyLocked(id))return;
+    if(!s.Enabled||!camera||!s.Doc.SelectedId())return CancelViewportDuplicateDrag();
+    const auto roots=s.SelectionRoots();if(roots.empty())return CancelViewportDuplicateDrag();
+    for(auto id:roots)if(s.Doc.IsEffectivelyLocked(id))return CancelViewportDuplicateDrag();
     std::map<EntityId,Matrix> worlds;Vector center=Vector::ZeroVector;
     for(auto id:roots){const auto m=s.World(id,worlds);center+=Vector(m.m30,m.m31,m.m32);}center/=static_cast<float>(roots.size());
     Matrix pivot=s.World(roots.front(),worlds);pivot.m30=center.x;pivot.m31=center.y;pivot.m32=center.z;
@@ -833,7 +1460,18 @@ void jEditor::RenderViewportGizmo(jCamera* camera,float x,float y,float width,fl
     ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());ImGuizmo::SetOrthographic(!camera->IsPerspectiveProjection);
     const auto& io=ImGui::GetIO();ImGuizmo::SetRect(x,y,width>0?width:io.DisplaySize.x,height>0?height:io.DisplaySize.y);
     float* snap=Placement.UseSnap?(Placement.GizmoOperation==ImGuizmo::TRANSLATE?Placement.TranslationSnap:Placement.GizmoOperation==ImGuizmo::ROTATE?&Placement.RotationSnap:Placement.ScaleSnap):nullptr;
+    const bool wasUsing = ImGuizmo::IsUsing();
     const bool changed=ImGuizmo::Manipulate(camera->View.mm,camera->Projection.mm,Placement.GizmoOperation,Placement.GizmoMode,pivot.mm,nullptr,snap);
+    const bool usingGizmo = ImGuizmo::IsUsing();
+    if (!wasUsing && usingGizmo && io.KeyAlt && Placement.GizmoOperation == ImGuizmo::TRANSLATE && !s.Doc.IsPlaying())
+        s.GizmoDuplicate.emplace(jEditorRuntime::Impl::DuplicateDrag{center});
+    if (s.GizmoDuplicate)
+    {
+        const Vector offset = Vector(pivot.m30, pivot.m31, pivot.m32) - s.GizmoDuplicate->StartPivot;
+        if (!s.UpdateGizmoDuplicate(offset)) CancelViewportDuplicateDrag();
+        else if (!usingGizmo) s.FinishGizmoDuplicate(false);
+        return true;
+    }
     if(changed){
         if(!s.GizmoTransaction)s.GizmoTransaction=s.Doc.BeginTransaction("Transform selection");
         const Matrix delta=pivot*before.GetInverse();
@@ -844,5 +1482,6 @@ void jEditor::RenderViewportGizmo(jCamera* camera,float x,float y,float width,fl
         else s.Error="This transform introduces local shear. Use a parent group or uniform scale; scene was left unchanged.";
     }
     if(s.GizmoTransaction&&!ImGuizmo::IsUsing()){s.Doc.CommitTransaction();s.GizmoTransaction=false;}
+    return usingGizmo || ImGuizmo::IsOver();
 }
 #endif

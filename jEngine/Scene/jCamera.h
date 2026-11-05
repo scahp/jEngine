@@ -119,6 +119,7 @@ public:
 
 	virtual Matrix CreateView() const;
 	virtual Matrix CreateProjection() const;
+	float GetProjectionWidth() const;
 
 	virtual void BindCamera(const jShader* shader) const;
 
@@ -324,6 +325,8 @@ public:
 	jFrustumPlane Frustum;
 	int32 Width = 0;
 	int32 Height = 0;
+	// Allows a viewport to fit its presentation area while retaining framebuffer dimensions.
+	float ProjectionAspectOverride = 0.0f;
 
 	// todo 현재 렌더 스테이트를 저장하는 객체로 옮길 예정
 	bool IsEnableCullMode = false;

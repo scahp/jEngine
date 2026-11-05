@@ -30,7 +30,6 @@ std::shared_ptr<jRenderTarget> jSceneRenderTarget::SurfelGI_Attempt_RT;
 std::shared_ptr<jRenderTarget> jSceneRenderTarget::SurfelGI_Resolve_RT;
 std::shared_ptr<jRenderTarget> jSceneRenderTarget::AtmosphericShadow_RT;
 std::shared_ptr<jRenderTarget> jSceneRenderTarget::VBuffer_RT;
-std::shared_ptr<jRenderTarget> jSceneRenderTarget::HitObject_RT;
 
 // todo : remove this.
 #include "jPrimitiveUtil.h"
@@ -346,7 +345,6 @@ void jSceneRenderTarget::ReleasePersistentResources()
     ReturnAndResetRenderTarget(SurfelGI_Resolve_RT);
     ReturnAndResetRenderTarget(AtmosphericShadow_RT);
     ReturnAndResetRenderTarget(VBuffer_RT);
-    ReturnAndResetRenderTarget(HitObject_RT);
 }
 
 std::shared_ptr<jRenderTarget> jSceneRenderTarget::GetShadowMap(const jLight* InLight) const

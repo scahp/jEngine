@@ -3,6 +3,8 @@
 #include "Code/Engine/jEditor.h"
 #include "Code/Engine/Editor/jEditorProcedural.h"
 #include "Code/Engine/Editor/jEditorTools.h"
+#include "Code/Engine/Editor/jEditorWorkspace.h"
+#include "FileLoader/jEditorAssets.h"
 #include "Scene/jObject.h"
 #include "Scene/jMeshObject.h"
 #include "Scene/jRenderObject.h"
@@ -10,6 +12,9 @@
 #include "Scene/Light/jSpotLight.h"
 #include "Scene/jCamera.h"
 #include "Material/jMaterial.h"
+#include "imgui_internal.h"
+#include "jEngine.h"
+#include "jOptions.h"
 #include <fstream>
 
 namespace
@@ -18,6 +23,344 @@ bool MatrixNear(const Matrix& a,const Matrix& b)
 {
     for(int i=0;i<16;++i)if(std::abs(a.mm[i]-b.mm[i])>0.001f)return false;
     return true;
+}
+template<class Expect>
+void CheckViewportPlacement(const std::filesystem::path& directory, Expect expect)
+{
+    using namespace jEditorAuthoring;
+    jEditorProject project;
+    std::string error;
+    if (!project.Create(directory / "ViewportPlacement", "Placement fixture", error))
+    { expect(false, "viewport placement fixture project opens"); return; }
+    Document startup;
+    project.EditConfig().StartupScene = "Scenes/startup.jscene";
+    if (!startup.Save(project.GetRoot() / "Scenes/startup.jscene") || !project.Save(error))
+    { expect(false, "startup fixture is saved"); return; }
+    Document source;
+    const auto root = source.Create(EntityKind::Cube, "Placed prefab");
+    source.Create(EntityKind::Empty, "Prefab child", root);
+    if (!source.SavePrefab(root, project.GetRoot() / "Assets/prop.jprefab"))
+    { expect(false, "viewport placement fixture prefab saves"); return; }
+    { std::ofstream obj(project.GetRoot() / "Assets/prop.obj"); obj << "v -1 0 0\nv 1 0 0\nv 0 2 0\nf 1 2 3\n"; }
+    { std::ofstream obj(project.GetRoot() / "Assets/other.obj"); obj << "v -2 0 0\nv 2 0 0\nv 0 1 0\nf 1 2 3\n"; }
+    jEditorAssetRegistry registry(project);
+    if (!registry.Scan(error)) { expect(false, "viewport placement fixture scans"); return; }
+    const auto* prefab = registry.FindBySourcePath("Assets/prop.jprefab");
+    const auto* model = registry.FindBySourcePath("Assets/prop.obj");
+    const auto* other = registry.FindBySourcePath("Assets/other.obj");
+    if (!prefab || !model || !other) { expect(false, "viewport placement fixture assets are available"); return; }
+
+    auto* oldEngine = g_Engine;
+    auto* oldEditor = g_Editor;
+    auto* oldContext = ImGui::GetCurrentContext();
+    const bool oldVisibility = IsAuthoringWorkspaceVisible(), oldVsync = GUseVsync;
+    const auto oldOptions = gOptions;
+    jEngine engine;
+    jEditor editor;
+    auto camera = std::unique_ptr<jCamera>(jCamera::CreateCamera(Vector(25, 120, -100), Vector(25, 15, 10),
+        Vector(25, 121, -100), DegreeToRadian(45), .1f, 500, 1280, 720, true));
+    engine.Game.MainCamera = camera.get(); g_Engine = &engine; g_Editor = &editor;
+    auto* context = ImGui::CreateContext();
+    ImGui::SetCurrentContext(context);
+    auto& io = ImGui::GetIO(); io.DisplaySize = ImVec2(1280, 720); io.IniFilename = nullptr;
+    unsigned char* pixels = nullptr; int fontWidth = 0, fontHeight = 0;
+    io.Fonts->GetTexDataAsRGBA32(&pixels, &fontWidth, &fontHeight);
+    const auto state = project.GetRoot() / ".placement-test";
+    std::filesystem::create_directories(state);
+    { std::ofstream layout(state / "workspace.json"); layout << "{\"docking\":false,\"autoSave\":false}"; }
+    SetAuthoringTestStateDirectory(state);
+    SetAuthoringWorkspaceVisible(true);
+    if (OpenAuthoringProject(editor, project.GetProjectFile(), error))
+    {
+        auto& doc = editor.GetDocument();
+        const auto stand = doc.Create(EntityKind::Cube, "Stand");
+        doc.SetLocalPositions({{stand, {25, 5, 10}}}, "Position stand");
+        const auto baseline = doc.ToJson();
+        const std::string* payload = nullptr;
+        SetAuthoringIntegrationDrawHook([&] {
+            if (payload && ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceExtern | ImGuiDragDropFlags_SourceNoPreviewTooltip))
+            {
+                ImGui::SetDragDropPayload("JENGINE_ASSET", payload->c_str(), payload->size() + 1);
+                ImGui::EndDragDropSource();
+            }
+        });
+        const auto frame = [&](ImVec2 pointer, bool down, bool escape = false, bool alt = false,
+            bool shift = false, bool ctrl = false, bool right = false, bool save = false) {
+            TickAuthoringWorkspace(editor, 1.0f / 60);
+            camera->ProjectionAspectOverride = GetAuthoringSceneAspect();
+            camera->UpdateCamera();
+            io.AddMousePosEvent(pointer.x, pointer.y);
+            io.AddMouseButtonEvent(ImGuiMouseButton_Left, down);
+            io.AddMouseButtonEvent(ImGuiMouseButton_Right, right);
+            io.AddKeyEvent(ImGuiKey_Escape, escape);
+            io.AddKeyEvent(ImGuiMod_Alt, alt);
+            io.AddKeyEvent(ImGuiMod_Shift, shift);
+            io.AddKeyEvent(ImGuiMod_Ctrl, ctrl);
+            io.AddKeyEvent(ImGuiKey_S, save);
+            ImGui::NewFrame(); RenderAuthoringWorkspace(editor); ImGui::Render();
+        };
+        frame(ImVec2(1, 1), false);
+        if (const auto* scene = ImGui::FindWindowByName("Scene"); scene && GetAuthoringSceneAspect() > 0)
+        {
+            const auto& rect = scene->InnerRect;
+            const ImVec2 pointer(rect.GetCenter().x, rect.Max.y - rect.GetWidth() / (2 * GetAuthoringSceneAspect()));
+            const auto hover = [&](const std::string& asset) {
+                payload = &asset;
+                frame(ImVec2(1, 1), true);
+                for (int i = 0; i < 60; ++i)
+                {
+                    frame(pointer, true);
+                    if (const auto* drag = ImGui::GetDragDropPayload(); drag && drag->IsPreview()) return true;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                }
+                return false;
+            };
+            const bool preview = hover(prefab->Id);
+            payload = nullptr; frame(pointer, true, true); frame(pointer, false);
+            expect(preview && doc.ToJson() == baseline && !ImGui::GetDragDropPayload(),
+                "viewport prefab hover and Esc cancel do not edit the authored scene");
+            const bool delivered = hover(prefab->Id);
+            payload = nullptr; frame(pointer, false);
+            const auto* placed = doc.Find(doc.SelectedId());
+            expect(delivered && placed && placed->Id != stand && doc.Children(placed->Id).size() == 1 &&
+                std::abs(placed->Local.Position.Y - 25) < .001f && std::abs(placed->Local.Position.X - 25) < 1 &&
+                std::abs(placed->Local.Position.Z - 10) < 1 && doc.Undo() && doc.ToJson() == baseline,
+                "viewport prefab drop places the full subtree on the cursor support and undoes once");
+            const bool modelHover = hover(model->Id);
+            payload = nullptr; frame(pointer, false);
+            const bool queued = editor.PendingImportCount() == 1 && doc.ToJson() == baseline;
+            frame(pointer, false, true); frame(pointer, false);
+            editor.SyncDocumentToWorld();
+            expect(modelHover && queued && editor.PendingImportCount() == 0 && doc.ToJson() == baseline,
+                "viewport model drop stages the existing importer and Esc cancels the pending placement");
+
+            doc.NewScene();
+            jObject loadedModel, replacementModel;
+            auto* mesh = new jRenderObject();
+            mesh->GeometryDataPtr = std::make_shared<jRenderObjectGeometryData>();
+            auto positions = std::make_shared<jStreamParam<float>>();
+            positions->Data = {-1, -4, -2, 1, -4, 2, 0, 3, 0};
+            auto streams = std::make_shared<jVertexStreamData>();
+            streams->Params.push_back(positions);
+            mesh->GeometryDataPtr->VertexStreamPtr = streams;
+            loadedModel.AddRenderObject(mesh);
+            jObject::AddObject(&loadedModel);
+            editor.TrackWorldObjectSource(&loadedModel, model->SourcePath, model->Id, model->Revision);
+            for (int i = 0; i < 2; ++i)
+            {
+                auto* part = new jRenderObject();
+                part->GeometryDataPtr = std::make_shared<jRenderObjectGeometryData>();
+                replacementModel.AddRenderObject(part);
+            }
+            jObject::AddObject(&replacementModel);
+            editor.TrackWorldObjectSource(&replacementModel, other->SourcePath, other->Id, other->Revision);
+            const bool captured = editor.CaptureWorldToDocument();
+            const auto support = doc.Create(EntityKind::Cube, "Model support");
+            doc.SetLocalPositions({{support, {25, 5, 10}}}, "Position model support");
+            const auto beforeModelDrop = doc.ToJson();
+            const bool readyModelHover = hover(model->Id);
+            payload = nullptr; frame(pointer, false);
+            const auto* placedModel = doc.Find(doc.SelectedId());
+            expect(captured && readyModelHover && placedModel && placedModel->Id != support &&
+                placedModel->AssetId == model->Id && std::abs(placedModel->Local.Position.Y - 19) < .001f &&
+                doc.UndoLabel() == "Place model" && doc.Undo() && doc.ToJson() == beforeModelDrop,
+                "viewport model drop places the actual mesh bottom against the support and undoes once");
+            const auto sourceId = editor.EntityForObject(&loadedModel);
+            const auto group = doc.Create(EntityKind::Empty, "Model group");
+            doc.Reparent(sourceId, group, false);
+            doc.Create(EntityKind::Empty, "Model child", sourceId);
+            doc.SetLocalPositions({{sourceId, {7, 15, 8}}, {group, {20, 40, 60}}}, "Set fixture transforms");
+            editor.SelectEntity(sourceId);
+            const auto duplicate = editor.DuplicateSelected();
+            editor.SyncDocumentToWorld();
+            const auto beforeReplacement = doc.ToJson();
+            const auto oldLocal = doc.Find(duplicate) ? doc.Find(duplicate)->Local : Transform{};
+            const auto children = doc.Children(duplicate);
+            const auto state = editor.ReplaceModelAssets(std::array{duplicate}, other->SourcePath, other->Id, other->Revision);
+            editor.SyncDocumentToWorld();
+            const auto* changed = doc.Find(duplicate);
+            const auto* live = editor.ObjectForEntity(duplicate);
+            expect(state == jEditor::PlacementReadiness::Ready && changed && changed->Parent == group
+                && changed->Local == oldLocal && changed->AssetId == other->Id && changed->MeshLocalTransforms.empty()
+                && doc.Children(duplicate) == children && live && live->RenderObjects.size() == 2
+                && live->RenderObjects[0]->GeometryDataPtr == replacementModel.RenderObjects[0]->GeometryDataPtr
+                && doc.Find(sourceId)->AssetId == model->Id && doc.UndoLabel() == "Replace model asset"
+                && doc.Undo() && doc.ToJson() == beforeReplacement,
+                "replacing a duplicate swaps live geometry, retains its hierarchy and transform, and undoes once");
+            editor.SyncDocumentToWorld();
+            editor.SelectEntity(group);
+            expect(editor.GetSelectionRenderObjects().size() == 2,
+                "the selected group outlines the meshes of all visible descendants");
+            editor.ResetWorldBindings(false);
+            jObject::RemoveObject(&loadedModel);
+            jObject::RemoveObject(&replacementModel);
+
+            doc.NewScene();
+            const auto original = doc.Create(EntityKind::Cube, "Gizmo original");
+            doc.SetLocalPositions({{original, {25, 15, 10}}}, "Position gizmo original");
+            doc.Create(EntityKind::Empty, "Original child", original);
+            editor.SelectEntity(original);
+            const auto beforeDrag = doc.ToJson();
+            const auto cameraStart = camera->Pos;
+            const ImVec2 moved(pointer.x + 96, pointer.y);
+            const auto altFrame = [&](ImVec2 at, bool down, bool escape = false) { frame(at, down, escape, true); };
+
+            const auto revision = doc.Revision();
+            altFrame(pointer, false); altFrame(pointer, true); altFrame(pointer, false);
+            expect(doc.Revision() == revision && doc.ToJson() == beforeDrag,
+                "Alt-click on the move gizmo does not create an overlapping duplicate");
+            altFrame(pointer, true); altFrame(moved, true);
+            const auto copy = doc.SelectedId();
+            const bool liveCopy = doc.HasTransaction() && copy != original && doc.Find(copy) && doc.Children(copy).size() == 1 &&
+                doc.Find(original)->Local.Position == Vec3{25, 15, 10} && doc.Find(copy)->Local.Position != Vec3{25, 15, 10};
+            altFrame(moved, false);
+            expect(liveCopy && camera->Pos.IsNearlyEqual(cameraStart) && doc.UndoLabel() == "Duplicate and move" &&
+                doc.Undo() && doc.ToJson() == beforeDrag && doc.Redo() && doc.Find(copy),
+                "Alt-drag moves only the copied subtree and one undo or redo covers the entire gesture");
+            doc.Undo(); editor.SelectEntity(original);
+
+            altFrame(pointer, false); altFrame(pointer, true); altFrame(moved, true);
+            const bool previewCopy = doc.HasTransaction() && doc.SelectedId() != original;
+            altFrame(moved, true, true); altFrame(moved, true); altFrame(moved, false);
+            expect(previewCopy && doc.ToJson() == beforeDrag && doc.SelectedId() == original &&
+                !doc.HasTransaction() && camera->Pos.IsNearlyEqual(cameraStart),
+                "Esc cancels an Alt-drag and restores selection without orbiting during the held gesture");
+
+            editor.Placement.UseSnap = true;
+            altFrame(pointer, false); altFrame(pointer, true); altFrame(moved, true);
+            const bool movedWithSnap = doc.HasTransaction() && doc.SelectedId() != original;
+            altFrame(pointer, true); altFrame(pointer, false);
+            expect(movedWithSnap && doc.ToJson() == beforeDrag && doc.SelectedId() == original && !doc.HasTransaction(),
+                "returning an Alt-drag to the snapped origin discards the duplicate");
+
+            const ImVec2 empty(pointer.x - 180, pointer.y + 80);
+            altFrame(empty, false); altFrame(empty, true); altFrame(ImVec2(empty.x + 40, empty.y), true);
+            altFrame(ImVec2(empty.x + 40, empty.y), false);
+            frame(empty, false);
+            expect(!camera->Pos.IsNearlyEqual(cameraStart) && doc.ToJson() == beforeDrag,
+                "Alt-drag away from a gizmo still orbits the editor camera");
+        }
+        else expect(false, "viewport placement fixture shows the production Scene panel");
+
+        doc.NewScene("Workspace workflow");
+        const auto group = doc.Create(EntityKind::Empty, "Lights");
+        const auto a = doc.Create(EntityKind::PointLight, "Key light", group);
+        const auto b = doc.Create(EntityKind::PointLight, "Fill light");
+        const auto c = doc.Create(EntityKind::PointLight, "Rim light");
+        auto fill = *doc.Find(b), rim = *doc.Find(c);
+        fill.Light.Intensity = 2; fill.Light.Range = 500;
+        rim.Light.Intensity = 3; rim.Light.Range = 800;
+        doc.UpdateMany(std::array{fill, rim}, "Fixture light values");
+        editor.SelectEntity(0);
+        const ImVec2 idle(1, 1);
+        frame(idle, false);
+        ImGuiWindow* rows = nullptr;
+        for (auto* window : context->Windows)
+            if (std::string_view(window->Name).starts_with("Hierarchy/EntityRows_"))
+                rows = window;
+        if (rows)
+        {
+            const auto rowPoint = [&](int index) {
+                return ImVec2(rows->InnerRect.GetCenter().x,
+                    rows->DC.CursorStartPos.y + ImGui::GetFrameHeightWithSpacing() * index + ImGui::GetFrameHeight() * .5f);
+            };
+            const auto click = [&](ImVec2 point, bool shift = false, bool ctrl = false) {
+                frame(point, true, false, false, shift, ctrl);
+                frame(point, false, false, false, shift, ctrl);
+            };
+            click(rowPoint(1));
+            click(rowPoint(3), true);
+            expect(editor.GetSelectedEntities() == std::vector<EntityId>{a, b, c} && doc.SelectedId() == c,
+                "Shift-click selects the visible Hierarchy range and makes its endpoint active");
+            frame(rowPoint(1), false, false, false, false, false, true);
+            frame(rowPoint(1), false);
+            expect(editor.GetSelectedEntities() == std::vector<EntityId>{a, b, c},
+                "right-clicking a selected Hierarchy row preserves the range");
+            frame(idle, false, true);
+            frame(idle, false);
+            if (!context->OpenPopupStack.empty())
+            {
+                frame(idle, true);
+                frame(idle, false);
+            }
+
+            auto* inspector = ImGui::FindWindowByName("Inspector");
+            if (inspector)
+            {
+                inspector->StateStorage.SetInt(inspector->GetID("Transform"), 0);
+                frame(idle, false);
+                const auto intensityId = inspector->GetID("Intensity");
+                ImVec2 intensity(inspector->DC.CursorStartPos.x + 42, inspector->InnerRect.Min.y + 4);
+                bool intensityHovered = false;
+                for (; intensity.y < inspector->InnerRect.Max.y; intensity.y += ImGui::GetFrameHeight() * .5f)
+                {
+                    frame(intensity, false);
+                    if (context->HoveredId == intensityId) { intensityHovered = true; break; }
+                }
+                if (intensityHovered)
+                {
+                    const auto before = doc.ToJson();
+                    frame(intensity, true);
+                    frame(ImVec2(intensity.x + 35, intensity.y), true);
+                    frame(ImVec2(intensity.x + 65, intensity.y), true);
+                    frame(ImVec2(intensity.x + 65, intensity.y), false);
+                    const float edited = doc.Find(c)->Light.Intensity;
+                    const bool applied = edited > 3 && doc.Find(a)->Light.Intensity == edited && doc.Find(b)->Light.Intensity == edited
+                        && doc.Find(b)->Light.Range == 500 && doc.Find(c)->Light.Range == 800
+                        && !doc.HasTransaction() && doc.UndoLabel() == "Intensity";
+                    expect(applied && doc.Undo() && doc.ToJson() == before,
+                        "dragging mixed light intensity applies just that field to all lights in one Undo");
+                }
+                else expect(false, "multi-selection Inspector exposes the common light intensity drag control");
+            }
+            else expect(false, "multi-selection Inspector is visible");
+            click(rowPoint(2), false, true);
+            click(rowPoint(3), false, true);
+            expect(editor.GetSelectedEntities() == std::vector<EntityId>{a} && doc.SelectedId() == a,
+                "Ctrl-click removes selected rows and keeps the last remaining entity active");
+
+            const ImVec2 arrow(rows->DC.CursorStartPos.x + ImGui::GetFrameHeight() * .5f, rowPoint(0).y);
+            editor.SelectEntity(0);
+            click(arrow);
+            editor.SelectEntity(a);
+            frame(idle, false);
+            frame(idle, false);
+            click(rowPoint(1));
+            expect(doc.SelectedId() == a, "external selection expands its collapsed Hierarchy ancestor");
+            EntityId tail = 0;
+            for (int i = 0; i < 40; ++i) tail = doc.Create(EntityKind::Empty, "Filler");
+            editor.SelectEntity(tail);
+            frame(idle, false);
+            frame(idle, false);
+            expect(rows->Scroll.y > 0, "external selection scrolls to a clipped Hierarchy row");
+        }
+        else expect(false, "production Hierarchy row list is available for input");
+
+        const auto draftPath = project.GetRoot() / "Scenes/work.jscene";
+        const bool draftCreated = doc.Save(draftPath) && doc.RenameScene("Updated working scene");
+        frame(idle, false, false, false, false, true, false, true);
+        frame(idle, false);
+        Document savedDraft;
+        jEditorProject settings;
+        expect(draftCreated && savedDraft.Load(draftPath) && savedDraft.Name() == "Updated working scene"
+            && settings.Open(project.GetProjectFile(), error) && settings.GetConfig().StartupScene == "Scenes/startup.jscene",
+            "Ctrl+S saves the working scene while retaining the explicitly designated startup scene");
+        SetAuthoringIntegrationDrawHook({});
+    }
+    else expect(false, "viewport placement fixture opens through the workspace");
+    ShutdownAuthoringWorkspace();
+    SetAuthoringWorkspaceVisible(oldVisibility);
+    SetAuthoringTestStateDirectory(".jeditor");
+    ImGui::DestroyContext(context); ImGui::SetCurrentContext(oldContext);
+    g_Engine = oldEngine; g_Editor = oldEditor;
+    gOptions.UseDeferredRenderer = oldOptions.UseDeferredRenderer;
+    gOptions.UseSurfelGI = oldOptions.UseSurfelGI;
+    gOptions.SurfelGIInlineRayEnable = oldOptions.SurfelGIInlineRayEnable;
+    gOptions.UseSSGI = oldOptions.UseSSGI;
+    gOptions.BloomEyeAdaptation = oldOptions.BloomEyeAdaptation;
+    gOptions.SurfelGIIntensity = oldOptions.SurfelGIIntensity;
+    gOptions.SurfelGIInlineRayCount = oldOptions.SurfelGIInlineRayCount;
+    GUseVsync = oldVsync;
 }
 }
 #endif
@@ -34,6 +377,8 @@ int RunEditorAuthoringRuntimeTests()
     const auto directory=std::filesystem::temp_directory_path()/("jengine-authoring-runtime-"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
     std::filesystem::create_directories(directory/"Assets");
     {std::ofstream source(directory/"Assets/fixture.gltf");source<<"{}";}
+    CheckViewportPlacement(directory, expect);
+    ResetAllKeyState(); ResetMouseAllState();
     {
         jEditor editor;g_Editor=&editor;editor.SetProjectRoot(directory);
         expect(!editor.IsAuthoringEnabled(),"authoring leaves legacy placement compatibility opt-in");
@@ -310,6 +655,95 @@ int RunEditorAuthoringRuntimeTests()
         expect(document.UndoLabel() == "Paint terrain stroke" && document.Undo() &&
             document.Find(terrain)->Terrain.Heights.empty(), "one undo restores the terrain before the whole viewport stroke");
         jEditorTools::Shutdown();
+    }
+    {
+        jEditor editor;
+        editor.SetProjectRoot(directory);
+        auto& doc = editor.GetDocument();
+        const auto make = [&](EntityKind kind, const char* name, Vec3 position, EntityId parent = 0) {
+            const auto id = doc.Create(kind, name, parent);
+            auto entity = *doc.Find(id);
+            entity.Local.Position = position;
+            doc.Update(entity);
+            return id;
+        };
+        const auto world = [&](EntityId id) {
+            Matrix matrix;
+            return doc.GetWorldMatrix(id, matrix.mm) ? Vector(matrix.m30, matrix.m31, matrix.m32) : Vector(FLT_MAX);
+        };
+        const auto stand = make(EntityKind::Cube, "Stand", {30, 10, 20});
+        auto support = *doc.Find(stand);
+        support.Local.Scale = {2, .5f, 3};
+        support.Locked = true;
+        doc.Update(support);
+        const auto terrain = make(EntityKind::Terrain, "Raised terrain", {-150, 7, 0});
+        auto field = *doc.Find(terrain);
+        field.Terrain.SizeX = field.Terrain.SizeZ = 100;
+        field.Terrain.Heights.assign(size_t(field.Terrain.Resolution) * field.Terrain.Resolution, 2.0f);
+        doc.Update(field);
+        editor.Placement.UseSnap = true;
+        editor.Placement.TranslationSnap[0] = editor.Placement.TranslationSnap[2] = 10;
+        const auto revision = doc.Revision();
+        const auto surface = editor.FindPlacementHit({31, 100, 24}, {0, -1, 0}, 200, true);
+        const auto grid = editor.FindPlacementHit({31, 100, 24}, {0, -1, 0}, 200, false);
+        const auto slope = editor.FindPlacementHit({-150, 100, 0}, {0, -1, 0}, 200, true);
+        expect(surface && surface->Surface == stand && std::abs(surface->Point.Y - 15) < .001f &&
+            std::abs(surface->Point.X - 30) < .001f && std::abs(surface->Point.Z - 20) < .001f &&
+            grid && grid->Point == Vec3{30, 0, 20} && !grid->Surface &&
+            slope && slope->Surface == terrain && std::abs(slope->Point.Y - 9) < .001f && doc.Revision() == revision,
+            "placement traces transformed cube and terrain surfaces, snaps to grid, and leaves history untouched");
+        const auto prop = make(EntityKind::Cube, "Prop", {30, 45, 20});
+        editor.SelectEntity(prop);
+        expect(editor.PlaceSelectionOnGround() && world(prop).IsNearlyEqual(Vector(30, 25, 20)) &&
+            doc.UndoLabel() == "Place selection on ground" && doc.Undo() && world(prop).IsNearlyEqual(Vector(30, 45, 20)),
+            "grounding excludes the selected prop, contacts a locked support, and undoes once");
+
+        const auto group = make(EntityKind::Empty, "Reusable group", {100, 5, 20});
+        const auto child = make(EntityKind::Cube, "Child", {0, 12, 0}, group);
+        const auto prefabData = doc.PrefabJson(group);
+        Document preview;
+        jEditor::PlacementBounds bounds;
+        expect(preview.InstantiatePrefabJson(prefabData) &&
+            editor.PrefabPlacementBounds(preview, bounds, false) == jEditor::PlacementReadiness::Ready &&
+            bounds.Min == Vec3{-10, 2, -10} && bounds.Max == Vec3{10, 22, 10},
+            "prefab preview uses child bounds relative to the root's placement position");
+        const auto placed = doc.InstantiatePrefabJson(prefabData, 0, Vec3{30, 13, 20});
+        const auto children = doc.Children(placed);
+        expect(placed && children.size() == 1 && world(children.front()).IsNearlyEqual(Vector(30, 25, 20)) &&
+            doc.UndoLabel() == "Instantiate prefab" && doc.Undo() && !doc.Find(placed),
+            "prefab placement moves the whole subtree in one history entry");
+        const auto beforeModel = doc.ToJson();
+        expect(editor.ModelPlacementBounds("Assets/fixture.gltf", "staged-drop", 1, bounds, false) ==
+            jEditor::PlacementReadiness::Pending && editor.PendingImportCount() == 0 &&
+            editor.ModelPlacementBounds("Assets/fixture.gltf", "staged-drop", 1, bounds, true) ==
+            jEditor::PlacementReadiness::Pending && editor.PendingImportCount() == 1,
+            "hovering over an unloaded model does not start work; delivery stages the existing model importer");
+        editor.ReleasePlacementModels();
+        editor.SyncDocumentToWorld();
+        expect(editor.PendingImportCount() == 0 && doc.ToJson() == beforeModel,
+            "cancelling a staged placement preserves the document and retires its unused import");
+
+        auto transform = *doc.Find(group);
+        transform.Local.RotationDegrees.Y = 35;
+        transform.Local.Scale = {2, 1, 3};
+        doc.Update(transform);
+        editor.SelectEntity(child);
+        const auto initial = world(child);
+        const bool duplicated = editor.DuplicateAndMove({20, 0, 0});
+        const auto copy = editor.GetSelectedEntityId();
+        expect(duplicated && doc.Find(copy) && doc.Find(copy)->Parent == group && world(copy).IsNearlyEqual(initial + Vector(20, 0, 0)) &&
+            doc.UndoLabel() == "Duplicate and move" && doc.Undo() && !doc.Find(copy) && doc.Redo(),
+            "duplicate-and-move uses world offset under a transformed parent and is atomic for undo/redo");
+        editor.SelectEntity(copy);
+        expect(editor.RepeatDuplicateOffset() && world(editor.GetSelectedEntityId()).IsNearlyEqual(initial + Vector(40, 0, 0)),
+            "repeat duplicates the current selection by the last successful world offset");
+        const auto a = make(EntityKind::Empty, "A", {10, 1, 0}), b = make(EntityKind::Empty, "B", {13, 2, 0});
+        const auto c = make(EntityKind::Empty, "C", {30, 3, 0});
+        editor.SetSelectedEntities({a, b, c});
+        expect(editor.AlignSelection(jEditor::WorldAxis::Y) && world(a).y == 3 && world(b).y == 3 && doc.Undo() &&
+            world(a).y == 1 && world(b).y == 2, "align uses the last selected root's world position and undoes once");
+        expect(editor.DistributeSelection(jEditor::WorldAxis::X) && world(a).x == 10 && world(b).x == 20 && world(c).x == 30 &&
+            doc.Undo() && world(b).x == 13, "even distribution keeps the endpoints and records one edit");
     }
     {
         jEditor editor;

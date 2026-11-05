@@ -463,7 +463,8 @@ void IRenderer::UIPass()
 
 #ifdef ENABLE_EDITOR_FEATURES
     PrepareAuthoringUiFrame();
-    if (g_Editor && IsAuthoringWorkspaceVisible()) jEditorUiRenderer::PrepareScenePreview(RenderFrameContextPtr);
+    HitObjectPass();
+    if (g_Editor && IsAuthoringWorkspaceVisible()) jEditorUiRenderer::PrepareScenePreview(RenderFrameContextPtr, View);
 #endif
 	g_ImGUI->NewFrame([=]()
 	{

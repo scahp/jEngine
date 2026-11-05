@@ -7,10 +7,13 @@
 #include "Shader/jCommonShaderParameters.h"
 #include "Shader/jShader.h"
 #include "RHI/jRHIUtil.h"
+#include "RHI/jRenderTargetPool.h"
 #include "jOptions.h"
 
 #ifdef ENABLE_EDITOR_FEATURES
 #include "Code/Engine/jEditor.h"
+#include "Code/Engine/Editor/jEditorUiRenderer.h"
+#include "Code/Engine/Editor/jEditorWorkspace.h"
 #endif
 
 namespace
@@ -52,236 +55,231 @@ IMPLEMENT_SHADER_WITH_PERMUTATION(jShaderHitObjectPixelShader
     , ""
     , "main"
     , EShaderAccessStageFlag::FRAGMENT)
-}
-
-void jRenderer::RequestObjectPick(int32 mouseX, int32 mouseY)
-{
-	bObjectPickRequested = true;
-	PickMouseX = mouseX;
-	PickMouseY = mouseY;
-}
-
-void jRenderer::HitObjectPass()
-{
-	// HitObject picking is editor-only and should run only in Placement Mode.
 #ifdef ENABLE_EDITOR_FEATURES
-	if (!g_Editor || !g_Editor->Placement.EnablePlacementMode)
-	{
-		bObjectPickRequested = false;
-		if (g_Editor)
-		{
-			g_Editor->Placement.bPickRequested = false;
-		}
-		return;
-	}
+BEGIN_SHADER_PARAMETER_SET(jEditorSelectionOutlineParameters)
+    SHADER_TEXTURE2D_SRV(SelectionMask)
+END_SHADER_PARAMETER_SET()
 
-	// Check for pick requests from PlacementTool
-	if (g_Editor->Placement.bPickRequested)
-	{
-		bObjectPickRequested = true;
-		PickMouseX = g_Editor->Placement.PickMouseX;
-		PickMouseY = g_Editor->Placement.PickMouseY;
-		g_Editor->Placement.bPickRequested = false;  // Consume the request
-	}
-#else
-	return;
-#endif
+struct jEditorSelectionOutlinePixelShader : public jShader
+{
+    DECLARE_SHADER_PARAMETER_SETS(jEditorSelectionOutlineParameters)
 
-	if (!bObjectPickRequested)
-		return;
+    using ShaderPermutation = jPermutation<>;
+    ShaderPermutation Permutation;
 
-	bObjectPickRequested = false;
+    DECLARE_SHADER_WITH_PERMUTATION(jEditorSelectionOutlinePixelShader, Permutation)
+};
+IMPLEMENT_SHADER_WITH_PERMUTATION(jEditorSelectionOutlinePixelShader
+    , "EditorSelectionOutline_ps"
+    , "Resource/Shaders/hlsl/EditorSelectionOutline_ps.hlsl"
+    , ""
+    , "main"
+    , EShaderAccessStageFlag::FRAGMENT)
 
-	{
-		SCOPE_CPU_PROFILE(HitObjectPass);
-		SCOPE_GPU_PROFILE(RenderFrameContextPtr, HitObjectPass);
-		DEBUG_EVENT(RenderFrameContextPtr, "HitObjectPass");
-
-		// 1. Create HitObject render target (once)
-		if (!jSceneRenderTarget::HitObject_RT ||
-			jSceneRenderTarget::HitObject_RT->Info.Width != SCR_WIDTH ||
-			jSceneRenderTarget::HitObject_RT->Info.Height != SCR_HEIGHT)
-		{
-			jRenderTargetInfo HitObjectRTInfo = {
-				.Type = ETextureType::TEXTURE_2D,
-				.Format = ETextureFormat::RGBA8,
-				.Width = SCR_WIDTH,
-				.Height = SCR_HEIGHT,
-				.LayerCount = 1,
-				.IsGenerateMipmap = false,
-				.SampleCount = EMSAASamples::COUNT_1,
-				.RTClearValue = jRTClearValue(0.0f, 0.0f, 0.0f, 0.0f),
-				.TextureCreateFlag = ETextureCreateFlag::RTV,
-				.ResourceName = jNameStatic("HitObject_RT")
-			};
-			jSceneRenderTarget::HitObject_RT = g_rhi->CreateRenderTarget(HitObjectRTInfo);
-		}
-
-		// 2. Setup render pass
-		const jRTClearValue ClearColor = jRTClearValue(0.0f, 0.0f, 0.0f, 0.0f);
-		const jRTClearValue ClearDepth = jRTClearValue(1.0f, 0);
-
-		jAttachment colorAttachment = {
-			.RenderTargetPtr = jSceneRenderTarget::HitObject_RT,
-			.LoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE,
-			.StencilLoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_DONTCARE,
-			.RTClearValue = ClearColor,
-			.InitialLayout = EResourceLayout::UNDEFINED,
-			.FinalLayout = EResourceLayout::COLOR_ATTACHMENT
-		};
-
-		jAttachment depthAttachment = {
-			.RenderTargetPtr = RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr,
-			.LoadStoreOp = EAttachmentLoadStoreOp::LOAD_DONTCARE,
-			.StencilLoadStoreOp = EAttachmentLoadStoreOp::LOAD_DONTCARE,
-			.RTClearValue = ClearDepth,
-			.InitialLayout = RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetLayout(),
-			.FinalLayout = EResourceLayout::DEPTH_STENCIL_READ_ONLY
-		};
-
-		jRenderPassInfo renderPassInfo;
-		renderPassInfo.Attachments.push_back(colorAttachment);
-		const int32 DepthAttachmentIndex = (int32)renderPassInfo.Attachments.size();
-		renderPassInfo.Attachments.push_back(depthAttachment);
-
-		// Setup subpass
-		jSubpass subpass;
-		subpass.Initialize(0, 1, EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT, EPipelineStageMask::FRAGMENT_SHADER_BIT);
-		subpass.OutputColorAttachments.push_back(0);
-		subpass.OutputDepthAttachment = DepthAttachmentIndex;
-		subpass.DepthAttachmentReadOnly = true;
-		renderPassInfo.Subpasses.push_back(subpass);
-
-		jRenderPass* HitObjectRenderPass = g_rhi->GetOrCreateRenderPass(renderPassInfo, { 0, 0 }, { SCR_WIDTH, SCR_HEIGHT });
-
-		// 3. Setup pipeline state
-		jRasterizationStateInfo* RasterizationState = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::BACK, EFrontFace::CCW, false, 0.0f, 0.0f, 0.0f, 1.0f, false, false, (EMSAASamples)1, true, 0.2f, false, false>::Create();
-		auto DepthStencilState = TDepthStencilStateInfo<false, false, ECompareOp::LESS, false, false, 0.0f, 1.0f>::Create();
-		auto BlendingState = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
-
-		jPipelineStateFixedInfo HitObjectPipelineStateFixed = jPipelineStateFixedInfo(RasterizationState, DepthStencilState, BlendingState
-			, jViewport(0.0f, 0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT), jScissor(0, 0, SCR_WIDTH, SCR_HEIGHT), false);
-
-		// 4. Create shaders
-		jGraphicsPipelineShader HitObjectShader;
-		HitObjectShader.VertexShader = jShaderHitObjectVertexShader::CreateShader(jShaderHitObjectVertexShader::ShaderPermutation());
-		HitObjectShader.PixelShader = jShaderHitObjectPixelShader::CreateShader(jShaderHitObjectPixelShader::ShaderPermutation());
-
-		// 5. Transition layouts
-		g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), jSceneRenderTarget::HitObject_RT->GetTexture(), EResourceLayout::COLOR_ATTACHMENT);
-		g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer(), RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->GetTexture(), EResourceLayout::DEPTH_STENCIL_READ_ONLY);
-
-		// 6. Create draw commands for static render objects and pickable debug billboards.
-		int32 NumHitObjectRenderObjects = static_cast<int32>(jObject::GetStaticRenderObject().size());
-		for (auto* debugObject : jObject::GetDebugObject())
-		{
-			NumHitObjectRenderObjects += static_cast<int32>(debugObject->RenderObjects.size());
-		}
-
-		std::vector<jDrawCommand> HitObjectDrawCommands;
-		HitObjectDrawCommands.resize(NumHitObjectRenderObjects);
-
-		int32 i = 0;
-		for (auto iter : jObject::GetStaticRenderObject())
-		{
-			new (&HitObjectDrawCommands[i]) jDrawCommand(RenderFrameContextPtr, &View, iter, HitObjectRenderPass
-				, HitObjectShader, &HitObjectPipelineStateFixed, nullptr, jShaderBindingInstanceArray(), nullptr);
-			HitObjectDrawCommands[i].PrepareToDraw(false);
-			++i;
-		}
-		for (auto* debugObject : jObject::GetDebugObject())
-		{
-			for (auto* renderObject : debugObject->RenderObjects)
-			{
-				new (&HitObjectDrawCommands[i]) jDrawCommand(RenderFrameContextPtr, &View, renderObject, HitObjectRenderPass
-					, HitObjectShader, &HitObjectPipelineStateFixed, nullptr, jShaderBindingInstanceArray(), nullptr);
-				HitObjectDrawCommands[i].PrepareToDraw(false);
-				++i;
-			}
-		}
-
-		// 7. Begin render pass and draw objects
-		if (HitObjectRenderPass && HitObjectRenderPass->BeginRenderPass(RenderFrameContextPtr->GetActiveCommandBuffer()))
-		{
-			for (const auto& command : HitObjectDrawCommands)
-			{
-				command.Draw();
-			}
-
-			HitObjectRenderPass->EndRenderPass();
-		}
-	}
-
-	// 8. Readback pixel at (PickMouseX, PickMouseY) and decode ObjectID
-	ReadbackHitObject();
+std::shared_ptr<jRenderTarget> ObjectIdTarget(int32 width, int32 height, const jName& name)
+{
+    return jRenderTargetPool::GetRenderTargetForOneFrame({
+        .Format = ETextureFormat::RGBA8,
+        .Width = width,
+        .Height = height,
+        .RTClearValue = jRTClearValue(0.f, 0.f, 0.f, 0.f),
+        .TextureCreateFlag = ETextureCreateFlag::RTV | ETextureCreateFlag::TransferSrc,
+        .ResourceName = name
+    });
 }
 
-void jRenderer::ReadbackHitObject()
+bool DrawObjectIds(const std::shared_ptr<jRenderFrameContext>& frame, const jView& view,
+    const std::shared_ptr<jRenderTarget>& target, std::span<jRenderObject* const> objects,
+    const std::shared_ptr<jRenderTarget>& depth = {})
 {
-	static constexpr uint32 HitObjectReadbackRowPitch = 256;
-	static constexpr uint64 HitObjectReadbackBufferSize = HitObjectReadbackRowPitch;
+    if (!view.ViewUniformBufferShaderBindingInstance) return false;
+    auto* command = frame->GetActiveCommandBuffer();
+    const int32 width = target->Info.Width, height = target->Info.Height;
+    const auto colorLayout = EResourceLayout::COLOR_ATTACHMENT;
+    g_rhi->TransitionLayout(command, target->GetTexture(), colorLayout);
+    jRenderPassInfo pass;
+    pass.Attachments.push_back({
+        .RenderTargetPtr = target,
+        .LoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE,
+        .StencilLoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_DONTCARE,
+        .RTClearValue = target->Info.RTClearValue,
+        .InitialLayout = colorLayout,
+        .FinalLayout = colorLayout
+    });
+    jSubpass subpass;
+    subpass.Initialize(0, 1, EPipelineStageMask::COLOR_ATTACHMENT_OUTPUT_BIT, EPipelineStageMask::FRAGMENT_SHADER_BIT);
+    subpass.OutputColorAttachments.push_back(0);
+    if (depth)
+    {
+        const auto depthLayout = EResourceLayout::DEPTH_STENCIL_ATTACHMENT;
+        g_rhi->TransitionLayout(command, depth->GetTexture(), depthLayout);
+        subpass.OutputDepthAttachment = 1;
+        pass.Attachments.push_back({
+            .RenderTargetPtr = depth,
+            .LoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE,
+            .StencilLoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE,
+            .RTClearValue = depth->Info.RTClearValue,
+            .InitialLayout = depthLayout,
+            .FinalLayout = depthLayout
+        });
+    }
+    pass.Subpasses.push_back(subpass);
+    auto* renderPass = g_rhi->GetOrCreateRenderPass(pass, {0, 0}, {width, height});
+    if (!renderPass) return false;
 
-	// Transition HitObject_RT to TRANSFER_SRC for copy
-	g_rhi->TransitionLayout(RenderFrameContextPtr->GetActiveCommandBuffer()
-		, jSceneRenderTarget::HitObject_RT->GetTexture(), EResourceLayout::TRANSFER_SRC);
+    auto* raster = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::NONE, EFrontFace::CCW, false,
+        0.f, 0.f, 0.f, 1.f, false, false, EMSAASamples::COUNT_1, false, 0.f, false, false>::Create();
+    auto* depthState = depth
+        ? TDepthStencilStateInfo<true, true, ECompareOp::LESS, false, false, 0.f, 1.f>::Create()
+        : TDepthStencilStateInfo<false, false, ECompareOp::LESS, false, false, 0.f, 1.f>::Create();
+    auto* blend = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD,
+        EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
+    jPipelineStateFixedInfo pipeline(raster, depthState, blend, jViewport(0.f, 0.f, float(width), float(height)),
+        jScissor(0, 0, width, height), false);
+    jGraphicsPipelineShader shader;
+    shader.VertexShader = jShaderHitObjectVertexShader::CreateShader({});
+    shader.PixelShader = jShaderHitObjectPixelShader::CreateShader({});
+    if (!shader.VertexShader || !shader.PixelShader) return false;
 
-	RenderFrameContextPtr->GetActiveCommandBuffer()->FlushBarrierBatch();
+    // The ID shaders use the view and object sets even in forward rendering.
+    jView cameraView;
+    cameraView.ViewUniformBufferShaderBindingInstance = view.ViewUniformBufferShaderBindingInstance;
+    std::vector<jDrawCommand> draws;
+    draws.reserve(objects.size());
+    for (auto* object : objects)
+    {
+        if (!object || !object->GeometryDataPtr || !object->GeometryDataPtr->VertexBufferPtr) continue;
+        draws.emplace_back(frame, &cameraView, object, renderPass, shader, &pipeline, nullptr,
+            jShaderBindingInstanceArray(), nullptr);
+        draws.back().PrepareToDraw(false);
+    }
+    command->FlushBarrierBatch();
+    if (!renderPass->BeginRenderPass(command)) return false;
+    for (const auto& draw : draws) draw.Draw();
+    renderPass->EndRenderPass();
+    return true;
+}
+#endif
+}
 
-	// DX12 texture-to-buffer copies require a 256-byte aligned row pitch even for a 1x1 RGBA8 region.
-	static std::shared_ptr<jBuffer> ReadbackBuffer;
+void IRenderer::RequestObjectPick(int32 mouseX, int32 mouseY)
+{
+    bObjectPickRequested = true;
+    PickMouseX = mouseX;
+    PickMouseY = mouseY;
+}
 
-	if (!ReadbackBuffer || ReadbackBuffer->GetBufferSize() < HitObjectReadbackBufferSize)
-	{
-		ReadbackBuffer = g_rhi->CreateRawBuffer(HitObjectReadbackBufferSize, 0
-			, EBufferCreateFlag::Readback
-			, EResourceLayout::TRANSFER_DST
-			, nullptr
-			, HitObjectReadbackBufferSize
-			, jNameStatic("HitObject_ReadbackBuffer"));
-	}
+void IRenderer::HitObjectPass()
+{
+#ifdef ENABLE_EDITOR_FEATURES
+    if (!g_Editor || !g_Editor->Placement.EnablePlacementMode || IsAuthoringRuntimeMode())
+    {
+        bObjectPickRequested = false;
+        if (g_Editor) g_Editor->Placement.bPickRequested = false;
+        return;
+    }
+    auto& placement = g_Editor->Placement;
+    const bool authoring = IsAuthoringWorkspaceVisible();
+    bool toggleSelection = false;
+    if (placement.bPickRequested)
+    {
+        RequestObjectPick(placement.PickMouseX, placement.PickMouseY);
+        toggleSelection = authoring && placement.PickToggleSelection;
+        placement.bPickRequested = false;
+        placement.PickToggleSelection = false;
+    }
+    if (!bObjectPickRequested) return;
+    bObjectPickRequested = false;
+    if (authoring && g_Editor->GetDocument().IsPlaying()) return;
 
-	jTextureCopyRegion copyRegion;
-	copyRegion.X = Clamp(PickMouseX, 0, Max(0, SCR_WIDTH - 1));
-	copyRegion.Y = Clamp(PickMouseY, 0, Max(0, SCR_HEIGHT - 1));
-	copyRegion.Width = 1;
-	copyRegion.Height = 1;
-	copyRegion.DestRowPitchOverride = HitObjectReadbackRowPitch;
+    SCOPE_CPU_PROFILE(HitObjectPass);
+    auto target = ObjectIdTarget(SCR_WIDTH, SCR_HEIGHT, jNameStatic("HitObject_RT"));
+    auto depth = jRenderTargetPool::GetRenderTargetForOneFrame({
+        .Format = ETextureFormat::D24_S8,
+        .Width = SCR_WIDTH,
+        .Height = SCR_HEIGHT,
+        .RTClearValue = jRTClearValue(1.f, 0),
+        .ResourceName = jNameStatic("HitObjectDepth_RT")
+    });
+    auto objects = jObject::GetStaticRenderObject();
+    if (!authoring || gOptions.ShowDebugObject)
+        for (const auto* debug : jObject::GetDebugObject())
+            if (debug->Visible) objects.insert(objects.end(), debug->RenderObjects.begin(), debug->RenderObjects.end());
+    bool drawn;
+    {
+        DEBUG_EVENT(RenderFrameContextPtr, "HitObjectPass");
+        drawn = DrawObjectIds(RenderFrameContextPtr, View, target, objects, depth);
+    }
+    if (drawn) ReadbackHitObject(target, authoring, toggleSelection);
+#endif
+}
 
-	g_rhi->CopyTextureRegionToBuffer(RenderFrameContextPtr->GetActiveCommandBuffer()
-		, jSceneRenderTarget::HitObject_RT->GetTexture()
-		, copyRegion
-		, ReadbackBuffer.get());
+void IRenderer::ReadbackHitObject(const std::shared_ptr<jRenderTarget>& target, bool authoring, bool toggleSelection)
+{
+#ifdef ENABLE_EDITOR_FEATURES
+    // DX12 requires a 256-byte aligned row pitch even for a 1x1 region.
+    static constexpr uint32 rowPitch = 256;
+    static std::shared_ptr<jBuffer> readback;
+    if (!readback)
+        readback = g_rhi->CreateRawBuffer(rowPitch, 0, EBufferCreateFlag::Readback, EResourceLayout::TRANSFER_DST,
+            nullptr, rowPitch, jNameStatic("HitObject_ReadbackBuffer"));
+    if (!readback) return;
 
-	// Submit command buffer and wait until copy is complete before mapping
-	RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, true);
+    auto* command = RenderFrameContextPtr->GetActiveCommandBuffer();
+    g_rhi->TransitionLayout(command, target->GetTexture(), EResourceLayout::TRANSFER_SRC);
+    command->FlushBarrierBatch();
+    jTextureCopyRegion region;
+    region.X = Clamp(PickMouseX, 0, target->Info.Width - 1);
+    region.Y = Clamp(PickMouseY, 0, target->Info.Height - 1);
+    region.Width = region.Height = 1;
+    region.DestRowPitchOverride = rowPitch;
+    g_rhi->CopyTextureRegionToBuffer(command, target->GetTexture(), region, readback.get());
+    RenderFrameContextPtr->SubmitCurrentActiveCommandBuffer(jRenderFrameContext::None, true);
+    RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
 
-	// Active command buffer is refreshed after submit; begin recording for subsequent passes
-	RenderFrameContextPtr->GetActiveCommandBuffer()->Begin();
-
-	uint8* MappedPtr = (uint8*)ReadbackBuffer->Map();
-	if (MappedPtr)
-	{
-		jRenderObjectID renderObjectID =
-			(jRenderObjectID(MappedPtr[0]) << 0) |
-			(jRenderObjectID(MappedPtr[1]) << 8) |
-			(jRenderObjectID(MappedPtr[2]) << 16) |
-			(jRenderObjectID(MappedPtr[3]) << 24);
-
-		ReadbackBuffer->Unmap();
+    const auto* bytes = static_cast<const uint8*>(readback->Map());
+    if (!bytes) return;
+    const jRenderObjectID objectId = jRenderObjectID(bytes[0]) | (jRenderObjectID(bytes[1]) << 8) |
+        (jRenderObjectID(bytes[2]) << 16) | (jRenderObjectID(bytes[3]) << 24);
+    readback->Unmap();
+    auto* picked = objectId ? jRenderObject::FindRenderObjectByID(objectId) : nullptr;
+    if (authoring)
+    {
+        const auto id = g_Editor->EntityForObject(picked ? picked->Owner : nullptr);
+        if (toggleSelection) g_Editor->ToggleEntitySelection(id);
+        else g_Editor->SelectEntity(id);
+        RevealAuthoringSelection(*g_Editor);
+    }
+    else g_Editor->Placement.SelectObject(picked);
+#endif
+}
 
 #ifdef ENABLE_EDITOR_FEATURES
-		if (g_Editor)
-		{
-			if (renderObjectID != 0)
-			{
-				jRenderObject* picked = jRenderObject::FindRenderObjectByID(renderObjectID);
-				g_Editor->Placement.SelectObject(picked);
-			}
-			else
-			{
-				g_Editor->Placement.SelectObject((jRenderObject*)nullptr);
-			}
-		}
-#endif
-	}
+void jEditorUiRenderer::DrawSelectionOutline(const std::shared_ptr<jRenderFrameContext>& frame, const jView& view,
+    const std::shared_ptr<jRenderTarget>& preview)
+{
+    if (!g_Editor) return;
+    const auto meshes = g_Editor->GetSelectionRenderObjects();
+    if (meshes.empty()) return;
+    auto* pixelShader = jEditorSelectionOutlinePixelShader::CreateShader({});
+    if (!pixelShader) return;
+    DEBUG_EVENT(frame, "Editor selection outline");
+    const auto mask = ObjectIdTarget(preview->Info.Width, preview->Info.Height, jNameStatic("EditorSelectionMask_RT"));
+    if (!DrawObjectIds(frame, view, mask, meshes)) return;
+    g_rhi->TransitionLayout(frame->GetActiveCommandBuffer(), mask->GetTexture(), EResourceLayout::SHADER_READ_ONLY);
+    jRHIUtil::DrawFullScreen(frame, preview,
+        [&](const auto&, jShaderBindingArray& bindings, jShaderBindingResourceInlineAllocator& allocator) {
+            jEditorSelectionOutlineParameters parameters;
+            parameters.SelectionMask.Texture = mask->GetTexture();
+            jShaderParameterSet::BuildShaderBindings(parameters, EShaderAccessStageFlag::FRAGMENT, bindings, allocator);
+        },
+        [pixelShader](const auto&) { return pixelShader; },
+        [](jRasterizationStateInfo*& raster, jBlendingStateInfo*& blend, jDepthStencilStateInfo*& depth) {
+            raster = TRasterizationStateInfo<EPolygonMode::FILL, ECullMode::NONE, EFrontFace::CCW, false,
+                0.f, 0.f, 0.f, 1.f, false, false, EMSAASamples::COUNT_1, false, 0.f, false, false>::Create();
+            blend = TBlendingStateInfo<false, EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD,
+                EBlendFactor::ONE, EBlendFactor::ZERO, EBlendOp::ADD, EColorMask::ALL>::Create();
+            depth = TDepthStencilStateInfo<false, false, ECompareOp::LESS, false, false, 0.f, 1.f>::Create();
+        });
 }
+#endif

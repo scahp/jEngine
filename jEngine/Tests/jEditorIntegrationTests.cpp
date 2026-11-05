@@ -5,6 +5,7 @@
 #include "Code/Engine/Editor/jEditorWorkspace.h"
 #include "Code/Engine/Editor/jEditorTools.h"
 #include "Code/Engine/Editor/jEditorUiRenderer.h"
+#include "Code/Engine/Editor/jEditorCapture.h"
 #include "FileLoader/jEditorAssets.h"
 #include "Scene/jObject.h"
 #include "Scene/jRenderObject.h"
@@ -19,6 +20,7 @@
 #include "jEngine.h"
 #include "jOptions.h"
 #include "lodepng.h"
+#include "stb_image.h"
 #include <set>
 #include "External/PathTracingDataLoader/json.hpp"
 #include <chrono>
@@ -55,22 +57,75 @@ void WriteModelFixture(const fs::path& assets)
     Write(assets / "triangle.obj", "mtllib triangle.mtl\nusemtl fixture\n"
         "v -15 0 0\nv 15 0 0\nv 0 30 0\nvt 0 0\nvt 1 0\nvt 0.5 1\nvn 0 0 -1\nf 1/1/1 3/3/1 2/2/1\n");
     Write(assets / "triangle.mtl", "newmtl fixture\nKd 1 1 1\nmap_Kd color.png\n");
-    const unsigned char png[] = {137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,0,1,0,0,0,1,8,6,0,0,0,31,21,196,137,
-        0,0,0,13,73,68,65,84,120,156,99,248,207,192,240,31,0,5,0,1,255,137,153,61,29,0,0,0,0,73,69,78,68,174,66,96,130};
+    std::array<unsigned char, 4 * 4 * 4> red{};
+    for (size_t i = 0; i < red.size(); i += 4) red[i] = red[i + 3] = 255;
+    unsigned char* encoded = nullptr;
+    size_t size = 0;
+    const auto encodeError = LodePNG_encode32(&encoded, &size, red.data(), 4, 4);
+    std::unique_ptr<unsigned char, decltype(&std::free)> png(encoded, std::free);
+    if (encodeError) throw std::runtime_error("Could not encode model fixture texture");
     std::ofstream output(assets / "color.png", std::ios::binary);
     output.exceptions(std::ios::badbit | std::ios::failbit);
-    output.write(reinterpret_cast<const char*>(png), sizeof(png));
+    output.write(reinterpret_cast<const char*>(png.get()), static_cast<std::streamsize>(size));
 }
 jRenderObject* FirstMesh(jEditor& editor, EntityId id)
 {
     auto* object = editor.ObjectForEntity(id);
     return object && !object->RenderObjects.empty() ? object->RenderObjects.front() : nullptr;
 }
+bool IsOutlinePixel(const uint8* pixel)
+{
+    return pixel[0] >= 250 && pixel[3] >= 254 &&
+        ((pixel[1] >= 160 && pixel[1] <= 166 && pixel[2] >= 37 && pixel[2] <= 45) ||
+         (pixel[1] >= 205 && pixel[1] <= 212 && pixel[2] >= 107 && pixel[2] <= 116));
+}
+std::string ReadCaptureFile(const fs::path& path)
+{
+    std::ifstream input(path, std::ios::binary);
+    return {std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+}
+bool CheckStill(const fs::path& path, int width, int height, bool checkScene)
+{
+#ifdef _WIN32
+    FILE* handle = nullptr;
+    if (_wfopen_s(&handle, path.c_str(), L"rb") != 0) return false;
+#else
+    FILE* handle = std::fopen(path.c_str(), "rb");
+#endif
+    const std::unique_ptr<FILE, decltype(&std::fclose)> file(handle, std::fclose);
+    if (!file) return false;
+    int w = 0, h = 0, channels = 0;
+    const std::unique_ptr<stbi_uc, decltype(&stbi_image_free)> image(
+        stbi_load_from_file(file.get(), &w, &h, &channels, 4),
+        stbi_image_free);
+    if (!image || w != width || h != height) return false;
+    if (!checkScene) return true;
+    size_t lit = 0, outline = 0, opaque = 0;
+    for (size_t index = 0; index < size_t(w) * h; ++index)
+    {
+        const auto* pixel = image.get() + index * 4;
+        lit += std::max({pixel[0], pixel[1], pixel[2]}) > 12;
+        opaque += pixel[3] == 255;
+        outline += IsOutlinePixel(pixel);
+    }
+    return lit > 12 && opaque == size_t(w) * h && outline == 0;
+}
+bool CheckMp4(const fs::path& path, unsigned width, unsigned height)
+{
+    const auto file = ReadCaptureFile(path);
+    const auto table = file.find("stsd");
+    const auto avc = file.find("avc1", table);
+    if (file.size() < 32 || file.compare(4, 4, "ftyp") != 0 || file.find("mdat") == std::string::npos
+        || avc == std::string::npos || avc + 32 >= file.size() || file.find("avcC", avc) == std::string::npos) return false;
+    const auto u16 = [&](size_t offset) { return (unsigned(uint8(file[offset])) << 8) | unsigned(uint8(file[offset + 1])); };
+    return u16(avc + 28) == width && u16(avc + 30) == height;
+}
 Json ReadScenePixels(const std::shared_ptr<jTexture>& texture, const fs::path& png, const jCamera* camera, const Vector& floorPoint)
 {
     Json result{{"available", bool(texture)}, {"readback", false}};
     if (!texture || !texture->Width || !texture->Height || texture->Width > 4096 || texture->Height > 4096
-        || (texture->Format != ETextureFormat::RGBA8 && texture->Format != ETextureFormat::BGRA8)) return result;
+        || (texture->Format != ETextureFormat::RGBA8 && texture->Format != ETextureFormat::BGRA8
+            && !(IsUseDX12() && texture->Format == ETextureFormat::RGB8))) return result;
     const uint32 width = texture->Width, height = texture->Height;
     uint32 rowPitch = width * 4;
     uint64 size = uint64(rowPitch) * height;
@@ -121,7 +176,7 @@ Json ReadScenePixels(const std::shared_ptr<jTexture>& texture, const fs::path& p
     if (!mapped) return result;
     std::vector<uint8> rgba(size_t(width)*height*4);
     std::set<uint32> colors;
-    size_t lit = 0, opaque = 0; int minimum = 255, maximum = 0;
+    size_t lit = 0, opaque = 0, outline = 0; int minimum = 255, maximum = 0;
     for (uint32 y=0;y<height;++y) for (uint32 x=0;x<width;++x)
     {
         const auto* pixel = mapped+size_t(y)*rowPitch+x*4;
@@ -131,6 +186,7 @@ Json ReadScenePixels(const std::shared_ptr<jTexture>& texture, const fs::path& p
         const int brightest=std::max({int(output[0]),int(output[1]),int(output[2])});
         const int darkest=std::min({int(output[0]),int(output[1]),int(output[2])});
         lit+=brightest>12; opaque+=output[3]>=254;
+        outline += IsOutlinePixel(output);
         minimum=std::min(minimum,darkest);maximum=std::max(maximum,brightest);
         if(colors.size()<1024)colors.insert(uint32(output[0])|(uint32(output[1])<<8)|(uint32(output[2])<<16));
     }
@@ -156,10 +212,10 @@ Json ReadScenePixels(const std::shared_ptr<jTexture>& texture, const fs::path& p
             {"world",{floorPoint.x,floorPoint.y,floorPoint.z}},{"samples",floorSamples},{"litPixels",floorLit}};
     }
     readback->Unmap();
-    const auto pngError=LodePNG_encode32_file(png.string().c_str(),rgba.data(),width,height);
+    const bool pngSaved = !png.empty() && LodePNG_encode32_file(png.string().c_str(), rgba.data(), width, height) == 0;
     result.update({{"readback",true},{"width",width},{"height",height},{"litPixels",lit},{"opaquePixels",opaque},
         {"distinctColorsAtMost1024",colors.size()},{"minimumRgb",minimum},{"maximumRgb",maximum},
-        {"pngSaved",pngError==0},{"png",png.generic_string()}});
+        {"outlinePixels", outline}, {"pngSaved",pngSaved},{"png",png.generic_string()}});
     return result;
 }
 bool BufferMatches(jBuffer* source, const IStreamParam& expected)
@@ -327,6 +383,30 @@ int RunEditorAuthoringGpuTests(const char* outputDirectory)
         editor.SetAuthoringEnabled(true);
         auto& document = editor.GetDocument();
         if (!document.Entities().empty()) throw std::runtime_error("Fresh project must open with an empty authored document");
+        const auto front = document.Create(EntityKind::Cube, "Front selection target");
+        const auto back = document.Create(EntityKind::Cube, "Overlapping selection target");
+        document.SetLocalPositions({{front, {0, 1000, 0}}, {back, {0, 1000, 45}}}, "Overlap selection targets");
+        jCamera::SetCamera(camera, Vector(0,1000,-200), Vector(0,1000,0), Vector(0,1001,-200),
+            DegreeToRadian(60), 1, 20000, SCR_WIDTH, SCR_HEIGHT, true, 200);
+        camera->UpdateCamera();
+        editor.SelectEntity(0);
+        frames(2);
+        const auto beforeOutline = ReadScenePixels(jEditorUiRenderer::AcquireScenePreview(), {}, nullptr, Vector::ZeroVector);
+        editor.Placement.bPickRequested = true;
+        editor.Placement.PickMouseX = SCR_WIDTH / 2;
+        editor.Placement.PickMouseY = SCR_HEIGHT / 2;
+        frame();
+        expect(editor.GetSelectedEntities() == std::vector<EntityId>{front} && document.SelectedId() == front,
+            "GPU Scene picking selects the nearest overlapping authored mesh");
+        const auto withOutline = ReadScenePixels(jEditorUiRenderer::AcquireScenePreview(), {}, nullptr, Vector::ZeroVector);
+        expect(beforeOutline.value("readback", false) && withOutline.value("readback", false) &&
+            withOutline.value("outlinePixels", size_t(0)) > beforeOutline.value("outlinePixels", size_t(0)) + 12,
+            "selected mesh renders an amber contour into the real Scene preview", withOutline.dump());
+        editor.Placement.bPickRequested = true;
+        editor.Placement.PickToggleSelection = true;
+        frame();
+        expect(editor.GetSelectedEntities().empty() && !document.SelectedId(), "Ctrl Scene picking toggles the mesh out of selection");
+        if (!LoadAuthoringScene(editor, fixture / "Scenes/start.jscene", error)) throw std::runtime_error(error);
         std::vector<EntityId> ids;
         document.BeginTransaction("Create 100 GPU-backed authored entities");
         for (int i = 0; i < 100; ++i)
@@ -401,6 +481,54 @@ int RunEditorAuthoringGpuTests(const char* outputDirectory)
         expect(floorProbe.value("inside",false)&&floorProbe.value("samples",size_t(0))>=40
             &&floorProbe.value("litPixels",size_t(0))*4>=floorProbe.value("samples",size_t(0))*3,
             "terrain floor is actually rasterized from above at an unoccluded pre-UI pixel patch");
+        {
+            using namespace jEditorCapture;
+            const auto finishCapture = [&] {
+                for (int i = 0; i < 8 && GetStatus().State == Phase::Screenshot; ++i) frame();
+                const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+                while (GetStatus().State == Phase::Saving && std::chrono::steady_clock::now() < deadline)
+                {
+                    EndFrame();
+                    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+                }
+                return GetStatus().State == Phase::Idle && GetStatus().Error.empty();
+            };
+            const auto png = output / jEditorAssetPath::FromUtf8("capture-장면.png");
+            const bool screenshot = Start({png, 341, 223, 30, Format::Png}, error) && finishCapture();
+            expect(screenshot && CheckStill(png, 341, 223, true),
+                "PNG screenshot decodes at a custom resolution with scene pixels and without selection guides",
+                error.empty() ? GetStatus().Error : error);
+            expect(!Start({png, 341, 223, 30, Format::Png}, error) && CheckStill(png, 341, 223, true),
+                "capture rejects an existing output filename and leaves its pixels intact");
+            for (const auto format : {Format::Jpeg, Format::Bmp})
+            {
+                if (!Supports(format)) continue;
+                auto path = output / "capture-format";
+                path.replace_extension(Extension(format));
+                const bool saved = Start({path, 246, 154, 30, format}, error) && finishCapture();
+                expect(saved && CheckStill(path, 246, 154, false),
+                    format == Format::Jpeg ? "JPEG capture decodes at the requested size" : "BMP capture decodes at the requested size",
+                    error.empty() ? GetStatus().Error : error);
+            }
+            if (Supports(Format::Mp4))
+            {
+                const auto path = output / "capture-video.mp4";
+                expect(!Start({path, 1281, 720, 30, Format::Mp4}, error) && !fs::exists(path),
+                    "MP4 capture rejects odd dimensions before creating a file");
+                const bool started = Start({path, 1280, 720, 30, Format::Mp4}, error);
+                if (started)
+                {
+                    frames(5);
+                    std::this_thread::sleep_for(std::chrono::milliseconds(90));
+                    frames(5);
+                    Stop();
+                    frame();
+                }
+                expect(started && finishCapture() && GetStatus().Frames >= 2 && CheckMp4(path, 1280, 720),
+                    "recording encodes multiple H.264 frames and finalizes a 720p MP4",
+                    error.empty() ? GetStatus().Error : error);
+            }
+        }
         size_t objectBindings = 0, lightBindings = 0, gpuMeshes = 0;
         for (const auto& [id, entity] : document.Entities())
         {
