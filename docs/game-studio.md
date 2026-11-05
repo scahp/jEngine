@@ -13,7 +13,6 @@ definition copies, symlinks or junctions in the engine.
 ```text
 jEngine/
 ├── .agents/plugins/marketplace.json  # Codex plugin source
-├── .codex/config.toml                # Codex agent config_file paths
 ├── .claude/settings.json             # Claude marketplace source
 ├── tools/JaehoGameStudio/
 │   ├── plugin.json
@@ -38,26 +37,25 @@ git submodule update --init -- tools/JaehoGameStudio
 ```
 
 The committed configuration already points to the package. No copying or link
-creation is needed after checkout. Trust the project so Codex reads its
-`.codex/config.toml`, then open a new session after changing agent registrations.
+creation is needed after checkout. No project `.codex` folder is generated.
+Open a new session after changing host agent registrations.
 
 ## Load the plugin
 
 Plugin locations are registered only in `.agents/plugins/marketplace.json`.
-Installation stores activation in the normal Codex user settings. The seven
-custom agents are registered separately with relative `config_file` paths in
-`.codex/config.toml`. All definitions remain inside the submodule. Install the
-plugin skills with:
+Installation stores activation in the normal Codex user settings. No project
+`.codex` directory is created. Install the plugin skills with:
 
 ```sh
 codex plugin marketplace add .
 codex plugin add jaeho-game-studio@jengine-tools
 ```
 
-Marketplace registration and agent registration have separate native settings.
-The project configuration points directly to all seven `codex-agents/` files
-inside the submodule. No global agent installation or copied role profiles are
-required. Project setup does not modify user configuration.
+Marketplace registration does not automatically register the seven Codex custom
+agents. Those use separate host configuration or an existing host registration;
+the role source files stay in the submodule `codex-agents/` directory. Project
+setup does not modify user configuration. See the package README for a direct
+source reference example.
 
 Claude Code reads the current submodule directly with:
 
@@ -83,13 +81,12 @@ python3 tools/JaehoGameStudio/scripts/sync-studio.py --project . --check
 
 Windows can use the installed `python` or `py -3.11`. The script has no additional
 dependencies. It mirrors native formats inside the package and maintains plugin path
-registrations, including the Codex agent `config_file` paths. Common skills stay in the single package `skills/`
+registrations. It never creates a project `.codex` folder. Common skills stay in the single package `skills/`
 tree. Conflicting edits stop for review; `--check` is read-only.
 
 Old unchanged project copies are retired during initial migration. Local edits
 stop migration so they can be preserved in the package first. Unrelated user
-agents and configuration remain intact. The explicit `--legacy-copies` option
-exists for older clients, not this layout. No watcher, hook or update job is used.
+agents and configuration remain intact. No watcher, hook or update job is used.
 
 ## Update and preserve context
 
@@ -100,7 +97,7 @@ git submodule update --init -- tools/JaehoGameStudio
 
 The engine pins an exact package commit. Ordinary role-body and common-skill
 changes require no project definition synchronization. New shared roles are committed inside the
-package; project agent references are committed with the updated submodule pin. Publish package changes first.
+package; Codex host registration is maintained separately. Publish package changes first.
 
 Actual decisions, contracts and role checkpoints stay in `.jaeho-studio/`.
 The optional initializer creates missing records while preserving existing data:
