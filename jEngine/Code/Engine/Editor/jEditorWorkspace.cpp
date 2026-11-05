@@ -106,6 +106,7 @@ struct Workspace
     std::vector<size_t> AssetRows;
     std::vector<std::string> ReimportRequests;
     EntityId PropertyOwner = 0;
+    std::optional<std::pair<EntityId, size_t>> InspectedSubmesh;
     bool OwnPropertyTransaction = false;
     std::string CachedEntityFilter, CachedAssetFilter, Status;
     Dialog Modal = Dialog::None;
@@ -382,10 +383,28 @@ void FinishProperty(Document& document, Entity& entity, bool changed, const char
 {
     FinishProperties(document, std::span(&entity, changed ? 1 : 0), label);
 }
-void FinishMaterialProperty(Document& document, Entity& entity, bool changed, const char* label)
+Entity MaterialEditEntity(Document& document, const Entity& presented, std::optional<size_t> submesh)
+{
+    auto entity = *document.Find(presented.Id);
+    if (submesh)
+    {
+        if (presented.Material.OverrideEnabled) entity.MeshMaterials[uint32_t(*submesh)] = presented.Material;
+        else entity.MeshMaterials.erase(uint32_t(*submesh));
+    }
+    else entity.Material = presented.Material;
+    return entity;
+}
+void CommitMaterialProperty(Document& document, Entity& entity, const char* label, std::optional<size_t> submesh)
+{
+    const auto edited = MaterialEditEntity(document, entity, submesh);
+    if (!document.Update(edited, label)) Message(document.LastError(), true);
+}
+void FinishMaterialProperty(Document& document, Entity& entity, bool changed, const char* label, std::optional<size_t> submesh = {})
 {
     if (changed) entity.Material.OverrideEnabled = true;
-    FinishProperty(document, entity, changed, label);
+    std::vector<Entity> edits;
+    if (changed) edits.push_back(MaterialEditEntity(document, entity, submesh));
+    FinishProperties(document, edits, label);
 }
 void Vec3Field(Document& document, Entity& entity, const char* label, Vec3& value, float speed = .25f)
 {
@@ -677,7 +696,7 @@ const jEditorAssetRecord* AssetDropTarget()
     return asset;
 }
 void TextureSlot(Document& document, Entity& entity, const char* label, std::string& path,
-    const std::string* inherited = nullptr, bool* overridden = nullptr)
+    const std::string* inherited = nullptr, bool* overridden = nullptr, std::optional<size_t> submesh = {})
 {
     const auto& shown = overridden && !*overridden ? *inherited : path;
     auto& s = State();
@@ -699,12 +718,12 @@ void TextureSlot(Document& document, Entity& entity, const char* label, std::str
         path = asset->SourcePath;
         if (overridden) *overridden = true;
         entity.Material.OverrideEnabled = true;
-        document.Update(entity, "Assign texture");
+        CommitMaterialProperty(document, entity, "Assign texture", submesh);
     }
 }
 template <typename T>
 void ResetMaterialParameter(Document& document, Entity& entity, const char* label, bool& overridden,
-    T& value, const T& inherited)
+    T& value, const T& inherited, std::optional<size_t> submesh = {})
 {
     if (!overridden) return;
     ImGui::PushID(label);
@@ -712,11 +731,11 @@ void ResetMaterialParameter(Document& document, Entity& entity, const char* labe
     {
         overridden = false;
         value = inherited;
-        document.Update(entity, "Reset material parameter");
+        CommitMaterialProperty(document, entity, "Reset material parameter", submesh);
     }
     ImGui::PopID();
 }
-void MaterialInspector(jEditor& editor, Entity& entity)
+void MaterialInspector(jEditor& editor, Entity& entity, std::optional<size_t> submesh = {})
 {
     auto& document = editor.GetDocument();
     const auto& assetPath = entity.Material.GraphAsset;
@@ -724,13 +743,13 @@ void MaterialInspector(jEditor& editor, Entity& entity)
     if (const auto* asset = AssetDropTarget(); asset && asset->Kind == jEditorAssetKind::Material)
     {
         std::string error;
-        if (jEditorTools::AssignSharedMaterial(editor, entity.Id, asset->SourcePath, error))
-            entity = *document.Find(entity.Id);
+        if (jEditorTools::AssignSharedMaterial(editor, entity.Id, asset->SourcePath, error, submesh))
+            entity.Material = *editor.ReadMaterialProperties(entity.Id, submesh);
         else Message(error, true);
     }
     auto& material = entity.Material;
-    if (entity.Kind == EntityKind::Model && ImGui::Checkbox("Override imported material", &material.OverrideEnabled))
-        document.Update(entity, "Toggle material override");
+    if (entity.Kind == EntityKind::Model && ImGui::Checkbox(submesh ? "Override submesh material" : "Override imported material", &material.OverrideEnabled))
+        CommitMaterialProperty(document, entity, "Toggle material override", submesh);
 
     auto defaults = material;
     if (defaults.GraphOverrides) defaults.GraphOverrides.emplace();
@@ -739,29 +758,29 @@ void MaterialInspector(jEditor& editor, Entity& entity)
     auto color = flags && !flags->BaseColor ? defaults.BaseColor : material.BaseColor;
     const bool colorChanged = ImGui::ColorEdit3("Base color", &color.X);
     if (colorChanged) { material.BaseColor = color; if (flags) flags->BaseColor = true; }
-    FinishMaterialProperty(document, entity, colorChanged, "Material color");
-    if (flags) ResetMaterialParameter(document, entity, "Base color", flags->BaseColor, material.BaseColor, defaults.BaseColor);
+    FinishMaterialProperty(document, entity, colorChanged, "Material color", submesh);
+    if (flags) ResetMaterialParameter(document, entity, "Base color", flags->BaseColor, material.BaseColor, defaults.BaseColor, submesh);
 
-    FinishMaterialProperty(document, entity, ImGui::ColorEdit3("Emissive", &material.Emissive.X, ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_Float), "Emissive");
+    FinishMaterialProperty(document, entity, ImGui::ColorEdit3("Emissive", &material.Emissive.X, ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_Float), "Emissive", submesh);
     auto scalar = [&](const char* label, float& value, float inherited, bool* overridden, float minimum)
     {
         float shown = overridden && !*overridden ? inherited : value;
         const bool changed = ImGui::SliderFloat(label, &shown, minimum, 1);
         if (changed) { value = shown; if (overridden) *overridden = true; }
-        FinishMaterialProperty(document, entity, changed, label);
-        if (overridden) ResetMaterialParameter(document, entity, label, *overridden, value, inherited);
+        FinishMaterialProperty(document, entity, changed, label, submesh);
+        if (overridden) ResetMaterialParameter(document, entity, label, *overridden, value, inherited, submesh);
     };
     scalar("Metallic", material.Metallic, defaults.Metallic, flags ? &flags->Metallic : nullptr, 0);
     scalar("Roughness", material.Roughness, defaults.Roughness, flags ? &flags->Roughness : nullptr, .01f);
-    FinishMaterialProperty(document, entity, ImGui::SliderFloat("Opacity", &material.Opacity, 0, 1), "Opacity");
+    FinishMaterialProperty(document, entity, ImGui::SliderFloat("Opacity", &material.Opacity, 0, 1), "Opacity", submesh);
     TextureSlot(document, entity, "Base color texture", material.BaseColorTexture, &defaults.BaseColorTexture,
-        flags ? &flags->BaseColorTexture : nullptr);
+        flags ? &flags->BaseColorTexture : nullptr, submesh);
     if (flags) ResetMaterialParameter(document, entity, "Base color texture", flags->BaseColorTexture,
-        material.BaseColorTexture, defaults.BaseColorTexture);
+        material.BaseColorTexture, defaults.BaseColorTexture, submesh);
     TextureSlot(document, entity, "Normal texture", material.NormalTexture, &defaults.NormalTexture,
-        flags ? &flags->NormalTexture : nullptr);
+        flags ? &flags->NormalTexture : nullptr, submesh);
     if (flags) ResetMaterialParameter(document, entity, "Normal texture", flags->NormalTexture,
-        material.NormalTexture, defaults.NormalTexture);
+        material.NormalTexture, defaults.NormalTexture, submesh);
     if (ImGui::TreeNode("Subsurface material"))
     {
         auto shown = material;
@@ -775,9 +794,9 @@ void MaterialInspector(jEditor& editor, Entity& entity)
         else if (!material.SubsurfaceOverrideEnabled)
         {
             const auto* object = editor.ObjectForEntity(entity.Id);
-            if (object && !object->RenderObjects.empty() && object->RenderObjects[0]->MaterialPtr && object->RenderObjects[0]->MaterialPtr->Surface)
+            if (object && submesh.value_or(0) < object->RenderObjects.size() && object->RenderObjects[submesh.value_or(0)]->MaterialPtr && object->RenderObjects[submesh.value_or(0)]->MaterialPtr->Surface)
             {
-                const auto& surface = *object->RenderObjects[0]->MaterialPtr->Surface;
+                const auto& surface = *object->RenderObjects[submesh.value_or(0)]->MaterialPtr->Surface;
                 shown.SubsurfaceWeight = surface.Subsurface;
                 shown.SubsurfaceColor = {surface.SubsurfaceColor[0], surface.SubsurfaceColor[1], surface.SubsurfaceColor[2]};
                 shown.SubsurfaceThicknessWorld = surface.SubsurfaceThicknessWorld; shown.SubsurfaceProfile = surface.SubsurfaceProfile;
@@ -792,26 +811,26 @@ void MaterialInspector(jEditor& editor, Entity& entity)
                 material.SubsurfaceThicknessWorld = shown.SubsurfaceThicknessWorld; material.SubsurfaceProfile = shown.SubsurfaceProfile;
                 if (overridden) *overridden = true;
             }
-            FinishMaterialProperty(document, entity, changed, label);
+            FinishMaterialProperty(document, entity, changed, label, submesh);
         };
         finishSSS(ImGui::SliderFloat("Subsurface weight", &shown.SubsurfaceWeight, 0, 1), flags ? &flags->SubsurfaceWeight : nullptr, "Subsurface weight");
-        if (flags) ResetMaterialParameter(document, entity, "SSS weight", flags->SubsurfaceWeight, material.SubsurfaceWeight, defaults.SubsurfaceWeight);
+        if (flags) ResetMaterialParameter(document, entity, "SSS weight", flags->SubsurfaceWeight, material.SubsurfaceWeight, defaults.SubsurfaceWeight, submesh);
         finishSSS(ImGui::ColorEdit3("Subsurface color", &shown.SubsurfaceColor.X), flags ? &flags->SubsurfaceColor : nullptr, "Subsurface color");
-        if (flags) ResetMaterialParameter(document, entity, "SSS color", flags->SubsurfaceColor, material.SubsurfaceColor, defaults.SubsurfaceColor);
+        if (flags) ResetMaterialParameter(document, entity, "SSS color", flags->SubsurfaceColor, material.SubsurfaceColor, defaults.SubsurfaceColor, submesh);
         finishSSS(ImGui::DragFloat("Thickness (world)", &shown.SubsurfaceThicknessWorld, .01f, 0, 10000, "%.3g", ImGuiSliderFlags_AlwaysClamp),
             flags ? &flags->SubsurfaceThickness : nullptr, "Subsurface thickness");
-        if (flags) ResetMaterialParameter(document, entity, "SSS thickness", flags->SubsurfaceThickness, material.SubsurfaceThicknessWorld, defaults.SubsurfaceThicknessWorld);
+        if (flags) ResetMaterialParameter(document, entity, "SSS thickness", flags->SubsurfaceThickness, material.SubsurfaceThicknessWorld, defaults.SubsurfaceThicknessWorld, submesh);
         static const auto profiles = [] { std::array<const char*, 8> names{}; for (size_t i = 0; i < names.size(); ++i) names[i] = jSubsurface::Profiles[i].Name; return names; }();
         int profile = int(shown.SubsurfaceProfile);
         const bool profileChanged = ImGui::Combo("Diffusion profile", &profile, profiles.data(), int(profiles.size()));
         if (profileChanged) shown.SubsurfaceProfile = uint32_t(profile);
         finishSSS(profileChanged, flags ? &flags->SubsurfaceProfile : nullptr, "Subsurface profile");
-        if (flags) ResetMaterialParameter(document, entity, "SSS profile", flags->SubsurfaceProfile, material.SubsurfaceProfile, defaults.SubsurfaceProfile);
+        if (flags) ResetMaterialParameter(document, entity, "SSS profile", flags->SubsurfaceProfile, material.SubsurfaceProfile, defaults.SubsurfaceProfile, submesh);
         if (material.SubsurfaceOverrideEnabled && ImGui::Button("Inherit subsurface"))
         {
             material.SubsurfaceOverrideEnabled = false;
             if (flags) flags->SubsurfaceWeight = flags->SubsurfaceColor = flags->SubsurfaceThickness = flags->SubsurfaceProfile = false;
-            document.Update(entity, "Inherit subsurface material");
+            CommitMaterialProperty(document, entity, "Inherit subsurface material", submesh);
         }
         ImGui::TextWrapped("Deferred surface diffusion requires Project Settings > Enable Deferred SSS. Thickness uses scene world units; 0 disables diffusion. Presets approximate surface scattering, not hidden-surface transmission. PT keeps its existing subsurface approximation.");
         const auto& reason = GetRendererFeatureDiagnostics().SubsurfaceSupportReason;
@@ -832,9 +851,9 @@ void MaterialInspector(jEditor& editor, Entity& entity)
         else if (!material.SkinOverrideEnabled)
         {
             const auto* object = editor.ObjectForEntity(entity.Id);
-            if (object && !object->RenderObjects.empty() && object->RenderObjects[0]->MaterialPtr && object->RenderObjects[0]->MaterialPtr->Surface)
+            if (object && submesh.value_or(0) < object->RenderObjects.size() && object->RenderObjects[submesh.value_or(0)]->MaterialPtr && object->RenderObjects[submesh.value_or(0)]->MaterialPtr->Surface)
             {
-                const auto& surface = *object->RenderObjects[0]->MaterialPtr->Surface;
+                const auto& surface = *object->RenderObjects[submesh.value_or(0)]->MaterialPtr->Surface;
                 shown.ShadingModel = surface.ShadingModel; shown.SubsurfaceSpace = surface.SubsurfaceSpace;
                 shown.SpecularWeight = surface.SpecularWeight; shown.DiffuseOcclusion = surface.DiffuseOcclusion;
                 shown.PreScatterWeight = surface.PreScatterWeight;
@@ -850,33 +869,33 @@ void MaterialInspector(jEditor& editor, Entity& entity)
                 material.PreScatterWeight = shown.PreScatterWeight;
                 if (overridden) *overridden = true;
             }
-            FinishMaterialProperty(document, entity, changed, label);
+            FinishMaterialProperty(document, entity, changed, label, submesh);
         };
         int model = int(shown.ShadingModel), space = int(shown.SubsurfaceSpace);
         const bool modelChanged = ImGui::Combo("Shading model", &model, "Standard PBR\0Skin Kelemen\0");
         if (modelChanged) shown.ShadingModel = jMaterialMapping::ShadingModel(model);
         finishSkin(modelChanged, flags ? &flags->ShadingModel : nullptr, "Shading model");
-        if (flags) ResetMaterialParameter(document, entity, "Shading model", flags->ShadingModel, material.ShadingModel, defaults.ShadingModel);
+        if (flags) ResetMaterialParameter(document, entity, "Shading model", flags->ShadingModel, material.ShadingModel, defaults.ShadingModel, submesh);
         const bool spaceChanged = ImGui::Combo("Subsurface space", &space, "Screen\0Texture (UV)\0");
         if (spaceChanged) shown.SubsurfaceSpace = jMaterialMapping::SubsurfaceSpace(space);
         finishSkin(spaceChanged, flags ? &flags->SubsurfaceSpace : nullptr, "Subsurface space");
-        if (flags) ResetMaterialParameter(document, entity, "Subsurface space", flags->SubsurfaceSpace, material.SubsurfaceSpace, defaults.SubsurfaceSpace);
+        if (flags) ResetMaterialParameter(document, entity, "Subsurface space", flags->SubsurfaceSpace, material.SubsurfaceSpace, defaults.SubsurfaceSpace, submesh);
         finishSkin(ImGui::SliderFloat("Specular weight", &shown.SpecularWeight, 0, 8), flags ? &flags->SpecularWeight : nullptr, "Specular weight");
-        if (flags) ResetMaterialParameter(document, entity, "Specular weight", flags->SpecularWeight, material.SpecularWeight, defaults.SpecularWeight);
+        if (flags) ResetMaterialParameter(document, entity, "Specular weight", flags->SpecularWeight, material.SpecularWeight, defaults.SpecularWeight, submesh);
         finishSkin(ImGui::SliderFloat("Diffuse occlusion", &shown.DiffuseOcclusion, 0, 1), flags ? &flags->DiffuseOcclusion : nullptr, "Diffuse occlusion");
-        if (flags) ResetMaterialParameter(document, entity, "Diffuse occlusion", flags->DiffuseOcclusion, material.DiffuseOcclusion, defaults.DiffuseOcclusion);
+        if (flags) ResetMaterialParameter(document, entity, "Diffuse occlusion", flags->DiffuseOcclusion, material.DiffuseOcclusion, defaults.DiffuseOcclusion, submesh);
         finishSkin(ImGui::SliderFloat("Pre-scatter weight", &shown.PreScatterWeight, 0, 1), flags ? &flags->PreScatterWeight : nullptr, "Pre-scatter weight");
-        if (flags) ResetMaterialParameter(document, entity, "Pre-scatter weight", flags->PreScatterWeight, material.PreScatterWeight, defaults.PreScatterWeight);
+        if (flags) ResetMaterialParameter(document, entity, "Pre-scatter weight", flags->PreScatterWeight, material.PreScatterWeight, defaults.PreScatterWeight, submesh);
         if (material.SkinOverrideEnabled && ImGui::Button("Inherit skin shading"))
         {
             material.SkinOverrideEnabled = false;
             if (flags) flags->ShadingModel = flags->SubsurfaceSpace = flags->SpecularWeight = flags->DiffuseOcclusion = flags->PreScatterWeight = false;
-            document.Update(entity, "Inherit skin shading");
+            CommitMaterialProperty(document, entity, "Inherit skin shading", submesh);
         }
         ImGui::TextWrapped("Skin Kelemen interprets Roughness as Beckmann m. Texture diffusion uses UVs and requires its renderer support; these material controls alone do not reproduce the original full Skin pipeline.");
         ImGui::TreePop();
     }
-    if (ImGui::Button("Material graph")) SetAuthoringToolsVisible(true);
+    if (ImGui::Button("Material graph")) { jEditorTools::OpenMaterialGraph(); SetAuthoringToolsVisible(true); }
 }
 bool HasMaterial(EntityKind kind)
 {
@@ -1132,12 +1151,27 @@ void MultiInspector(jEditor& editor, std::span<const EntityId> ids)
 }
 void Inspector(jEditor& editor)
 {
-    auto& document = editor.GetDocument(); const auto* selected = document.Find(editor.GetSelectedEntityId());
-    if (const auto submesh = editor.GetSelectedModelSubmesh())
+    auto& document = editor.GetDocument();
+    const auto submesh = editor.GetSelectedModelSubmesh();
+    const auto target = submesh ? std::optional(std::pair(submesh->Model, submesh->Index)) : std::nullopt;
+    if (State().InspectedSubmesh != target) { FinishInspectorEdit(editor); State().InspectedSubmesh = target; }
+    const auto* selected = document.Find(editor.GetSelectedEntityId());
+    if (submesh)
     {
         ImGui::Text("Submesh %03zu", submesh->Index + 1);
         ImGui::TextWrapped("%s", document.Find(submesh->Model)->Name.c_str());
-        ImGui::TextDisabled("Read-only submesh");
+        ImGui::TextWrapped("Material changes apply only to this submesh instance.");
+        auto entity = *document.Find(submesh->Model);
+        const auto material = editor.ReadMaterialProperties(submesh->Model, submesh->Index);
+        if (!material) { ImGui::TextDisabled("Waiting for the imported material."); return; }
+        entity.Material = *material;
+        ImGui::PushID(int(submesh->Model)); ImGui::PushID(int(submesh->Index));
+        const bool locked = document.IsEffectivelyLocked(entity.Id) || document.IsPlaying();
+        if (locked) ImGui::TextDisabled("Unlock the model and stop Play to edit its material.");
+        ImGui::BeginDisabled(locked);
+        MaterialInspector(editor, entity, submesh->Index);
+        ImGui::EndDisabled();
+        ImGui::PopID(); ImGui::PopID();
         return;
     }
     if (!selected) { ImGui::TextWrapped("Select an object in Hierarchy or the scene."); return; }

@@ -16,6 +16,8 @@ Use **Undo graph** and **Redo graph** for graph edits. Applying the graph update
 
 For imported scenes with a material sidecar, **Scene material library → Source material** selects a source slot. **Save and apply to scene** writes that slot's graph and refreshes the meshes using it. Paths in this mode are relative to the imported scene's material-library root.
 
+Imported model submeshes are editable targets too. Select a `Submesh` row (or pick the part in Scene), then choose **Inspector → Material graph**. **Save and Apply** updates that submesh instance's override. A part without its own override gets a separate default graph path, `Assets/Materials/Model_<ID>_Submesh_<number>.jmaterial`, so the first save does not overwrite an inherited model graph. See [submesh editing](04-placement-inspector.md#서브메시-재질-편집) for inheritance, scene persistence and model-replacement behavior.
+
 ## Selection, shortcuts and panel layout
 
 - Click a node body or title to select it. Click empty graph space to clear selection. Newly added nodes are selected automatically; changing the object, source material or loaded graph clears stale selection.

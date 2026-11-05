@@ -9,6 +9,7 @@
 #include <memory>
 
 class jEditorRuntime;
+class jMaterial;
 
 // Authoring commands and world publication run on the creating/scene owner thread.
 // Document edits are cheap CPU data edits. Tick publishes them before rendering;
@@ -22,6 +23,8 @@ public:
     using ProceduralFactory = std::function<std::shared_ptr<jObject>(const jEditorAuthoring::Entity&, std::string& error)>;
     using ProceduralUpdater = std::function<void(const jEditorAuthoring::Entity&, jObject&, float deltaTime, float playTime)>;
     using MaterialApplier = std::function<void(const jEditorAuthoring::MaterialProperties&, jObject&)>;
+    using SubmeshMaterialApplier = std::function<void(const jEditorAuthoring::MaterialProperties&, jObject&, size_t,
+        const std::shared_ptr<jMaterial>&)>;
 
     struct PlacementBounds { jEditorAuthoring::Vec3 Min, Max; };
     struct PlacementHit
@@ -50,7 +53,11 @@ public:
     void SetAssetResolver(AssetResolver resolver);
     void SetProceduralFactory(ProceduralFactory factory, ProceduralUpdater update = {});
     void SetMaterialApplier(MaterialApplier apply);
+    void SetSubmeshMaterialApplier(SubmeshMaterialApplier apply);
     jEditorAuthoring::MaterialProperties ResolveMaterial(const jEditorAuthoring::MaterialProperties& material);
+    std::optional<jEditorAuthoring::MaterialProperties> ReadMaterialProperties(EntityId entity, std::optional<size_t> submesh = {});
+    bool UpdateMaterialProperties(EntityId entity, const jEditorAuthoring::MaterialProperties& material,
+        const std::string& label, std::optional<size_t> submesh = {});
 
     // Call after existing import publication; paths are relative to project root.
     void TrackWorldObjectSource(jObject* object, const std::string& source,

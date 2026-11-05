@@ -70,6 +70,16 @@ Hierarchy 항목이나 Scene의 물체를 클릭하면 선택합니다. `Ctrl`/m
 
 Camera 물체는 `Vertical FOV`, `Near`, `Far`, `Primary`를 저장합니다. Play 중에는 보이는 주 카메라를 사용합니다. Scene의 자유 이동 카메라 위치를 저장하려면 Camera 엔티티의 Transform을 편집하세요. [저작 도구](08-authoring-tools.md)에서 재질 그래프와 애니메이션을 이어서 다룹니다.
 
+## 서브메시 재질 편집
+
+1. Hierarchy에서 가져온 Model을 펼치고 `Submesh 001` 같은 파트를 선택합니다. Scene에서 해당 파트를 클릭해 선택해도 됩니다.
+2. Inspector에서 `Base color`, `Metallic`, `Roughness`, 텍스처, SSS·Skin 값을 수정합니다. 처음 수정하면 `Override submesh material`이 켜지고 선택한 모델 인스턴스의 해당 파트에만 적용됩니다.
+3. Assets의 `.jmaterial`을 `Shared material`에 끌어 놓거나 `Material graph` 버튼으로 해당 파트의 노드 그래프를 엽니다. 아직 파트 전용 재질이 없으면 기본 그래프 저장 경로는 `Assets/Materials/Model_<ID>_Submesh_<번호>.jmaterial`입니다.
+4. `Override submesh material`을 끄면 모델 전체 오버라이드가 있을 때는 그 재질을, 없으면 가져온 원본 재질을 다시 사용합니다.
+5. 장면을 저장하면 파트별 재질도 함께 저장됩니다. Undo/Redo와 Prefab·복제에도 포함됩니다.
+
+서브메시는 별도 장면 오브젝트를 만들지 않습니다. 변형·가시성·잠금은 부모 Model을 선택해 편집하세요. 잠긴 모델이나 Play 중에는 재질을 수정할 수 없습니다. 파트별 설정은 해당 모델의 메시 순서에 대응합니다. 다른 모델 자산으로 교체하면 기존 파트별 설정은 초기화되고, Undo로 모델과 설정을 함께 복구할 수 있습니다. 공유 `.jmaterial` 파일을 직접 수정하면 그 파일을 사용하는 다른 파트에도 반영됩니다.
+
 ## 자주 쓰는 장면 단축키
 
 | 키 | 동작 |

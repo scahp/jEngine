@@ -942,7 +942,7 @@ void InheritMaterialGraph(MaterialProperties& instance, const MaterialProperties
         || overrides.ShadingModel || overrides.SubsurfaceSpace || overrides.SpecularWeight || overrides.DiffuseOcclusion || overrides.PreScatterWeight;
 }
 
-bool AssignSharedMaterial(jEditor& editor, EntityId id, const std::string& path, std::string& error)
+bool AssignSharedMaterial(jEditor& editor, EntityId id, const std::string& path, std::string& error, std::optional<size_t> submesh)
 {
     auto& document = editor.GetDocument();
     const auto* selected = document.Find(id);
@@ -952,8 +952,9 @@ bool AssignSharedMaterial(jEditor& editor, EntityId id, const std::string& path,
     MaterialGraph graph;
     MaterialProperties defaults;
     if (!file || !LoadMaterial(*file, graph, error) || !EvaluateMaterial(graph, defaults, error)) return false;
-    auto entity = *selected;
-    auto& material = entity.Material;
+    auto target = editor.ReadMaterialProperties(id, submesh);
+    if (!target) { error = "The selected material target is no longer available"; return false; }
+    auto& material = *target;
     if (!material.GraphOverrides || material.GraphAsset != path)
     {
         const bool localNormal = !material.NormalTexture.empty() && (!material.GraphOverrides || material.GraphOverrides->NormalTexture);
@@ -962,7 +963,7 @@ bool AssignSharedMaterial(jEditor& editor, EntityId id, const std::string& path,
     material.GraphAsset = path;
     material.OverrideEnabled = true;
     InheritMaterialGraph(material, defaults);
-    if (!document.Update(entity, "Assign shared material")) { error = document.LastError(); return false; }
+    if (!editor.UpdateMaterialProperties(id, material, "Assign shared material", submesh)) { error = editor.LastError(); return false; }
     editor.ReimportAsset(path);
     return true;
 }
@@ -1107,6 +1108,8 @@ constexpr const char* BrushModes[] = {"Raise", "Lower", "Flatten", "Smooth"};
 struct ToolState
 {
     EntityId Selected = 0; MaterialGraph Graph; uint32_t SelectedNode = 0, NextNode = 4;
+    std::optional<size_t> SelectedSubmesh;
+    bool FocusMaterialGraph = false;
     std::vector<MaterialGraph> Undo, Redo;
     uint32_t MovingNode = 0, RevealNode = 0;
     float GraphHeightRatio = .6f, GraphWidthRatio = .65f;
@@ -1891,12 +1894,12 @@ void MaterialDetails(jEditor& editor, Entity e)
             else e.Material = std::move(defaults);
             e.Material.OverrideEnabled = true;
             e.Material.GraphAsset = s.GraphPath;
-            if (!editor.GetDocument().Update(e, "Apply material graph")) s.Error = editor.GetDocument().LastError();
+            if (!editor.UpdateMaterialProperties(e.Id, e.Material, "Apply material graph", s.SelectedSubmesh)) s.Error = editor.LastError();
             else { s.AssignedGraph = e.Material.GraphAsset; s.AssignedGraphHasNormal = s.Graph.Normal != 0; }
             editor.ReimportAsset(s.GraphPath);
         }
     }
-    if (ImGui::Button("Use as shared material") && AssignSharedMaterial(editor, e.Id, s.GraphPath, s.Error))
+    if (ImGui::Button("Use as shared material") && AssignSharedMaterial(editor, e.Id, s.GraphPath, s.Error, s.SelectedSubmesh))
         s.Selected = 0;
     ImGui::EndDisabled();
 }
@@ -2037,6 +2040,12 @@ bool RenderSceneMaterialLibrary(jEditor& editor, const jEditorProject* project, 
     return true;
 }
 }
+void OpenMaterialGraph()
+{
+    auto& s = Tools();
+    s.SceneMaterialRoot.clear(); s.SceneMaterials.clear();
+    s.Selected = 0; s.AssignedGraph.clear(); s.FocusMaterialGraph = true;
+}
 void FinishTerrainStroke(jEditor& editor)
 {
     auto& s = Tools();
@@ -2103,21 +2112,40 @@ bool RenderTerrainBrush(jEditor& editor, const jCamera& camera, const ImVec2& po
 bool Render(jEditor& editor, const jEditorProject* project, const jEditorAssetRegistry* registry)
 {
     if (RenderSceneMaterialLibrary(editor, project, registry)) return false;
-    auto& s = Tools(); auto& doc = editor.GetDocument(); const auto* selected = doc.Find(editor.GetSelectedEntityId());
+    auto& s = Tools(); auto& doc = editor.GetDocument();
+    const auto submesh = editor.GetSelectedModelSubmesh();
+    const auto targetId = submesh ? submesh->Model : editor.GetSelectedEntityId();
+    const std::optional<size_t> targetMesh = submesh ? std::optional<size_t>(submesh->Index) : std::nullopt;
+    const auto* selected = doc.Find(targetId);
     if (!selected) { ImGui::TextUnformatted("Select an object to edit its material, animation or procedural components."); return false; }
     Entity e = *selected;
-    bool paintInScene = false, graphVisible = false;
-    if (s.Selected != e.Id || s.AssignedGraph != e.Material.GraphAsset)
+    if (targetMesh)
     {
+        const auto material = editor.ReadMaterialProperties(e.Id, targetMesh);
+        if (!material) { ImGui::TextUnformatted("The selected submesh material is not available."); return false; }
+        e.Material = *material;
+        ImGui::Text("%s / Submesh %03zu material", e.Name.c_str(), *targetMesh + 1);
+    }
+    bool paintInScene = false, graphVisible = false;
+    if (s.Selected != e.Id || s.SelectedSubmesh != targetMesh || s.AssignedGraph != e.Material.GraphAsset)
+    {
+        if (targetMesh) s.FocusMaterialGraph = true;
+        s.SelectedSubmesh = targetMesh;
         s.Selected = e.Id; s.AssignedGraph = e.Material.GraphAsset; s.Graph = {}; s.Undo.clear(); s.Redo.clear(); s.SelectedNode = s.MovingNode = s.RevealNode = 0;
         s.Graph.Nodes = {{1, 0, 0, NodeKind::Color, e.Material.BaseColor, 1, 20, 20, ""}, {2, 0, 0, NodeKind::Scalar, {}, e.Material.Metallic, 20, 120, ""}, {3, 0, 0, NodeKind::Scalar, {}, e.Material.Roughness, 20, 220, ""}};
         s.Graph.BaseColor = 1; s.Graph.Metallic = 2; s.Graph.Roughness = 3; s.NextNode = 4; s.Error.clear();
         if (!e.Material.GraphAsset.empty()) { std::snprintf(s.GraphPath, sizeof(s.GraphPath), "%s", e.Material.GraphAsset.c_str()); const auto file = editor.GetProjectRoot() / e.Material.GraphAsset; LoadMaterial(file, s.Graph, s.Error); for (const auto& n : s.Graph.Nodes) s.NextNode = std::max(s.NextNode, n.Id + 1); }
+        if (targetMesh && (!e.Material.OverrideEnabled || e.Material.GraphAsset.empty()))
+            std::snprintf(s.GraphPath, sizeof(s.GraphPath), "Assets/Materials/Model_%llu_Submesh_%zu.jmaterial", static_cast<unsigned long long>(e.Id), *targetMesh + 1);
+        else if (e.Material.GraphAsset.empty())
+            std::snprintf(s.GraphPath, sizeof(s.GraphPath), "Assets/Materials/Material_%llu.jmaterial", static_cast<unsigned long long>(e.Id));
         s.AssignedGraphHasNormal = s.Graph.Normal != 0;
     }
     if (ImGui::BeginTabBar("AdvancedTools"))
     {
-        if (ImGui::BeginTabItem("Material graph")) { graphVisible = true; GraphUI(editor, e, project, registry); ImGui::EndTabItem(); }
+        const auto graphFlags = s.FocusMaterialGraph ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
+        if (ImGui::BeginTabItem("Material graph", nullptr, graphFlags)) { s.FocusMaterialGraph = false; graphVisible = true; GraphUI(editor, e, project, registry); ImGui::EndTabItem(); }
+        ImGui::BeginDisabled(targetMesh.has_value());
         if (ImGui::BeginTabItem("Animation"))
         {
             bool changed = ImGui::Checkbox("Enabled", &e.Animation.Enabled); ImGui::SameLine(); changed |= ImGui::Checkbox("Loop", &e.Animation.Loop);
@@ -2197,6 +2225,7 @@ bool Render(jEditor& editor, const jEditorProject* project, const jEditorAssetRe
                 if (changed && !doc.Update(e, "Edit terrain / navigation")) s.Error = doc.LastError();
             } ImGui::EndTabItem();
         }
+        ImGui::EndDisabled();
         ImGui::EndTabBar();
     }
     if (!graphVisible && !s.Error.empty()) ImGui::TextColored(ImVec4(1, .4f, .25f, 1), "%s", s.Error.c_str());

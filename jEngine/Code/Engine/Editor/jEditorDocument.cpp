@@ -214,42 +214,56 @@ bool ValidTransform(const Transform& value)
         && VectorNumber(value.Scale, -1e4f, 1e4f) && std::abs(value.Scale.X) >= 1e-5f
         && std::abs(value.Scale.Y) >= 1e-5f && std::abs(value.Scale.Z) >= 1e-5f;
 }
+bool ValidateMaterial(const MaterialProperties& material, std::string& error)
+{
+    const auto reject = [&](const char* message) { error = message; return false; };
+    if (!ValidAssetPath(material.BaseColorTexture) || !ValidAssetPath(material.NormalTexture) || !ValidAssetPath(material.GraphAsset))
+        return reject("Material references must be normalized project-relative paths");
+    if (material.GraphOverrides && material.GraphAsset.empty()) return reject("Shared material overrides require a graph asset");
+    if (!VectorNumber(material.BaseColor, 0, 1) || !VectorNumber(material.Emissive, 0, 1e6f)
+        || !Number(material.Metallic, 0, 1) || !Number(material.Roughness, 0, 1) || !Number(material.Opacity, 0, 1))
+        return reject("Invalid material properties");
+    if (!Number(material.SubsurfaceWeight, 0, 1) || !VectorNumber(material.SubsurfaceColor, 0, 1)
+        || !Number(material.SubsurfaceThicknessWorld, 0, 10000) || material.SubsurfaceProfile > 7)
+        return reject("Subsurface requires weight/color 0..1, thickness 0..10000 world units and profile 0..7");
+    if (material.GraphOverrides && !material.SubsurfaceOverrideEnabled)
+    {
+        const auto& flags = *material.GraphOverrides;
+        if (flags.SubsurfaceWeight || flags.SubsurfaceColor || flags.SubsurfaceThickness || flags.SubsurfaceProfile)
+            return reject("Subsurface graph overrides require explicit authored subsurface data");
+    }
+    if (uint32_t(material.ShadingModel) > 1 || uint32_t(material.SubsurfaceSpace) > 1
+        || !Number(material.SpecularWeight, 0, 8) || !Number(material.DiffuseOcclusion, 0, 1)
+        || !Number(material.PreScatterWeight, 0, 1))
+        return reject("Skin material requires valid model/space, specular weight 0..8 and occlusion/pre-scatter 0..1");
+    if (material.GraphOverrides && !material.SkinOverrideEnabled)
+    {
+        const auto& flags = *material.GraphOverrides;
+        if (flags.ShadingModel || flags.SubsurfaceSpace || flags.SpecularWeight || flags.DiffuseOcclusion || flags.PreScatterWeight)
+            return reject("Skin graph overrides require explicit authored skin data");
+    }
+    return true;
+}
 bool ValidateEntity(const Entity& entity, std::string& error)
 {
     const auto reject = [&](const char* message) { error = message; return false; };
     if (!entity.Id || entity.Id == std::numeric_limits<EntityId>::max()) return reject("Invalid or exhausted entity ID");
     if (!KindName(entity.Kind)) return reject("Unknown entity kind");
     if (!ValidText(entity.Name, MaxNameBytes)) return reject("Entity name must be valid UTF-8, 1..256 bytes without controls");
-    if (!ValidAssetPath(entity.SourceAsset) || !ValidAssetPath(entity.Material.BaseColorTexture) || !ValidAssetPath(entity.Material.NormalTexture) || !ValidAssetPath(entity.Material.GraphAsset))
+    if (!ValidAssetPath(entity.SourceAsset))
         return reject("Asset references must be normalized project-relative paths");
-    if (entity.Material.GraphOverrides && entity.Material.GraphAsset.empty())
-        return reject("Shared material overrides require a graph asset");
     if (!ValidText(entity.AssetId, 128, true)) return reject("Invalid asset ID");
     if (!ValidTransform(entity.Local)) return reject("Transform must be finite, bounded and have nonzero scale");
     if (entity.MeshLocalTransforms.size() > 65536) return reject("Mesh transform limit exceeded");
     for (const auto& mesh : entity.MeshLocalTransforms)
         if (!ValidTransform(mesh)) return reject("Invalid mesh-local transform");
-    if (!VectorNumber(entity.Material.BaseColor, 0, 1) || !VectorNumber(entity.Material.Emissive, 0, 1e6f)
-        || !Number(entity.Material.Metallic, 0, 1) || !Number(entity.Material.Roughness, 0, 1) || !Number(entity.Material.Opacity, 0, 1))
-        return reject("Invalid material properties");
-    if (!Number(entity.Material.SubsurfaceWeight, 0, 1) || !VectorNumber(entity.Material.SubsurfaceColor, 0, 1)
-        || !Number(entity.Material.SubsurfaceThicknessWorld, 0, 10000) || entity.Material.SubsurfaceProfile > 7)
-        return reject("Subsurface requires weight/color 0..1, thickness 0..10000 world units and profile 0..7");
-    if (entity.Material.GraphOverrides && !entity.Material.SubsurfaceOverrideEnabled)
+    if (!ValidateMaterial(entity.Material, error)) return false;
+    if (!entity.MeshMaterials.empty() && entity.Kind != EntityKind::Model) return reject("Submesh materials require a model entity");
+    if (entity.MeshMaterials.size() > 65536) return reject("Submesh material limit exceeded");
+    for (const auto& [index, material] : entity.MeshMaterials)
     {
-        const auto& flags = *entity.Material.GraphOverrides;
-        if (flags.SubsurfaceWeight || flags.SubsurfaceColor || flags.SubsurfaceThickness || flags.SubsurfaceProfile)
-            return reject("Subsurface graph overrides require explicit authored subsurface data");
-    }
-    if (uint32_t(entity.Material.ShadingModel) > 1 || uint32_t(entity.Material.SubsurfaceSpace) > 1
-        || !Number(entity.Material.SpecularWeight, 0, 8) || !Number(entity.Material.DiffuseOcclusion, 0, 1)
-        || !Number(entity.Material.PreScatterWeight, 0, 1))
-        return reject("Skin material requires valid model/space, specular weight 0..8 and occlusion/pre-scatter 0..1");
-    if (entity.Material.GraphOverrides && !entity.Material.SkinOverrideEnabled)
-    {
-        const auto& flags = *entity.Material.GraphOverrides;
-        if (flags.ShadingModel || flags.SubsurfaceSpace || flags.SpecularWeight || flags.DiffuseOcclusion || flags.PreScatterWeight)
-            return reject("Skin graph overrides require explicit authored skin data");
+        if (index >= 65536) return reject("Submesh material index exceeds the supported limit");
+        if (!ValidateMaterial(material, error)) return false;
     }
     if (entity.ShadowCaster && entity.Kind != EntityKind::Cube && entity.Kind != EntityKind::Sphere
         && entity.Kind != EntityKind::Model && entity.Kind != EntityKind::ParticleEmitter
@@ -361,6 +375,9 @@ size_t StateBytes(const SceneState& state)
             + entity.Animation.Keys.capacity() * sizeof(AnimationKeyframe) + entity.Terrain.Heights.capacity() * sizeof(float)
             + entity.Water.Waves.Waves.capacity() * sizeof(jWaterSimulation::Wave)
             + entity.MeshLocalTransforms.capacity() * sizeof(Transform);
+        for (const auto& [index, material] : entity.MeshMaterials)
+            bytes += sizeof(MaterialProperties) + 48 + material.BaseColorTexture.capacity()
+                + material.NormalTexture.capacity() + material.GraphAsset.capacity();
     }
     return bytes;
 }
@@ -379,16 +396,12 @@ Json EncodeShadow(const jAdvancedShadows::Settings& s)
         {"deepOpacityMultiplier", s.DeepOpacityMultiplier}, {"deepTauMax", s.DeepTauMax}, {"deepMaxDistance", s.DeepMaxDistance},
         {"volumeMaxTriangles", s.VolumeMaxTriangles}, {"volumeRange", s.VolumeRange}};
 }
-Json Encode(const Entity& e)
+Json EncodeMaterial(const MaterialProperties& value)
 {
-    Json keys = Json::array();
-    Json meshes = Json::array();
-    for (const auto& mesh : e.MeshLocalTransforms) meshes.push_back(Encode(mesh));
-    for (const auto& key : e.Animation.Keys) keys.push_back({{"time", key.Time}, {"transform", Encode(key.Local)}});
-    Json material{{"overrideEnabled", e.Material.OverrideEnabled}, {"baseColor", Encode(e.Material.BaseColor)}, {"emissive", Encode(e.Material.Emissive)},
-        {"metallic", e.Material.Metallic}, {"roughness", e.Material.Roughness}, {"opacity", e.Material.Opacity},
-        {"baseColorTexture", e.Material.BaseColorTexture}, {"normalTexture", e.Material.NormalTexture}, {"graphAsset", e.Material.GraphAsset}};
-    if (const auto& overrides = e.Material.GraphOverrides)
+    Json material{{"overrideEnabled", value.OverrideEnabled}, {"baseColor", Encode(value.BaseColor)}, {"emissive", Encode(value.Emissive)},
+        {"metallic", value.Metallic}, {"roughness", value.Roughness}, {"opacity", value.Opacity},
+        {"baseColorTexture", value.BaseColorTexture}, {"normalTexture", value.NormalTexture}, {"graphAsset", value.GraphAsset}};
+    if (const auto& overrides = value.GraphOverrides)
     {
         material["graphOverrides"] = {{"baseColor", overrides->BaseColor}, {"baseColorTexture", overrides->BaseColorTexture},
             {"metallic", overrides->Metallic}, {"roughness", overrides->Roughness}, {"normalTexture", overrides->NormalTexture}};
@@ -399,15 +412,23 @@ Json Encode(const Entity& e)
             material["graphOverrides"]["skin"] = {{"shadingModel", overrides->ShadingModel}, {"subsurfaceSpace", overrides->SubsurfaceSpace},
                 {"specularWeight", overrides->SpecularWeight}, {"diffuseOcclusion", overrides->DiffuseOcclusion}, {"preScatterWeight", overrides->PreScatterWeight}};
     }
-    if (e.Material.SubsurfaceOverrideEnabled)
-        material["subsurface"] = {{"weight", e.Material.SubsurfaceWeight}, {"color", Encode(e.Material.SubsurfaceColor)},
-            {"thicknessWorld", e.Material.SubsurfaceThicknessWorld}, {"profile", e.Material.SubsurfaceProfile}};
-    if (e.Material.SkinOverrideEnabled)
-        material["skin"] = {{"shadingModel", uint32_t(e.Material.ShadingModel)}, {"subsurfaceSpace", uint32_t(e.Material.SubsurfaceSpace)},
-            {"specularWeight", e.Material.SpecularWeight}, {"diffuseOcclusion", e.Material.DiffuseOcclusion}, {"preScatterWeight", e.Material.PreScatterWeight}};
+    if (value.SubsurfaceOverrideEnabled)
+        material["subsurface"] = {{"weight", value.SubsurfaceWeight}, {"color", Encode(value.SubsurfaceColor)},
+            {"thicknessWorld", value.SubsurfaceThicknessWorld}, {"profile", value.SubsurfaceProfile}};
+    if (value.SkinOverrideEnabled)
+        material["skin"] = {{"shadingModel", uint32_t(value.ShadingModel)}, {"subsurfaceSpace", uint32_t(value.SubsurfaceSpace)},
+            {"specularWeight", value.SpecularWeight}, {"diffuseOcclusion", value.DiffuseOcclusion}, {"preScatterWeight", value.PreScatterWeight}};
+    return material;
+}
+Json Encode(const Entity& e)
+{
+    Json keys = Json::array();
+    Json meshes = Json::array();
+    for (const auto& mesh : e.MeshLocalTransforms) meshes.push_back(Encode(mesh));
+    for (const auto& key : e.Animation.Keys) keys.push_back({{"time", key.Time}, {"transform", Encode(key.Local)}});
     Json result{{"id", e.Id}, {"parent", e.Parent}, {"kind", KindName(e.Kind)}, {"name", e.Name}, {"visible", e.Visible},
         {"locked", e.Locked}, {"transform", Encode(e.Local)}, {"sourceAsset", e.SourceAsset}, {"assetId", e.AssetId}, {"meshLocalTransforms", std::move(meshes)},
-        {"material", std::move(material)},
+        {"material", EncodeMaterial(e.Material)},
         {"light", {{"color", Encode(e.Light.Color)}, {"intensity", e.Light.Intensity}, {"range", e.Light.Range},
             {"innerConeDegrees", e.Light.InnerConeDegrees}, {"outerConeDegrees", e.Light.OuterConeDegrees}, {"castShadows", e.Light.CastShadows}}},
         {"camera", {{"verticalFovDegrees", e.Camera.VerticalFovDegrees}, {"nearPlane", e.Camera.NearPlane},
@@ -419,6 +440,12 @@ Json Encode(const Entity& e)
         {"terrain", {{"resolution", e.Terrain.Resolution}, {"sizeX", e.Terrain.SizeX}, {"sizeZ", e.Terrain.SizeZ}, {"heights", e.Terrain.Heights}}},
         {"navigation", {{"enabled", e.Navigation.Enabled}, {"cellSize", e.Navigation.CellSize}, {"agentRadius", e.Navigation.AgentRadius},
             {"agentHeight", e.Navigation.AgentHeight}, {"maxSlopeDegrees", e.Navigation.MaxSlopeDegrees}}}};
+    if (!e.MeshMaterials.empty())
+    {
+        auto& materials = result["meshMaterials"] = Json::array();
+        for (const auto& [index, material] : e.MeshMaterials)
+            materials.push_back({{"index", index}, {"material", EncodeMaterial(material)}});
+    }
     if (e.Light.ShadowOverride) result["light"]["shadow"] = EncodeShadow(*e.Light.ShadowOverride);
     if (e.ShadowCaster) result["shadowCaster"] = *e.ShadowCaster;
     // Keep unchanged v1 documents byte-shape compatible for non-water defaults.
@@ -511,10 +538,60 @@ Transform DecodeTransform(const Json& value)
     ObjectKeys(value, {"position", "rotationDegrees", "scale"});
     return {DecodeVec(value.at("position")), DecodeVec(value.at("rotationDegrees")), DecodeVec(value.at("scale"))};
 }
+MaterialProperties DecodeMaterial(const Json& m)
+{
+    MaterialProperties material;
+    ObjectKeys(m, {"overrideEnabled", "baseColor", "emissive", "metallic", "roughness", "opacity", "baseColorTexture", "normalTexture", "graphAsset"}, "graphOverrides", "subsurface", "skin");
+    material.OverrideEnabled = Boolean(m.at("overrideEnabled"));
+    material.BaseColor = DecodeVec(m.at("baseColor")); material.Emissive = DecodeVec(m.at("emissive"));
+    material.Metallic = Float(m.at("metallic")); material.Roughness = Float(m.at("roughness")); material.Opacity = Float(m.at("opacity"));
+    material.BaseColorTexture = String(m.at("baseColorTexture")); material.NormalTexture = String(m.at("normalTexture")); material.GraphAsset = String(m.at("graphAsset"));
+    if (const auto it = m.find("graphOverrides"); it != m.end())
+    {
+        ObjectKeys(*it, {"baseColor", "baseColorTexture", "metallic", "roughness"}, "normalTexture", "subsurface", "skin");
+        // Older scenes stored any explicit normal path as a local slot.
+        const auto normal = it->find("normalTexture");
+        material.GraphOverrides = MaterialGraphOverrides{Boolean(it->at("baseColor")), Boolean(it->at("baseColorTexture")),
+            Boolean(it->at("metallic")), Boolean(it->at("roughness")),
+            normal == it->end() ? !material.NormalTexture.empty() : Boolean(*normal)};
+        if (const auto sss = it->find("subsurface"); sss != it->end())
+        {
+            ObjectKeys(*sss, {"weight", "color", "thickness", "profile"});
+            auto& flags = *material.GraphOverrides;
+            flags.SubsurfaceWeight = Boolean(sss->at("weight")); flags.SubsurfaceColor = Boolean(sss->at("color"));
+            flags.SubsurfaceThickness = Boolean(sss->at("thickness")); flags.SubsurfaceProfile = Boolean(sss->at("profile"));
+        }
+        if (const auto skin = it->find("skin"); skin != it->end())
+        {
+            ObjectKeys(*skin, {"shadingModel", "subsurfaceSpace", "specularWeight", "diffuseOcclusion", "preScatterWeight"});
+            auto& flags = *material.GraphOverrides;
+            flags.ShadingModel = Boolean(skin->at("shadingModel")); flags.SubsurfaceSpace = Boolean(skin->at("subsurfaceSpace"));
+            flags.SpecularWeight = Boolean(skin->at("specularWeight")); flags.DiffuseOcclusion = Boolean(skin->at("diffuseOcclusion"));
+            flags.PreScatterWeight = Boolean(skin->at("preScatterWeight"));
+        }
+    }
+    if (const auto sss = m.find("subsurface"); sss != m.end())
+    {
+        ObjectKeys(*sss, {"weight", "color", "thicknessWorld", "profile"});
+        material.SubsurfaceOverrideEnabled = true;
+        material.SubsurfaceWeight = Float(sss->at("weight")); material.SubsurfaceColor = DecodeVec(sss->at("color"));
+        material.SubsurfaceThicknessWorld = Float(sss->at("thicknessWorld")); material.SubsurfaceProfile = Unsigned32(sss->at("profile"));
+    }
+    if (const auto skin = m.find("skin"); skin != m.end())
+    {
+        ObjectKeys(*skin, {"shadingModel", "subsurfaceSpace", "specularWeight", "diffuseOcclusion", "preScatterWeight"});
+        material.SkinOverrideEnabled = true;
+        material.ShadingModel = jMaterialMapping::ShadingModel(Unsigned32(skin->at("shadingModel")));
+        material.SubsurfaceSpace = jMaterialMapping::SubsurfaceSpace(Unsigned32(skin->at("subsurfaceSpace")));
+        material.SpecularWeight = Float(skin->at("specularWeight")); material.DiffuseOcclusion = Float(skin->at("diffuseOcclusion"));
+        material.PreScatterWeight = Float(skin->at("preScatterWeight"));
+    }
+    return material;
+}
 Entity DecodeEntity(const Json& j)
 {
     ObjectKeys(j, {"id", "parent", "kind", "name", "visible", "locked", "transform", "sourceAsset", "assetId", "meshLocalTransforms",
-        "material", "light", "camera", "animation", "particles", "terrain", "navigation"}, "water", "shadowCaster");
+        "material", "light", "camera", "animation", "particles", "terrain", "navigation"}, "water", "shadowCaster", "meshMaterials");
     Entity e;
     e.Id = Unsigned(j.at("id")); e.Parent = Unsigned(j.at("parent"));
     const std::string kind = String(j.at("kind"));
@@ -528,51 +605,17 @@ Entity DecodeEntity(const Json& j)
     const auto& meshes = j.at("meshLocalTransforms");
     if (!meshes.is_array() || meshes.size() > 65536) throw std::runtime_error("Mesh transform limit exceeded");
     for (const auto& mesh : meshes) e.MeshLocalTransforms.push_back(DecodeTransform(mesh));
-    const auto& m = j.at("material");
-    ObjectKeys(m, {"overrideEnabled", "baseColor", "emissive", "metallic", "roughness", "opacity", "baseColorTexture", "normalTexture", "graphAsset"}, "graphOverrides", "subsurface", "skin");
-    e.Material.OverrideEnabled = Boolean(m.at("overrideEnabled"));
-    e.Material.BaseColor = DecodeVec(m.at("baseColor")); e.Material.Emissive = DecodeVec(m.at("emissive"));
-    e.Material.Metallic = Float(m.at("metallic")); e.Material.Roughness = Float(m.at("roughness")); e.Material.Opacity = Float(m.at("opacity"));
-    e.Material.BaseColorTexture = String(m.at("baseColorTexture")); e.Material.NormalTexture = String(m.at("normalTexture")); e.Material.GraphAsset = String(m.at("graphAsset"));
-    if (const auto it = m.find("graphOverrides"); it != m.end())
+    e.Material = DecodeMaterial(j.at("material"));
+    if (const auto materials = j.find("meshMaterials"); materials != j.end())
     {
-        ObjectKeys(*it, {"baseColor", "baseColorTexture", "metallic", "roughness"}, "normalTexture", "subsurface", "skin");
-        // Older scenes stored any explicit normal path as a local slot.
-        const auto normal = it->find("normalTexture");
-        e.Material.GraphOverrides = MaterialGraphOverrides{Boolean(it->at("baseColor")), Boolean(it->at("baseColorTexture")),
-            Boolean(it->at("metallic")), Boolean(it->at("roughness")),
-            normal == it->end() ? !e.Material.NormalTexture.empty() : Boolean(*normal)};
-        if (const auto sss = it->find("subsurface"); sss != it->end())
+        if (!materials->is_array() || materials->size() > 65536) throw std::runtime_error("Submesh material limit exceeded");
+        for (const auto& slot : *materials)
         {
-            ObjectKeys(*sss, {"weight", "color", "thickness", "profile"});
-            auto& flags = *e.Material.GraphOverrides;
-            flags.SubsurfaceWeight = Boolean(sss->at("weight")); flags.SubsurfaceColor = Boolean(sss->at("color"));
-            flags.SubsurfaceThickness = Boolean(sss->at("thickness")); flags.SubsurfaceProfile = Boolean(sss->at("profile"));
+            ObjectKeys(slot, {"index", "material"});
+            const auto index = Unsigned32(slot.at("index"));
+            if (index >= 65536 || !e.MeshMaterials.emplace(index, DecodeMaterial(slot.at("material"))).second)
+                throw std::runtime_error("Invalid or duplicate submesh material index");
         }
-        if (const auto skin = it->find("skin"); skin != it->end())
-        {
-            ObjectKeys(*skin, {"shadingModel", "subsurfaceSpace", "specularWeight", "diffuseOcclusion", "preScatterWeight"});
-            auto& flags = *e.Material.GraphOverrides;
-            flags.ShadingModel = Boolean(skin->at("shadingModel")); flags.SubsurfaceSpace = Boolean(skin->at("subsurfaceSpace"));
-            flags.SpecularWeight = Boolean(skin->at("specularWeight")); flags.DiffuseOcclusion = Boolean(skin->at("diffuseOcclusion"));
-            flags.PreScatterWeight = Boolean(skin->at("preScatterWeight"));
-        }
-    }
-    if (const auto sss = m.find("subsurface"); sss != m.end())
-    {
-        ObjectKeys(*sss, {"weight", "color", "thicknessWorld", "profile"});
-        e.Material.SubsurfaceOverrideEnabled = true;
-        e.Material.SubsurfaceWeight = Float(sss->at("weight")); e.Material.SubsurfaceColor = DecodeVec(sss->at("color"));
-        e.Material.SubsurfaceThicknessWorld = Float(sss->at("thicknessWorld")); e.Material.SubsurfaceProfile = Unsigned32(sss->at("profile"));
-    }
-    if (const auto skin = m.find("skin"); skin != m.end())
-    {
-        ObjectKeys(*skin, {"shadingModel", "subsurfaceSpace", "specularWeight", "diffuseOcclusion", "preScatterWeight"});
-        e.Material.SkinOverrideEnabled = true;
-        e.Material.ShadingModel = jMaterialMapping::ShadingModel(Unsigned32(skin->at("shadingModel")));
-        e.Material.SubsurfaceSpace = jMaterialMapping::SubsurfaceSpace(Unsigned32(skin->at("subsurfaceSpace")));
-        e.Material.SpecularWeight = Float(skin->at("specularWeight")); e.Material.DiffuseOcclusion = Float(skin->at("diffuseOcclusion"));
-        e.Material.PreScatterWeight = Float(skin->at("preScatterWeight"));
     }
     const auto& l = j.at("light");
     ObjectKeys(l, {"color", "intensity", "range", "innerConeDegrees", "outerConeDegrees", "castShadows"}, "shadow");
