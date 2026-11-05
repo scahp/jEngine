@@ -1,8 +1,10 @@
 #include "pch.h"
 #include "jModelLoader.h"
 
+#include "assimp/BaseImporter.h"
 #include "assimp/Importer.hpp"
 #include "assimp/cimport.h"
+#include "assimp/importerdesc.h"
 #include "assimp/postprocess.h"
 #include "assimp/scene.h"
 #include "assimp/Exporter.hpp"
@@ -18,6 +20,7 @@
 #include "jAssimpUtf8IO.h"
 #include "External/PathTracingDataLoader/json.hpp"
 #include "Core/jLog.h"
+#include <cstring>
 #include <filesystem>
 #include <utility>
 
@@ -89,6 +92,26 @@ namespace
     bool IsCancelled(const jAssetCancellation& cancellation)
     {
         return cancellation && cancellation->load();
+    }
+
+    void SkipLegacyGlbProbe(Assimp::Importer& importer, const char* filename)
+    {
+        // The glTF 1 reader throws during format detection when it sees a GLB 2 header.
+        constexpr char glb2Signature[] = {'g', 'l', 'T', 'F', 2, 0, 0, 0};
+        char header[sizeof(glb2Signature)];
+        std::ifstream file(FromUtf8(filename), std::ios::binary);
+        if (!file.read(header, sizeof(header)) || std::memcmp(header, glb2Signature, sizeof(header)) != 0)
+            return;
+
+        for (size_t index = 0; index < importer.GetImporterCount(); ++index)
+        {
+            if (std::strcmp(importer.GetImporterInfo(index)->mName, "glTF Importer") != 0)
+                continue;
+            auto* legacy = importer.GetImporter(index);
+            if (importer.UnregisterLoader(legacy) == aiReturn_SUCCESS)
+                delete legacy;
+            break;
+        }
     }
 
     struct jPreparationFutures
@@ -177,6 +200,7 @@ std::unique_ptr<jPreparedModel> jModelLoader::PrepareModel(const char* filename,
     if (IsCancelled(cancellation)) return fail("Cancelled");
 	Assimp::Importer importer;
     importer.SetIOHandler(new jAssimpUtf8IO());
+    SkipLegacyGlbProbe(importer, filename);
     unsigned flags = aiProcess_Triangulate | aiProcess_CalcTangentSpace | aiProcess_MakeLeftHanded;
     if (settings.FlipUVs) flags |= aiProcess_FlipUVs;
     if (settings.GenerateNormals) flags |= aiProcess_GenSmoothNormals;

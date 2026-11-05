@@ -21,6 +21,16 @@
 
 #if JPROFILE_BACKEND == JPROFILE_BACKEND_TRACY
 // Tracy is distributed as headers + a single translation unit.
+#ifdef _WIN32
+// The editor connects over loopback. Keep the profiler off the LAN on Windows.
+	#ifndef TRACY_ONLY_LOCALHOST
+		#define TRACY_ONLY_LOCALHOST
+	#endif
+	#ifndef TRACY_NO_BROADCAST
+		#define TRACY_NO_BROADCAST
+	#endif
+#endif
+
 // System tracing controls context-switch / CPU data capture in Tracy.
 // Keep it configurable from CoreDefines.h for per-project stability tuning.
 #if !JPROFILE_TRACY_ENABLE_SYSTEM_TRACING

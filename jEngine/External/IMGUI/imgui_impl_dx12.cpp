@@ -1065,7 +1065,8 @@ static void ImGui_ImplDX12_RenderWindow(ImGuiViewport* viewport, void*)
     cmd_list->ResourceBarrier(1, &barrier);
     cmd_list->Close();
 
-    vd->CommandQueue->Wait(vd->Fence, vd->FenceSignaledValue);
+    if (vd->FenceSignaledValue != 0)
+        vd->CommandQueue->Wait(vd->Fence, vd->FenceSignaledValue);
     vd->CommandQueue->ExecuteCommandLists(1, (ID3D12CommandList* const*)&cmd_list);
     vd->CommandQueue->Signal(vd->Fence, ++vd->FenceSignaledValue);
 }

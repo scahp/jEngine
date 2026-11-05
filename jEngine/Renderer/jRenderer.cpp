@@ -614,11 +614,12 @@ void jRenderer::SetupBasePass()
     {
         for (int32 i = 0; i < _countof(RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer); ++i)
         {
+            const auto& target = RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[i];
             jAttachment color = {
-                .RenderTargetPtr = RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[i],
+                .RenderTargetPtr = target,
                 .LoadStoreOp = EAttachmentLoadStoreOp::CLEAR_STORE,
                 .StencilLoadStoreOp = EAttachmentLoadStoreOp::DONTCARE_DONTCARE,
-                .RTClearValue = ClearColor,
+                .RTClearValue = target->Info.RTClearValue,
                 .InitialLayout = EResourceLayout::UNDEFINED,
                 .FinalLayout = EResourceLayout::COLOR_ATTACHMENT
             };

@@ -214,7 +214,8 @@ void jCommandBufferManager_DX12::WaitCommandQueueAcrossSync(const std::shared_pt
 
     auto Sync_DX12 = (jSyncAcrossCommandQueue_DX12*)InSync.get();
     check(Sync_DX12->Fence);
-    CommandQueue->Wait(Sync_DX12->Fence->Fence.Get(), Sync_DX12->FenceValue);
+    if (Sync_DX12->FenceValue != 0)
+        CommandQueue->Wait(Sync_DX12->Fence->Fence.Get(), Sync_DX12->FenceValue);
 }
 
 jQueryPool* jCommandBufferManager_DX12::GetQueryTimePool() const

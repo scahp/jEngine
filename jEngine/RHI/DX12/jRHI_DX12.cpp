@@ -428,8 +428,6 @@ bool jRHI_DX12::InitRHI()
     HRESULT hr = factory.As(&Factory);
     if (SUCCEEDED(hr))
     {
-        Factory->MakeWindowAssociation(m_hWnd, DXGI_MWA_NO_ALT_ENTER | DXGI_MWA_NO_WINDOW_CHANGES);
-
         BOOL allowTearing = false;
         hr = Factory->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &allowTearing, sizeof(allowTearing));
 
@@ -695,6 +693,8 @@ void jRHI_DX12::ReleaseRHI()
     Adapter.Reset();
     Factory.Reset();
     DispatchComputeCommandSignature.Reset();
+    DrawCommandSignature.Reset();
+    DrawIndexedCommandSignature.Reset();
     Device.Reset();
 
 #if defined(_DEBUG)
