@@ -1,0 +1,13 @@
+{
+  "enabledPlugins": {
+    "jaeho-game-studio@jaeho-studio": true
+  },
+  "extraKnownMarketplaces": {
+    "jaeho-studio": {
+      "source": {
+        "path": "./tools/JaehoGameStudio",
+        "source": "directory"
+      }
+    }
+  }
+}

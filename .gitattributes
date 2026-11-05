@@ -49,11 +49,3 @@
 *.gltf binary
 *.glb binary
 *.bin binary
-
-# BEGIN JAEHOGAMESTUDIO MIRRORS
-/.claude/agents/jgs-*.md text eol=lf
-/.codex/agents/jgs-*.toml text eol=lf
-/.claude/skills/** text=auto eol=lf
-/.agents/skills/** text=auto eol=lf
-/.jgs-mirror.json text eol=lf
-# END JAEHOGAMESTUDIO MIRRORS
