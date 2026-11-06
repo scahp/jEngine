@@ -129,9 +129,9 @@ ComPtr<IDxcBlob> jShaderCompiler_DX12::Compile(const char* InShaderCode, uint32 
     if (JFAIL(m_dxc.CreateInstance(CLSID_DxcLibrary, Library.GetAddressOf())))
         return nullptr;
 
-    // Shader 로부터 Blob 생성
+    // The shader loader supplies UTF-8 source, including when DXC embeds it in SPIR-V debug info.
     ComPtr<IDxcBlobEncoding> textBlob;
-    if (JFAIL(Library->CreateBlobWithEncodingFromPinned((LPBYTE)InShaderCode, InShaderCodeLength, 0, &textBlob)))
+    if (JFAIL(Library->CreateBlobWithEncodingFromPinned(InShaderCode, InShaderCodeLength, DXC_CP_UTF8, &textBlob)))
         return nullptr;
 
     std::vector<const wchar_t*> options;

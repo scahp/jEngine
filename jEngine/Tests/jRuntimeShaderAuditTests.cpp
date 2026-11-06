@@ -88,7 +88,7 @@ namespace
             || FAILED(library.CreateInstance(CLSID_DxcCompiler, compiler.GetAddressOf()))
             || FAILED(library.CreateInstance(CLSID_DxcLibrary, utilities.GetAddressOf()))
             || FAILED(utilities->CreateBlobWithEncodingFromPinned(
-                reinterpret_cast<LPBYTE>(const_cast<char*>(source.data())), static_cast<UINT32>(source.size()), 0, &text)))
+                source.data(), static_cast<UINT32>(source.size()), DXC_CP_UTF8, &text)))
         {
             std::cerr << "Runtime DXC diagnostic initialization failed" << std::endl;
             return;
@@ -214,13 +214,15 @@ int RunRuntimeShaderAuditTests()
                 const char* name = gather ? "gather" : "resolve";
                 const wchar_t* entry = gather ? L"SurfelGIGatherIrradianceHWRT_CS" : L"main";
                 std::set<std::string> included;
-                const auto source = FlattenRuntimeShader(output / (std::string(name) + ".hlsl"), includeDirectory, included);
+                const auto source = "// UTF-8 comment: \xED\x95\x9C\xEA\xB8\x80\n"
+                    + FlattenRuntimeShader(output / (std::string(name) + ".hlsl"), includeDirectory, included);
                 const auto blob = compiler.Compile(source.data(), static_cast<uint32>(source.size()),
                     L"cs_6_6", entry, false, options);
                 uint32 magic = 0;
                 if (blob && blob->GetBufferSize() >= sizeof(magic))
                     std::memcpy(&magic, blob->GetBufferPointer(), sizeof(magic));
-                const std::string label = std::string("runtime DXC generated ") + name + (vulkan ? " SPIR-V" : " DXIL");
+                const std::string label = std::string("runtime DXC generated ") + name + (vulkan ? " SPIR-V" : " DXIL")
+                    + " with UTF-8 source";
                 if (!expect(magic == (vulkan ? 0x07230203u : 0x43425844u), label.c_str()))
                     PrintRuntimeCompilerDiagnostics(source, entry, options);
             }
