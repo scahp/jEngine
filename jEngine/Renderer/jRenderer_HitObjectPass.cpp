@@ -16,6 +16,7 @@
 #include "Code/Engine/jEditor.h"
 #include "Code/Engine/Editor/jEditorUiRenderer.h"
 #include "Code/Engine/Editor/jEditorWorkspace.h"
+#include "Code/Engine/Editor/jRenderInspector.h"
 #endif
 
 namespace
@@ -285,6 +286,20 @@ void IRenderer::ReadbackHitObject(const std::shared_ptr<jRenderTarget>& target, 
         RevealAuthoringSelection(*g_Editor);
     }
     else g_Editor->Placement.SelectObject(picked);
+    if (jRenderInspector::IsPixelProbeActive())
+    {
+        const auto submesh = g_Editor->GetSelectedModelSubmesh();
+        const bool selectedSubmesh = submesh && submesh->RenderId == objectId;
+        const auto selectedEntity = selectedSubmesh ? submesh->Model : g_Editor->GetSelectedEntityId();
+        const auto* entity = picked ? g_Editor->GetDocument().Find(selectedEntity) : nullptr;
+        std::string material;
+        if (entity)
+            if (auto properties = g_Editor->ReadMaterialProperties(selectedEntity,
+                selectedSubmesh ? std::optional<size_t>(submesh->Index) : std::nullopt))
+                material = properties->GraphAsset;
+        jRenderInspector::RecordPixelObject(g_rhi->GetCurrentFrameNumber(), objectId, entity ? selectedEntity : 0,
+            selectedSubmesh && picked ? int(submesh->Index) : -1, entity ? entity->Name : "", material);
+    }
 #endif
 }
 

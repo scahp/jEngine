@@ -59,6 +59,7 @@ bool jRenderer::ResolveMultisampleScene()
     auto& scene = *RenderFrameContextPtr->SceneRenderTargetPtr;
     jRasterFeatureDebug::ReleaseResources();
     if (scene.ColorPtr->Info.SampleCount == EMSAASamples::COUNT_1) return true;
+    SCOPE_GPU_PROFILE(RenderFrameContextPtr, ResolveMultisampleScene);
     auto* command = RenderFrameContextPtr->GetActiveCommandBuffer();
     std::vector<std::shared_ptr<jRenderTarget>> sources = {scene.ColorPtr};
     sources.insert(sources.end(), std::begin(scene.GBuffer), std::end(scene.GBuffer));
@@ -190,6 +191,7 @@ bool jRenderer::ResolveMultisampleScene()
 bool jRenderer::DecodeSkinPostNormals()
 {
     if (!RenderFrameContextPtr->HasSkinMaterials) return true;
+    SCOPE_GPU_PROFILE(RenderFrameContextPtr, SkinPostNormalDecode);
     auto& scene = *RenderFrameContextPtr->SceneRenderTargetPtr;
     auto info = scene.GBuffer[0]->Info;
     info.SampleCount = EMSAASamples::COUNT_1;

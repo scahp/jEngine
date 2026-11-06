@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "jRenderer.h"
+#include "Code/Engine/Editor/jRenderInspector.h"
 #include "jOptions.h"
 #include "Scene/jCamera.h"
 #include "Scene/Light/jLight.h"
@@ -886,6 +887,16 @@ std::shared_ptr<jTexture> jRenderer::RTAO()
 	SCOPE_GPU_PROFILE(RenderFrameContextPtr, RaytracingAO);
 	DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "RaytracingAO", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
 
+    // This legacy hit shader dereferences an index buffer for every static
+    // render object. Authored non-indexed meshes (for example particles) cannot
+    // be bound to that table. Keep the frame valid and report the missing AO.
+    if (!RenderFrameContextPtr->RaytracingScene || !RenderFrameContextPtr->RaytracingScene->TLASBufferPtr)
+        return {};
+    for (const auto* object : jObject::GetStaticRenderObject())
+        if (!object || !object->GeometryDataPtr || !object->GeometryDataPtr->IndexBufferPtr ||
+            !object->GeometryDataPtr->VertexBufferPtr)
+            return {};
+
 	// Create Persistent Resources
 	if (!jSceneRenderTarget::AOProjection || jSceneRenderTarget::AOProjection->Info.Width != (int32)RayRTWidth || jSceneRenderTarget::AOProjection->Info.Height != (int32)RayRTHeight)
 	{
@@ -1249,10 +1260,15 @@ void jRenderer::AOPass()
 	{
 		return;
 	}
-	if (gOptions.ShowDebugRT)
-		DebugRTs.push_back(AOResult);
-
+    if (!AOResult)
+    {
+        jRenderInspector::Observe(RenderFrameContextPtr, View, jRenderInspector::ViewMode::AO, "RaytracingAO", {},
+            "RTAO requires a valid RT scene and indexed geometry for its legacy material table");
+        return;
+    }
+    if (gOptions.ShowDebugRT) DebugRTs.push_back(AOResult);
 	ApplyAOToFinalColor(RenderFrameContextPtr, AOResult);
+    jRenderInspector::Observe(RenderFrameContextPtr, View, jRenderInspector::ViewMode::AO, "AO result", AOResult);
 }
 
 void jRenderer::SSGIPass()

@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "jEditorUiRenderer.h"
 #include "jEditorCapture.h"
+#include "jRenderInspector.h"
 #include "FileLoader/jEditorAssets.h"
 #include "FileLoader/jImageFileLoader.h"
 #include <set>
@@ -99,6 +100,7 @@ void PrepareScenePreview(const std::shared_ptr<jRenderFrameContext>& frame, cons
     g_rhi->TransitionLayout(command, source, restore);
 #ifdef ENABLE_EDITOR_FEATURES
     jEditorCapture::ReadFrame(frame, *texture, view.Camera ? view.Camera->ProjectionAspectOverride : 0.f);
+    jRenderInspector::Observe(frame, view, jRenderInspector::ViewMode::Final, "PostProcess / final display", preview.Target->GetTexturePtr());
     if (drawSelection) DrawSelectionOutline(frame, view, preview.Target);
 #endif
     g_rhi->TransitionLayout(command, texture, EResourceLayout::SHADER_READ_ONLY);

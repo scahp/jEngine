@@ -2,6 +2,7 @@
 #include "Core/jLog.h"
 
 #include "jRHI_Vulkan.h"
+#include "Profiler/jRenderTrace.h"
 
 #include "FileLoader/jImageFileLoader.h"
 #include "FileLoader/jFile.h"
@@ -1416,6 +1417,7 @@ jBlendingStateInfo* jRHI_Vulkan::CreateBlendingState(const jBlendingStateInfo& i
 
 void jRHI_Vulkan::DrawArrays(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 vertStartIndex, int32 vertCount) const
 {
+    jRenderTrace::RecordCommand(false);
 	check(InRenderFrameContext);
     check(InRenderFrameContext->GetActiveCommandBuffer());
 
@@ -1429,6 +1431,7 @@ void jRHI_Vulkan::DrawArrays(const std::shared_ptr<jRenderFrameContext>& InRende
 
 void jRHI_Vulkan::DrawArraysInstanced(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 vertStartIndex, int32 vertCount, int32 instanceCount) const
 {
+    jRenderTrace::RecordCommand(false);
 	check(InRenderFrameContext);
     check(InRenderFrameContext->GetActiveCommandBuffer());
 
@@ -1442,6 +1445,7 @@ void jRHI_Vulkan::DrawArraysInstanced(const std::shared_ptr<jRenderFrameContext>
 
 void jRHI_Vulkan::DrawElements(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 indexCount) const
 {
+    jRenderTrace::RecordCommand(false);
 	check(InRenderFrameContext);
     check(InRenderFrameContext->GetActiveCommandBuffer());
 
@@ -1455,6 +1459,7 @@ void jRHI_Vulkan::DrawElements(const std::shared_ptr<jRenderFrameContext>& InRen
 
 void jRHI_Vulkan::DrawElementsInstanced(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 indexCount, int32 instanceCount) const
 {
+    jRenderTrace::RecordCommand(false);
 	check(InRenderFrameContext);
     check(InRenderFrameContext->GetActiveCommandBuffer());
 
@@ -1468,6 +1473,7 @@ void jRHI_Vulkan::DrawElementsInstanced(const std::shared_ptr<jRenderFrameContex
 
 void jRHI_Vulkan::DrawElementsBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 indexCount, int32 baseVertexIndex) const
 {
+    jRenderTrace::RecordCommand(false);
 	check(InRenderFrameContext);
     check(InRenderFrameContext->GetActiveCommandBuffer());
 
@@ -1481,6 +1487,7 @@ void jRHI_Vulkan::DrawElementsBaseVertex(const std::shared_ptr<jRenderFrameConte
 
 void jRHI_Vulkan::DrawElementsInstancedBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 indexCount, int32 baseVertexIndex, int32 instanceCount) const
 {
+    jRenderTrace::RecordCommand(false);
 	check(InRenderFrameContext);
 	check(InRenderFrameContext->GetActiveCommandBuffer());
 
@@ -1494,6 +1501,7 @@ void jRHI_Vulkan::DrawElementsInstancedBaseVertex(const std::shared_ptr<jRenderF
 
 void jRHI_Vulkan::DrawIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, jBuffer* buffer, int32 startIndex, int32 drawCount) const
 {
+    jRenderTrace::RecordCommand(false);
 	check(InRenderFrameContext);
     check(InRenderFrameContext->GetActiveCommandBuffer());
 
@@ -1531,6 +1539,7 @@ EMSAASamples jRHI_Vulkan::SelectMSAASamples(uint32 requested)
 void jRHI_Vulkan::DrawElementsIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext
 	, EPrimitiveType type, jBuffer* buffer, int32 startIndex, int32 drawCount) const
 {
+    jRenderTrace::RecordCommand(false);
     check(InRenderFrameContext);
     check(InRenderFrameContext->GetActiveCommandBuffer());
 
@@ -1545,6 +1554,7 @@ void jRHI_Vulkan::DrawElementsIndirect(const std::shared_ptr<jRenderFrameContext
 
 void jRHI_Vulkan::DispatchCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ) const
 {
+    jRenderTrace::RecordCommand(true);
     check(InRenderFrameContext);
     check(InRenderFrameContext->GetActiveCommandBuffer());
 
@@ -1558,6 +1568,7 @@ void jRHI_Vulkan::DispatchCompute(const std::shared_ptr<jRenderFrameContext>& In
 
 void jRHI_Vulkan::DispatchComputeIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, jBuffer* buffer, uint32 bufferOffset) const
 {
+    jRenderTrace::RecordCommand(true);
     check(InRenderFrameContext);
     check(InRenderFrameContext->GetActiveCommandBuffer());
     check(buffer);

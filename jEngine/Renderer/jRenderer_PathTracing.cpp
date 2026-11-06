@@ -1,5 +1,6 @@
 ﻿#include "pch.h"
 #include "jRenderer_PathTracing.h"
+#include "Code/Engine/Editor/jRenderInspector.h"
 #include "RHI/jRaytracingScene.h"
 #include "jSceneRenderTargets.h"
 #include "RHI/jRHIUtil.h"
@@ -597,6 +598,8 @@ void jRenderer_PathTracing::PathTracing()
 
 		g_rhi->TransitionLayout(CmdBuffer, PathTracingOutput, EResourceLayout::SHADER_READ_ONLY);
 	}
+
+    jRenderInspector::Observe(RenderFrameContextPtr, View, jRenderInspector::ViewMode::SceneHDR, "PathTracing", output);
 
 	{
 		DEBUG_EVENT_WITH_COLOR(RenderFrameContextPtr, "SimpleTonemap", Vector4(0.8f, 0.0f, 0.0f, 1.0f));
