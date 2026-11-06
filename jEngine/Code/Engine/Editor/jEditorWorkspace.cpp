@@ -30,6 +30,7 @@
 #include <future>
 #include <ctime>
 #include <set>
+#include <utility>
 
 namespace
 {
@@ -71,10 +72,19 @@ struct CaptureDialog
     std::string Error;
 };
 struct RendererChoiceRect { ImVec2 Position{}, Size{}; bool Visible = false; };
+struct ViewportCameraLook
+{
+    ImGuiID ViewportId = 0;
+    double AnchorX = 0, AnchorY = 0;
+    double PreviousX = 0, PreviousY = 0;
+    int PreviousCursorMode = GLFW_CURSOR_NORMAL;
+    bool RestoreImGuiCursorUpdates = false;
+};
 struct Workspace
 {
     bool Visible = true, Runtime = false, ViewHovered = false, ViewFocused = false;
     bool ViewportOnly = false, ToggleViewportOnly = false;
+    ViewportCameraLook CameraLook;
     bool RendererControlVisible = false, ViewToolbarOwnsInput = false;
     bool FixedLayout = true, ShowAssets = true, ShowLogs = true, ShowProfiler = false, ShowTools = false;
     bool PaintTerrainInScene = false;
@@ -129,6 +139,112 @@ struct Workspace
 };
 Workspace& State() { static Workspace state; return state; }
 jCamera* Camera() { return g_Engine ? g_Engine->Game.MainCamera : nullptr; }
+
+void EndViewportCameraLook()
+{
+    auto& active = State().CameraLook;
+    if (!active.ViewportId) return;
+    const auto look = std::exchange(active, {});
+    if (!ImGui::GetCurrentContext()) return;
+    if (look.RestoreImGuiCursorUpdates)
+        ImGui::GetIO().ConfigFlags &= ~ImGuiConfigFlags_NoMouseCursorChange;
+
+    const auto* viewport = ImGui::FindViewportByID(look.ViewportId);
+    if (!viewport || !viewport->PlatformHandle) return;
+    if (IsUseVulkan())
+    {
+        auto* window = static_cast<GLFWwindow*>(viewport->PlatformHandle);
+        glfwSetInputMode(window, GLFW_CURSOR, look.PreviousCursorMode);
+        if (glfwGetWindowAttrib(window, GLFW_FOCUSED))
+            glfwSetCursorPos(window, look.AnchorX, look.AnchorY);
+    }
+#ifdef _WIN32
+    else
+    {
+        auto window = static_cast<HWND>(viewport->PlatformHandle);
+        SetCursorPos(int(look.AnchorX), int(look.AnchorY));
+        if (GetForegroundWindow() == window) SetCursor(LoadCursor(nullptr, IDC_ARROW));
+    }
+#endif
+}
+
+void UpdateViewportCameraLook(jEditor& editor, jCamera* camera, ImGuiViewport& viewport, [[maybe_unused]] ImVec2 center, bool canStart)
+{
+    auto& look = State().CameraLook;
+    auto& io = ImGui::GetIO();
+    const auto getFocus = ImGui::GetPlatformIO().Platform_GetWindowFocus;
+    if (!io.MouseDown[ImGuiMouseButton_Right] || !camera || !viewport.PlatformHandle ||
+        io.AppFocusLost || (getFocus && !getFocus(&viewport)) ||
+        (look.ViewportId && look.ViewportId != viewport.ID))
+    {
+        EndViewportCameraLook();
+        return;
+    }
+
+    const bool starting = look.ViewportId == 0;
+    if (starting && (!canStart || !ImGui::IsMouseClicked(ImGuiMouseButton_Right) ||
+        ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup) || (io.KeyAlt && io.MouseDown[ImGuiMouseButton_Left])))
+        return;
+
+    double x = 0, y = 0, nextX = 0, nextY = 0;
+    const auto pressed = io.MouseClickedPos[ImGuiMouseButton_Right];
+    const ImVec2 anchor(pressed.x - viewport.Pos.x, pressed.y - viewport.Pos.y);
+    if (IsUseVulkan())
+    {
+        auto* window = static_cast<GLFWwindow*>(viewport.PlatformHandle);
+        glfwGetCursorPos(window, &x, &y);
+        if (starting)
+        {
+            look.AnchorX = look.PreviousX = anchor.x;
+            look.AnchorY = look.PreviousY = anchor.y;
+            look.PreviousCursorMode = glfwGetInputMode(window, GLFW_CURSOR);
+            look.RestoreImGuiCursorUpdates = !(io.ConfigFlags & ImGuiConfigFlags_NoMouseCursorChange);
+            // ImGui would otherwise replace the disabled mode on a detached viewport.
+            io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        }
+        nextX = x;
+        nextY = y;
+    }
+#ifdef _WIN32
+    else
+    {
+        auto window = static_cast<HWND>(viewport.PlatformHandle);
+        POINT cursor{};
+        POINT target{LONG(center.x - viewport.Pos.x), LONG(center.y - viewport.Pos.y)};
+        if (!GetCursorPos(&cursor) || !ClientToScreen(window, &target))
+        {
+            EndViewportCameraLook();
+            return;
+        }
+        if (starting)
+        {
+            POINT origin{LONG(anchor.x), LONG(anchor.y)};
+            if (!ClientToScreen(window, &origin)) return;
+            look.AnchorX = look.PreviousX = origin.x;
+            look.AnchorY = look.PreviousY = origin.y;
+        }
+        x = cursor.x;
+        y = cursor.y;
+        // Measure from the last warp position, so the synthetic move adds no rotation.
+        if ((cursor.x != target.x || cursor.y != target.y) && !SetCursorPos(target.x, target.y))
+        {
+            EndViewportCameraLook();
+            return;
+        }
+        SetCursor(nullptr);
+        nextX = target.x;
+        nextY = target.y;
+    }
+#endif
+    look.ViewportId = viewport.ID;
+    ImGui::SetMouseCursor(ImGuiMouseCursor_None);
+    const float deltaX = float(x - look.PreviousX), deltaY = float(y - look.PreviousY);
+    look.PreviousX = nextX;
+    look.PreviousY = nextY;
+    if (deltaX || deltaY) editor.HandleCameraMouseMove(deltaX, deltaY, camera, true);
+}
+
 void Message(const std::string& value, bool error = false)
 {
     State().Status = value;
@@ -250,6 +366,7 @@ void FinishInspectorEdit(jEditor& editor)
 }
 void FinishWorkspaceEdit(jEditor& editor)
 {
+    EndViewportCameraLook();
     editor.CancelViewportDuplicateDrag();
     FinishInspectorEdit(editor);
     jEditorTools::FinishTerrainStroke(editor);
@@ -1952,6 +2069,7 @@ void ApplyAuthoringViewportOnlyToggle(jEditor& editor)
     if (ImGuizmo::IsUsing() || ImGui::GetDragDropPayload()) return;
     s.ToggleViewportOnly = false;
     if (s.UnsavedPrompt || s.OpenModal || ImGui::GetTopMostPopupModal()) return;
+    EndViewportCameraLook();
     s.ViewportOnly = !s.ViewportOnly;
     s.ViewHovered = s.ViewFocused = false;
     editor.SetViewportInputState(false, false);
@@ -1978,6 +2096,7 @@ void SetAuthoringWorkspaceVisible(bool visible)
         jEditorCapture::Stop();
         FinishWorkspaceEdit(*g_Editor);
         ClearAssetPlacement(*g_Editor);
+        g_Editor->SetViewportInputState(false, false);
         g_Editor->Placement.bPickRequested = false;
     }
     auto& s = State();
@@ -1986,6 +2105,7 @@ void SetAuthoringWorkspaceVisible(bool visible)
 }
 void SetAuthoringRuntimeMode(bool runtime)
 {
+    EndViewportCameraLook();
     auto& s = State();
     s.Runtime = runtime;
     s.Visible = !runtime;
@@ -2202,11 +2322,14 @@ void UpdateAuthoringViewportOnlyInput(jEditor& editor)
     const auto getFocus = ImGui::GetPlatformIO().Platform_GetWindowFocus;
     s.ViewFocused = !io.AppFocusLost && (!getFocus || (main->PlatformHandle && getFocus(main)));
     const ImVec2 max(main->Pos.x + main->Size.x, main->Pos.y + main->Size.y);
-    s.ViewHovered = s.ViewFocused && ImRect(main->Pos, max).Contains(io.MousePos);
+    const bool hovered = s.ViewFocused && ImRect(main->Pos, max).Contains(io.MousePos);
+    const bool wasLooking = s.CameraLook.ViewportId == main->ID;
+    s.ViewHovered = hovered || (s.ViewFocused && wasLooking);
     SyncWorkspaceInput();
     editor.SetViewportInputState(s.ViewHovered, s.ViewFocused);
-    if (s.ViewHovered && (io.MouseDown[1] || (io.KeyAlt && io.MouseDown[0])) && (io.MouseDelta.x || io.MouseDelta.y))
-        editor.HandleCameraMouseMove(int32(io.MouseDelta.x), int32(io.MouseDelta.y), Camera());
+    UpdateViewportCameraLook(editor, Camera(), *main, ImVec2(main->Pos.x + main->Size.x * .5f, main->Pos.y + main->Size.y * .5f), hovered);
+    if (!wasLooking && !s.CameraLook.ViewportId && hovered && io.KeyAlt && io.MouseDown[0] && (io.MouseDelta.x || io.MouseDelta.y))
+        editor.HandleCameraMouseMove(io.MouseDelta.x, io.MouseDelta.y, Camera());
 }
 void DrawSceneLoadingOverlay(ImDrawList& draw, const ImVec2& position, const ImVec2& size)
 {
@@ -2463,9 +2586,12 @@ void RenderAuthoringWorkspace(jEditor& editor)
         if (void* texture = jEditorUiRenderer::ScenePreviewTexture()) ImGui::Image(texture, size);
         else ImGui::Dummy(size);
         const bool imageHovered = ImGui::IsItemHovered();
+        auto* viewport = ImGui::GetWindowViewport();
         if (imageHovered && (ImGui::IsMouseClicked(0) || ImGui::IsMouseClicked(1))) s.ViewToolbarOwnsInput = false;
         const bool viewportInputBlocked = toolbarBlocksInput || s.ViewToolbarOwnsInput;
-        s.ViewHovered = imageHovered && !viewportInputBlocked;
+        const bool viewportHovered = imageHovered && !viewportInputBlocked;
+        const bool wasLooking = s.CameraLook.ViewportId == viewport->ID;
+        s.ViewHovered = viewportHovered || wasLooking;
         s.ViewFocused = ImGui::IsWindowFocused() && !viewportInputBlocked;
         editor.SetViewportInputState(s.ViewHovered, s.ViewFocused);
         if (s.ViewFocused) editor.SetShortcutInputState(true);
@@ -2475,12 +2601,14 @@ void RenderAuthoringWorkspace(jEditor& editor)
         auto* sceneDraw = ImGui::GetWindowDrawList();
         sceneDraw->PushClipRect(position, ImVec2(position.x + size.x, position.y + size.y), true);
         const bool terrainBrush = !dragging && s.ShowTools && s.PaintTerrainInScene && camera &&
-            jEditorTools::RenderTerrainBrush(editor, *camera, position, size, s.ViewHovered);
+            jEditorTools::RenderTerrainBrush(editor, *camera, position, size, viewportHovered);
         const bool gizmoInput = !dragging && !terrainBrush && !viewportInputBlocked &&
             editor.RenderViewportGizmo(camera, position.x, position.y, size.x, size.y);
         if (dragging || terrainBrush) editor.CancelViewportDuplicateDrag();
         sceneDraw->PopClipRect();
-        if (!dragging && s.ViewHovered && !gizmoInput)
+        const bool cameraInput = viewportHovered && !dragging && !gizmoInput && !terrainBrush;
+        UpdateViewportCameraLook(editor, camera, *viewport, ImVec2(position.x + size.x * .5f, position.y + size.y * .5f), cameraInput);
+        if (!wasLooking && !s.CameraLook.ViewportId && !dragging && viewportHovered && !gizmoInput)
         {
             if (!document.IsPlaying() && !terrainBrush && ImGui::IsMouseClicked(0) && !io.KeyAlt)
             {
@@ -2493,8 +2621,8 @@ void RenderAuthoringWorkspace(jEditor& editor)
                     editor.Placement.PickMouseY = int32(y);
                 }
             }
-            if ((io.MouseDown[1] || (io.KeyAlt && io.MouseDown[0])) && (io.MouseDelta.x || io.MouseDelta.y))
-                editor.HandleCameraMouseMove(int32(io.MouseDelta.x), int32(io.MouseDelta.y), camera);
+            if (io.KeyAlt && io.MouseDown[0] && (io.MouseDelta.x || io.MouseDelta.y))
+                editor.HandleCameraMouseMove(io.MouseDelta.x, io.MouseDelta.y, camera);
         }
         if (!s.Status.empty() && size.x > 12 && size.y > ImGui::GetTextLineHeight() + 16)
         {
@@ -2507,7 +2635,11 @@ void RenderAuthoringWorkspace(jEditor& editor)
         }
         DrawSceneLoadingOverlay(*sceneDraw, position, size);
     }
-    else editor.CancelViewportDuplicateDrag();
+    else
+    {
+        EndViewportCameraLook();
+        editor.CancelViewportDuplicateDrag();
+    }
     ImGui::End();
     if (scene) ImGui::PopStyleVar();
     if (s.ShowAssets && bottom > 0)
@@ -2580,6 +2712,7 @@ void RenderAuthoringWorkspace(jEditor& editor)
 }
 void ShutdownAuthoringWorkspace()
 {
+    EndViewportCameraLook();
     jEditorCapture::Shutdown();
     jSceneFeatureTools::Shutdown();
     auto& s = State(); jEditorAssetPanel::Shutdown(); if (s.Registry) s.Registry->Shutdown();

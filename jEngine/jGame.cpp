@@ -2116,7 +2116,7 @@ void jGame::OnMouseMove(int32 xOffset, int32 yOffset)
     if (IsAuthoringViewportOnly() || IsAuthoringWorkspaceVisible()) return;
     if (g_Editor && g_Editor->IsAuthoringEnabled())
     {
-        g_Editor->HandleCameraMouseMove(xOffset, yOffset, MainCamera);
+        g_Editor->HandleCameraMouseMove(float(xOffset), float(yOffset), MainCamera);
         return;
     }
 #endif

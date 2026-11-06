@@ -77,7 +77,7 @@ public:
     void SetViewportInputState(bool hovered, bool focused);
     void SetShortcutInputState(bool editorWindowFocused);
     bool HandleCameraInput(float deltaTime, jCamera* camera);
-    bool HandleCameraMouseMove(int32 xOffset, int32 yOffset, jCamera* camera);
+    bool HandleCameraMouseMove(float xOffset, float yOffset, jCamera* camera, bool capturedFlyLook = false);
     bool RenderViewportGizmo(jCamera* camera, float x = 0, float y = 0, float width = 0, float height = 0);
     bool CancelViewportDuplicateDrag();
 

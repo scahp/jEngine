@@ -1751,12 +1751,15 @@ bool jEditor::HandleCameraInput(float deltaTime,jCamera* camera)
     if(g_MouseState[MouseButtonIndex(EMouseButtonType::RIGHT)].Down){const float vertical=(jEditorProjectSettings::ActionDown("camera.up",EInputKey::E)?distance:0)-(jEditorProjectSettings::ActionDown("camera.down",EInputKey::Q)?distance:0);const Vector offset=Vector::UpVector*vertical;camera->Pos+=offset;camera->Target+=offset;camera->Up+=offset;}
     return true;
 }
-bool jEditor::HandleCameraMouseMove(int32 xOffset,int32 yOffset,jCamera* camera)
+bool jEditor::HandleCameraMouseMove(float xOffset, float yOffset, jCamera* camera, bool capturedFlyLook)
 {
-    auto& s=*Runtime->Data;if(!s.Owner()||!s.Enabled)return false;
-    if(!camera||!s.Hovered||(!IsAuthoringViewportOnly()&&(ImGuizmo::IsUsing()||ImGuizmo::IsOver())))return true;
-    const bool orbit=IsKeyDown(EInputKey::ALT)&&g_MouseState[MouseButtonIndex(EMouseButtonType::LEFT)].Down;
-    const bool fly=g_MouseState[MouseButtonIndex(EMouseButtonType::RIGHT)].Down;
+    auto& s = *Runtime->Data;
+    if (!s.Owner() || !s.Enabled) return false;
+    if (!camera) return true;
+    if (!capturedFlyLook && (!s.Hovered || (!IsAuthoringViewportOnly() && (ImGuizmo::IsUsing() || ImGuizmo::IsOver()))))
+        return true;
+    const bool orbit = !capturedFlyLook && IsKeyDown(EInputKey::ALT) && g_MouseState[MouseButtonIndex(EMouseButtonType::LEFT)].Down;
+    const bool fly = capturedFlyLook || g_MouseState[MouseButtonIndex(EMouseButtonType::RIGHT)].Down;
     if(!orbit&&!fly)return true;
     Vector angles=camera->GetEulerAngle()+Vector(yOffset*0.0025f,xOffset*0.0025f,0);
     if(orbit){
