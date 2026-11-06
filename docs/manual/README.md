@@ -27,6 +27,7 @@ jEngine의 기본 **저작 화면**에서 프로젝트를 만들고, 물체를 �
 | 11 | [노드 재질의 매핑](material-mapping.md) | Parallax/POM, Relief, Interior, Horizon 노드 연결하기 |
 | 12 | [고급 그림자](advanced-shadows.md) | CSM, VSM/ESM/EVSM, Shadow Volume, Deep, Dual Paraboloid, PSM 설정과 객체별 그림자 생성 |
 | 13 | [재질 확산·MSAA·Hi-Z](material-diffusion-msaa-hiz.md) | Verified Screen SSS/MSAA/Hi-Z and human Skin Kelemen/UV workflow, six saved controls and support limits (English) |
+| 14 | [렌더링 패스와 픽셀 진단](rendering-inspector.md) | 패스 시간·중간 출력·Debug View·픽셀 값과 고정 프레임 확인하기 |
 
 The [human-head reference sample](../../examples/subsurface-human-demo/README.md) includes original Object-space normals, linear Spec/AO, Skin Kelemen/UV controls and six saved projects. Its [reference audit](../reports/skin-reference-audit.md) records 76 frames / 142 checks, separately from the generic 127-frame / 183-check fixtures; original pixel parity is not claimed.
 

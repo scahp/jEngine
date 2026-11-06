@@ -13,6 +13,7 @@ A personal 3D engine and editor using Vulkan and DirectX 12.
 
 [**User manual (Korean)**](docs/manual/README.md) — numbered screenshots, scene loading,
 projects, scene editing, assets, authoring tools, and packaging.
+[Render Pass Inspector](docs/manual/rendering-inspector.md) — pass timings, debug views, frozen previews, and pixel values.
 [Editor guide](docs/editor-authoring.md) · [Implementation and measurements](docs/reports/editor-authoring.md) · [Studio sample](examples/authoring-demo/README.md)
 
 ## Supported platforms
