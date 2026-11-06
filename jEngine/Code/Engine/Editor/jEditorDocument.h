@@ -140,6 +140,9 @@ struct Entity
     // Mesh-local TRS overrides survive model save/reload; empty uses source defaults.
     std::vector<Transform> MeshLocalTransforms;
     MaterialProperties Material{};
+    // Model-instance overrides, indexed like MeshLocalTransforms. Omitted slots
+    // inherit the model override or their imported source material.
+    std::map<uint32_t, MaterialProperties> MeshMaterials;
     LightProperties Light{};
     CameraProperties Camera{};
     AnimationProperties Animation{};

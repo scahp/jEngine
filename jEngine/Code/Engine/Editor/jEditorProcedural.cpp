@@ -5,6 +5,7 @@
 #include "FileLoader/jImageFileLoader.h"
 #include "Material/jMaterial.h"
 #include "Material/jMaterialWater.h"
+#include "PathTracingDataLoader/jPathTracingData.h"
 #include "jEditorWater.h"
 #include "Scene/jObject.h"
 #include "Scene/jMeshObject.h"
@@ -255,13 +256,14 @@ struct MaterialState
     MaterialProperties Last{};
     bool HasLast = false;
     std::filesystem::path ProjectRoot;
-    std::vector<std::shared_ptr<jMaterial>> Originals;
+    std::map<jRenderObjectID, std::shared_ptr<jMaterial>> Originals;
 };
 struct Adapter
 {
     jEditor* Editor = nullptr;
     std::map<jObjectID, MaterialState> Materials;
-    void ApplyMaterial(const MaterialProperties& properties, jObject& object)
+    void ApplyMaterial(const MaterialProperties& properties, jObject& object, std::optional<size_t> submesh = {},
+        const std::shared_ptr<jMaterial>& original = {})
     {
         if (Materials.size() > 1024)
             std::erase_if(Materials, [](const auto& entry) { return !jObject::FindObjectByID(entry.first); });
@@ -269,21 +271,25 @@ struct Adapter
         // Runtime decides when the material is dirty. An identical payload may
         // still be a texture reimport, so do not suppress its cache epoch lookup.
         state.ProjectRoot = Editor->GetProjectRoot();
-        if (state.Originals.size() != object.RenderObjects.size())
+        const size_t first = submesh.value_or(0);
+        const size_t count = submesh ? 1 : object.RenderObjects.size();
+        if (first > object.RenderObjects.size() || count > object.RenderObjects.size() - first) return;
+        for (size_t i = first; i < first + count; ++i)
         {
-            state.Originals.clear();
-            for (auto* render : object.RenderObjects) state.Originals.push_back(render->MaterialPtr ? render->MaterialPtr : GDefaultMaterial);
+            auto* render = object.RenderObjects[i];
+            state.Originals.try_emplace(render->RenderObjectID, render->MaterialPtr ? render->MaterialPtr : GDefaultMaterial);
         }
+        if (submesh && original) state.Originals[object.RenderObjects[first]->RenderObjectID] = original;
         if (!properties.OverrideEnabled)
         {
-            for (size_t i = 0; i < object.RenderObjects.size(); ++i)
+            for (size_t i = first; i < first + count; ++i)
             {
                 auto* render = object.RenderObjects[i];
-                if (render->MaterialPtr && state.Originals[i] &&
-                    render->MaterialPtr->IsRaytracingAlphaTestEnabled() != state.Originals[i]->IsRaytracingAlphaTestEnabled() &&
+                if (render->MaterialPtr && state.Originals.at(object.RenderObjects[i]->RenderObjectID) &&
+                    render->MaterialPtr->IsRaytracingAlphaTestEnabled() != state.Originals.at(object.RenderObjects[i]->RenderObjectID)->IsRaytracingAlphaTestEnabled() &&
                     g_rhi && g_rhi->RaytracingScene && render->IsSupportRaytracing())
                     g_rhi->RaytracingScene->MarkBLASDirty(render);
-                object.RenderObjects[i]->MaterialPtr = state.Originals[i];
+                object.RenderObjects[i]->MaterialPtr = state.Originals.at(object.RenderObjects[i]->RenderObjectID);
             }
             state.Last = properties; state.HasLast = true;
             return;
@@ -308,16 +314,33 @@ struct Adapter
 #ifdef _WIN32
         if ((albedo || normal) && g_rhi == g_rhi_dx12) g_rhi->Flush();
 #endif
-        for (size_t i = 0; i < object.RenderObjects.size(); ++i)
+        for (size_t i = first; i < first + count; ++i)
         {
             auto* render = object.RenderObjects[i];
-            const auto& source = state.Originals[i];
+            const auto& source = state.Originals.at(object.RenderObjects[i]->RenderObjectID);
             std::shared_ptr<jMaterial> material;
             if (auto meshMaterial = std::dynamic_pointer_cast<jMeshMaterial>(source))
                 material = std::make_shared<jMeshMaterial>(*meshMaterial);
             else material = source ? std::make_shared<jMaterial>(*source) : std::make_shared<jMaterial>();
             // A clone must not Free the original instance's descriptor set.
             material->ShaderBindingInstance.reset(); material->NeedToUpdateShaderBindingInstance = true;
+            // Legacy PT imports keep texture IDs in their payload instead of
+            // TexData. Preserve those maps when the first instance edit opts
+            // into authored PBR properties.
+            if (source && source->MaterialDataPtr && source->MaterialDataPtr->GetDataSizeInBytes() == sizeof(Material) && gPathTracingScene)
+            {
+                Material imported;
+                std::memcpy(&imported, source->MaterialDataPtr->GetData(), sizeof(imported));
+                const auto inheritTexture = [&](jMaterial::EMaterialTextureType type, int index) {
+                    auto& slot = material->TexData[int(type)];
+                    if (!slot.Texture && index >= 0 && size_t(index) < gPathTracingScene->textures.size())
+                        slot.Texture = gPathTracingScene->textures[size_t(index)];
+                };
+                inheritTexture(jMaterial::EMaterialTextureType::Albedo, imported.baseColorTexId);
+                inheritTexture(jMaterial::EMaterialTextureType::Normal, imported.normalmapTexID);
+                inheritTexture(jMaterial::EMaterialTextureType::Metallic, imported.metallicRoughnessTexID);
+                inheritTexture(jMaterial::EMaterialTextureType::Emission, imported.emissionmapTexID);
+            }
             material->UseMaterialProperties = true;
             material->BaseColorOpacity = Vector4(ToVector(properties.BaseColor), properties.Opacity);
             material->Emissive = ToVector(properties.Emissive);
@@ -364,6 +387,8 @@ void Install(jEditor& editor)
     auto adapter = std::make_shared<Adapter>(); adapter->Editor = &editor;
     editor.SetMaterialApplier([adapter](const MaterialProperties& material, jObject& object)
         { adapter->ApplyMaterial(material, object); });
+    editor.SetSubmeshMaterialApplier([adapter](const MaterialProperties& material, jObject& object, size_t index,
+        const std::shared_ptr<jMaterial>& original) { adapter->ApplyMaterial(material, object, index, original); });
     editor.SetProceduralFactory([](const Entity& entity, std::string& error) -> std::shared_ptr<jObject>
     {
         if (!g_rhi) { error = "Procedural publication requires the render owner."; return {}; }

@@ -17,6 +17,7 @@
 #include "FileLoader/jAssetImportService.h"
 #include "FileLoader/jModelUploadSession.h"
 #include "Material/jMaterial.h"
+#include "PathTracingDataLoader/jPathTracingData.h"
 #include "RHI/jRaytracingScene.h"
 #include "jPrimitiveUtil.h"
 #include "jOptions.h"
@@ -241,11 +242,12 @@ struct jEditorRuntime::Impl
         std::shared_ptr<jCamera> Camera;
         std::vector<Matrix> MeshLocal;
         std::vector<SurfaceSnapshot> InheritedSurface;
+        std::vector<std::shared_ptr<jMaterial>> InheritedMaterials;
+        std::vector<bool> ExplicitCoverageApplied;
         jEditorAuthoring::Entity Last;
         Matrix AppliedWorld{IdentityType};
         bool Registered=false,MaterialApplied=false,HasAppliedWorld=false;
         bool InheritedShadowCaster=true,HasInheritedShadowCaster=false;
-        bool ExplicitCoverageApplied = false;
         std::string AssetKey;
     };
     struct Borrowed { jObject* Object=nullptr;jObjectID Id=0;jLight* Light=nullptr;bool WasRegistered=false; };
@@ -266,6 +268,7 @@ struct jEditorRuntime::Impl
     jEditor::ProceduralFactory Factory;
     jEditor::ProceduralUpdater UpdateProcedural;
     jEditor::MaterialApplier ApplyMaterial;
+    jEditor::SubmeshMaterialApplier ApplySubmeshMaterial;
     std::map<EntityId,Binding> Bindings;
     std::map<jObjectID,Source> Sources;
     std::map<std::string,Prototype> Prototypes;
@@ -433,6 +436,107 @@ struct jEditorRuntime::Impl
         if(entity->Parent)result=World(entity->Parent,cache)*result;
         cache[id]=result;return result;
     }
+    bool PublishMaterial(Binding& b, const MaterialProperties& properties, std::optional<size_t> submesh = {})
+    {
+        if (submesh && !ApplySubmeshMaterial)
+        { Error = "Submesh material publication requires a submesh material adapter."; return false; }
+        const auto resolved = Editor.ResolveMaterial(properties);
+        const auto graph = GraphDefaults.find(properties.GraphAsset);
+        if (properties.OverrideEnabled && graph != GraphDefaults.end() && graph->second.Failed) return false;
+        if (properties.OverrideEnabled && graph != GraphDefaults.end() && graph->second.Mapping.Program
+            && graph->second.Mapping.Program->Active && !RasterSurfacePublicationEnabled)
+        { Error = "Mapping material publication requires Deferred or Forward; the current material was retained."; return false; }
+        if (b.InheritedMaterials.size() != b.Object->RenderObjects.size())
+        {
+            b.InheritedMaterials.clear(); b.InheritedSurface.clear();
+            b.ExplicitCoverageApplied.assign(b.Object->RenderObjects.size(), false);
+            for (const auto* mesh : b.Object->RenderObjects)
+            {
+                SurfaceSnapshot original;
+                if (const auto& material = mesh->MaterialPtr)
+                {
+                    original.Surface = material->Surface; original.SubsurfaceOnly = material->SubsurfaceOnlySurface;
+                    original.AlphaTest = material->bRaytracingAlphaTest; original.AlphaCutoff = material->RaytracingAlphaCutoff;
+                }
+                b.InheritedMaterials.push_back(mesh->MaterialPtr);
+                b.InheritedSurface.push_back(original);
+            }
+        }
+        const size_t first = submesh.value_or(0);
+        auto meshes = std::span<jRenderObject* const>(b.Object->RenderObjects);
+        if (submesh) meshes = meshes.subspan(first, 1);
+        std::vector<bool> previousAlpha;
+        for (const auto* mesh : meshes) previousAlpha.push_back(mesh->MaterialPtr && mesh->MaterialPtr->bRaytracingAlphaTest);
+        for (auto* mesh : meshes) if (mesh->MaterialPtr && mesh->MaterialPtr.use_count() > 1)
+        {
+            if (auto source = std::dynamic_pointer_cast<jMeshMaterial>(mesh->MaterialPtr)) mesh->MaterialPtr = std::make_shared<jMeshMaterial>(*source);
+            else mesh->MaterialPtr = std::make_shared<jMaterial>(*mesh->MaterialPtr);
+            mesh->MaterialPtr->ShaderBindingInstance.reset(); mesh->MaterialPtr->NeedToUpdateShaderBindingInstance = true;
+        }
+        if (submesh) ApplySubmeshMaterial(resolved, *b.Object, first, b.InheritedMaterials[first]);
+        else ApplyMaterial(resolved, *b.Object);
+        const bool skinOverride = properties.OverrideEnabled && resolved.SkinOverrideEnabled;
+        const auto* explicitSurface = properties.OverrideEnabled && graph != GraphDefaults.end() && graph->second.ExplicitSurface
+            ? &*graph->second.ExplicitSurface : nullptr;
+        for (size_t i = 0; i < meshes.size(); ++i)
+        {
+            auto* mesh = meshes[i];
+            const auto& original = b.InheritedSurface[first + i];
+            if (!properties.OverrideEnabled) mesh->MaterialPtr = b.InheritedMaterials[first + i];
+            if (!mesh->MaterialPtr) continue;
+            // The inherited handle is immutable. Inheritance does not need any
+            // of the authored surface/mapping mutations below.
+            if (properties.OverrideEnabled)
+            {
+                auto& material = *mesh->MaterialPtr;
+                if (resolved.SubsurfaceOverrideEnabled)
+                {
+                    if (!material.Surface) { material.Surface.emplace(); material.SubsurfaceOnlySurface = true; }
+                    auto& surface = *material.Surface;
+                    surface.Subsurface = resolved.SubsurfaceWeight;
+                    surface.SubsurfaceColor = {resolved.SubsurfaceColor.X, resolved.SubsurfaceColor.Y, resolved.SubsurfaceColor.Z};
+                    surface.SubsurfaceThicknessWorld = resolved.SubsurfaceThicknessWorld;
+                    surface.SubsurfaceProfile = resolved.SubsurfaceProfile;
+                }
+                if (skinOverride || material.Surface)
+                {
+                    if (!material.Surface) { material.Surface.emplace(); material.SubsurfaceOnlySurface = true; }
+                    auto& surface = *material.Surface;
+                    const auto inherited = original.Surface.value_or(jSurfaceShading{});
+                    surface.ShadingModel = skinOverride ? resolved.ShadingModel : inherited.ShadingModel;
+                    surface.SubsurfaceSpace = skinOverride ? resolved.SubsurfaceSpace : inherited.SubsurfaceSpace;
+                    surface.SpecularWeight = skinOverride ? resolved.SpecularWeight : inherited.SpecularWeight;
+                    surface.DiffuseOcclusion = skinOverride ? resolved.DiffuseOcclusion : inherited.DiffuseOcclusion;
+                    surface.PreScatterWeight = skinOverride ? resolved.PreScatterWeight : inherited.PreScatterWeight;
+                }
+                const jEditorTools::PreparedMaterialMapping empty;
+                const auto& prepared = graph != GraphDefaults.end() ? graph->second.Mapping : empty;
+                jEditorTools::ApplyMaterialMapping(material, prepared, jEditorTools::MaterialMappingOverrides(properties));
+                if (explicitSurface || b.ExplicitCoverageApplied[first + i])
+                {
+                    const auto coverage = explicitSurface ? *explicitSurface : original.Surface.value_or(jSurfaceShading{});
+                    const bool needsMetadata = resolved.SubsurfaceOverrideEnabled || skinOverride;
+                    if (explicitSurface || original.Surface || needsMetadata)
+                    {
+                        if (!material.Surface) material.Surface = original.Surface.value_or(jSurfaceShading{});
+                        auto& surface = *material.Surface;
+                        surface.AlphaMode = coverage.AlphaMode; surface.AlphaCutoff = coverage.AlphaCutoff;
+                        surface.DoubleSided = coverage.DoubleSided; surface.LegacyPackedMap = coverage.LegacyPackedMap;
+                        material.SubsurfaceOnlySurface = explicitSurface ? false : original.Surface ? original.SubsurfaceOnly : true;
+                    }
+                    else { material.Surface.reset(); material.SubsurfaceOnlySurface = original.SubsurfaceOnly; }
+                    material.bRaytracingAlphaTest = explicitSurface ? coverage.AlphaMode == jSurfaceAlphaMode::Mask : original.AlphaTest;
+                    material.RaytracingAlphaCutoff = explicitSurface ? coverage.AlphaCutoff : original.AlphaCutoff;
+                    ++material.Revision;
+                }
+                material.NeedToUpdateShaderBindingInstance = true;
+            }
+            b.ExplicitCoverageApplied[first + i] = explicitSurface != nullptr;
+            if (mesh->MaterialPtr->bRaytracingAlphaTest != previousAlpha[i] && g_rhi && g_rhi->RaytracingScene && mesh->IsSupportRaytracing())
+                g_rhi->RaytracingScene->MarkBLASDirty(mesh);
+        }
+        return true;
+    }
     void Apply(Binding& b,const Entity& entity,const Matrix& world)
     {
         if(b.Object){
@@ -444,105 +548,25 @@ struct jEditorRuntime::Impl
                 const Matrix transformed=world*(i<b.MeshLocal.size()?b.MeshLocal[i]:Matrix(IdentityType));
                 mesh->SetWorldMatrixOverride(transformed);mesh->UpdateWorldMatrix();
             }
-            if(ApplyMaterial&&(!b.MaterialApplied || !(b.Last.Material==entity.Material))){
-                if(entity.Material.OverrideEnabled||b.MaterialApplied){
-                const auto resolved = Editor.ResolveMaterial(entity.Material);
-                const auto graph = GraphDefaults.find(entity.Material.GraphAsset);
-                if (entity.Material.OverrideEnabled && graph != GraphDefaults.end() && graph->second.Failed)
-                    return; // Retain the previous material/resources until a valid reimport.
-                if (entity.Material.OverrideEnabled && graph != GraphDefaults.end() && graph->second.Mapping.Program
-                    && graph->second.Mapping.Program->Active && !RasterSurfacePublicationEnabled)
-                { Error = "Mapping material publication requires Deferred or Forward; the current material was retained."; return; }
-                if (b.InheritedSurface.size() != b.Object->RenderObjects.size())
+            if(ApplyMaterial && (!b.MaterialApplied || b.Last.Material != entity.Material || b.Last.MeshMaterials != entity.MeshMaterials))
+            {
+                if (!entity.MeshMaterials.empty() || !b.Last.MeshMaterials.empty())
                 {
-                    b.InheritedSurface.clear();
-                    for (const auto* mesh : b.Object->RenderObjects)
-                    {
-                        SurfaceSnapshot original;
-                        if (const auto& material = mesh->MaterialPtr)
-                        {
-                            original.Surface = material->Surface; original.SubsurfaceOnly = material->SubsurfaceOnlySurface;
-                            original.AlphaTest = material->bRaytracingAlphaTest; original.AlphaCutoff = material->RaytracingAlphaCutoff;
-                        }
-                        b.InheritedSurface.push_back(original);
-                    }
-                }
-                std::vector<bool> previousAlpha;
-                for (const auto* mesh : b.Object->RenderObjects)
-                    previousAlpha.push_back(mesh->MaterialPtr && mesh->MaterialPtr->bRaytracingAlphaTest);
-                for(auto* mesh:b.Object->RenderObjects)if(mesh->MaterialPtr&&mesh->MaterialPtr.use_count()>1){
-                    if(auto source=std::dynamic_pointer_cast<jMeshMaterial>(mesh->MaterialPtr))mesh->MaterialPtr=std::make_shared<jMeshMaterial>(*source);
-                    else mesh->MaterialPtr=std::make_shared<jMaterial>(*mesh->MaterialPtr);
-                    mesh->MaterialPtr->ShaderBindingInstance.reset();mesh->MaterialPtr->NeedToUpdateShaderBindingInstance=true;
-                }
-                ApplyMaterial(resolved,*b.Object);
-                if (resolved.SubsurfaceOverrideEnabled)
-                    for (auto* mesh : b.Object->RenderObjects) if (mesh->MaterialPtr)
-                    {
-                        if (!mesh->MaterialPtr->Surface)
-                        { mesh->MaterialPtr->Surface.emplace(); mesh->MaterialPtr->SubsurfaceOnlySurface = true; }
-                        auto& surface = *mesh->MaterialPtr->Surface;
-                        surface.Subsurface = resolved.SubsurfaceWeight;
-                        surface.SubsurfaceColor = {resolved.SubsurfaceColor.X, resolved.SubsurfaceColor.Y, resolved.SubsurfaceColor.Z};
-                        surface.SubsurfaceThicknessWorld = resolved.SubsurfaceThicknessWorld;
-                        surface.SubsurfaceProfile = resolved.SubsurfaceProfile;
-                        mesh->MaterialPtr->NeedToUpdateShaderBindingInstance = true;
-                    }
-                const bool skinOverride = entity.Material.OverrideEnabled && resolved.SkinOverrideEnabled;
-                for (size_t i = 0; i < b.Object->RenderObjects.size(); ++i)
-                    if (auto* mesh = b.Object->RenderObjects[i]; mesh->MaterialPtr && (skinOverride || mesh->MaterialPtr->Surface))
-                    {
-                        if (!mesh->MaterialPtr->Surface)
-                        { mesh->MaterialPtr->Surface.emplace(); mesh->MaterialPtr->SubsurfaceOnlySurface = true; }
-                        auto& surface = *mesh->MaterialPtr->Surface;
-                        const auto inherited = b.InheritedSurface[i].Surface.value_or(jSurfaceShading{});
-                        surface.ShadingModel = skinOverride ? resolved.ShadingModel : inherited.ShadingModel;
-                        surface.SubsurfaceSpace = skinOverride ? resolved.SubsurfaceSpace : inherited.SubsurfaceSpace;
-                        surface.SpecularWeight = skinOverride ? resolved.SpecularWeight : inherited.SpecularWeight;
-                        surface.DiffuseOcclusion = skinOverride ? resolved.DiffuseOcclusion : inherited.DiffuseOcclusion;
-                        surface.PreScatterWeight = skinOverride ? resolved.PreScatterWeight : inherited.PreScatterWeight;
-                        mesh->MaterialPtr->NeedToUpdateShaderBindingInstance = true;
-                    }
-                if (entity.Material.OverrideEnabled)
-                {
-                    const jEditorTools::PreparedMaterialMapping empty;
-                    const auto& prepared = graph != GraphDefaults.end() ? graph->second.Mapping : empty;
-                    for (auto* mesh : b.Object->RenderObjects) if (mesh->MaterialPtr)
-                        jEditorTools::ApplyMaterialMapping(*mesh->MaterialPtr, prepared, jEditorTools::MaterialMappingOverrides(entity.Material));
-                }
-                const auto* explicitSurface = entity.Material.OverrideEnabled && graph != GraphDefaults.end() && graph->second.ExplicitSurface
-                    ? &*graph->second.ExplicitSurface : nullptr;
-                // Coverage is published after the legacy adapter's clone. Only
-                // explicitly present graph surface metadata opts into authored
-                // coverage; scalar SSS/Skin metadata cannot change legacy alpha.
-                if (explicitSurface || b.ExplicitCoverageApplied)
+                    const auto effective = [](const Entity& owner, size_t index) -> const MaterialProperties& {
+                        const auto slot = owner.MeshMaterials.find(uint32_t(index));
+                        return slot != owner.MeshMaterials.end() && slot->second.OverrideEnabled ? slot->second : owner.Material;
+                    };
                     for (size_t i = 0; i < b.Object->RenderObjects.size(); ++i)
                     {
-                        auto* mesh = b.Object->RenderObjects[i];
-                        if (!mesh->MaterialPtr) continue;
-                        auto& material = *mesh->MaterialPtr;
-                        const auto& original = b.InheritedSurface[i];
-                        const auto coverage = explicitSurface ? *explicitSurface : original.Surface.value_or(jSurfaceShading{});
-                        const bool needsMetadata = entity.Material.OverrideEnabled && (resolved.SubsurfaceOverrideEnabled || skinOverride);
-                        if (explicitSurface || original.Surface || needsMetadata)
-                        {
-                            if (!material.Surface) material.Surface = original.Surface.value_or(jSurfaceShading{});
-                            auto& surface = *material.Surface;
-                            surface.AlphaMode = coverage.AlphaMode; surface.AlphaCutoff = coverage.AlphaCutoff;
-                            surface.DoubleSided = coverage.DoubleSided; surface.LegacyPackedMap = coverage.LegacyPackedMap;
-                            material.SubsurfaceOnlySurface = explicitSurface ? false : original.Surface ? original.SubsurfaceOnly : true;
-                        }
-                        else { material.Surface.reset(); material.SubsurfaceOnlySurface = original.SubsurfaceOnly; }
-                        material.bRaytracingAlphaTest = explicitSurface ? coverage.AlphaMode == jSurfaceAlphaMode::Mask : original.AlphaTest;
-                        material.RaytracingAlphaCutoff = explicitSurface ? coverage.AlphaCutoff : original.AlphaCutoff;
-                        material.NeedToUpdateShaderBindingInstance = true;
-                        ++material.Revision;
-                        if (material.bRaytracingAlphaTest != previousAlpha[i] && g_rhi && g_rhi->RaytracingScene && mesh->IsSupportRaytracing())
-                            g_rhi->RaytracingScene->MarkBLASDirty(mesh);
+                        const auto& current = effective(entity, i);
+                        const auto& previous = effective(b.Last, i);
+                        if (b.MaterialApplied && current == previous) continue;
+                        if (!current.OverrideEnabled && !previous.OverrideEnabled) continue;
+                        if (!PublishMaterial(b, current, i)) return;
                     }
-                b.ExplicitCoverageApplied = explicitSurface != nullptr;
                 }
-                b.MaterialApplied=true;
+                else if ((entity.Material.OverrideEnabled || b.MaterialApplied) && !PublishMaterial(b, entity.Material)) return;
+                b.MaterialApplied = true;
             }
         }
         if(b.Light){
@@ -585,10 +609,11 @@ struct jEditorRuntime::Impl
         if(entity.Kind==EntityKind::Model)binding.AssetKey=Key(entity.SourceAsset,entity.AssetId);
         const auto duplicate=DuplicateOf.find(entity.Id);
         if(duplicate!=DuplicateOf.end()&&(entity.Kind==EntityKind::Model||entity.Kind==EntityKind::Cube||entity.Kind==EntityKind::Sphere))if(auto original=Bindings.find(duplicate->second);original!=Bindings.end()&&original->second.Object
-            && original->second.AssetKey == binding.AssetKey && original->second.Last.Material == entity.Material){
+            && original->second.AssetKey == binding.AssetKey && original->second.Last.Material == entity.Material && original->second.Last.MeshMaterials == entity.MeshMaterials){
             binding.OwnedObject=CloneObject(*original->second.Object);binding.Object=binding.OwnedObject.get();
             binding.InheritedShadowCaster=original->second.InheritedShadowCaster;binding.HasInheritedShadowCaster=original->second.HasInheritedShadowCaster;
             binding.InheritedSurface=original->second.InheritedSurface;
+            binding.InheritedMaterials=original->second.InheritedMaterials;
             binding.ExplicitCoverageApplied=original->second.ExplicitCoverageApplied;
             binding.MeshLocal=original->second.MeshLocal;binding.MaterialApplied=true;return true;
         }
@@ -854,6 +879,89 @@ const std::filesystem::path& jEditor::GetProjectRoot()const{return Runtime->Data
 void jEditor::SetAssetResolver(AssetResolver resolver){auto& s=*Runtime->Data;if(s.Owner())s.Resolver=std::move(resolver);}
 void jEditor::SetProceduralFactory(ProceduralFactory factory,ProceduralUpdater update){auto& s=*Runtime->Data;if(!s.Owner())return;s.Factory=std::move(factory);s.UpdateProcedural=std::move(update);s.AppliedRevision=UINT64_MAX;}
 void jEditor::SetMaterialApplier(MaterialApplier apply){auto& s=*Runtime->Data;if(!s.Owner())return;s.ApplyMaterial=std::move(apply);for(auto& [id,b]:s.Bindings)b.MaterialApplied=false;s.AppliedRevision=UINT64_MAX;}
+void jEditor::SetSubmeshMaterialApplier(SubmeshMaterialApplier apply)
+{
+    auto& s = *Runtime->Data; if (!s.Owner()) return;
+    s.ApplySubmeshMaterial = std::move(apply);
+    for (auto& [id, binding] : s.Bindings) binding.MaterialApplied = false;
+    s.AppliedRevision = UINT64_MAX;
+}
+
+std::optional<MaterialProperties> jEditor::ReadMaterialProperties(EntityId id, std::optional<size_t> submesh)
+{
+    auto& s = *Runtime->Data;
+    if (!s.Owner()) return {};
+    const auto* entity = s.Doc.Find(id);
+    if (!entity) return {};
+    if (!submesh) return entity->Material;
+    const auto* object = ObjectForEntity(id);
+    if (entity->Kind != EntityKind::Model || !object || *submesh >= object->RenderObjects.size()) return {};
+    if (const auto slot = entity->MeshMaterials.find(uint32_t(*submesh)); slot != entity->MeshMaterials.end() && slot->second.OverrideEnabled) return slot->second;
+    if (entity->Material.OverrideEnabled)
+    {
+        auto inherited = ResolveMaterial(entity->Material);
+        inherited.OverrideEnabled = false;
+        return inherited;
+    }
+    MaterialProperties result;
+    result.Metallic = gOptions.Metallic; result.Roughness = gOptions.Roughness;
+    auto source = object->RenderObjects[*submesh]->MaterialPtr;
+    const auto binding = s.Bindings.find(id);
+    if (binding != s.Bindings.end() && *submesh < binding->second.InheritedMaterials.size())
+        source = binding->second.InheritedMaterials[*submesh];
+    if (!source) return result;
+    if (source->UseMaterialProperties)
+    {
+        result.BaseColor = A(Vector(source->BaseColorOpacity.x, source->BaseColorOpacity.y, source->BaseColorOpacity.z));
+        result.Opacity = source->BaseColorOpacity.w; result.Emissive = A(source->Emissive);
+        result.Metallic = source->MetallicFactor; result.Roughness = source->RoughnessFactor;
+    }
+    else if (source->MaterialDataPtr && source->MaterialDataPtr->GetDataSizeInBytes() == sizeof(Material))
+    {
+        Material imported;
+        std::memcpy(&imported, source->MaterialDataPtr->GetData(), sizeof(imported));
+        result.BaseColor = A(imported.baseColor); result.Emissive = A(imported.emission);
+        result.Opacity = imported.opacity; result.Metallic = imported.metallic; result.Roughness = imported.roughness;
+    }
+    const auto texturePath = [&](jMaterial::EMaterialTextureType kind) -> std::string {
+        const auto* path = source->TexData[int(kind)].FilePath.ToStr();
+        if (!path || !*path) return {};
+        const auto file = jEditorAssetPath::FromUtf8(path);
+        const auto relative = file.is_absolute() ? file.lexically_relative(s.Root) : file;
+        if (relative.empty()) return {};
+        for (const auto& part : relative) if (part == "..") return {};
+        return jEditorAssetPath::ToUtf8(relative);
+    };
+    result.BaseColorTexture = texturePath(jMaterial::EMaterialTextureType::Albedo);
+    result.NormalTexture = texturePath(jMaterial::EMaterialTextureType::Normal);
+    if (source->Surface)
+    {
+        const auto& surface = *source->Surface;
+        result.SubsurfaceWeight = surface.Subsurface;
+        result.SubsurfaceColor = {surface.SubsurfaceColor[0], surface.SubsurfaceColor[1], surface.SubsurfaceColor[2]};
+        result.SubsurfaceThicknessWorld = surface.SubsurfaceThicknessWorld; result.SubsurfaceProfile = surface.SubsurfaceProfile;
+        result.ShadingModel = surface.ShadingModel; result.SubsurfaceSpace = surface.SubsurfaceSpace;
+        result.SpecularWeight = surface.SpecularWeight; result.DiffuseOcclusion = surface.DiffuseOcclusion;
+        result.PreScatterWeight = surface.PreScatterWeight;
+    }
+    return result;
+}
+
+bool jEditor::UpdateMaterialProperties(EntityId id, const MaterialProperties& material, const std::string& label, std::optional<size_t> submesh)
+{
+    auto& s = *Runtime->Data;
+    if (!s.Owner() || s.Doc.IsPlaying() || !ReadMaterialProperties(id, submesh)) return false;
+    auto entity = *s.Doc.Find(id);
+    if (submesh)
+    {
+        if (material.OverrideEnabled) entity.MeshMaterials[uint32_t(*submesh)] = material;
+        else entity.MeshMaterials.erase(uint32_t(*submesh));
+    }
+    else entity.Material = material;
+    if (!s.Doc.Update(entity, label)) { s.Error = s.Doc.LastError(); return false; }
+    return true;
+}
+
 MaterialProperties jEditor::ResolveMaterial(const MaterialProperties& material)
 {
     auto& s = *Runtime->Data;
@@ -1231,6 +1339,7 @@ jEditor::PlacementReadiness jEditor::ReplaceModelAssets(std::span<const EntityId
         edit.AssetId = assetId;
         edit.SourceAsset = source;
         edit.MeshLocalTransforms.clear(); // These are indexed by the old asset's meshes.
+        edit.MeshMaterials.clear();
     }
     if (!s.Doc.UpdateMany(edits, "Replace model asset"))
     {
@@ -1475,19 +1584,17 @@ void jEditor::ReimportAsset(const std::string& source,uint64_t revision)
     {
         const auto binding = s.Bindings.find(id);
         if (binding == s.Bindings.end()) continue;
-        const auto& material = entity.Material;
-        const auto graph = s.GraphDefaults.find(material.GraphAsset);
-        const bool mappingDependency = graph != s.GraphDefaults.end() && graph->second.Mapping.Program
-            && std::find(graph->second.Mapping.Program->Dependencies.begin(), graph->second.Mapping.Program->Dependencies.end(), source)
-                != graph->second.Mapping.Program->Dependencies.end();
-        if ((!material.GraphAsset.empty() && material.GraphAsset == source) || mappingDependency)
-        {
-            binding->second.MaterialApplied = false;
-            continue;
-        }
-        const auto resolved = ResolveMaterial(material);
-        if (resolved.NormalTexture == source || resolved.BaseColorTexture == source)
-            binding->second.MaterialApplied = false;
+        const auto usesSource = [&](const MaterialProperties& material) {
+            const auto graph = s.GraphDefaults.find(material.GraphAsset);
+            const bool mappingDependency = graph != s.GraphDefaults.end() && graph->second.Mapping.Program
+                && std::find(graph->second.Mapping.Program->Dependencies.begin(), graph->second.Mapping.Program->Dependencies.end(), source)
+                    != graph->second.Mapping.Program->Dependencies.end();
+            if ((!material.GraphAsset.empty() && material.GraphAsset == source) || mappingDependency) return true;
+            const auto resolved = ResolveMaterial(material);
+            return resolved.NormalTexture == source || resolved.BaseColorTexture == source;
+        };
+        if (usesSource(entity.Material) || std::any_of(entity.MeshMaterials.begin(), entity.MeshMaterials.end(),
+            [&](const auto& slot) { return usesSource(slot.second); })) binding->second.MaterialApplied = false;
     }
     // Keep the last good instances until the new revision is fully prepared.
     s.AppliedRevision=UINT64_MAX;
@@ -1557,7 +1664,9 @@ void jEditor::Tick(float deltaTime,jCamera* camera)
         for (auto& [path, graph] : s.GraphDefaults) if (graph.Pending)
         {
             graph.Dirty = true;
-            for (auto& [id, binding] : s.Bindings) if (binding.Last.Material.GraphAsset == path) binding.MaterialApplied = false;
+            for (auto& [id, binding] : s.Bindings)
+                if (binding.Last.Material.GraphAsset == path || std::any_of(binding.Last.MeshMaterials.begin(), binding.Last.MeshMaterials.end(),
+                    [&](const auto& slot) { return slot.second.GraphAsset == path; })) binding.MaterialApplied = false;
             s.AppliedRevision = UINT64_MAX;
         }
     }

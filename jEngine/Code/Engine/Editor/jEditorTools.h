@@ -84,7 +84,9 @@ bool ApplySceneMaterialLibrary(const std::filesystem::path& source, const std::v
 bool PrepareMaterialThumbnail(const std::filesystem::path& root, const std::filesystem::path& file,
     jEditorThumbnail& thumbnail, std::string& diagnostic);
 void InheritMaterialGraph(jEditorAuthoring::MaterialProperties& instance, const jEditorAuthoring::MaterialProperties& defaults);
-bool AssignSharedMaterial(jEditor& editor, jEditorAuthoring::EntityId id, const std::string& path, std::string& error);
+bool AssignSharedMaterial(jEditor& editor, jEditorAuthoring::EntityId id, const std::string& path, std::string& error,
+    std::optional<size_t> submesh = {});
+void OpenMaterialGraph();
 struct NavigationBake
 {
     Mesh DebugMesh;
