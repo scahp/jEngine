@@ -7,13 +7,24 @@
 #include <map>
 #include <set>
 #include <string>
+#if defined(_MSC_VER) && defined(_DEBUG)
+#include <crtdbg.h>
+#endif
 
 namespace
 {
 using namespace jAdvancedShadowMath;
 int passed=0,failed=0;
 void Check(bool condition,const char* name)
-{if(condition)++passed;else{++failed;std::cerr<<"FAIL: "<<name<<'\n';}}
+{
+    if(condition)++passed;
+    else{++failed;std::cerr<<"FAIL: "<<name<<'\n';}
+#if defined(_MSC_VER) && defined(_DEBUG)
+    // CTest normally hides successful output. Preserve the last completed
+    // case when the checked Windows runtime stops inside the next operation.
+    std::cerr<<"CHECK "<<(passed+failed)<<": "<<name<<std::endl;
+#endif
+}
 bool Near(double a,double b,double epsilon=1.0e-9){return std::abs(a-b)<=epsilon*std::max({1.0,std::abs(a),std::abs(b)});}
 Vec3 Sub(const Vec3& a,const Vec3& b){return {a[0]-b[0],a[1]-b[1],a[2]-b[2]};}
 Vec3 Cross(const Vec3& a,const Vec3& b){return {a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]};}
@@ -514,6 +525,12 @@ void TestMomentsAndDeep()
 }
 int main()
 {
+#if defined(_MSC_VER) && defined(_DEBUG)
+    // Assertions must be visible in the CI log rather than waiting on a
+    // desktop-only CRT dialog on the unattended runner.
+    _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
+    _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
+#endif
     TestMatricesAndCascades();TestDirectionalFit();TestNativeDirectionalFit();TestPerspectiveAndParaboloid();TestNativePerspectiveFixture();TestSubdivision();TestVolumes();TestPerspectiveMomentDepth();TestMomentsAndDeep();
     std::cout<<"Advanced shadow math: "<<passed<<'/'<<(passed+failed)<<" passed\n";return failed?1:0;
 }
