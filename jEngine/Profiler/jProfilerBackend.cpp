@@ -673,10 +673,24 @@ void jProfileGPUInitializeForRHI()
 		auto* rhiVulkan = static_cast<jRHI_Vulkan*>(g_rhi);
 		check(rhiVulkan);
 
+		uint32 familyCount = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties(rhiVulkan->PhysicalDevice, &familyCount, nullptr);
+		std::vector<VkQueueFamilyProperties> families(familyCount);
+		vkGetPhysicalDeviceQueueFamilyProperties(rhiVulkan->PhysicalDevice, &familyCount, families.data());
+
 		const char* ContextNames[(int32)ECommandBufferType::MAX] = { "Vulkan Graphics", "Vulkan Compute", "Vulkan Copy" };
 		for (int32 i = 0; i < (int32)ECommandBufferType::MAX; ++i)
 		{
-			auto* manager = static_cast<jCommandBufferManager_Vulkan*>(rhiVulkan->GetCommandBufferManager((ECommandBufferType)i));
+			const auto commandType = static_cast<ECommandBufferType>(i);
+			const auto& queue = rhiVulkan->GetQueue(commandType);
+			if (!queue.Queue || queue.QueueIndex >= familyCount)
+				continue;
+			const auto& family = families[queue.QueueIndex];
+			// Tracy records query resets and timestamps in this queue's command buffers.
+			if (!(family.queueFlags & (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)) || !family.timestampValidBits)
+				continue;
+
+			auto* manager = static_cast<jCommandBufferManager_Vulkan*>(rhiVulkan->GetCommandBufferManager(commandType));
 			if (!manager)
 				continue;
 
@@ -690,8 +704,7 @@ void jProfileGPUInitializeForRHI()
 			if (vkAllocateCommandBuffers(rhiVulkan->Device, &allocInfo, &tempCommandBuffer) != VK_SUCCESS || tempCommandBuffer == VK_NULL_HANDLE)
 				continue;
 
-			const VkQueue queue = rhiVulkan->GetQueue((ECommandBufferType)i).Queue;
-			g_TracyVkCtx[i] = TracyVkContext(rhiVulkan->PhysicalDevice, rhiVulkan->Device, queue, tempCommandBuffer);
+			g_TracyVkCtx[i] = TracyVkContext(rhiVulkan->PhysicalDevice, rhiVulkan->Device, queue.Queue, tempCommandBuffer);
 
 			vkFreeCommandBuffers(rhiVulkan->Device, manager->GetPool(), 1, &tempCommandBuffer);
 
