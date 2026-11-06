@@ -80,7 +80,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
         ComputeCommon.CascadeRingOffsetYPacked,
         ComputeCommon.CascadeRingOffsetZPacked,
         cascadeIndex);
-    const int3 localCell = SurfelGIModWrap3(phys - ring, dim);
+    const int3 localCell = SurfelGIWrapRingCell(phys - ring, dim);
     const int3 delta = GetCascadeDelta(cascadeIndex);
     const bool clearAll = GetCascadeClearAll(cascadeIndex);
     if (!ShouldClearCell(localCell, dim, delta, clearAll))

@@ -55,13 +55,11 @@ uint SurfelGIGetCascadeIndexByDistance(float4 cascadeStartDistancePacked, float 
     return cascade;
 }
 
-int3 SurfelGIModWrap3(int3 value, int3 dim)
+int3 SurfelGIWrapRingCell(int3 cell, int3 dim)
 {
-    int3 result = value % dim;
-    if (result.x < 0) result.x += dim.x;
-    if (result.y < 0) result.y += dim.y;
-    if (result.z < 0) result.z += dim.z;
-    return result;
+    // The local or physical coordinate and the ring offset are both in [0, dim).
+    // Bias their sum or difference so Vulkan's remainder operands stay nonnegative.
+    return int3(uint3(cell + dim) % uint3(dim));
 }
 
 int3 SurfelGIGetCascadeDim(
@@ -161,7 +159,7 @@ bool SurfelGITryCellLinearToWorldCell(
     phys.y = (int)(tmp % dimY);
     phys.z = (int)(tmp / dimY);
 
-    const int3 local = SurfelGIModWrap3(phys - SurfelGIGetCascadeRingOffset(
+    const int3 local = SurfelGIWrapRingCell(phys - SurfelGIGetCascadeRingOffset(
         cascadeRingOffsetXPacked,
         cascadeRingOffsetYPacked,
         cascadeRingOffsetZPacked,
@@ -203,7 +201,7 @@ bool SurfelGITryWorldCellToLinear(
     if (any(local < 0) || any(local >= dim))
         return false;
 
-    const int3 phys = SurfelGIModWrap3(local + SurfelGIGetCascadeRingOffset(
+    const int3 phys = SurfelGIWrapRingCell(local + SurfelGIGetCascadeRingOffset(
         cascadeRingOffsetXPacked,
         cascadeRingOffsetYPacked,
         cascadeRingOffsetZPacked,
