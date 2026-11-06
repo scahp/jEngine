@@ -569,7 +569,7 @@ bool EvaluateDeepTauBins(const DeepTauBins& bins,double receiver,double maxTau,d
 }
 bool BuildShadowVolume(const VolumeInput& input,VolumeMesh& output,std::string& error,const VolumeLimits& limits)
 {
-    error.clear();Vec3 direction;
+    error.clear();Vec3 direction{};
     if(input.Positions.empty()||input.Positions.size()>3*MaximumVolumeTriangles||input.Indices.empty()||input.Indices.size()%3||
         limits.MaxInputTriangles<1||limits.MaxInputTriangles>MaximumVolumeTriangles||input.Indices.size()/3>limits.MaxInputTriangles||
         limits.MaxOutputTriangles<1||limits.MaxOutputTriangles>8*MaximumVolumeTriangles||
@@ -704,7 +704,12 @@ bool BuildShadowVolume(const VolumeInput& input,VolumeMesh& output,std::string& 
         for(std::size_t i=0;i<points.size();++i)
         {
             if((i&255)==0&&IsCancelled(limits.Cancelled))return Reject(error,"Shadow volume cancelled.");
-            Vec3 ray=direction;if(input.PointLight&&!Unit(Sub(points[i],input.Light),ray))return Reject(error,"Point-light extrusion direction is degenerate.");
+            Vec3 ray{};
+            if(input.PointLight)
+            {
+                if(!Unit(Sub(points[i],input.Light),ray))return Reject(error,"Point-light extrusion direction is degenerate.");
+            }
+            else ray=direction;
             const auto extruded=Add(points[i],Scale(ray,input.ExtrusionDistance));
             if(!std::all_of(extruded.begin(),extruded.end(),[](double x){return std::isfinite(x);}))return Reject(error,"Shadow volume extrusion overflowed.");
             candidate.Positions.push_back(extruded);
