@@ -1,7 +1,13 @@
 #include "pch.h"
 #include "jName.h"
 
-robin_hood::unordered_map<uint32, std::shared_ptr<std::string>> jName::s_NameTable;
-robin_hood::unordered_map<uint32, std::shared_ptr<std::wstring>> jName::s_WideNameTable;
-jMutexRWLock jName::Lock;
+jName::Storage& jName::GetStorage()
+{
+    // Shader registration can intern names before another translation unit's
+    // globals are initialized. Construct the maps and their lock together on
+    // first use. Cached character pointers must also survive static teardown.
+    static Storage* const storage = new Storage;
+    return *storage;
+}
+
 const jName jName::Invalid;

@@ -10,9 +10,13 @@
 struct jName
 {
 private:
-	static robin_hood::unordered_map<uint32, std::shared_ptr<std::string>> s_NameTable;
-	static robin_hood::unordered_map<uint32, std::shared_ptr<std::wstring>> s_WideNameTable;
-	static jMutexRWLock Lock;
+    struct Storage
+    {
+        robin_hood::unordered_map<uint32, std::shared_ptr<std::string>> Names;
+        robin_hood::unordered_map<uint32, std::shared_ptr<std::wstring>> WideNames;
+        jMutexRWLock Lock;
+    };
+    static Storage& GetStorage();
 
 	// Helper function: Convert wchar_t* to UTF-8 char*
 	static std::string WideToUtf8(const wchar_t* wstr, size_t wlen)
@@ -112,13 +116,14 @@ public:
 	FORCEINLINE void Set(const char* pName, size_t size)
 	{
 		check(pName);
+        auto& storage = GetStorage();
 		NameStringW = nullptr;
 		const uint32 NewNameHash = GenerateNameHash(pName, size);
 
 		auto find_func = [&]()
 		{
-            const auto find_it = s_NameTable.find(NewNameHash);
-            if (s_NameTable.end() != find_it)
+            const auto find_it = storage.Names.find(NewNameHash);
+            if (storage.Names.end() != find_it)
             {
                 NameHash = NewNameHash;
                 NameString = find_it->second->c_str();
@@ -129,19 +134,19 @@ public:
 		};
 
 		{
-			jScopeReadLock sr(&Lock);
+			jScopeReadLock sr(&storage.Lock);
 			if (find_func())
 				return;
 		}
 
 		{
-			jScopeWriteLock sw(&Lock);
+			jScopeWriteLock sw(&storage.Lock);
 			
 			// Try again, to avoid entering creation section simultaneously.
             if (find_func())
                 return;
 
-			const auto it_ret = s_NameTable.emplace(NewNameHash, CreateNewName_Internal(pName, size));
+			const auto it_ret = storage.Names.emplace(NewNameHash, CreateNewName_Internal(pName, size));
 			if (it_ret.second)
 			{
 				NameHash = NewNameHash;
@@ -194,10 +199,12 @@ public:
 		if (NameString)
 			return NameString;
 
+        auto& storage = GetStorage();
+
 		{
-			jScopeReadLock s(&Lock);
-			const auto it_find = s_NameTable.find(NameHash);
-			if (it_find == s_NameTable.end())
+			jScopeReadLock s(&storage.Lock);
+			const auto it_find = storage.Names.find(NameHash);
+			if (it_find == storage.Names.end())
 				return nullptr;
 
 			NameString = it_find->second->c_str();
@@ -221,13 +228,15 @@ public:
 		if (!utf8Str)
 			return nullptr;
 
-		// Convert to wchar_t* and cache in s_WideNameTable
+        auto& storage = GetStorage();
+
+		// Convert to wchar_t* and cache in storage.WideNames
 		{
-			jScopeWriteLock sw(&Lock);
+			jScopeWriteLock sw(&storage.Lock);
 
 			// Check again after acquiring write lock
-			const auto it_find_wide = s_WideNameTable.find(NameHash);
-			if (it_find_wide != s_WideNameTable.end())
+			const auto it_find_wide = storage.WideNames.find(NameHash);
+			if (it_find_wide != storage.WideNames.end())
 			{
 				NameStringW = it_find_wide->second->c_str();
 				return NameStringW;
@@ -235,7 +244,7 @@ public:
 
 			// Convert and store
 			std::wstring wideString = Utf8ToWide(utf8Str, NameStringLength > 0 ? NameStringLength : strlen(utf8Str));
-			const auto it_ret = s_WideNameTable.emplace(NameHash, std::make_shared<std::wstring>(wideString));
+			const auto it_ret = storage.WideNames.emplace(NameHash, std::make_shared<std::wstring>(wideString));
 			if (it_ret.second)
 			{
 				NameStringW = it_ret.first->second->c_str();
@@ -254,10 +263,12 @@ public:
 		if (NameString)
 			return NameStringLength;
 
+        auto& storage = GetStorage();
+
 		{
-			jScopeReadLock s(&Lock);
-			const auto it_find = s_NameTable.find(NameHash);
-			if (it_find == s_NameTable.end())
+			jScopeReadLock s(&storage.Lock);
+			const auto it_find = storage.Names.find(NameHash);
+			if (it_find == storage.Names.end())
 				return 0;
 
 			NameString = it_find->second->c_str();

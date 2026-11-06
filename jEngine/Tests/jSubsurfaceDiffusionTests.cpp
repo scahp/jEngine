@@ -18,7 +18,7 @@ int RunSubsurfaceDiffusionTests()
             std::cerr << "FAIL subsurface: " << message << '\n';
         }
     };
-    auto near = [](float a, float b) { return std::abs(a - b) <= 2.0e-6f; };
+    auto nearlyEqual = [](float a, float b) { return std::abs(a - b) <= 2.0e-6f; };
     std::string error;
     Settings settings, validated;
     require(!HasEffect(settings), "default is off");
@@ -58,20 +58,20 @@ int RunSubsurfaceDiffusionTests()
         for (std::size_t i = 0; i < kernel.size(); ++i)
         {
             const auto& sample = kernel[i];
-            symmetric = symmetric && near(sample.Offset, -kernel[kernel.size() - 1 - i].Offset);
+            symmetric = symmetric && nearlyEqual(sample.Offset, -kernel[kernel.size() - 1 - i].Offset);
             for (std::size_t c = 0; c < 3; ++c)
             {
                 finite = finite && std::isfinite(sample.Weight[c]) && sample.Weight[c] >= 0.0f;
-                symmetric = symmetric && near(sample.Weight[c], kernel[kernel.size() - 1 - i].Weight[c]);
+                symmetric = symmetric && nearlyEqual(sample.Weight[c], kernel[kernel.size() - 1 - i].Weight[c]);
                 total[c] += sample.Weight[c];
                 firstMoment[c] += sample.Weight[c] * sample.Offset;
                 secondMoment[c] += sample.Weight[c] * sample.Offset * sample.Offset;
             }
         }
         require(finite && symmetric, "finite positive mirror-symmetric profile");
-        require(near(total[0], 1.0f) && near(total[1], 1.0f) && near(total[2], 1.0f),
+        require(nearlyEqual(total[0], 1.0f) && nearlyEqual(total[1], 1.0f) && nearlyEqual(total[2], 1.0f),
             "unit channel energy preserves constant diffuse fields");
-        require(near(firstMoment[0], 0.0f) && near(firstMoment[1], 0.0f) && near(firstMoment[2], 0.0f),
+        require(nearlyEqual(firstMoment[0], 0.0f) && nearlyEqual(firstMoment[1], 0.0f) && nearlyEqual(firstMoment[2], 0.0f),
             "symmetric impulse has no spatial shift");
         require(secondMoment[0] > 0.0f && secondMoment[1] > 0.0f && secondMoment[2] > 0.0f,
             "each channel spreads an impulse");
@@ -84,7 +84,7 @@ int RunSubsurfaceDiffusionTests()
         for (const auto& x : kernel)
             for (const auto& y : kernel)
                 for (std::size_t c = 0; c < 3; ++c) transported[c] += x.Weight[c] * y.Weight[c];
-        require(near(transported[0], 1.0f) && near(transported[1], 1.0f) && near(transported[2], 1.0f),
+        require(nearlyEqual(transported[0], 1.0f) && nearlyEqual(transported[1], 1.0f) && nearlyEqual(transported[2], 1.0f),
             "two-dimensional impulse energy is conserved");
 
         // With every neighboring sample rejected by a boundary, its weight is
@@ -93,7 +93,7 @@ int RunSubsurfaceDiffusionTests()
         RGB edge{};
         for (const auto& sample : kernel)
             for (std::size_t c = 0; c < 3; ++c) edge[c] += sample.Weight[c] * center[c];
-        require(near(edge[0], center[0]) && near(edge[1], center[1]) && near(edge[2], center[2]),
+        require(nearlyEqual(edge[0], center[0]) && nearlyEqual(edge[1], center[1]) && nearlyEqual(edge[2], center[2]),
             "fully rejected boundary preserves its own diffuse energy");
     }
     auto variance = [](const Kernel& kernel, std::size_t channel)
@@ -104,8 +104,8 @@ int RunSubsurfaceDiffusionTests()
     };
     require(variance(kernels[0], 0) > variance(kernels[0], 1) &&
         variance(kernels[0], 1) > variance(kernels[0], 2), "skin spreads red farther than green and blue");
-    require(near(variance(kernels[7], 0), variance(kernels[7], 1)) &&
-        near(variance(kernels[7], 1), variance(kernels[7], 2)), "neutral profile has no chromatic spread");
+    require(nearlyEqual(variance(kernels[7], 0), variance(kernels[7], 1)) &&
+        nearlyEqual(variance(kernels[7], 1), variance(kernels[7], 2)), "neutral profile has no chromatic spread");
     require(variance(kernels[1], 1) > variance(kernels[0], 1), "non-skin profile changes the diffusion distribution");
     Kernel unchanged = kernels[0];
     const auto before = unchanged;
@@ -114,8 +114,8 @@ int RunSubsurfaceDiffusionTests()
     require(!BuildKernel(invalidProfile, unchanged, error) &&
         std::memcmp(&unchanged, &before, sizeof(Kernel)) == 0, "invalid profile leaves last-good kernel intact");
 
-    require(near(EffectiveRadiusWorld(Profiles[0], settings, 0.5f), 0.5f), "authored thickness bounds diffusion support");
-    require(near(EffectiveRadiusWorld(Profiles[0], settings, 100.0f), 1.2f), "profile bounds thick-material support");
+    require(nearlyEqual(EffectiveRadiusWorld(Profiles[0], settings, 0.5f), 0.5f), "authored thickness bounds diffusion support");
+    require(nearlyEqual(EffectiveRadiusWorld(Profiles[0], settings, 100.0f), 1.2f), "profile bounds thick-material support");
     require(EffectiveRadiusWorld(Profiles[0], settings, 0.0f) == 0.0f &&
         EffectiveRadiusWorld(Profiles[0], settings, std::numeric_limits<float>::quiet_NaN()) == 0.0f,
         "zero and invalid thickness cannot produce a radius");
@@ -124,7 +124,7 @@ int RunSubsurfaceDiffusionTests()
         "world-to-pixel radius follows projected scale");
     require(ProjectedRadiusPixels(1000.0f, 0.01f, 32.0f) == 32.0f &&
         ProjectedRadiusPixels(1000.0f, 0.01f, 1000.0f) == MaximumRadiusPixels,
-        "near-camera radii obey both finite pixel budgets");
+        "nearlyEqual-camera radii obey both finite pixel budgets");
     require(ProjectedRadiusPixels(1.0f, 0.0f, 32.0f) == 0.0f,
         "degenerate inverse projection cannot create an unbounded filter");
 
@@ -133,16 +133,16 @@ int RunSubsurfaceDiffusionTests()
     RGB scene;
     for (std::size_t c = 0; c < 3; ++c) scene[c] = diffuse[c] + specularAndEmission[c];
     const auto composed = ComposeDiffuse(scene, diffuse, filtered, RGB{1.0f, 1.0f, 1.0f}, 1.0f);
-    require(near(composed[0] - filtered[0], specularAndEmission[0]) &&
-        near(composed[1] - filtered[1], specularAndEmission[1]) &&
-        near(composed[2] - filtered[2], specularAndEmission[2]),
+    require(nearlyEqual(composed[0] - filtered[0], specularAndEmission[0]) &&
+        nearlyEqual(composed[1] - filtered[1], specularAndEmission[1]) &&
+        nearlyEqual(composed[2] - filtered[2], specularAndEmission[2]),
         "diffuse replacement preserves the unfiltered specular/emissive remainder");
     require(ComposeDiffuse(scene, diffuse, filtered, RGB{1.0f, 1.0f, 1.0f}, 0.0f) == scene,
         "zero global strength is exact identity");
     require(ComposeDiffuse(scene, diffuse, filtered, RGB{}, 1.0f) == scene,
         "zero material strength is exact identity");
     const auto redOnly = ComposeDiffuse(scene, diffuse, filtered, RGB{0.5f, 0.0f, 0.0f}, 1.0f);
-    require(near(redOnly[0], scene[0] + 0.5f * (filtered[0] - diffuse[0])) &&
+    require(nearlyEqual(redOnly[0], scene[0] + 0.5f * (filtered[0] - diffuse[0])) &&
         redOnly[1] == scene[1] && redOnly[2] == scene[2], "material colour controls redistribution per channel");
 
     std::size_t bytes = 123;

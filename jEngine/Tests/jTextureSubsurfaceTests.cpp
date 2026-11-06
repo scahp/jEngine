@@ -10,7 +10,7 @@ int RunTextureSubsurfaceTests()
     int checks=0,failures=0;
     const auto require=[&](bool condition,const char* message)
     {++checks;if(!condition){++failures;std::cerr<<"FAIL texture SSS: "<<message<<'\n';}};
-    const auto near=[](float a,float b){return std::abs(a-b)<2.e-6f;};
+    const auto nearlyEqual=[](float a,float b){return std::abs(a-b)<2.e-6f;};
     std::string error;Settings settings,validated;
     const float receiverLength=std::sqrt(10100.f);
     const RGB receiverRay{10.f/receiverLength,0.f,100.f/receiverLength};
@@ -51,11 +51,11 @@ int RunTextureSubsurfaceTests()
     for(unsigned level=0;level<6;++level)
     {
         const auto sigma=IncrementalSigmaMm(level);accumulatedVariance+=sigma*sigma;
-        require(near(accumulatedVariance,VarianceMm2[level]),"Gaussian convolution adds variance in mm squared");
+        require(nearlyEqual(accumulatedVariance,VarianceMm2[level]),"Gaussian convolution adds variance in mm squared");
         for(unsigned c=0;c<3;++c)
         {require(std::isfinite(weights[level][c])&&weights[level][c]>=0.f,"lobes have finite positive channel energy");total[c]+=weights[level][c];}
     }
-    for(unsigned c=0;c<3;++c) require(near(total[c],1.f),"constant irradiance is preserved per channel");
+    for(unsigned c=0;c<3;++c) require(nearlyEqual(total[c],1.f),"constant irradiance is preserved per channel");
     require(IncrementalSigmaMm(6)==0.f&&IncrementalSigmaMm(999)==0.f,"invalid Gaussian level is bounded");
     const auto impulseVariance=[&](unsigned c){float x=0.f;for(unsigned l=0;l<6;++l)x+=weights[l][c]*VarianceMm2[l];return x;};
     require(impulseVariance(0)>impulseVariance(1)&&impulseVariance(1)>impulseVariance(2),"skin transports red farther than green/blue");
@@ -64,13 +64,13 @@ int RunTextureSubsurfaceTests()
             "transmission encoding and decoding use the same explicit units/extinction");
     require(EncodeTransmission(0,.2f,1.f)==1.f&&EncodeTransmission(1,.2f,0.f)==1.f,"zero optical thickness is exact unit transmission");
     require(EncodeTransmission(10000,.2f,1.f)>0.f&&std::isfinite(DecodeTransmission(0,.2f)),"thick/missing transmission remains finite");
-    require(near(CorrectedThicknessMm(3,.3f,-.5f,1.f),10.f),"aligned entry normal does not invent a correction");
-    require(near(CorrectedThicknessMm(3,.3f,-.5f,-1.f),5.f),"sampled opposing entry normal changes the backface correction");
-    require(near(CorrectedThicknessMm(6,.6f,-.5f,-1.f),5.f),"world-scale/mm conversion leaves physical transport invariant");
+    require(nearlyEqual(CorrectedThicknessMm(3,.3f,-.5f,1.f),10.f),"aligned entry normal does not invent a correction");
+    require(nearlyEqual(CorrectedThicknessMm(3,.3f,-.5f,-1.f),5.f),"sampled opposing entry normal changes the backface correction");
+    require(nearlyEqual(CorrectedThicknessMm(6,.6f,-.5f,-1.f),5.f),"world-scale/mm conversion leaves physical transport invariant");
     require(CorrectedThicknessMm(1,0,-1,-1)==0.f,"invalid unit conversion is finite and inactive");
     require(RangeAttenuation(1,0)==1.f&&RangeAttenuation(0,10)==1.f&&RangeAttenuation(100,10)==0.f,
         "point-light window exactly matches unbounded/center/range limits");
-    require(near(RangeAttenuation(25,10),.87890625f),"point-light smooth range matches existing d squared convention");
+    require(nearlyEqual(RangeAttenuation(25,10),.87890625f),"point-light smooth range matches existing d squared convention");
     std::size_t bytes=123;
     require(ValidateWorkExtent(1,1024,1024,1280,720,bytes,error)&&bytes==std::size_t(1024)*1024*116u+1280u*720u*16u+16u,
         "one-surface work accounting includes all atlas/capture/output targets");
