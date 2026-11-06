@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "Code/Engine/Editor/jEditorWorkspace.h"
 #include "jRHI_DX12.h"
+#include "Profiler/jRenderTrace.h"
 #include "jShaderCompiler_DX12.h"
 #include <iomanip>
 #include "jBufferUtil_DX12.h"
@@ -1778,6 +1779,7 @@ std::shared_ptr<jShaderBindingInstance> jRHI_DX12::CreateShaderBindingInstance(c
 
 void jRHI_DX12::DrawArrays(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type, int32 vertStartIndex, int32 vertCount) const
 {
+    jRenderTrace::RecordCommand(false);
     auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
     check(CommandBuffer_DX12);
 
@@ -1792,6 +1794,7 @@ void jRHI_DX12::DrawArrays(const std::shared_ptr<jRenderFrameContext>& InRenderF
 void jRHI_DX12::DrawArraysInstanced(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type
 	, int32 vertStartIndex, int32 vertCount, int32 instanceCount) const
 {
+    jRenderTrace::RecordCommand(false);
     auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
     check(CommandBuffer_DX12);
 
@@ -1806,6 +1809,7 @@ void jRHI_DX12::DrawArraysInstanced(const std::shared_ptr<jRenderFrameContext>& 
 void jRHI_DX12::DrawElements(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type
 	, int32 elementSize, int32 startIndex, int32 indexCount) const
 {
+    jRenderTrace::RecordCommand(false);
     auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
     check(CommandBuffer_DX12);
 
@@ -1820,6 +1824,7 @@ void jRHI_DX12::DrawElements(const std::shared_ptr<jRenderFrameContext>& InRende
 void jRHI_DX12::DrawElementsInstanced(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type
 	, int32 elementSize, int32 startIndex, int32 indexCount, int32 instanceCount) const
 {
+    jRenderTrace::RecordCommand(false);
     auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
     check(CommandBuffer_DX12);
 
@@ -1834,6 +1839,7 @@ void jRHI_DX12::DrawElementsInstanced(const std::shared_ptr<jRenderFrameContext>
 void jRHI_DX12::DrawElementsBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, EPrimitiveType type
 	, int32 elementSize, int32 startIndex, int32 indexCount, int32 baseVertexIndex) const
 {
+    jRenderTrace::RecordCommand(false);
     auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
     check(CommandBuffer_DX12);
 
@@ -1848,6 +1854,7 @@ void jRHI_DX12::DrawElementsBaseVertex(const std::shared_ptr<jRenderFrameContext
 void jRHI_DX12::DrawElementsInstancedBaseVertex(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext
 	, EPrimitiveType type, int32 elementSize, int32 startIndex, int32 indexCount, int32 baseVertexIndex, int32 instanceCount) const
 {
+    jRenderTrace::RecordCommand(false);
     auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
     check(CommandBuffer_DX12);
 
@@ -1862,6 +1869,7 @@ void jRHI_DX12::DrawElementsInstancedBaseVertex(const std::shared_ptr<jRenderFra
 void jRHI_DX12::DrawIndirect(const std::shared_ptr<jRenderFrameContext>& frame, EPrimitiveType type,
     jBuffer* buffer, int32 startIndex, int32 drawCount) const
 {
+    jRenderTrace::RecordCommand(false);
     check(frame && buffer && startIndex >= 0 && drawCount > 0 && DrawCommandSignature);
     auto* command = static_cast<jCommandBuffer_DX12*>(frame->GetActiveCommandBuffer());
     auto* arguments = static_cast<jBuffer_DX12*>(buffer);
@@ -1897,6 +1905,7 @@ EMSAASamples jRHI_DX12::SelectMSAASamples(uint32 requested)
 void jRHI_DX12::DrawElementsIndirect(const std::shared_ptr<jRenderFrameContext>& frame, EPrimitiveType type,
     jBuffer* buffer, int32 startIndex, int32 drawCount) const
 {
+    jRenderTrace::RecordCommand(false);
     check(frame && buffer && startIndex >= 0 && drawCount > 0 && DrawIndexedCommandSignature);
     auto* command = static_cast<jCommandBuffer_DX12*>(frame->GetActiveCommandBuffer());
     auto* arguments = static_cast<jBuffer_DX12*>(buffer);
@@ -1913,6 +1922,7 @@ void jRHI_DX12::DrawElementsIndirect(const std::shared_ptr<jRenderFrameContext>&
 
 void jRHI_DX12::DispatchCompute(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, uint32 numGroupsX, uint32 numGroupsY, uint32 numGroupsZ) const
 {
+    jRenderTrace::RecordCommand(true);
     auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
     check(CommandBuffer_DX12);
     check(CommandBuffer_DX12->CommandList);
@@ -1928,6 +1938,7 @@ void jRHI_DX12::DispatchCompute(const std::shared_ptr<jRenderFrameContext>& InRe
 
 void jRHI_DX12::DispatchComputeIndirect(const std::shared_ptr<jRenderFrameContext>& InRenderFrameContext, jBuffer* buffer, uint32 bufferOffset) const
 {
+    jRenderTrace::RecordCommand(true);
     auto CommandBuffer_DX12 = (jCommandBuffer_DX12*)InRenderFrameContext->GetActiveCommandBuffer();
     check(CommandBuffer_DX12);
     check(CommandBuffer_DX12->CommandList);

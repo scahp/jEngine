@@ -1,0 +1,1055 @@
+{
+  "base_revision": "9fa706338d050ead1acf15d998a5a72d499f8221",
+  "branch": "codex/render-pass-inspector",
+  "verified_at": "2026-11-07T02:25:01.156565+09:00",
+  "device": "Apple M4",
+  "api": "Vulkan via experimental MoltenVK",
+  "build": "Debug",
+  "frames_per_case": 120,
+  "capture_frame": 60,
+  "resolution": [
+    1280,
+    900
+  ],
+  "fixed_simulation_step": 0.016666666666666666,
+  "scope": "correctness; not a performance benchmark or Windows GPU validation",
+  "cases": {
+    "passes": {
+      "clean_shutdown": true,
+      "validation_messages": 0,
+      "results": {
+        "frozenFrame": 13,
+        "livePixelAfterCapture": [
+          0.0498046875,
+          0.099609375,
+          0.890625,
+          1.0
+        ],
+        "livePixelFrameAfterCapture": 81,
+        "mode": "passes",
+        "passes": [
+          {
+            "cpuMs": 0.063209,
+            "gpuMs": 0.244166,
+            "key": "/ShadowPass#0",
+            "name": "ShadowPass"
+          },
+          {
+            "cpuMs": 0.233792,
+            "gpuMs": 0.951417,
+            "key": "/BasePass#0",
+            "name": "BasePass"
+          },
+          {
+            "cpuMs": 0.1205,
+            "gpuMs": 0.37216699999999997,
+            "key": "/BasePass#0/LightingPass#0",
+            "name": "LightingPass"
+          },
+          {
+            "cpuMs": 0.043417,
+            "gpuMs": 0.128125,
+            "key": "/InspectorPreview#0",
+            "name": "InspectorPreview"
+          },
+          {
+            "cpuMs": 0.026833,
+            "gpuMs": 0.106209,
+            "key": "/CalcLinearDepth#0",
+            "name": "CalcLinearDepth"
+          },
+          {
+            "cpuMs": 0.026667,
+            "gpuMs": 0.476375,
+            "key": "/CopyDepthBuffer#0",
+            "name": "CopyDepthBuffer"
+          },
+          {
+            "cpuMs": 0.003166,
+            "gpuMs": 0.002959,
+            "key": "/RaytracingAO#0",
+            "name": "RaytracingAO"
+          },
+          {
+            "cpuMs": 0.052541,
+            "gpuMs": 0.043292,
+            "key": "/PostProcess#0",
+            "name": "PostProcess"
+          },
+          {
+            "cpuMs": 0.003,
+            "gpuMs": 0.004458,
+            "key": "/DebugPasses#0",
+            "name": "DebugPasses"
+          },
+          {
+            "cpuMs": 0.04825,
+            "gpuMs": 0.065417,
+            "key": "/InspectorPreview#1",
+            "name": "InspectorPreview"
+          }
+        ],
+        "resources": [
+          {
+            "available": true,
+            "name": "Final color",
+            "producer": "PostProcess / final display"
+          },
+          {
+            "available": true,
+            "name": "Scene HDR",
+            "producer": "Scene HDR before PostProcess"
+          },
+          {
+            "available": true,
+            "name": "Base color",
+            "producer": "BasePass"
+          },
+          {
+            "available": true,
+            "name": "World normal (post)",
+            "producer": "BasePass"
+          },
+          {
+            "available": true,
+            "name": "Device depth",
+            "producer": "BasePass"
+          },
+          {
+            "available": true,
+            "name": "Linear depth",
+            "producer": "CalcLinearDepth"
+          },
+          {
+            "available": true,
+            "name": "Metallic",
+            "producer": "BasePass"
+          },
+          {
+            "available": true,
+            "name": "Roughness",
+            "producer": "BasePass"
+          },
+          {
+            "available": true,
+            "name": "Emissive",
+            "producer": "BasePass"
+          },
+          {
+            "available": false,
+            "name": "Surfel irradiance",
+            "producer": "Not produced"
+          },
+          {
+            "available": false,
+            "name": "Ambient occlusion",
+            "producer": "RaytracingAO"
+          },
+          {
+            "available": true,
+            "name": "Base lighting HDR",
+            "producer": "BasePass"
+          },
+          {
+            "available": false,
+            "name": "Subsurface mask",
+            "producer": "Not produced"
+          },
+          {
+            "available": false,
+            "name": "Diffuse lighting HDR",
+            "producer": "Not produced"
+          }
+        ],
+        "traceFrame": 97
+      },
+      "image_sha256": "75049556ad80522421568a6974203b1ecfd002c06cd23dea2430c2af122c2ec9",
+      "image": "docs/manual/images/render-inspector-passes.png"
+    },
+    "pixel": {
+      "clean_shutdown": true,
+      "validation_messages": 0,
+      "results": {
+        "frozenFrame": 0,
+        "mode": "pixel",
+        "passes": [
+          {
+            "cpuMs": 0.077542,
+            "gpuMs": 0.244916,
+            "key": "/ShadowPass#0",
+            "name": "ShadowPass"
+          },
+          {
+            "cpuMs": 0.2725,
+            "gpuMs": 0.791041,
+            "key": "/BasePass#0",
+            "name": "BasePass"
+          },
+          {
+            "cpuMs": 0.139917,
+            "gpuMs": 0.33049999999999996,
+            "key": "/BasePass#0/LightingPass#0",
+            "name": "LightingPass"
+          },
+          {
+            "cpuMs": 0.050625,
+            "gpuMs": 0.09704199999999999,
+            "key": "/InspectorPreview#0",
+            "name": "InspectorPreview"
+          },
+          {
+            "cpuMs": 0.03175,
+            "gpuMs": 0.06829199999999999,
+            "key": "/CalcLinearDepth#0",
+            "name": "CalcLinearDepth"
+          },
+          {
+            "cpuMs": 0.030209,
+            "gpuMs": 0.38470899999999997,
+            "key": "/CopyDepthBuffer#0",
+            "name": "CopyDepthBuffer"
+          },
+          {
+            "cpuMs": 0.003667,
+            "gpuMs": 0.003292,
+            "key": "/RaytracingAO#0",
+            "name": "RaytracingAO"
+          },
+          {
+            "cpuMs": 0.062834,
+            "gpuMs": 0.026416,
+            "key": "/PostProcess#0",
+            "name": "PostProcess"
+          },
+          {
+            "cpuMs": 0.003375,
+            "gpuMs": 0.012417,
+            "key": "/DebugPasses#0",
+            "name": "DebugPasses"
+          },
+          {
+            "cpuMs": 0.054375,
+            "gpuMs": 0.023916,
+            "key": "/InspectorPreview#1",
+            "name": "InspectorPreview"
+          }
+        ],
+        "pixelAvailable": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          true,
+          false,
+          false
+        ],
+        "pixelFrame": 9,
+        "pixelValues": [
+          [
+            0.729411780834198,
+            0.4117647111415863,
+            0.34117648005485535,
+            1.0
+          ],
+          [
+            0.5,
+            0.140625,
+            0.09375,
+            1.0
+          ],
+          [
+            0.9453125,
+            0.2890625,
+            0.21875,
+            1.0
+          ],
+          [
+            0.625,
+            0.49609375,
+            0.01611328125,
+            1.0
+          ],
+          [
+            0.9990487694740295,
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            104.03286743164062,
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            -0.0,
+            -0.0,
+            0.0,
+            0.419921875
+          ],
+          [
+            -0.0,
+            -0.0,
+            0.0,
+            0.419921875
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.5,
+            0.140625,
+            0.09375,
+            1.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            -21.664445877075195,
+            11.984225273132324,
+            0.14309054613113403,
+            1.0
+          ]
+        ],
+        "renderObjectId": 6,
+        "resources": [
+          {
+            "available": true,
+            "name": "Final color",
+            "producer": "PostProcess / final display"
+          },
+          {
+            "available": true,
+            "name": "Scene HDR",
+            "producer": "Scene HDR before PostProcess"
+          },
+          {
+            "available": true,
+            "name": "Base color",
+            "producer": "BasePass"
+          },
+          {
+            "available": true,
+            "name": "World normal (post)",
+            "producer": "BasePass"
+          },
+          {
+            "available": true,
+            "name": "Device depth",
+            "producer": "BasePass"
+          },
+          {
+            "available": true,
+            "name": "Linear depth",
+            "producer": "CalcLinearDepth"
+          },
+          {
+            "available": true,
+            "name": "Metallic",
+            "producer": "BasePass"
+          },
+          {
+            "available": true,
+            "name": "Roughness",
+            "producer": "BasePass"
+          },
+          {
+            "available": true,
+            "name": "Emissive",
+            "producer": "BasePass"
+          },
+          {
+            "available": false,
+            "name": "Surfel irradiance",
+            "producer": "Not produced"
+          },
+          {
+            "available": false,
+            "name": "Ambient occlusion",
+            "producer": "RaytracingAO"
+          },
+          {
+            "available": true,
+            "name": "Base lighting HDR",
+            "producer": "BasePass"
+          },
+          {
+            "available": false,
+            "name": "Subsurface mask",
+            "producer": "Not produced"
+          },
+          {
+            "available": false,
+            "name": "Diffuse lighting HDR",
+            "producer": "Not produced"
+          }
+        ],
+        "traceFrame": 97
+      },
+      "image_sha256": "07aa96d4b99ad3b4ba651d83d5fb1853ae7b86a9006886480e792057d0a390b1",
+      "image": "docs/manual/images/render-inspector-pixel.png"
+    },
+    "forward": {
+      "clean_shutdown": true,
+      "validation_messages": 0,
+      "results": {
+        "frozenFrame": 0,
+        "mode": "forward",
+        "passes": [
+          {
+            "cpuMs": 0.063334,
+            "gpuMs": 0.44079199999999996,
+            "key": "/ShadowPass#0",
+            "name": "ShadowPass"
+          },
+          {
+            "cpuMs": 0.136375,
+            "gpuMs": 0.348333,
+            "key": "/BasePass#0",
+            "name": "BasePass"
+          },
+          {
+            "cpuMs": 0.032167,
+            "gpuMs": 0.121916,
+            "key": "/CalcLinearDepth#0",
+            "name": "CalcLinearDepth"
+          },
+          {
+            "cpuMs": 0.025542,
+            "gpuMs": 0.23183299999999998,
+            "key": "/CopyDepthBuffer#0",
+            "name": "CopyDepthBuffer"
+          },
+          {
+            "cpuMs": 0.003083,
+            "gpuMs": 0.043125,
+            "key": "/RaytracingAO#0",
+            "name": "RaytracingAO"
+          },
+          {
+            "cpuMs": 0.052958,
+            "gpuMs": 0.143042,
+            "key": "/PostProcess#0",
+            "name": "PostProcess"
+          },
+          {
+            "cpuMs": 0.002791,
+            "gpuMs": 0.003916,
+            "key": "/DebugPasses#0",
+            "name": "DebugPasses"
+          },
+          {
+            "cpuMs": 0.050209,
+            "gpuMs": 0.02575,
+            "key": "/InspectorPreview#0",
+            "name": "InspectorPreview"
+          }
+        ],
+        "pixelAvailable": [
+          true,
+          true,
+          false,
+          false,
+          true,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false,
+          true,
+          false,
+          false
+        ],
+        "pixelFrame": 9,
+        "pixelValues": [
+          [
+            0.7490196228027344,
+            0.41960784792900085,
+            0.3490196168422699,
+            1.0
+          ],
+          [
+            0.53125,
+            0.146484375,
+            0.09765625,
+            1.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.9990487694740295,
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            104.0328598022461,
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.53125,
+            0.146484375,
+            0.09765625,
+            1.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            -21.66184425354004,
+            11.981155395507812,
+            0.13618429005146027,
+            1.0
+          ]
+        ],
+        "renderObjectId": 6,
+        "resources": [
+          {
+            "available": true,
+            "name": "Final color",
+            "producer": "PostProcess / final display"
+          },
+          {
+            "available": true,
+            "name": "Scene HDR",
+            "producer": "Scene HDR before PostProcess"
+          },
+          {
+            "available": false,
+            "name": "Base color",
+            "producer": "Not produced"
+          },
+          {
+            "available": false,
+            "name": "World normal (post)",
+            "producer": "Not produced"
+          },
+          {
+            "available": true,
+            "name": "Device depth",
+            "producer": "BasePass"
+          },
+          {
+            "available": true,
+            "name": "Linear depth",
+            "producer": "CalcLinearDepth"
+          },
+          {
+            "available": false,
+            "name": "Metallic",
+            "producer": "Not produced"
+          },
+          {
+            "available": false,
+            "name": "Roughness",
+            "producer": "Not produced"
+          },
+          {
+            "available": false,
+            "name": "Emissive",
+            "producer": "Not produced"
+          },
+          {
+            "available": false,
+            "name": "Surfel irradiance",
+            "producer": "Not produced"
+          },
+          {
+            "available": false,
+            "name": "Ambient occlusion",
+            "producer": "RaytracingAO"
+          },
+          {
+            "available": true,
+            "name": "Base lighting HDR",
+            "producer": "BasePass"
+          },
+          {
+            "available": false,
+            "name": "Subsurface mask",
+            "producer": "Not produced"
+          },
+          {
+            "available": false,
+            "name": "Diffuse lighting HDR",
+            "producer": "Not produced"
+          }
+        ],
+        "traceFrame": 97
+      },
+      "image_sha256": "4c74493084a295301931398b1b03ef52d95740536d22fa24b8f4079beafdf978"
+    },
+    "surfel": {
+      "clean_shutdown": true,
+      "validation_messages": 0,
+      "results": {
+        "entityId": 1,
+        "frozenFrame": 0,
+        "mode": "surfel",
+        "passes": [
+          {
+            "cpuMs": 0.931541,
+            "gpuMs": 1.200375,
+            "key": "/ShadowPass#0",
+            "name": "ShadowPass"
+          },
+          {
+            "cpuMs": 0.639834,
+            "gpuMs": 1.216833,
+            "key": "/BasePass#0",
+            "name": "BasePass"
+          },
+          {
+            "cpuMs": 0.099416,
+            "gpuMs": 0.33616599999999996,
+            "key": "/BasePass#0/LightingPass#0",
+            "name": "LightingPass"
+          },
+          {
+            "cpuMs": 0.019375,
+            "gpuMs": 0.050041999999999996,
+            "key": "/CalcLinearDepth#0",
+            "name": "CalcLinearDepth"
+          },
+          {
+            "cpuMs": 0.020125,
+            "gpuMs": 0.038542,
+            "key": "/CopyDepthBuffer#0",
+            "name": "CopyDepthBuffer"
+          },
+          {
+            "cpuMs": 0.802917,
+            "gpuMs": 7.6405829999999995,
+            "key": "/SurfelGIPass#0",
+            "name": "SurfelGIPass"
+          },
+          {
+            "cpuMs": 0.02875,
+            "gpuMs": 0.012291999999999999,
+            "key": "/SurfelGIPass#0/SurfelGI_DispatchClearVisibleCellCounter#0",
+            "name": "SurfelGI_DispatchClearVisibleCellCounter"
+          },
+          {
+            "cpuMs": 0.020416,
+            "gpuMs": 0.015208,
+            "key": "/SurfelGIPass#0/SurfelGI_DispatchCollectVisibleCells#0",
+            "name": "SurfelGI_DispatchCollectVisibleCells"
+          },
+          {
+            "cpuMs": 0.02375,
+            "gpuMs": 0.018333,
+            "key": "/SurfelGIPass#0/SurfelGI_DispatchRefreshVisibleCellSurfels#0",
+            "name": "SurfelGI_DispatchRefreshVisibleCellSurfels"
+          },
+          {
+            "cpuMs": 0.023792,
+            "gpuMs": 0.7745829999999999,
+            "key": "/SurfelGIPass#0/SurfelGI_DispatchCleanup#0",
+            "name": "SurfelGI_DispatchCleanup"
+          },
+          {
+            "cpuMs": 0.01725,
+            "gpuMs": 0.076666,
+            "key": "/SurfelGIPass#0/SurfelGI_DispatchReservoirClearCandidates#0",
+            "name": "SurfelGI_DispatchReservoirClearCandidates"
+          },
+          {
+            "cpuMs": 0.008334,
+            "gpuMs": 0.014582999999999999,
+            "key": "/SurfelGIPass#0/SurfelGI_DispatchReservoirClearStats#0",
+            "name": "SurfelGI_DispatchReservoirClearStats"
+          },
+          {
+            "cpuMs": 0.039667,
+            "gpuMs": 0.11499999999999999,
+            "key": "/SurfelGIPass#0/SurfelGI_DispatchReservoirGatherCandidates#0",
+            "name": "SurfelGI_DispatchReservoirGatherCandidates"
+          },
+          {
+            "cpuMs": 0.032708,
+            "gpuMs": 0.008,
+            "key": "/SurfelGIPass#0/SurfelGI_DispatchReservoirPlaceCandidates#0",
+            "name": "SurfelGI_DispatchReservoirPlaceCandidates"
+          },
+          {
+            "cpuMs": 0.013875,
+            "gpuMs": 0.034874999999999996,
+            "key": "/SurfelGIPass#0/SurfelGI_DispatchClearInlineRayDispatch#0",
+            "name": "SurfelGI_DispatchClearInlineRayDispatch"
+          },
+          {
+            "cpuMs": 0.021625,
+            "gpuMs": 0.7264999999999999,
+            "key": "/SurfelGIPass#0/SurfelGI_DispatchCompactActiveInlineRayIndices#0",
+            "name": "SurfelGI_DispatchCompactActiveInlineRayIndices"
+          },
+          {
+            "cpuMs": 0.016042,
+            "gpuMs": 0.053292,
+            "key": "/SurfelGIPass#0/SurfelGI_DispatchBuildInlineRayDispatchArgs#0",
+            "name": "SurfelGI_DispatchBuildInlineRayDispatchArgs"
+          },
+          {
+            "cpuMs": 0.483375,
+            "gpuMs": 3.998916,
+            "key": "/SurfelGIPass#0/SurfelGI_DispatchGatherIrradianceInlineRay#0",
+            "name": "SurfelGI_DispatchGatherIrradianceInlineRay"
+          },
+          {
+            "cpuMs": 0.067625,
+            "gpuMs": 11.219624999999999,
+            "key": "/SurfelGIResolve#0",
+            "name": "SurfelGIResolve"
+          },
+          {
+            "cpuMs": 0.062541,
+            "gpuMs": 10.859542,
+            "key": "/SurfelGIResolve#0/SurfelGI_Resolve#0",
+            "name": "SurfelGI_Resolve"
+          },
+          {
+            "cpuMs": 0.027791,
+            "gpuMs": 0.09887499999999999,
+            "key": "/SurfelGIResolve#0/SurfelGI_Resolve#0/InspectorPreview#0",
+            "name": "InspectorPreview"
+          },
+          {
+            "cpuMs": 0.020292,
+            "gpuMs": 0.1565,
+            "key": "/Apply_SurfelGI#0",
+            "name": "Apply_SurfelGI"
+          },
+          {
+            "cpuMs": 0.02875,
+            "gpuMs": 0.022334,
+            "key": "/PostProcess#0",
+            "name": "PostProcess"
+          },
+          {
+            "cpuMs": 0.001458,
+            "gpuMs": 0.045917,
+            "key": "/DebugPasses#0",
+            "name": "DebugPasses"
+          },
+          {
+            "cpuMs": 0.025583,
+            "gpuMs": 0.014832999999999999,
+            "key": "/InspectorPreview#0",
+            "name": "InspectorPreview"
+          }
+        ],
+        "pixelAvailable": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          false,
+          false
+        ],
+        "pixelFrame": 9,
+        "pixelValues": [
+          [
+            0.3960784375667572,
+            0.3450980484485626,
+            0.23529411852359772,
+            1.0
+          ],
+          [
+            0.130859375,
+            0.095703125,
+            0.041015625,
+            1.0
+          ],
+          [
+            0.734375,
+            0.6796875,
+            0.609375,
+            1.0
+          ],
+          [
+            0.5,
+            0.4765625,
+            0.984375,
+            1.0
+          ],
+          [
+            0.9987732768058777,
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            701.0403442382812,
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            0.0,
+            -0.0,
+            0.0,
+            0.66552734375
+          ],
+          [
+            0.0,
+            -0.0,
+            0.0,
+            0.66552734375
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          [
+            0.0810546875,
+            0.0634765625,
+            0.02978515625,
+            1.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.1123046875,
+            0.08203125,
+            0.0361328125,
+            1.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            474.27490234375,
+            216.8828125,
+            -167.69708251953125,
+            1.0
+          ]
+        ],
+        "renderObjectId": 11,
+        "resources": [
+          {
+            "available": true,
+            "name": "Final color",
+            "producer": "PostProcess / final display"
+          },
+          {
+            "available": true,
+            "name": "Scene HDR",
+            "producer": "Scene HDR before PostProcess"
+          },
+          {
+            "available": true,
+            "name": "Base color",
+            "producer": "BasePass"
+          },
+          {
+            "available": true,
+            "name": "World normal (post)",
+            "producer": "BasePass"
+          },
+          {
+            "available": true,
+            "name": "Device depth",
+            "producer": "BasePass"
+          },
+          {
+            "available": true,
+            "name": "Linear depth",
+            "producer": "CalcLinearDepth"
+          },
+          {
+            "available": true,
+            "name": "Metallic",
+            "producer": "BasePass"
+          },
+          {
+            "available": true,
+            "name": "Roughness",
+            "producer": "BasePass"
+          },
+          {
+            "available": true,
+            "name": "Emissive",
+            "producer": "BasePass"
+          },
+          {
+            "available": true,
+            "name": "Surfel irradiance",
+            "producer": "SurfelGIResolve"
+          },
+          {
+            "available": false,
+            "name": "Ambient occlusion",
+            "producer": "Not produced"
+          },
+          {
+            "available": true,
+            "name": "Base lighting HDR",
+            "producer": "BasePass"
+          },
+          {
+            "available": false,
+            "name": "Subsurface mask",
+            "producer": "Not produced"
+          },
+          {
+            "available": false,
+            "name": "Diffuse lighting HDR",
+            "producer": "Not produced"
+          }
+        ],
+        "submesh": 7,
+        "traceFrame": 97
+      },
+      "image_sha256": "6587c6d7b7b5ac99dfc6c2ef4e4f0e997f8b3e5b67ce0b2cceb9f8c6b80b8f80",
+      "image": "docs/manual/images/render-inspector-surfel.png"
+    }
+  },
+  "shader_checks": {
+    "success": true,
+    "shaders": [
+      "vulkan/inspector-preview",
+      "vulkan/inspector-pixel",
+      "dx12/inspector-preview",
+      "dx12/inspector-pixel"
+    ],
+    "layout_types": [
+      "jRenderInspectorDisplay",
+      "jRenderInspectorProbe"
+    ],
+    "group": "render-inspector"
+  },
+  "source_sha256": {
+    "jEngine/Code/Engine/Editor/jRenderInspector.cpp": "5239d3ccbec7fbea12d8adf6571d1082a93298ee4bf3318c4c53430deedd0551",
+    "jEngine/Code/Engine/Editor/jRenderInspector.h": "5d2ff48749d98d224a7770035203f7ef62c12a7dde1e3de9a092b1fa3422763b",
+    "jEngine/Profiler/jRenderTrace.cpp": "815979e1ad7dee602710c574fbad9bbfbf1efb46750a41391bc43df76c866f9a",
+    "jEngine/Profiler/jRenderTrace.h": "9b44f967ebf60d79f3980e8f3300da487c18dae8f5bb7dbe4ae9f1098f882edd",
+    "jEngine/Resource/Shaders/hlsl/RenderInspectorPixel_cs.hlsl": "1df24df506f354e7f55fc15929a58e260db0aa914c7f906fa3fb81f760a2cec3",
+    "jEngine/Resource/Shaders/hlsl/RenderInspectorPreview_ps.hlsl": "140ec2c96d8caee7008864dfd5edbf444c600191070e1c877fd05dbd9fa8cc9d"
+  },
+  "implementation_revision": "5b9571bc5a3a021ef54b21b7dc4014d4b534b32b"
+}

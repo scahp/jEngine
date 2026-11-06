@@ -4,6 +4,7 @@
 #include "Code/Engine/Editor/jEditorStartup.h"
 #include "Code/Engine/Editor/jEditorExtensions.h"
 #include "Code/Engine/Editor/jEditorTools.h"
+#include "Code/Engine/Editor/jRenderInspector.h"
 #include "Math/Vector.h"
 #include "Scene/jCamera.h"
 #include "Scene/jObject.h"
@@ -2039,9 +2040,16 @@ void jGame::Draw()
 		std::shared_ptr<jRenderFrameContext> renderFrameContext = g_rhi->BeginRenderFrame();
 		if (!renderFrameContext)
 			return;
+
+        jRenderInspector::BeginFrame(renderFrameContext);
+        jRenderTrace::BeginFrame(g_rhi->GetCurrentFrameNumber(), IsUsingPathTracingRenderer() ? "PathTracing" :
+            (renderFrameContext->UseForwardRenderer ? "Forward" : "Deferred"), IsUseVulkan() ? "Vulkan" : "DX12", SCR_WIDTH, SCR_HEIGHT);
+        struct EndRenderTrace { ~EndRenderTrace() { jRenderTrace::EndFrame(); } } endRenderTrace;
 		
 		jView View(MainCamera, jLight::GetLights());
 		View.PrepareViewUniformBufferShaderBindingInstance();
+        for (int i = 0; i < int(jRenderInspector::ViewMode::Count); ++i)
+            jRenderInspector::Observe(renderFrameContext, View, jRenderInspector::ViewMode(i), "Not produced", {});
 
 #if USE_PATH_TRACING
 		if (IsUsingPathTracingRenderer())

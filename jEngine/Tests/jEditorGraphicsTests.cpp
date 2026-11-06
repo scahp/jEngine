@@ -7,6 +7,7 @@
 #include "Shader/jShader.h"
 #include <cmath>
 #include <limits>
+namespace jRenderInspector { int ExportShaderFixtures(const char* directory); }
 
 int RunEditorGraphicsTests()
 {
@@ -223,6 +224,7 @@ int ExportEditorGraphicsShaderFixtures(const char* directory, bool vulkan)
             first = false; contract << '"' << field.Name << "\":" << field.ByteOffset;
         }
         contract << "}}}\n";
+        if (jRenderInspector::ExportShaderFixtures(directory)) return EXIT_FAILURE;
         return ExportEditorPathTracingShaderFixtures(directory, vulkan);
     }
     catch (const std::exception& error)

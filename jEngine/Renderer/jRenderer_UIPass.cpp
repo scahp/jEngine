@@ -438,6 +438,7 @@ namespace
 #include "Code/Engine/Editor/jEditorWorkspace.h"
 #include "Code/Engine/Editor/jEditorUiRenderer.h"
 #include "Code/Engine/Editor/jEditorCapture.h"
+#include "Code/Engine/Editor/jRenderInspector.h"
 #endif
 
 void IRenderer::UIPass()
@@ -471,6 +472,7 @@ void IRenderer::UIPass()
     if (!viewportOnly) HitObjectPass();
     if (g_Editor && (viewportOnly ? jEditorCapture::GetStatus().State != jEditorCapture::Phase::Idle : IsAuthoringWorkspaceVisible()))
         jEditorUiRenderer::PrepareScenePreview(RenderFrameContextPtr, View, !viewportOnly);
+    jRenderInspector::PrepareUI(RenderFrameContextPtr, View);
 #endif
 	g_ImGUI->NewFrame([=]()
 	{

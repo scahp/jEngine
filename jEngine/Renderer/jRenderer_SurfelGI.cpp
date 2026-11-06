@@ -13,6 +13,7 @@
 #include "FileLoader/jImageFileLoader.h"
 #include "jSceneRenderTargets.h"
 #include "Profiler/jPerformanceProfile.h"
+#include "Code/Engine/Editor/jRenderInspector.h"
 #include "RHI/jRenderFrameContext.h"
 #include "RHI/jRenderTargetPool.h"
 #include "RHI/jRHIUtil.h"
@@ -2399,6 +2400,7 @@ void jRenderer::SurfelGIResolvePass()
     auto MainCamera = jCamera::GetMainCamera();
     if (!MainCamera)
         return;
+    SCOPE_GPU_PROFILE(RenderFrameContextPtr, SurfelGIResolve);
     const int32 Width = RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->Info.Width;
     const int32 Height = RenderFrameContextPtr->SceneRenderTargetPtr->DepthPtr->Info.Height;
 
@@ -2488,6 +2490,8 @@ void jRenderer::SurfelGIResolvePass()
         , ResolveRT->Info.Width / 8 + ((ResolveRT->Info.Width % 8) ? 1 : 0)
         , ResolveRT->Info.Height / 8 + ((ResolveRT->Info.Height % 8) ? 1 : 0)
         , 1);
+    jRenderInspector::Observe(RenderFrameContextPtr, View, jRenderInspector::ViewMode::SurfelGI,
+        "SurfelGIResolve", ResolveRT->GetTexturePtr());
 }
 
 bool jRenderer::ApplySurfelGI()

@@ -19,6 +19,7 @@
 #include "imgui_internal.h"
 #include "Core/jLog.h"
 #include "Code/Engine/ConsoleVariables/jConsole.h"
+#include "jRenderInspector.h"
 #include "jEngine.h"
 #include "jOptions.h"
 #include "Scene/jCamera.h"
@@ -346,11 +347,12 @@ bool ViewportRendererToolbar()
         if (comboHovered) ImGui::SetTooltip("The active renderer is shown until the owner update applies this request.");
     }
     else if (!s.RendererSwitchError.empty()) ImGui::TextWrapped("%s", s.RendererSwitchError.c_str());
+    const bool debugControlsActive = jRenderInspector::DrawViewportControls();
     ImGui::Separator();
     const ImVec2 end(start.x + available, ImGui::GetCursorScreenPos().y);
     const bool toolbarHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) && ImGui::IsMouseHoveringRect(start, end);
-    if (popup || comboActive || (toolbarHovered && (ImGui::IsMouseClicked(0) || ImGui::IsMouseClicked(1)))) s.ViewToolbarOwnsInput = true;
-    return toolbarHovered || popup || comboActive || ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup);
+    if (popup || comboActive || debugControlsActive || (toolbarHovered && (ImGui::IsMouseClicked(0) || ImGui::IsMouseClicked(1)))) s.ViewToolbarOwnsInput = true;
+    return toolbarHovered || popup || comboActive || debugControlsActive || ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup);
 }
 void ShowDialog(Dialog dialog, const fs::path& path = {})
 {
@@ -2464,6 +2466,8 @@ void RenderAuthoringWorkspace(jEditor& editor)
         {
             ImGui::MenuItem("Assets / Console", nullptr, &s.ShowAssets);
             ImGui::MenuItem("Profiler", nullptr, &s.ShowProfiler);
+            if (ImGui::MenuItem("Render Pass Inspector", nullptr, jRenderInspector::IsVisible()))
+                jRenderInspector::SetVisible(!jRenderInspector::IsVisible());
             if (ImGui::MenuItem("Material / Animation / Effects / Terrain", nullptr, s.ShowTools))
                 SetAuthoringToolsVisible(!s.ShowTools);
             if (ImGui::MenuItem("Extensions / hot reload")) jEditorExtensions::SetVisible(editor, true);
@@ -2583,7 +2587,9 @@ void RenderAuthoringWorkspace(jEditor& editor)
             }
         }
         ImGui::SetCursorScreenPos(position); s.ViewPosition = position; s.ViewSize = size;
-        if (void* texture = jEditorUiRenderer::ScenePreviewTexture()) ImGui::Image(texture, size);
+        void* sceneTexture = jRenderInspector::GetViewMode() == jRenderInspector::ViewMode::Final
+            ? jEditorUiRenderer::ScenePreviewTexture() : jRenderInspector::ViewportTexture();
+        if (sceneTexture) ImGui::Image(sceneTexture, size);
         else ImGui::Dummy(size);
         const bool imageHovered = ImGui::IsItemHovered();
         auto* viewport = ImGui::GetWindowViewport();
@@ -2597,12 +2603,12 @@ void RenderAuthoringWorkspace(jEditor& editor)
         if (s.ViewFocused) editor.SetShortcutInputState(true);
         auto* camera = Camera();
         const bool dragging = ImGui::GetDragDropPayload() != nullptr;
-        if (scene && camera) RenderAssetPlacement(editor, *camera);
+        if (scene && camera && !jRenderInspector::IsPickingPixel()) RenderAssetPlacement(editor, *camera);
         auto* sceneDraw = ImGui::GetWindowDrawList();
         sceneDraw->PushClipRect(position, ImVec2(position.x + size.x, position.y + size.y), true);
-        const bool terrainBrush = !dragging && s.ShowTools && s.PaintTerrainInScene && camera &&
+        const bool terrainBrush = !dragging && !jRenderInspector::IsPickingPixel() && s.ShowTools && s.PaintTerrainInScene && camera &&
             jEditorTools::RenderTerrainBrush(editor, *camera, position, size, viewportHovered);
-        const bool gizmoInput = !dragging && !terrainBrush && !viewportInputBlocked &&
+        const bool gizmoInput = !dragging && !terrainBrush && !viewportInputBlocked && !jRenderInspector::IsPickingPixel() &&
             editor.RenderViewportGizmo(camera, position.x, position.y, size.x, size.y);
         if (dragging || terrainBrush) editor.CancelViewportDuplicateDrag();
         sceneDraw->PopClipRect();
@@ -2615,8 +2621,10 @@ void RenderAuthoringWorkspace(jEditor& editor)
                 double x = io.MousePos.x, y = io.MousePos.y;
                 if (MapAuthoringViewportPoint(x, y))
                 {
+                    const bool pixelPick = jRenderInspector::IsPickingPixel();
+                    if (pixelPick) jRenderInspector::RequestPixel(int32(x), int32(y));
                     editor.Placement.bPickRequested = true;
-                    editor.Placement.PickToggleSelection = io.KeyCtrl || io.KeySuper;
+                    editor.Placement.PickToggleSelection = !pixelPick && (io.KeyCtrl || io.KeySuper);
                     editor.Placement.PickMouseX = int32(x);
                     editor.Placement.PickMouseY = int32(y);
                 }
@@ -2681,6 +2689,7 @@ void RenderAuthoringWorkspace(jEditor& editor)
         } ImGui::End();
     }
     if (s.ShowProfiler) { if (ImGui::Begin("Editor diagnostics", &s.ShowProfiler)) Profiler(editor); ImGui::End(); }
+    jRenderInspector::DrawWindow();
     s.PaintTerrainInScene = false;
     if (s.ShowTools)
     {
@@ -2714,6 +2723,7 @@ void ShutdownAuthoringWorkspace()
 {
     EndViewportCameraLook();
     jEditorCapture::Shutdown();
+    jRenderInspector::Shutdown();
     jSceneFeatureTools::Shutdown();
     auto& s = State(); jEditorAssetPanel::Shutdown(); if (s.Registry) s.Registry->Shutdown();
     s.ShowKeyboardShortcuts = false;

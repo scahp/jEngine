@@ -3,6 +3,7 @@
 #include <sysinfoapi.h>
 #endif
 #include "Profiler/jProfilerBackend.h"
+#include "Profiler/jRenderTrace.h"
 
 #define ENABLE_PROFILE 1
 #define ENABLE_PROFILE_CPU (ENABLE_PROFILE && 1)
@@ -180,6 +181,7 @@ struct jProfile_GPU
 	jGPUPriorityName Name;
 	jQuery* Query = nullptr;
 	int32 Indent = 0;
+    jRenderTrace::Token TraceToken;
 
 	static int32 CurrentWatingResultListIndex;
 	static std::vector<jProfile_GPU> WatingResultList[jRHI::MaxWaitingQuerySet];
@@ -218,7 +220,8 @@ struct jProfile_GPU
 			{
 				iter.Query->GetQueryResult();
 			}
-			AddScopedProfileGPU(iter.Name, iter.Query->GetElpasedTime(), iter.Indent);
+				AddScopedProfileGPU(iter.Name, iter.Query->GetElpasedTime(), iter.Indent);
+                jRenderTrace::CompleteGpu(iter.TraceToken, iter.Query->GetElpasedTime());
             jQueryTimePool::ReturnQueryTime(iter.Query);
 		}
 		prevList.clear();
@@ -239,6 +242,7 @@ public:
 	{
 		Profile.Name = jGPUPriorityName(name, s_priority.fetch_add(1), InRenderFrameContext->GetActiveCommandBuffer()->Type);
         Profile.Indent = ScopedProfilerGPUIndent.fetch_add(1);
+        Profile.TraceToken = jRenderTrace::BeginPass(name.ToStr(), uint32(InRenderFrameContext->GetActiveCommandBuffer()->Type));
 
 		ExternalGPUProfileScope = jProfileGPUZoneBegin(InRenderFrameContext, name.ToStr());
         
@@ -249,6 +253,7 @@ public:
 	~jScopedProfile_GPU()
 	{
 		Profile.Query->EndQuery(RenderFrameContextPtr.lock()->GetActiveCommandBuffer());
+        jRenderTrace::EndPass(Profile.TraceToken);
 		jProfile_GPU::WatingResultList[jProfile_GPU::CurrentWatingResultListIndex].emplace_back(Profile);
 		jProfileGPUZoneEnd(ExternalGPUProfileScope);
 		ScopedProfilerGPUIndent.fetch_add(-1);

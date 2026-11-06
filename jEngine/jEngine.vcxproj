@@ -184,6 +184,8 @@ xcopy /y /i "$(JEngineDxcDirectory)\dxil.dll" "$(OutDir)"</Command>
     <ClInclude Include="pch.h" />
     <ClInclude Include="Profiler\jProfilerBackend.h" />
     <ClInclude Include="Profiler\jPerformanceProfile.h" />
+    <ClInclude Include="Profiler\jRenderTrace.h" />
+    <ClInclude Include="Code\Engine\Editor\jRenderInspector.h" />
     <ClInclude Include="Renderer\jDirectionalLightDrawCommandGenerator.h" />
     <ClInclude Include="Renderer\jDrawCommand.h" />
     <ClInclude Include="Renderer\jPointLightDrawCommandGenerator.h" />
@@ -423,6 +425,8 @@ xcopy /y /i "$(JEngineDxcDirectory)\dxil.dll" "$(OutDir)"</Command>
     <ClCompile Include="Code\Engine\Editor\jEditorRuntime.cpp"></ClCompile>
     <ClCompile Include="Code\Engine\Editor\jEditorUiRenderer.cpp"></ClCompile>
     <ClCompile Include="Code\Engine\Editor\jEditorCapture.cpp"></ClCompile>
+    <ClCompile Include="Code\Engine\Editor\jRenderInspector.cpp"></ClCompile>
+    <ClCompile Include="Profiler\jRenderTrace.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
     <ClCompile Include="Code\Engine\Editor\jEditorCaptureEncoding.cpp"></ClCompile>
     <ClCompile Include="Code\Engine\Editor\jEditorStartup.cpp"></ClCompile>
     <ClCompile Include="Code\Engine\Editor\jEditorDocument.cpp"></ClCompile>

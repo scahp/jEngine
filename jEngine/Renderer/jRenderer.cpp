@@ -2,6 +2,7 @@
 #include "FileLoader/jImageFileLoader.h"
 #include "Material/jMaterial.h"
 #include "Profiler/jPerformanceProfile.h"
+#include "Code/Engine/Editor/jRenderInspector.h"
 #include "RHI/jRHIUtil.h"
 #include "RHI/jRaytracingScene.h"
 #include "RHI/jRenderFrameContext.h"
@@ -1401,6 +1402,25 @@ void jRenderer::Render()
             return;
         }
 
+        {
+            using Mode = jRenderInspector::ViewMode;
+            const auto& scene = *RenderFrameContextPtr->SceneRenderTargetPtr;
+            const auto texture = [](const std::shared_ptr<jRenderTarget>& target) {
+                return target && !target->Info.IsMemoryless ? target->GetTexturePtr() : std::shared_ptr<jTexture>{}; };
+            const char* producer = scene.MultisampleTargets.empty() ? "BasePass" : "ResolveMultisampleScene";
+            jRenderInspector::Observe(RenderFrameContextPtr, View, Mode::DirectLighting, producer, texture(scene.ColorPtr));
+            jRenderInspector::Observe(RenderFrameContextPtr, View, Mode::DeviceDepth, producer, texture(scene.DepthPtr));
+            if (!RenderFrameContextPtr->UseForwardRenderer)
+            {
+                jRenderInspector::Observe(RenderFrameContextPtr, View, Mode::Normal,
+                    RenderFrameContextPtr->HasSkinMaterials ? "SkinPostNormalDecode" : producer, texture(scene.GBuffer[0]));
+                jRenderInspector::Observe(RenderFrameContextPtr, View, Mode::Albedo, producer, texture(scene.GBuffer[1]));
+                jRenderInspector::Observe(RenderFrameContextPtr, View, Mode::Metallic, producer, texture(scene.GBuffer[2]));
+                jRenderInspector::Observe(RenderFrameContextPtr, View, Mode::Roughness, producer, texture(scene.GBuffer[2]));
+                jRenderInspector::Observe(RenderFrameContextPtr, View, Mode::Emissive, producer, texture(scene.GBuffer[3]));
+            }
+        }
+
         if (!RenderFrameContextPtr->UseForwardRenderer && !UseHWRTDirectLighting)
         {
             auto* emission = RenderFrameContextPtr->SceneRenderTargetPtr->GBuffer[int32(EGBufferType::EMISSIVE)]->GetTexture();
@@ -1461,6 +1481,9 @@ void jRenderer::Render()
                 , RenderFrameContextPtr->SceneRenderTargetPtr->LinearDepthPtr->GetTexture()->Height / 8 + ((RenderFrameContextPtr->SceneRenderTargetPtr->LinearDepthPtr->GetTexture()->Height % 8) ? 1 : 0)
                 , 1);
         }
+
+        jRenderInspector::Observe(RenderFrameContextPtr, View, jRenderInspector::ViewMode::LinearDepth,
+            "CalcLinearDepth", RenderFrameContextPtr->SceneRenderTargetPtr->LinearDepthPtr->GetTexturePtr());
 
         // Queue submit to prepare scenecolor RT for postprocess
         if (gOptions.QueueSubmitAfterBasePass)
@@ -1580,6 +1603,18 @@ void jRenderer::Render()
     }
 
     SubsurfacePass();
+    {
+        using Mode = jRenderInspector::ViewMode;
+        const auto& scene = *RenderFrameContextPtr->SceneRenderTargetPtr;
+        jRenderInspector::Observe(RenderFrameContextPtr, View, Mode::SceneHDR, "Scene HDR before PostProcess", scene.ColorPtr->GetTexturePtr());
+        if (RenderFrameContextPtr->UseSubsurface)
+        {
+            if (scene.SubsurfaceMask) jRenderInspector::Observe(RenderFrameContextPtr, View, Mode::SubsurfaceMask,
+                "BasePass", scene.SubsurfaceMask->GetTexturePtr());
+            if (scene.DiffuseLighting) jRenderInspector::Observe(RenderFrameContextPtr, View, Mode::DiffuseLighting,
+                "SubsurfaceDiffusion", scene.DiffuseLighting->GetTexturePtr());
+        }
+    }
     if (RenderFrameContextPtr->HasSkinMaterials && !RenderFrameContextPtr->SkinEnergyLUT)
         MutableRendererFeatureDiagnostics().SubsurfaceSupportReason +=
             " Skin energy LUT unavailable: using uncompensated diffuse fallback. " + jSkinShading::GetLastStats().Diagnostic;
