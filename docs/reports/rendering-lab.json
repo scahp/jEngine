@@ -1,0 +1,1051 @@
+{
+  "build": "Nov  7 2026 17:25:52",
+  "camera": {
+    "aspectOverride": 1.7777777910232544,
+    "fovRadians": 1.0471975803375244,
+    "position": [
+      0.0,
+      45.0,
+      -90.0
+    ],
+    "target": [
+      0.0,
+      0.0,
+      0.0
+    ]
+  },
+  "comparisonKind": "baseline difference, not ground truth",
+  "configuration": "Debug",
+  "cpuScope": "Controlled Game.Update/Draw/EndOfFrame; experiment telemetry and OS event polling excluded",
+  "definition": {
+    "baseline": "pcf",
+    "camera": {
+      "aspect": 1.7777777777777777,
+      "far": 1000.0,
+      "fovDegrees": 60.0,
+      "near": 0.1,
+      "position": [
+        0.0,
+        45.0,
+        -90.0
+      ],
+      "target": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "common": {
+      "bleedReduction": 0.2,
+      "blurRadius": 2.0,
+      "casterPadding": 100.0,
+      "maxDistance": 400.0,
+      "minimumVariance": 1e-05,
+      "negativeExponent": 8.0,
+      "pcfRadius": 1.5,
+      "positiveExponent": 32.0,
+      "resolution": 512.0
+    },
+    "displayExposure": 0.0,
+    "family": "shadows",
+    "fixedStep": 0.016666666666666666,
+    "measuredFrames": 24,
+    "motionDegrees": 15.0,
+    "name": "Shadow calibration",
+    "region": [
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "repetitions": 1,
+    "scenario": 0,
+    "schema": 1,
+    "variants": [
+      {
+        "algorithm": "shadow.pcf",
+        "enabled": true,
+        "id": "pcf",
+        "label": "Poisson PCF",
+        "overrides": {}
+      },
+      {
+        "algorithm": "shadow.vsm",
+        "enabled": true,
+        "id": "vsm",
+        "label": "VSM",
+        "overrides": {}
+      },
+      {
+        "algorithm": "shadow.esm",
+        "enabled": true,
+        "id": "esm",
+        "label": "ESM",
+        "overrides": {}
+      },
+      {
+        "algorithm": "shadow.evsm",
+        "enabled": true,
+        "id": "evsm",
+        "label": "EVSM",
+        "overrides": {}
+      }
+    ],
+    "warmupFrames": 12
+  },
+  "directionalLightDirection": [
+    -0.36599817872047424,
+    -0.7848856449127197,
+    0.5000000596046448
+  ],
+  "driverVersion": 10403,
+  "gpu": "Apple M4",
+  "projection": "One-cascade CSM in a 2x2 atlas for every method. Production VSM/ESM/EVSM additionally fit receiver/caster bounds; this compares complete shadow methods, not isolated filters.",
+  "randomization": "Production shadow patterns are deterministic; no stochastic seed parameter is used",
+  "reason": "",
+  "renderedFrames": 399,
+  "reproducibilityScope": "Authored scene snapshot and asset revision references; external assets are referenced, not bundled.",
+  "resolution": [
+    1280,
+    720
+  ],
+  "rhi": "Vulkan",
+  "sceneFingerprintFnv1a64": "77d161228f9b2401",
+  "sceneName": "Shadow Lab calibration",
+  "sceneRevision": 3,
+  "schema": 1,
+  "sourceProject": "examples/rendering-lab/project.jproject",
+  "status": "completed",
+  "summary": [
+    {
+      "algorithm": "shadow.pcf",
+      "baselineDifference": {
+        "mae": 0.0,
+        "maxAbs": 0.0,
+        "nonfinitePixels": 0,
+        "pixels": 921600,
+        "rmse": 0.0,
+        "valid": true
+      },
+      "estimatedShadowTargetBytes": 20971520,
+      "id": "pcf",
+      "label": "Poisson PCF",
+      "sceneGpu": {
+        "count": 24,
+        "maxMs": 9.5865,
+        "meanMs": 7.805206708333333,
+        "medianMs": 7.6537915,
+        "minMs": 7.12975,
+        "p95Ms": 8.868477699999998,
+        "stddevMs": 0.49937192698073896
+      },
+      "shadowGpu": {
+        "count": 24,
+        "maxMs": 0.6597919999999999,
+        "meanMs": 0.46756949999999997,
+        "medianMs": 0.45816650000000003,
+        "minMs": 0.245917,
+        "p95Ms": 0.6483312999999999,
+        "stddevMs": 0.1364218755359638
+      },
+      "updateDrawCpu": {
+        "count": 24,
+        "maxMs": 10.588125,
+        "meanMs": 8.394430541666667,
+        "medianMs": 8.322729,
+        "minMs": 7.695167,
+        "p95Ms": 9.621050099999998,
+        "stddevMs": 0.6257016809260344
+      },
+      "validRuns": 1
+    },
+    {
+      "algorithm": "shadow.vsm",
+      "baselineDifference": {
+        "mae": 0.002133941526559216,
+        "maxAbs": 0.3203125,
+        "nonfinitePixels": 0,
+        "pixels": 921600,
+        "rmse": 0.013651088458017933,
+        "valid": true
+      },
+      "estimatedShadowTargetBytes": 37748736,
+      "id": "vsm",
+      "label": "VSM",
+      "sceneGpu": {
+        "count": 24,
+        "maxMs": 9.527292,
+        "meanMs": 7.839166708333333,
+        "medianMs": 7.727416999999999,
+        "minMs": 6.511666,
+        "p95Ms": 9.073879449999998,
+        "stddevMs": 0.5763837873728666
+      },
+      "shadowGpu": {
+        "count": 24,
+        "maxMs": 1.9061659999999998,
+        "meanMs": 1.500071208333333,
+        "medianMs": 1.5434375,
+        "minMs": 1.1635,
+        "p95Ms": 1.8779089999999996,
+        "stddevMs": 0.2161837073152868
+      },
+      "updateDrawCpu": {
+        "count": 24,
+        "maxMs": 10.566333,
+        "meanMs": 8.409140625,
+        "medianMs": 8.3047085,
+        "minMs": 6.742584,
+        "p95Ms": 9.674501749999997,
+        "stddevMs": 0.7173908105358737
+      },
+      "validRuns": 1
+    },
+    {
+      "algorithm": "shadow.esm",
+      "baselineDifference": {
+        "mae": 0.002163024646471496,
+        "maxAbs": 0.3203125,
+        "nonfinitePixels": 0,
+        "pixels": 921600,
+        "rmse": 0.013828819926546807,
+        "valid": true
+      },
+      "estimatedShadowTargetBytes": 37748736,
+      "id": "esm",
+      "label": "ESM",
+      "sceneGpu": {
+        "count": 24,
+        "maxMs": 9.278292,
+        "meanMs": 7.848112916666667,
+        "medianMs": 7.8327919999999995,
+        "minMs": 6.301417,
+        "p95Ms": 8.3428437,
+        "stddevMs": 0.5273134681788684
+      },
+      "shadowGpu": {
+        "count": 24,
+        "maxMs": 1.9705,
+        "meanMs": 1.4280226666666664,
+        "medianMs": 1.4168749999999999,
+        "minMs": 1.1759169999999999,
+        "p95Ms": 1.5735284999999999,
+        "stddevMs": 0.15023683396104592
+      },
+      "updateDrawCpu": {
+        "count": 24,
+        "maxMs": 10.083375,
+        "meanMs": 8.348295291666668,
+        "medianMs": 8.300771000000001,
+        "minMs": 6.487292,
+        "p95Ms": 9.831891949999997,
+        "stddevMs": 0.8218548345440168
+      },
+      "validRuns": 1
+    },
+    {
+      "algorithm": "shadow.evsm",
+      "baselineDifference": {
+        "mae": 0.0021257962210586775,
+        "maxAbs": 0.3203125,
+        "nonfinitePixels": 0,
+        "pixels": 921600,
+        "rmse": 0.013616871037745023,
+        "valid": true
+      },
+      "estimatedShadowTargetBytes": 37748736,
+      "id": "evsm",
+      "label": "EVSM",
+      "sceneGpu": {
+        "count": 24,
+        "maxMs": 9.084208,
+        "meanMs": 7.775581583333335,
+        "medianMs": 7.879021,
+        "minMs": 6.40175,
+        "p95Ms": 8.2560456,
+        "stddevMs": 0.5161805952818999
+      },
+      "shadowGpu": {
+        "count": 24,
+        "maxMs": 1.929417,
+        "meanMs": 1.5502431250000002,
+        "medianMs": 1.5573964999999999,
+        "minMs": 1.2057909999999998,
+        "p95Ms": 1.90292505,
+        "stddevMs": 0.20177919546237344
+      },
+      "updateDrawCpu": {
+        "count": 24,
+        "maxMs": 10.021125,
+        "meanMs": 8.336263958333333,
+        "medianMs": 8.3149585,
+        "minMs": 6.902958,
+        "p95Ms": 9.915266899999999,
+        "stddevMs": 0.760630406469719
+      },
+      "validRuns": 1
+    }
+  ],
+  "tasks": [
+    {
+      "actualAtlas": [
+        1024,
+        1024
+      ],
+      "algorithm": "shadow.pcf",
+      "cpuSamplesMs": [
+        8.490334,
+        8.274208,
+        9.775875,
+        8.177375,
+        7.745625,
+        8.316833,
+        8.365791,
+        7.785333,
+        8.466458,
+        7.802833,
+        8.191333,
+        10.588125,
+        8.097209,
+        7.695167,
+        8.328625,
+        8.123084,
+        8.5265,
+        8.564958,
+        8.6145,
+        7.904209,
+        8.743709,
+        7.875958,
+        8.466833,
+        8.545458
+      ],
+      "estimatedShadowTargetBytes": 20971520,
+      "label": "Poisson PCF",
+      "reason": "",
+      "repetition": 0,
+      "sceneGpu": {
+        "count": 24,
+        "maxMs": 9.5865,
+        "meanMs": 7.805206708333333,
+        "medianMs": 7.6537915,
+        "minMs": 7.12975,
+        "p95Ms": 8.868477699999998,
+        "stddevMs": 0.49937192698073896
+      },
+      "sceneGpuSamplesMs": [
+        9.021334,
+        7.638833,
+        7.547834,
+        7.492584,
+        7.5990839999999995,
+        7.550458,
+        7.713417,
+        7.413459,
+        7.628583,
+        9.5865,
+        7.802582999999999,
+        7.12975,
+        7.8564169999999995,
+        7.614958,
+        7.716125,
+        7.958125,
+        7.5327079999999995,
+        7.549957999999999,
+        7.966542,
+        7.668749999999999,
+        7.998041,
+        7.760209,
+        8.002291999999999,
+        7.576416999999999
+      ],
+      "shadowGpu": {
+        "count": 24,
+        "maxMs": 0.6597919999999999,
+        "meanMs": 0.46756949999999997,
+        "medianMs": 0.45816650000000003,
+        "minMs": 0.245917,
+        "p95Ms": 0.6483312999999999,
+        "stddevMs": 0.1364218755359638
+      },
+      "shadowGpuSamplesMs": [
+        0.251166,
+        0.290666,
+        0.475167,
+        0.331416,
+        0.302875,
+        0.574875,
+        0.32037499999999997,
+        0.387667,
+        0.43229199999999995,
+        0.245917,
+        0.6597919999999999,
+        0.6211249999999999,
+        0.652,
+        0.428792,
+        0.311875,
+        0.511417,
+        0.411875,
+        0.5958749999999999,
+        0.611042,
+        0.441166,
+        0.5109589999999999,
+        0.6275419999999999,
+        0.605542,
+        0.62025
+      ],
+      "status": "completed",
+      "updateDrawCpu": {
+        "count": 24,
+        "maxMs": 10.588125,
+        "meanMs": 8.394430541666667,
+        "medianMs": 8.322729,
+        "minMs": 7.695167,
+        "p95Ms": 9.621050099999998,
+        "stddevMs": 0.6257016809260344
+      },
+      "variant": "pcf"
+    },
+    {
+      "actualAtlas": [
+        1024,
+        1024
+      ],
+      "algorithm": "shadow.vsm",
+      "cpuSamplesMs": [
+        8.251,
+        7.949084,
+        8.387833,
+        9.786083,
+        8.105208,
+        8.257167,
+        8.051959,
+        8.334125,
+        8.636125,
+        8.296875,
+        7.744458,
+        8.103166,
+        8.367,
+        10.566333,
+        8.097875,
+        8.091417,
+        9.042208,
+        8.312542,
+        6.742584,
+        8.631083,
+        7.566209,
+        8.80725,
+        8.968125,
+        8.723666
+      ],
+      "estimatedShadowTargetBytes": 37748736,
+      "label": "VSM",
+      "reason": "",
+      "repetition": 0,
+      "sceneGpu": {
+        "count": 24,
+        "maxMs": 9.527292,
+        "meanMs": 7.839166708333333,
+        "medianMs": 7.727416999999999,
+        "minMs": 6.511666,
+        "p95Ms": 9.073879449999998,
+        "stddevMs": 0.5763837873728666
+      },
+      "sceneGpuSamplesMs": [
+        7.695084,
+        9.227167,
+        7.296583999999999,
+        7.587916,
+        7.628041,
+        7.445459,
+        7.660041,
+        7.574875,
+        7.50625,
+        7.753749999999999,
+        7.935124999999999,
+        9.527292,
+        7.454292,
+        7.701084,
+        7.870749999999999,
+        7.758125,
+        6.511666,
+        8.102458,
+        7.655834,
+        7.917666,
+        8.20525,
+        8.20375,
+        7.807207999999999,
+        8.114334
+      ],
+      "shadowGpu": {
+        "count": 24,
+        "maxMs": 1.9061659999999998,
+        "meanMs": 1.500071208333333,
+        "medianMs": 1.5434375,
+        "minMs": 1.1635,
+        "p95Ms": 1.8779089999999996,
+        "stddevMs": 0.2161837073152868
+      },
+      "shadowGpuSamplesMs": [
+        1.411,
+        1.3409579999999999,
+        1.3296249999999998,
+        1.531542,
+        1.5553329999999999,
+        1.282125,
+        1.3714169999999999,
+        1.566042,
+        1.7213749999999999,
+        1.7258339999999999,
+        1.254542,
+        1.214833,
+        1.6028749999999998,
+        1.898834,
+        1.6451669999999998,
+        1.5745,
+        1.5782079999999998,
+        1.7055,
+        1.9061659999999998,
+        1.297542,
+        1.1829159999999999,
+        1.382541,
+        1.759334,
+        1.1635
+      ],
+      "status": "completed",
+      "updateDrawCpu": {
+        "count": 24,
+        "maxMs": 10.566333,
+        "meanMs": 8.409140625,
+        "medianMs": 8.3047085,
+        "minMs": 6.742584,
+        "p95Ms": 9.674501749999997,
+        "stddevMs": 0.7173908105358737
+      },
+      "variant": "vsm"
+    },
+    {
+      "actualAtlas": [
+        1024,
+        1024
+      ],
+      "algorithm": "shadow.esm",
+      "cpuSamplesMs": [
+        10.083375,
+        7.356833,
+        8.192958,
+        8.332542,
+        8.054834,
+        8.269,
+        8.064959,
+        8.210292,
+        8.14425,
+        8.728667,
+        8.515833,
+        9.948167,
+        6.487292,
+        8.363792,
+        9.083459,
+        8.179792,
+        8.589917,
+        8.010208,
+        9.096875,
+        8.746417,
+        8.662917,
+        9.173,
+        6.861625,
+        7.202083
+      ],
+      "estimatedShadowTargetBytes": 37748736,
+      "label": "ESM",
+      "reason": "",
+      "repetition": 0,
+      "sceneGpu": {
+        "count": 24,
+        "maxMs": 9.278292,
+        "meanMs": 7.848112916666667,
+        "medianMs": 7.8327919999999995,
+        "minMs": 6.301417,
+        "p95Ms": 8.3428437,
+        "stddevMs": 0.5273134681788684
+      },
+      "sceneGpuSamplesMs": [
+        7.647167,
+        7.66475,
+        7.712458,
+        7.753374999999999,
+        7.678666,
+        7.805459,
+        7.678999999999999,
+        8.121875,
+        7.800208,
+        9.278292,
+        6.301417,
+        7.999584,
+        8.031875,
+        7.825875,
+        7.894666,
+        7.768583,
+        7.839709,
+        8.357624999999999,
+        8.117334,
+        7.901084,
+        8.128708999999999,
+        6.709416,
+        8.259083,
+        8.0785
+      ],
+      "shadowGpu": {
+        "count": 24,
+        "maxMs": 1.9705,
+        "meanMs": 1.4280226666666664,
+        "medianMs": 1.4168749999999999,
+        "minMs": 1.1759169999999999,
+        "p95Ms": 1.5735284999999999,
+        "stddevMs": 0.15023683396104592
+      },
+      "shadowGpuSamplesMs": [
+        1.4753749999999999,
+        1.468834,
+        1.5108329999999999,
+        1.36425,
+        1.4001249999999998,
+        1.3357919999999999,
+        1.1759169999999999,
+        1.19,
+        1.378125,
+        1.277834,
+        1.4414589999999998,
+        1.576416,
+        1.381167,
+        1.9705,
+        1.441625,
+        1.433625,
+        1.338209,
+        1.381375,
+        1.543667,
+        1.5571659999999998,
+        1.348666,
+        1.454875,
+        1.3599999999999999,
+        1.466709
+      ],
+      "status": "completed",
+      "updateDrawCpu": {
+        "count": 24,
+        "maxMs": 10.083375,
+        "meanMs": 8.348295291666668,
+        "medianMs": 8.300771000000001,
+        "minMs": 6.487292,
+        "p95Ms": 9.831891949999997,
+        "stddevMs": 0.8218548345440168
+      },
+      "variant": "esm"
+    },
+    {
+      "actualAtlas": [
+        1024,
+        1024
+      ],
+      "algorithm": "shadow.evsm",
+      "cpuSamplesMs": [
+        8.469375,
+        8.188791,
+        7.731583,
+        8.7835,
+        7.765292,
+        8.085625,
+        8.269208,
+        10.021125,
+        8.296208,
+        8.511625,
+        7.712667,
+        8.32275,
+        8.661792,
+        8.371208,
+        8.731959,
+        7.811917,
+        6.902958,
+        8.368084,
+        9.363333,
+        9.012833,
+        8.307167,
+        10.012667,
+        7.350209,
+        7.018459
+      ],
+      "estimatedShadowTargetBytes": 37748736,
+      "label": "EVSM",
+      "reason": "",
+      "repetition": 0,
+      "sceneGpu": {
+        "count": 24,
+        "maxMs": 9.084208,
+        "meanMs": 7.775581583333335,
+        "medianMs": 7.879021,
+        "minMs": 6.40175,
+        "p95Ms": 8.2560456,
+        "stddevMs": 0.5161805952818999
+      },
+      "sceneGpuSamplesMs": [
+        7.406083,
+        7.647749999999999,
+        7.304875,
+        7.6,
+        7.5329999999999995,
+        9.084208,
+        7.650958999999999,
+        8.081875,
+        7.567583,
+        8.020959,
+        7.860709,
+        7.897333,
+        7.898874999999999,
+        7.689041,
+        6.632708,
+        8.051333,
+        8.184292,
+        8.162333,
+        7.734584,
+        8.011333,
+        8.268708,
+        6.40175,
+        7.915042,
+        8.008625
+      ],
+      "shadowGpu": {
+        "count": 24,
+        "maxMs": 1.929417,
+        "meanMs": 1.5502431250000002,
+        "medianMs": 1.5573964999999999,
+        "minMs": 1.2057909999999998,
+        "p95Ms": 1.90292505,
+        "stddevMs": 0.20177919546237344
+      },
+      "shadowGpuSamplesMs": [
+        1.6002079999999999,
+        1.359583,
+        1.497375,
+        1.368916,
+        1.361209,
+        1.583292,
+        1.553334,
+        1.9057499999999998,
+        1.886917,
+        1.2057909999999998,
+        1.4295,
+        1.632167,
+        1.561459,
+        1.7394999999999998,
+        1.264209,
+        1.3427499999999999,
+        1.25175,
+        1.639417,
+        1.542125,
+        1.929417,
+        1.5913329999999999,
+        1.835208,
+        1.537416,
+        1.5872089999999999
+      ],
+      "status": "completed",
+      "updateDrawCpu": {
+        "count": 24,
+        "maxMs": 10.021125,
+        "meanMs": 8.336263958333333,
+        "medianMs": 8.3149585,
+        "minMs": 6.902958,
+        "p95Ms": 9.915266899999999,
+        "stddevMs": 0.760630406469719
+      },
+      "variant": "evsm"
+    }
+  ],
+  "timingScope": "Graphics scene interval plus AdvancedShadows interval. Warmup/capture/readback/encoding excluded; no sum of nested scopes.",
+  "evidenceNotes": [
+    "Captured on Apple M4, Debug, macOS Vulkan with experimental MoltenVK. Not a cross-platform performance ranking.",
+    "Raw PFM captures remain in the ignored local build folder; images in docs/manual/images are unmodified PNG captures.",
+    "Scene GPU timing excludes UI and capture/readback/encoding, not all engine CPU work."
+  ],
+  "workflowChecks": [
+    {
+      "cameraRestored": true,
+      "documentUnchanged": true,
+      "frames": 783,
+      "lightOverridesRestored": true,
+      "mode": "static",
+      "optionsRestored": true,
+      "report": "build/authoring/manual/rendering-lab/static/runs/run-1794040465399534-0",
+      "status": "completed",
+      "tasks": [
+        {
+          "variant": "pcf",
+          "repeat": 0,
+          "state": "completed",
+          "gpuSamples": 8,
+          "atlas": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "variant": "vsm",
+          "repeat": 0,
+          "state": "completed",
+          "gpuSamples": 8,
+          "atlas": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "variant": "esm",
+          "repeat": 0,
+          "state": "completed",
+          "gpuSamples": 8,
+          "atlas": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "variant": "evsm",
+          "repeat": 0,
+          "state": "completed",
+          "gpuSamples": 8,
+          "atlas": [
+            1024,
+            1024
+          ]
+        }
+      ]
+    },
+    {
+      "cameraRestored": true,
+      "documentUnchanged": true,
+      "frames": 853,
+      "lightOverridesRestored": true,
+      "mode": "camera",
+      "optionsRestored": true,
+      "report": "build/authoring/manual/rendering-lab/camera/runs/run-1794040341153106-0",
+      "status": "completed",
+      "tasks": [
+        {
+          "variant": "pcf",
+          "repeat": 0,
+          "state": "completed",
+          "gpuSamples": 8,
+          "atlas": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "variant": "vsm",
+          "repeat": 0,
+          "state": "completed",
+          "gpuSamples": 8,
+          "atlas": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "variant": "esm",
+          "repeat": 0,
+          "state": "completed",
+          "gpuSamples": 8,
+          "atlas": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "variant": "evsm",
+          "repeat": 0,
+          "state": "completed",
+          "gpuSamples": 8,
+          "atlas": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "variant": "evsm",
+          "repeat": 1,
+          "state": "completed",
+          "gpuSamples": 8,
+          "atlas": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "variant": "esm",
+          "repeat": 1,
+          "state": "completed",
+          "gpuSamples": 8,
+          "atlas": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "variant": "vsm",
+          "repeat": 1,
+          "state": "completed",
+          "gpuSamples": 8,
+          "atlas": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "variant": "pcf",
+          "repeat": 1,
+          "state": "completed",
+          "gpuSamples": 8,
+          "atlas": [
+            1024,
+            1024
+          ]
+        }
+      ]
+    },
+    {
+      "cameraRestored": true,
+      "documentUnchanged": true,
+      "frames": 855,
+      "lightOverridesRestored": true,
+      "mode": "light",
+      "optionsRestored": true,
+      "report": "build/authoring/manual/rendering-lab/light/runs/run-1794040350613160-0",
+      "status": "completed",
+      "tasks": [
+        {
+          "variant": "pcf",
+          "repeat": 0,
+          "state": "completed",
+          "gpuSamples": 8,
+          "atlas": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "variant": "vsm",
+          "repeat": 0,
+          "state": "completed",
+          "gpuSamples": 8,
+          "atlas": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "variant": "esm",
+          "repeat": 0,
+          "state": "completed",
+          "gpuSamples": 8,
+          "atlas": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "variant": "evsm",
+          "repeat": 0,
+          "state": "completed",
+          "gpuSamples": 8,
+          "atlas": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "variant": "evsm",
+          "repeat": 1,
+          "state": "completed",
+          "gpuSamples": 8,
+          "atlas": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "variant": "esm",
+          "repeat": 1,
+          "state": "completed",
+          "gpuSamples": 8,
+          "atlas": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "variant": "vsm",
+          "repeat": 1,
+          "state": "completed",
+          "gpuSamples": 8,
+          "atlas": [
+            1024,
+            1024
+          ]
+        },
+        {
+          "variant": "pcf",
+          "repeat": 1,
+          "state": "completed",
+          "gpuSamples": 8,
+          "atlas": [
+            1024,
+            1024
+          ]
+        }
+      ]
+    },
+    {
+      "cameraRestored": true,
+      "documentUnchanged": true,
+      "frames": 10,
+      "lightOverridesRestored": true,
+      "mode": "cancel",
+      "optionsRestored": true,
+      "report": "build/authoring/manual/rendering-lab/cancel/runs/run-1794040360113298-0",
+      "status": "cancelled",
+      "tasks": [
+        {
+          "variant": "pcf",
+          "repeat": 0,
+          "state": "cancelled",
+          "gpuSamples": 1,
+          "atlas": [
+            1024,
+            1024
+          ]
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "cpuTests": [
+      "render-trace",
+      "rendering-experiment"
+    ],
+    "shaderCompilations": [
+      "Vulkan",
+      "DX12"
+    ],
+    "shaderLayoutContracts": [
+      "jLabCaptureUniform"
+    ],
+    "invalidCliCases": 7,
+    "gpuValidationErrors": 0,
+    "windowsGpuRuntime": "not tested"
+  },
+  "imageSha256": {
+    "rendering-lab-evsm-difference.png": "31656c11fc776d507e9ac9b160b4832a43fe602f791fb9aadef00cbbbf8358df",
+    "rendering-lab-pcf.png": "887d50786ef57d4795a6570b83611db9c446bb3259ae67b0ead915cbab1b6252",
+    "rendering-lab-evsm.png": "1b5ebefefc6d3327bf81d7a5beeb74b599fb8a352b76ae71d221368d82dd5fc5",
+    "rendering-lab-results.png": "007037a15c596fd6bb39c9dcdd54f68940d7884b31181ed8d4fc3383ad8872b9"
+  }
+}
