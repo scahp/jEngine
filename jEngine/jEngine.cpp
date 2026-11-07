@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "Code/Engine/Editor/jRenderingLab.h"
 #include "jEngine.h"
 #include "Shader/jShader.h"
 #include "Profiler/jPerformanceProfile.h"
@@ -101,12 +102,15 @@ void jEngine::Release()
 
 void jEngine::ProcessInput(float deltaTime)
 {
+    jRenderingLab::BeforeFrame();
+    if (jRenderingLab::IsRunning()) return;
     if (jEditorProjectSettings::ConsumePresentModeChange() && g_rhi) g_rhi->RecreateSwapChain();
 	Game.ProcessInput(deltaTime);
 }
 
 void jEngine::Update(float deltaTime)
 {
+    if (jRenderingLab::ControlledUpdate()) return;
 	//SCOPE_CPU_PROFILE(Engine_Update);
 	//SCOPE_GPU_PROFILE(Engine_Update);
 
@@ -167,5 +171,6 @@ void jEngine::EndOfFrame()
 	jProfileFrameMark();
 	jPerformanceProfile::GetInstance().Update(g_timeDeltaSecond);
 	jRenderTargetPool::ReturnAllOneFrameRTs();
+    jRenderingLab::AfterFrame();
 	ResetMouseClickedState();
 }

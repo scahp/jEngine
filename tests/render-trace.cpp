@@ -38,6 +38,13 @@ int main()
     BeginFrame(49, "Deferred", "Vulkan", 960, 540);
     expect(!BeginPass("Reused frame", 0).Frame, "frame IDs cannot be reused"); EndFrame();
     Reset(); expect(!IsEnabled() && !LatestCompletedFrame(), "shutdown clears retained traces");
+    const auto lease = BeginCapture(); SetEnabled(false);
+    expect(IsEnabled(), "external capture does not depend on inspector visibility");
+    const auto secondLease = BeginCapture(); EndCapture(lease); EndCapture(lease);
+    expect(IsEnabled(), "ending one lease cannot disable another client");
+    Reset(); const auto newLease = BeginCapture(); EndCapture(secondLease);
+    expect(IsEnabled(), "stale lease cannot end a post-reset capture");
+    EndCapture(newLease); expect(!IsEnabled(), "last capture lease releases telemetry");
     std::cout << "Render trace lifecycle: " << failures << " failures\n";
     return failures ? 1 : 0;
 }

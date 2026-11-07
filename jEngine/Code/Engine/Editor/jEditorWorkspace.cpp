@@ -20,6 +20,7 @@
 #include "Core/jLog.h"
 #include "Code/Engine/ConsoleVariables/jConsole.h"
 #include "jRenderInspector.h"
+#include "jRenderingLab.h"
 #include "jEngine.h"
 #include "jOptions.h"
 #include "Scene/jCamera.h"
@@ -2127,6 +2128,7 @@ void SetAuthoringTestStateDirectory(const fs::path& directory)
 }
 bool RequestAuthoringWindowClose()
 {
+    if (jRenderingLab::IsRunning()) { jRenderingLab::Cancel(); return false; }
     auto& s = State();
     if (s.Runtime || s.CloseApproved || !g_Editor) return true;
     FinishWorkspaceEdit(*g_Editor);
@@ -2169,6 +2171,7 @@ bool IsAuthoringViewportHovered() { return State().ViewHovered; }
 bool IsAuthoringViewportFocused() { return State().ViewFocused; }
 float GetAuthoringSceneAspect()
 {
+    if (jRenderingLab::IsRunning()) return jRenderingLab::CameraAspect();
     if (IsAuthoringViewportOnly() || !IsAuthoringWorkspaceVisible() || !g_Editor || g_Editor->GetDocument().IsPlaying()) return 0.0f;
     const auto size = State().ViewSize;
     return size.x > 0.0f && size.y > 0.0f ? size.x / size.y : 0.0f;
@@ -2392,6 +2395,12 @@ void DrawSceneLoadingOverlay(ImDrawList& draw, const ImVec2& position, const ImV
 void RenderAuthoringWorkspace(jEditor& editor)
 {
     auto& s = State(); auto& document = editor.GetDocument();
+    if (jRenderingLab::IsRunning())
+    {
+        EndViewportCameraLook();
+        editor.SetViewportInputState(false, false); editor.SetShortcutInputState(false);
+        KeepAuthoringDockSpaceAlive(); jRenderingLab::Render(editor); return;
+    }
     s.ViewHovered = s.ViewFocused = s.RendererControlVisible = false; s.ViewSize = {};
     for (auto& choice : s.RendererChoices) choice.Visible = false;
     editor.SetViewportInputState(false, false); editor.SetShortcutInputState(false);
@@ -2466,6 +2475,8 @@ void RenderAuthoringWorkspace(jEditor& editor)
         {
             ImGui::MenuItem("Assets / Console", nullptr, &s.ShowAssets);
             ImGui::MenuItem("Profiler", nullptr, &s.ShowProfiler);
+            if (ImGui::MenuItem("Rendering Lab", nullptr, jRenderingLab::IsVisible()))
+                jRenderingLab::SetVisible(!jRenderingLab::IsVisible());
             if (ImGui::MenuItem("Render Pass Inspector", nullptr, jRenderInspector::IsVisible()))
                 jRenderInspector::SetVisible(!jRenderInspector::IsVisible());
             if (ImGui::MenuItem("Material / Animation / Effects / Terrain", nullptr, s.ShowTools))
@@ -2690,6 +2701,7 @@ void RenderAuthoringWorkspace(jEditor& editor)
     }
     if (s.ShowProfiler) { if (ImGui::Begin("Editor diagnostics", &s.ShowProfiler)) Profiler(editor); ImGui::End(); }
     jRenderInspector::DrawWindow();
+    jRenderingLab::Render(editor);
     s.PaintTerrainInScene = false;
     if (s.ShowTools)
     {
@@ -2721,6 +2733,7 @@ void RenderAuthoringWorkspace(jEditor& editor)
 }
 void ShutdownAuthoringWorkspace()
 {
+    jRenderingLab::Shutdown();
     EndViewportCameraLook();
     jEditorCapture::Shutdown();
     jRenderInspector::Shutdown();

@@ -1,0 +1,15 @@
+{
+  "assetRoot": "Assets",
+  "name": "Rendering Lab",
+  "projectId": "12bdb134-27ab-49f8-b821-8cd546694138",
+  "schemaVersion": 1,
+  "settings": {
+    "render.bloom": "false",
+    "render.deferred": "true",
+    "render.ssgi": "false",
+    "render.surfelgi": "false",
+    "render.surfelgi.inline": "false",
+    "render.vsync": "false"
+  },
+  "startupScene": "Scenes/ShadowStudy.jscene"
+}

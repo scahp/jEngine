@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "name": "Shadow calibration",
+  "family": "shadows",
+  "baseline": "pcf",
+  "warmupFrames": 12,
+  "measuredFrames": 24,
+  "repetitions": 1,
+  "fixedStep": 0.016666666666666666,
+  "motionDegrees": 15,
+  "scenario": 0,
+  "displayExposure": 0,
+  "region": [
+    0,
+    0,
+    1,
+    1
+  ],
+  "common": {
+    "resolution": 512,
+    "maxDistance": 400,
+    "casterPadding": 100,
+    "pcfRadius": 1.5,
+    "blurRadius": 2,
+    "positiveExponent": 32,
+    "negativeExponent": 8,
+    "minimumVariance": 1e-05,
+    "bleedReduction": 0.2
+  },
+  "camera": {
+    "position": [
+      0,
+      45,
+      -90
+    ],
+    "target": [
+      0,
+      0,
+      0
+    ],
+    "fovDegrees": 60,
+    "near": 0.1,
+    "far": 1000,
+    "aspect": 1.7777777777777777
+  },
+  "variants": [
+    {
+      "id": "pcf",
+      "label": "Poisson PCF",
+      "algorithm": "shadow.pcf",
+      "enabled": true,
+      "overrides": {}
+    },
+    {
+      "id": "vsm",
+      "label": "VSM",
+      "algorithm": "shadow.vsm",
+      "enabled": true,
+      "overrides": {}
+    },
+    {
+      "id": "esm",
+      "label": "ESM",
+      "algorithm": "shadow.esm",
+      "enabled": true,
+      "overrides": {}
+    },
+    {
+      "id": "evsm",
+      "label": "EVSM",
+      "algorithm": "shadow.evsm",
+      "enabled": true,
+      "overrides": {}
+    }
+  ]
+}

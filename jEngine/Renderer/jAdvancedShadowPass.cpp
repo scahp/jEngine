@@ -2,6 +2,7 @@
 #include "jAdvancedShadowPass.h"
 #include "Features/jAdvancedShadowMath.h"
 #include "Features/jShadowFiltering.h"
+#include "Profiler/jPerformanceProfile.h"
 #include "jDrawCommand.h"
 #include "jSceneRenderTargets.h"
 #include "Material/jMaterial.h"
@@ -1169,6 +1170,7 @@ void Frame::BuildAndRecord(const std::shared_ptr<jRenderFrameContext>& frame, co
     LastStats = {};
     DebugOutputs.clear();
     if (!frame || !view.Camera) return;
+    SCOPE_GPU_PROFILE(frame, AdvancedShadows);
     Neutral();
     TrimCache();
     std::set<const jLight*> currentLights;

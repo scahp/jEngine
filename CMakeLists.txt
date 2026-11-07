@@ -57,6 +57,8 @@ target_compile_definitions(jEngine PRIVATE JENGINE_DXC_EXECUTABLE="${JENGINE_DXC
 set_source_files_properties(jEngine/External/xxHash/xxhash.c jEngine/Tests/jEffectsAuditTests.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 set_source_files_properties(
   jEngine/Profiler/jRenderTrace.cpp
+  jEngine/Renderer/Experiments/jRenderingExperiment.cpp
+  jEngine/Renderer/Experiments/jExperimentImage.cpp
   jEngine/Renderer/Features/jEnvironmentLighting.cpp
   jEngine/Renderer/Features/jHorizonMapping.cpp
   jEngine/Renderer/Features/jWaterSimulation.cpp
@@ -70,6 +72,10 @@ if(BUILD_TESTING)
   add_executable(jEngineRenderTraceTests tests/render-trace.cpp jEngine/Profiler/jRenderTrace.cpp)
   target_include_directories(jEngineRenderTraceTests PRIVATE jEngine)
   add_test(NAME render-trace COMMAND jEngineRenderTraceTests)
+  add_executable(jEngineRenderingExperimentTests tests/rendering-experiment.cpp
+    jEngine/Renderer/Experiments/jRenderingExperiment.cpp jEngine/Renderer/Experiments/jExperimentImage.cpp)
+  target_include_directories(jEngineRenderingExperimentTests PRIVATE jEngine jEngine/External/loadpng)
+  add_test(NAME rendering-experiment COMMAND jEngineRenderingExperimentTests)
   set(JENGINE_BUILD_PLUGIN_FIXTURES ON CACHE BOOL "Build editor plugin ABI fixtures" FORCE)
   add_subdirectory(examples/editor-plugin)
   add_dependencies(jEngine jengine_plugin_fixture_v1 jengine_plugin_fixture_v2 jengine_plugin_fixture_badabi jengine_plugin_fixture_failload jengine_plugin_fixture_failrestore jengine_plugin_fixture_oversized jengine_plugin_fixture_missingexport)

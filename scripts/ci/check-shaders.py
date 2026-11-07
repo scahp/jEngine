@@ -14,6 +14,7 @@ SHADERS.update({
     'editor-gbuffer': ('main', 'ps_6_6'),
     'inspector-preview': ('main', 'ps_6_6'),
     'inspector-pixel': ('main', 'cs_6_6'),
+    'lab-hdr': ('main', 'ps_6_6'),
     'editor-gbuffer-vs': ('main', 'vs_6_6'),
     'editor-forward': ('main', 'ps_6_6'),
     'shadow-directional': ('main', 'ps_6_6'),
@@ -120,7 +121,7 @@ def flatten_includes(text, include_dir, seen):
 def main():
     parser = argparse.ArgumentParser()
     for option in ('engine', 'dxc', 'source', 'output'): parser.add_argument('--' + option, required=True, type=Path)
-    parser.add_argument('--group', choices=['all', 'scene-features', 'render-inspector'], default='all',
+    parser.add_argument('--group', choices=['all', 'scene-features', 'render-inspector', 'rendering-lab'], default='all',
                         help='Check the selected feature batch without recompiling unrelated shaders.')
     args = parser.parse_args()
     args.engine, args.dxc, args.source, args.output = [v.resolve() for v in (args.engine, args.dxc, args.source, args.output)]
@@ -137,10 +138,14 @@ def main():
             contracts.update(json.loads((target / 'scene-features-cpu-layout.json').read_text()))
             inspector_contracts = json.loads((target / 'render-inspector-cpu-layout.json').read_text())
             contracts.update(inspector_contracts)
+            lab_contracts = json.loads((target / 'lab-cpu-layout.json').read_text())
+            contracts.update(lab_contracts)
             for name, (entry, profile) in SHADERS.items():
                 if args.group == 'scene-features' and not name.startswith(('scene-', 'mapping-')):
                     continue
                 if args.group == 'render-inspector' and not name.startswith('inspector-'):
+                    continue
+                if args.group == 'rendering-lab' and not name.startswith('lab-'):
                     continue
                 output = target / (name + ('.spv' if api == 'vulkan' else '.dxil'))
                 flattened = target / (name + '.flattened.hlsl')
@@ -158,6 +163,12 @@ def main():
         # Recreate the original regression: valid scalar-layout SPIR-V without
         # the CPU alignment offsets. It must compile, then fail the ABI check.
         control = args.output / 'unaligned-control.hlsl'
+        if args.group == 'rendering-lab':
+            missing = set(lab_contracts) - checked
+            if missing: raise ValueError(f'Lab CPU contracts were not reflected: {sorted(missing)}')
+            report.update(success=True, layout_types=sorted(checked), group=args.group)
+            print(f'PASS: {len(report["shaders"])} lab shader compilations; {len(checked)} CPU/SPIR-V type contracts')
+            return
         if args.group == 'render-inspector':
             missing = set(inspector_contracts) - checked
             if missing: raise ValueError(f'Inspector CPU contracts were not reflected: {sorted(missing)}')

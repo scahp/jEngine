@@ -3,6 +3,7 @@
 #include "Material/jMaterial.h"
 #include "Profiler/jPerformanceProfile.h"
 #include "Code/Engine/Editor/jRenderInspector.h"
+#include "Code/Engine/Editor/jRenderingLab.h"
 #include "RHI/jRHIUtil.h"
 #include "RHI/jRaytracingScene.h"
 #include "RHI/jRenderFrameContext.h"
@@ -1378,6 +1379,8 @@ void jRenderer::Render()
     jSceneRenderTarget::FilteredEnvMap2 = EnvironmentCubeMap->GetTexture();
 #endif
 
+    std::optional<jScopedProfile_GPU> labScope;
+    if (jRenderingLab::IsRunning()) labScope.emplace(RenderFrameContextPtr, jNameStatic("RenderingLabScene"));
     {
         Setup();
         ShadowPass();
@@ -1618,8 +1621,10 @@ void jRenderer::Render()
     if (RenderFrameContextPtr->HasSkinMaterials && !RenderFrameContextPtr->SkinEnergyLUT)
         MutableRendererFeatureDiagnostics().SubsurfaceSupportReason +=
             " Skin energy LUT unavailable: using uncompensated diffuse fallback. " + jSkinShading::GetLastStats().Diagnostic;
+    jRenderingLab::CaptureHDR(RenderFrameContextPtr, *RenderFrameContextPtr->SceneRenderTargetPtr->ColorPtr->GetTexture());
     PostProcess();
 
     DebugPasses();
+    labScope.reset();
     UIPass();
 }

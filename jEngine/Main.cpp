@@ -13,6 +13,7 @@
 #include "Core/jLog.h"
 #include "Code/Engine/Editor/jEditorStartup.h"
 #include "Code/Engine/Editor/jEditorWorkspace.h"
+#include "Code/Engine/Editor/jRenderingLab.h"
 #include "Code/Engine/jEditor.h"
 #include "Tests/jEditorIntegrationTests.h"
 #include "FileLoader/jEditorAssetPath.h"
@@ -156,6 +157,12 @@ int main(int argc, char** argv)
     utf8Pointers.push_back(nullptr); argc = nativeCount; argv = utf8Pointers.data();
 #endif
     gCommandLineArgument.Init(argc, argv);
+    bool hasLabArgument = false;
+    for (int i = 1; i < argc; ++i) hasLabArgument |= std::strcmp(argv[i], "--render-lab") == 0;
+    if (hasLabArgument)
+        for (int i = 1; i < argc; ++i)
+            if (std::strncmp(argv[i], "--ci-", 5) == 0 || std::strcmp(argv[i], "--runtime") == 0 || std::strcmp(argv[i], "--scene-browser") == 0)
+            { std::cerr << "Rendering Lab requires a standalone editor experiment, without CI or runtime modes" << std::endl; return EXIT_FAILURE; }
     if (argc >= 2 && std::strcmp(argv[1], "--ci-cpu") == 0) return RunCpuSelfTests();
     if (argc >= 2 && std::strcmp(argv[1], "--ci-rendering-features") == 0)
     {
@@ -209,6 +216,21 @@ int main(int argc, char** argv)
     }
 
     // Validate external input before creating a window, GPU resources or worker threads.
+    std::string labDefinition, labOutput;
+    for (int i = 1; i < argc; ++i)
+    {
+        if (std::strcmp(argv[i], "--render-lab") != 0) continue;
+        if (!labDefinition.empty() || i + 2 >= argc || !argv[i + 1][0] || !argv[i + 2][0] || argv[i + 1][0] == '-' || argv[i + 2][0] == '-')
+        { std::cerr << "Usage: --render-lab <experiment.jlab> <output-root> --project <project.jproject> [-vulkan|-dx12]" << std::endl; return EXIT_FAILURE; }
+        labDefinition = argv[++i]; labOutput = argv[++i];
+    }
+    if (!labDefinition.empty())
+    {
+        jRenderingExperiment::Definition definition; std::string error;
+        if (!jRenderingExperiment::Load(jEditorAssetPath::FromUtf8(labDefinition), definition, error))
+        { std::cerr << "Rendering Lab: " << error << std::endl; return EXIT_FAILURE; }
+        SetAuthoringTestStateDirectory(jEditorAssetPath::FromUtf8(labOutput) / "workspace-state");
+    }
     std::string editorFlowDirectory, rendererSwitchDirectory, sceneFeaturesDirectory, advancedShadowsDirectory, subsurfaceDirectory, rasterVisibilityDirectory, subsurfaceHumanDirectory;
     for (int i = 1; i < argc; ++i)
     {
@@ -262,6 +284,7 @@ int main(int argc, char** argv)
     }
     bool waitForTestScene = false;
     if (!ReadEngineBoolean("JENGINE_TEST_WAIT_FOR_SCENE", waitForTestScene)) return EXIT_FAILURE;
+    if (!labDefinition.empty()) waitForTestScene = true;
     if (gCommandLineArgument.HasArgument("--ci-editor-gpu") || !editorFlowDirectory.empty() || !rendererSwitchDirectory.empty() || !sceneFeaturesDirectory.empty() || !advancedShadowsDirectory.empty() || !subsurfaceDirectory.empty() || !rasterVisibilityDirectory.empty() || !subsurfaceHumanDirectory.empty()) waitForTestScene = true;
     if (!ReadEngineBoolean("JENGINE_SURFEL_GI", gOptions.UseSurfelGI)
         || !ReadEngineBoolean("JENGINE_INLINE_RAY", gOptions.SurfelGIInlineRayEnable))
@@ -388,6 +411,11 @@ int main(int argc, char** argv)
         g_Engine->Release(); g_rhi->ReleaseRHI(); glfwTerminate(); return EXIT_FAILURE;
     }
 #endif
+    if (!labDefinition.empty())
+    {
+        const int result = jRenderingLab::RunFromCommandLine(labDefinition.c_str(), labOutput.c_str());
+        g_Engine->Release(); g_rhi->ReleaseRHI(); glfwTerminate(); return result;
+    }
     if (!subsurfaceDirectory.empty() || !rasterVisibilityDirectory.empty() || !subsurfaceHumanDirectory.empty())
     {
         const int failures = !subsurfaceHumanDirectory.empty() ? RunSubsurfaceHumanIntegrationGpuTests(subsurfaceHumanDirectory.c_str())

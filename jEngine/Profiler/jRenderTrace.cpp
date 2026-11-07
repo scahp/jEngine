@@ -5,6 +5,7 @@
 #include <deque>
 #include <mutex>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace jRenderTrace
 {
@@ -16,6 +17,9 @@ struct State
 {
     std::mutex Mutex;
     std::atomic_bool Enabled{false};
+    std::atomic_uint32_t CaptureCount{0};
+    uint64_t NextLease = 0;
+    std::unordered_set<uint64_t> Captures;
     uint64_t Current = 0;
     std::deque<Frame> Frames;
     std::unordered_map<uint32_t, Clock::time_point> Starts;
@@ -37,12 +41,22 @@ void SetEnabled(bool enabled)
 {
     Get().Enabled.store(enabled, std::memory_order_relaxed);
 }
-bool IsEnabled() { return Get().Enabled.load(std::memory_order_relaxed); }
+bool IsEnabled() { auto& s = Get(); return s.Enabled.load(std::memory_order_relaxed) || s.CaptureCount.load(std::memory_order_relaxed) != 0; }
+uint64_t BeginCapture()
+{
+    auto& s = Get(); std::lock_guard lock(s.Mutex); const auto lease = ++s.NextLease;
+    s.Captures.insert(lease); s.CaptureCount.store(uint32_t(s.Captures.size()),std::memory_order_relaxed); return lease;
+}
+void EndCapture(uint64_t lease)
+{
+    auto& s = Get(); std::lock_guard lock(s.Mutex); s.Captures.erase(lease);
+    s.CaptureCount.store(uint32_t(s.Captures.size()),std::memory_order_relaxed);
+}
 void BeginFrame(uint64_t id, const char* renderer, const char* api, int width, int height)
 {
     auto& s = Get(); std::lock_guard lock(s.Mutex);
     s.Current = 0; s.Starts.clear(); Stack.clear();
-    if (!s.Enabled || !id) return;
+    if (!IsEnabled() || !id) return;
     // Frame identifiers are monotonic within one engine lifetime. Refuse reuse.
     if (!s.Frames.empty() && id <= s.Frames.back().Id) return;
     if (s.Frames.size() >= MaxFrames) s.Frames.pop_front();
@@ -60,7 +74,7 @@ Token BeginPass(const char* name, uint32_t queue)
 {
     if (!IsEnabled()) return {};
     auto& s = Get(); std::lock_guard lock(s.Mutex);
-    auto* frame = Find(s, s.Current); if (!frame || !s.Enabled) return {};
+    auto* frame = Find(s, s.Current); if (!frame || !IsEnabled()) return {};
     if (frame->Passes.size() >= MaxPasses) { ++frame->DroppedPasses; return {}; }
     const uint32_t id = static_cast<uint32_t>(frame->Passes.size() + 1);
     const uint32_t parent = !Stack.empty() && Stack.back().Frame == frame->Id ? Stack.back().Pass : 0;
@@ -134,5 +148,6 @@ void Reset()
 {
     auto& s = Get(); std::lock_guard lock(s.Mutex);
     s.Current = 0; s.Enabled = false; s.Frames.clear(); s.Starts.clear(); Stack.clear();
+    s.Captures.clear(); s.CaptureCount.store(0,std::memory_order_relaxed);
 }
 }

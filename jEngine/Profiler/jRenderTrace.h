@@ -43,6 +43,10 @@ struct Frame
 
 void SetEnabled(bool enabled);
 bool IsEnabled();
+// Independent capture clients keep telemetry alive without opening the editor
+// inspector or rendering its previews. Release the returned lease when done.
+uint64_t BeginCapture();
+void EndCapture(uint64_t lease);
 void BeginFrame(uint64_t id, const char* renderer, const char* api, int width, int height);
 void EndFrame();
 Token BeginPass(const char* name, uint32_t queue);
